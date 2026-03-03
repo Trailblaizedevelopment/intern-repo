@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
           template,
           variables,
           line_phone: line.phone,
-          to_phone: contact.phone_primary!,
+          contact_phone: contact.phone_primary!,
           touch_number: touch as 1 | 2 | 3,
           existing_conversation_id: contact.provider_conversation_id || undefined,
         });

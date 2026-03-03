@@ -5,7 +5,7 @@ import {
   ArrowLeft, HeartHandshake, Plus, Search, X, Trash2, Edit2, Check, ChevronDown, 
   ChevronRight, CreditCard, Calendar, DollarSign, Clock, MessageSquare, Copy, 
   ExternalLink, Eye, Undo2, AlertTriangle, Sparkles, Settings, Link as LinkIcon,
-  LayoutDashboard
+  LayoutDashboard, Users
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
@@ -66,8 +66,12 @@ export default function CustomerSuccessModule() {
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const chapterRefs = useRef<(HTMLDivElement | null)[]>([]);
   
-  // Alumni counts per chapter
+  // Alumni pipeline stats per chapter
   const [alumniCounts, setAlumniCounts] = useState<Record<string, number>>({});
+  const [alumniPipeline, setAlumniPipeline] = useState<Record<string, {
+    total: number; have_phone: number; imessage: number; contacted: number;
+    responded: number; signed_up: number; touch1_ready: number; touch2_due: number; touch3_due: number;
+  }>>({});
 
   // Booking link settings
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -206,6 +210,12 @@ export default function CustomerSuccessModule() {
       showToast('Failed to load chapters', 'error');
     } else {
       setChapters(data || []);
+      // Pre-fetch alumni pipeline stats for all chapters
+      (data || []).forEach(ch => {
+        if (alumniPipeline[ch.id] === undefined) {
+          fetchAlumniCount(ch.id);
+        }
+      });
     }
     setLoading(false);
   }
@@ -216,6 +226,17 @@ export default function CustomerSuccessModule() {
       const json = await res.json();
       if (json.data) {
         setAlumniCounts(prev => ({ ...prev, [chapterId]: json.data.total }));
+        setAlumniPipeline(prev => ({ ...prev, [chapterId]: {
+          total: json.data.total,
+          have_phone: json.data.have_phone,
+          imessage: json.data.imessage,
+          contacted: json.data.contacted,
+          responded: json.data.responded,
+          signed_up: json.data.signed_up,
+          touch1_ready: json.data.touch1_ready,
+          touch2_due: json.data.touch2_due,
+          touch3_due: json.data.touch3_due,
+        }}));
       }
     } catch (err) {
       console.error('Failed to fetch alumni count:', err);
@@ -921,6 +942,60 @@ export default function CustomerSuccessModule() {
 
                   {expandedChapter === chapter.id && (
                     <div className="chapter-card-body">
+                      {/* Alumni Pipeline Section */}
+                      {alumniPipeline[chapter.id] && (
+                        <div style={{ padding: '16px 20px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #e5e7eb', marginBottom: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Users size={15} /> Alumni Pipeline
+                            </h4>
+                            <Link href={`/dashboard/clients/${chapter.id}/alumni`} style={{ fontSize: '0.75rem', color: '#7c3aed', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              View Details <ExternalLink size={12} />
+                            </Link>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                            {[
+                              { label: 'Total', value: alumniPipeline[chapter.id].total, color: '#374151' },
+                              { label: 'Phone', value: alumniPipeline[chapter.id].have_phone, color: '#8b5cf6' },
+                              { label: 'iMessage', value: alumniPipeline[chapter.id].imessage, color: '#16a34a' },
+                              { label: 'Contacted', value: alumniPipeline[chapter.id].contacted, color: '#d97706' },
+                              { label: 'Responded', value: alumniPipeline[chapter.id].responded, color: '#2563eb' },
+                              { label: 'Signed Up', value: alumniPipeline[chapter.id].signed_up, color: '#059669' },
+                              { label: 'Response Rate', value: alumniPipeline[chapter.id].contacted > 0 ? `${Math.round((alumniPipeline[chapter.id].responded / alumniPipeline[chapter.id].contacted) * 100)}%` : '—', color: '#374151' },
+                            ].map((stat) => (
+                              <div key={stat.label} style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '1.125rem', fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                                <div style={{ fontSize: '0.65rem', color: '#9ca3af', fontWeight: 500 }}>{stat.label}</div>
+                              </div>
+                            ))}
+                          </div>
+                          {(alumniPipeline[chapter.id].touch1_ready > 0 || alumniPipeline[chapter.id].touch2_due > 0 || alumniPipeline[chapter.id].touch3_due > 0) && (
+                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+                              {alumniPipeline[chapter.id].touch1_ready > 0 && (
+                                <span style={{ color: '#8b5cf6', fontWeight: 600 }}>
+                                  {alumniPipeline[chapter.id].touch1_ready} ready for Touch 1
+                                </span>
+                              )}
+                              {alumniPipeline[chapter.id].touch2_due > 0 && (
+                                <span style={{ color: '#d97706', fontWeight: 600 }}>
+                                  {alumniPipeline[chapter.id].touch2_due} due for Touch 2
+                                </span>
+                              )}
+                              {alumniPipeline[chapter.id].touch3_due > 0 && (
+                                <span style={{ color: '#2563eb', fontWeight: 600 }}>
+                                  {alumniPipeline[chapter.id].touch3_due} due for Touch 3
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {alumniPipeline[chapter.id] === undefined && alumniCounts[chapter.id] === undefined && (
+                        <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '8px', marginBottom: '16px', fontSize: '0.8125rem', color: '#9ca3af', textAlign: 'center' }}>
+                          Loading pipeline data...
+                        </div>
+                      )}
+
                       {/* Check-ins Section */}
                       <div className="cs-checkins-section">
                         <div className="cs-checkins-header">

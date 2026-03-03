@@ -19,6 +19,7 @@ import {
 } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
+import ConversationViewer from '@/components/ConversationViewer';
 
 type SortField = 'first_name' | 'last_name' | 'phone_primary' | 'email' | 'year' | 'outreach_status' | 'created_at' | 'assigned_line' | 'touch1_sent_at' | 'last_response_at';
 type SortDir = 'asc' | 'desc';
@@ -165,6 +166,9 @@ export default function AlumniPage() {
 
   // Poll responses
   const [polling, setPolling] = useState(false);
+
+  // Conversation viewer
+  const [selectedContact, setSelectedContact] = useState<AlumniContact | null>(null);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -508,7 +512,9 @@ export default function AlumniPage() {
           </div>
         </div>
 
-        {/* ═══════ SECTION 3: Filters + Table ═══════ */}
+        {/* ═══════ SECTION 3: Filters + Table + Conversation ═══════ */}
+        <div style={{ display: 'flex', gap: '0', minHeight: selectedContact ? '600px' : 'auto' }}>
+        <div style={{ flex: selectedContact ? '0 0 65%' : '1 1 100%', minWidth: 0, transition: 'flex 0.2s ease' }}>
         <div className="module-actions-bar">
           <div className="module-search">
             <Search size={18} />
@@ -571,6 +577,7 @@ export default function AlumniPage() {
                   <SortHeader field="outreach_status">Status</SortHeader>
                   <SortHeader field="touch1_sent_at">Touches</SortHeader>
                   <SortHeader field="last_response_at">Last Response</SortHeader>
+                  <th style={{ width: '44px' }}></th>
                 </tr></thead>
                 <tbody>
                   {contacts.map(contact => (
@@ -614,6 +621,20 @@ export default function AlumniPage() {
                           </span>
                         ) : <span style={{ color: '#d1d5db', fontSize: '0.85rem' }}>—</span>}
                       </td>
+                      <td>
+                        <button
+                          onClick={() => setSelectedContact(contact)}
+                          title="View conversation"
+                          style={{
+                            background: selectedContact?.id === contact.id ? '#ede9fe' : 'none',
+                            border: '1px solid transparent',
+                            borderRadius: '6px', cursor: 'pointer', padding: '4px 6px',
+                            color: (contact.provider_conversation_id || contact.linq_chat_id) ? '#7c3aed' : '#d1d5db',
+                          }}
+                        >
+                          <MessageSquare size={15} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -634,6 +655,26 @@ export default function AlumniPage() {
             )}
           </>
         )}
+
+        </div>{/* end table column */}
+
+        {/* Conversation Viewer Side Panel */}
+        {selectedContact && (
+          <div style={{ flex: '0 0 35%', minWidth: '340px', maxWidth: '440px', borderRadius: '0 12px 12px 0', overflow: 'hidden', border: '1px solid #e5e7eb', borderLeft: 'none' }}>
+            <ConversationViewer
+              contact={selectedContact}
+              onClose={() => setSelectedContact(null)}
+              onStatusChange={(id, status) => {
+                fetchContacts();
+                fetchStats();
+                // Update selected contact status locally
+                setSelectedContact(prev => prev ? { ...prev, outreach_status: status } : null);
+              }}
+              onRefresh={() => { fetchContacts(); fetchStats(); }}
+            />
+          </div>
+        )}
+        </div>{/* end split layout */}
 
         {/* ═══════ SECTION 4: Activity Feed ═══════ */}
         <div style={{ marginTop: '24px' }}>
