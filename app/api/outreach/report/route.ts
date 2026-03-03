@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } }, { status: 500 });
   }
   try {
-    const { queue_id, status, error_message, linq_chat_id } = await request.json();
+    const { queue_id, status, error_message, linq_chat_id, provider_conversation_id } = await request.json();
 
     if (!queue_id || !status || !['sent', 'failed'].includes(status)) {
       return NextResponse.json({ data: null, error: { message: 'queue_id and status (sent/failed) are required', code: 'VALIDATION_ERROR' } }, { status: 400 });
@@ -47,6 +47,13 @@ export async function POST(request: NextRequest) {
         .update({ outreach_status: 'wrong_number' })
         .eq('id', entry.contact_id)
         .eq('outreach_status', 'not_contacted');
+    }
+
+    if (provider_conversation_id && entry.contact_id) {
+      await supabase
+        .from('alumni_contacts')
+        .update({ provider_conversation_id })
+        .eq('id', entry.contact_id);
     }
 
     return NextResponse.json({ data: { updated: true }, error: null });

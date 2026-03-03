@@ -674,6 +674,7 @@ export interface AlumniContact {
   outreach_status: OutreachStatus;
   is_imessage: boolean | null;
   linq_chat_id: string | null;
+  provider_conversation_id: string | null;
   assigned_line: number | null;
   touch1_sent_at: string | null;
   touch2_sent_at: string | null;

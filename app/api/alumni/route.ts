@@ -167,7 +167,7 @@ export async function PATCH(request: NextRequest) {
 
     const allowedFields = [
       'first_name', 'last_name', 'phone_primary', 'phone_secondary', 'email', 'year',
-      'outreach_status', 'is_imessage', 'linq_chat_id', 'assigned_line',
+      'outreach_status', 'is_imessage', 'provider_conversation_id', 'assigned_line',
       'touch1_sent_at', 'touch2_sent_at', 'touch3_sent_at',
       'last_response_at', 'response_text', 'response_classification',
     ];

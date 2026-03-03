@@ -74,6 +74,24 @@ export async function GET(request: NextRequest) {
       .eq('chapter_id', chapterId)
       .eq('outreach_status', 'signed_up');
 
+    const { count: touch1SentCount } = await supabase
+      .from('alumni_contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('chapter_id', chapterId)
+      .not('touch1_sent_at', 'is', null);
+
+    const { count: touch2SentCount } = await supabase
+      .from('alumni_contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('chapter_id', chapterId)
+      .not('touch2_sent_at', 'is', null);
+
+    const { count: touch3SentCount } = await supabase
+      .from('alumni_contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('chapter_id', chapterId)
+      .not('touch3_sent_at', 'is', null);
+
     // Touch-ready counts for Control Panel
     const { count: touch1Ready } = await supabase
       .from('alumni_contacts')
@@ -168,6 +186,11 @@ export async function GET(request: NextRequest) {
         unverified: unverifiedCount ?? 0,
         responded: respondedCount ?? 0,
         signed_up: signedUpCount ?? 0,
+        imessage_eligible: imessageCount ?? 0,
+        sms_only: smsCount ?? 0,
+        touch1_sent: touch1SentCount ?? 0,
+        touch2_sent: touch2SentCount ?? 0,
+        touch3_sent: touch3SentCount ?? 0,
         touch1_ready: touch1Ready ?? 0,
         touch2_due: touch2Due,
         touch3_due: touch3Due,
