@@ -727,30 +727,35 @@ export default function CustomerSuccessModule() {
       </header>
 
       <main className="module-main">
-        {/* Stats Row */}
-        <div className="module-stats-row" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-          <div className="module-stat">
-            <span className="module-stat-value">{totalChapters}</span>
-            <span className="module-stat-label">Total Chapters</span>
+        {loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+            {/* Skeleton summary line */}
+            <div style={{ height: '44px', background: '#f3f4f6', borderRadius: '10px', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            {/* Skeleton search bar */}
+            <div style={{ height: '48px', background: '#f3f4f6', borderRadius: '10px', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: '0.1s' }} />
+            {/* Skeleton chapter cards */}
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} style={{ height: '72px', background: '#f3f4f6', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
+            ))}
           </div>
-          <div className="module-stat">
-            <span className="module-stat-value" style={{ color: '#10b981' }}>{activeChapters}</span>
-            <span className="module-stat-label">Active</span>
-          </div>
-          <div className="module-stat">
-            <span className="module-stat-value" style={{ color: '#f59e0b' }}>{onboardingChapters}</span>
-            <span className="module-stat-label">Onboarding</span>
-          </div>
-          <div className="module-stat">
-            <span className="module-stat-value">${totalMRR.toLocaleString()}</span>
-            <span className="module-stat-label">Total MRR</span>
-          </div>
-          <div className="module-stat">
-            <span className="module-stat-value" style={{ color: overdueCheckIns > 0 ? '#ef4444' : '#8b5cf6' }}>
-              {overdueCheckIns}
-            </span>
-            <span className="module-stat-label">Overdue Check-ins</span>
-          </div>
+        )}
+        {!loading && <>
+        {/* Compact Summary */}
+        {/* Compact Summary */}
+        <div style={{ padding: '12px 16px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #e5e7eb', marginBottom: '16px', fontSize: '0.8125rem', color: '#6b7280', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span><strong style={{ color: '#111827' }}>{totalChapters}</strong> chapters</span>
+          <span>·</span>
+          <span><strong style={{ color: '#10b981' }}>{activeChapters}</strong> active</span>
+          <span>·</span>
+          <span><strong style={{ color: '#f59e0b' }}>{onboardingChapters}</strong> onboarding</span>
+          <span>·</span>
+          <span><strong style={{ color: '#111827' }}>${totalMRR.toLocaleString()}</strong> MRR</span>
+          {overdueCheckIns > 0 && (
+            <>
+              <span>·</span>
+              <span style={{ color: '#ef4444' }}><strong>{overdueCheckIns}</strong> overdue check-ins</span>
+            </>
+          )}
         </div>
 
         {/* Actions Bar */}
@@ -813,122 +818,6 @@ export default function CustomerSuccessModule() {
           </div>
         </div>
 
-        {/* ═══════ Alumni Pipeline Overview Table ═══════ */}
-        {Object.keys(alumniPipeline).length > 0 && (
-          <div style={{ marginBottom: '20px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#111827', margin: 0 }}>📊 Alumni Outreach Pipeline</h3>
-              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{Object.keys(alumniPipeline).length} chapters with alumni data</span>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Chapter</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: '0.7rem', textTransform: 'uppercase' }}>Alumni</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#8b5cf6', fontSize: '0.7rem', textTransform: 'uppercase' }}>Phone</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#16a34a', fontSize: '0.7rem', textTransform: 'uppercase' }}>iMessage</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#d97706', fontSize: '0.7rem', textTransform: 'uppercase' }}>Contacted</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#2563eb', fontSize: '0.7rem', textTransform: 'uppercase' }}>Responded</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#059669', fontSize: '0.7rem', textTransform: 'uppercase' }}>Signed Up</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#374151', fontSize: '0.7rem', textTransform: 'uppercase' }}>Rate</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#6b7280', fontSize: '0.7rem', textTransform: 'uppercase' }}>Status</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: '0.7rem', textTransform: 'uppercase' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {chapters
-                    .filter(ch => alumniPipeline[ch.id])
-                    .sort((a, b) => (alumniPipeline[b.id]?.total || 0) - (alumniPipeline[a.id]?.total || 0))
-                    .map(ch => {
-                      const p = alumniPipeline[ch.id];
-                      if (!p) return null;
-                      const responseRate = p.contacted > 0 ? Math.round((p.responded / p.contacted) * 100) : 0;
-                      const followUpsDue = (p.touch2_due || 0) + (p.touch3_due || 0);
-
-                      // Determine status chip
-                      let statusLabel = 'New';
-                      let statusColor = '#6b7280';
-                      let statusBg = '#f3f4f6';
-                      if (p.signed_up > 0 && p.contacted > 0 && p.touch1_ready === 0 && followUpsDue === 0) {
-                        statusLabel = '✅ Complete'; statusColor = '#059669'; statusBg = '#d1fae5';
-                      } else if (p.contacted > 0 && followUpsDue > 0) {
-                        statusLabel = '🟡 Follow-ups'; statusColor = '#d97706'; statusBg = '#fef3c7';
-                      } else if (p.contacted > 0) {
-                        statusLabel = '🟢 Active'; statusColor = '#16a34a'; statusBg = '#dcfce7';
-                      } else if (p.imessage > 0) {
-                        statusLabel = '🔵 Ready'; statusColor = '#2563eb'; statusBg = '#dbeafe';
-                      } else if (p.have_phone > 0 && p.imessage === 0) {
-                        statusLabel = '🔴 Verify'; statusColor = '#dc2626'; statusBg = '#fee2e2';
-                      }
-
-                      return (
-                        <tr key={ch.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                          <td style={{ padding: '10px 16px', fontWeight: 500 }}>
-                            <Link href={`/dashboard/clients/${ch.id}/alumni`} style={{ color: '#111827', textDecoration: 'none' }}>
-                              {ch.chapter_name}
-                              {ch.school && <span style={{ color: '#9ca3af', fontWeight: 400, marginLeft: '6px', fontSize: '0.75rem' }}>{ch.school}</span>}
-                            </Link>
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>{p.total.toLocaleString()}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#8b5cf6' }}>{p.have_phone.toLocaleString()}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>{p.imessage.toLocaleString()}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#d97706' }}>{p.contacted.toLocaleString()}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#2563eb' }}>{p.responded.toLocaleString()}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#059669', fontWeight: 600 }}>{p.signed_up}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: responseRate >= 20 ? '#16a34a' : responseRate >= 10 ? '#d97706' : '#6b7280' }}>
-                            {p.contacted > 0 ? `${responseRate}%` : '—'}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                            <span style={{ padding: '3px 8px', borderRadius: '9999px', fontSize: '0.65rem', fontWeight: 600, color: statusColor, backgroundColor: statusBg, whiteSpace: 'nowrap' }}>
-                              {statusLabel}
-                            </span>
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                            <Link
-                              href={`/dashboard/clients/${ch.id}/alumni`}
-                              style={{
-                                padding: '4px 10px', borderRadius: '6px', border: '1px solid #e5e7eb',
-                                background: '#fff', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600,
-                                color: '#7c3aed', textDecoration: 'none', whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {p.touch1_ready > 0 ? `Send ${p.touch1_ready}` : followUpsDue > 0 ? `${followUpsDue} follow-ups` : 'View'}
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  {/* Totals row */}
-                  {(() => {
-                    const totals = Object.values(alumniPipeline).reduce((acc, p) => ({
-                      total: acc.total + p.total,
-                      have_phone: acc.have_phone + p.have_phone,
-                      imessage: acc.imessage + p.imessage,
-                      contacted: acc.contacted + p.contacted,
-                      responded: acc.responded + p.responded,
-                      signed_up: acc.signed_up + p.signed_up,
-                    }), { total: 0, have_phone: 0, imessage: 0, contacted: 0, responded: 0, signed_up: 0 });
-                    const totalRate = totals.contacted > 0 ? Math.round((totals.responded / totals.contacted) * 100) : 0;
-                    return (
-                      <tr style={{ borderTop: '2px solid #e5e7eb', fontWeight: 700, fontSize: '0.8125rem' }}>
-                        <td style={{ padding: '10px 16px' }}>TOTAL</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>{totals.total.toLocaleString()}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#8b5cf6' }}>{totals.have_phone.toLocaleString()}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#16a34a' }}>{totals.imessage.toLocaleString()}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#d97706' }}>{totals.contacted.toLocaleString()}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#2563eb' }}>{totals.responded.toLocaleString()}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#059669' }}>{totals.signed_up}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>{totals.contacted > 0 ? `${totalRate}%` : '—'}</td>
-                        <td colSpan={2}></td>
-                      </tr>
-                    );
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* Chapters List */}
         <div className="chapters-list">
@@ -984,14 +873,6 @@ export default function CustomerSuccessModule() {
                       <h3>{chapter.chapter_name}</h3>
                       <span className="chapter-card-subtitle">
                         {chapter.fraternity}{chapter.fraternity && chapter.school ? ' • ' : ''}{chapter.school}
-                        {alumniPipeline[chapter.id] && (
-                          <span style={{ marginLeft: '8px', fontSize: '0.7rem', color: '#9ca3af' }}>
-                            {alumniPipeline[chapter.id].total} alumni
-                            {alumniPipeline[chapter.id].contacted > 0 && <> · <span style={{ color: '#d97706' }}>{alumniPipeline[chapter.id].contacted} contacted</span></>}
-                            {alumniPipeline[chapter.id].responded > 0 && <> · <span style={{ color: '#2563eb' }}>{alumniPipeline[chapter.id].responded} responded</span></>}
-                            {alumniPipeline[chapter.id].signed_up > 0 && <> · <span style={{ color: '#16a34a' }}>{alumniPipeline[chapter.id].signed_up} signed up</span></>}
-                          </span>
-                        )}
                       </span>
                     </div>
                     <div className="chapter-card-progress">
@@ -1354,6 +1235,7 @@ export default function CustomerSuccessModule() {
             </div>
           )}
         </div>
+        </>}
       </main>
 
       {/* Toast Notifications */}

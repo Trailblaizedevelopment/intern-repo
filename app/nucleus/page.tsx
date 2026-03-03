@@ -86,7 +86,6 @@ export default function Nucleus() {
   // Fetch all stats on mount
   useEffect(() => {
     fetchAllStats();
-    fetchOutreachOverview();
   }, []);
 
   async function fetchOutreachOverview() {
@@ -477,158 +476,23 @@ export default function Nucleus() {
           </div>
         )}
 
-        {/* Outreach Operations */}
-        {outreachStats && outreachStats.chapters.length > 0 && (
-          <section style={{ marginBottom: '24px' }}>
-            {/* Ops Strip */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px',
-            }}>
-              {[
-                { label: 'Sends Today', value: outreachStats.totals.sends_today, max: 150, color: '#8b5cf6' },
-                { label: 'Responses Today', value: outreachStats.totals.responses_today, color: '#2563eb' },
-                { label: 'Sign-ups Today', value: outreachStats.totals.signups_today, color: '#16a34a' },
-                { label: 'Follow-ups Due', value: outreachStats.totals.followups_due, color: '#d97706' },
-              ].map(s => (
-                <div key={s.label} style={{
-                  padding: '16px 20px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb',
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 700, color: s.color }}>
-                    {s.value}{s.max ? <span style={{ fontSize: '0.875rem', color: '#9ca3af', fontWeight: 400 }}>/{s.max}</span> : null}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Active Chapter Cards */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px',
-            }}>
-              {outreachStats.chapters.slice(0, 6).map(ch => {
-                const actionCount = ch.touch1_ready + ch.touch2_due + ch.touch3_due;
-                const responseRate = ch.contacted > 0 ? Math.round((ch.responded / ch.contacted) * 100) : 0;
-                const funnelPct = ch.total > 0 ? Math.round((ch.signed_up / ch.total) * 100) : 0;
-                return (
-                  <Link key={ch.id} href={`/dashboard/clients/${ch.id}/alumni`} style={{ textDecoration: 'none' }}>
-                    <div style={{
-                      padding: '16px 20px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb',
-                      cursor: 'pointer', transition: 'border-color 0.15s ease',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = '#8b5cf6')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1f2937' }}>{ch.name}</div>
-                          <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>{ch.school}</div>
-                        </div>
-                        {actionCount > 0 && (
-                          <span style={{
-                            padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 600,
-                            color: '#d97706', backgroundColor: '#fef3c7',
-                          }}>
-                            {actionCount} actions
-                          </span>
-                        )}
-                      </div>
-                      {/* Mini funnel bar */}
-                      <div style={{ display: 'flex', height: '4px', borderRadius: '2px', overflow: 'hidden', background: '#f3f4f6', marginBottom: '8px' }}>
-                        <div style={{ width: `${ch.total > 0 ? (ch.contacted / ch.total) * 100 : 0}%`, background: '#d97706', transition: 'width 0.3s' }} />
-                        <div style={{ width: `${ch.total > 0 ? (ch.responded / ch.total) * 100 : 0}%`, background: '#2563eb', transition: 'width 0.3s' }} />
-                        <div style={{ width: `${funnelPct}%`, background: '#16a34a', transition: 'width 0.3s' }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#6b7280' }}>
-                        <span>{ch.contacted}/{ch.total} contacted</span>
-                        <span>{ch.responded} responded ({responseRate}%)</span>
-                        <span style={{ color: '#16a34a', fontWeight: 600 }}>{ch.signed_up} signed up</span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Company Stats */}
-        <section className="nucleus-company-stats">
-          {companyStats.map((stat, index) => (
-            <div key={index} className="nucleus-company-stat">
-              <div className="nucleus-company-stat-icon" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                <stat.icon size={22} />
-              </div>
-              <div className="nucleus-company-stat-content">
-                <span className="nucleus-company-stat-value">
-                  {loading ? '...' : stat.value}
-                </span>
-                <span className="nucleus-company-stat-label">{stat.label}</span>
-              </div>
-              {stat.trend && (
-                <div className="nucleus-company-stat-trend positive">
-                  <ArrowUp size={14} />
-                  {stat.trend}
-                </div>
-              )}
-            </div>
-          ))}
-        </section>
-
         {/* Modules Grid */}
         <section className="nucleus-modules">
           <h2 className="nucleus-section-title">Modules</h2>
           <div className="nucleus-modules-grid">
             {modules.map((module, index) => (
-              <Link key={index} href={module.href} className="nucleus-module-card-enhanced">
-                <div className="nucleus-module-card-header">
-                  <div 
-                    className="nucleus-module-icon-enhanced" 
-                    style={{ background: module.gradient }}
-                  >
-                    <module.icon size={24} color="white" />
-                  </div>
-                  <div className="nucleus-module-info">
-                    <h3 className="nucleus-module-title-enhanced">{module.title}</h3>
-                    <p className="nucleus-module-description-enhanced">{module.description}</p>
-                  </div>
+              <Link key={index} href={module.href} className="nucleus-module-card-enhanced" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div 
+                  className="nucleus-module-icon-enhanced" 
+                  style={{ background: module.gradient, flexShrink: 0 }}
+                >
+                  <module.icon size={24} color="white" />
                 </div>
-                
-                {/* Stats Row */}
-                <div className="nucleus-module-stats-row">
-                  {loading ? (
-                    <div className="nucleus-module-stats-loading">Loading stats...</div>
-                  ) : module.stats.length > 0 ? (
-                    module.stats.map((stat, idx) => (
-                      <div key={idx} className="nucleus-module-stat-item">
-                        <stat.icon size={14} style={{ color: stat.color || '#6b7280' }} />
-                        <span className="nucleus-module-stat-value" style={{ color: stat.color }}>
-                          {stat.value}
-                        </span>
-                        <span className="nucleus-module-stat-label">{stat.label}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="nucleus-module-stats-empty">No data yet</div>
-                  )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3 className="nucleus-module-title-enhanced" style={{ marginBottom: '2px' }}>{module.title}</h3>
+                  <p className="nucleus-module-description-enhanced" style={{ margin: 0, fontSize: '0.8125rem', color: '#6b7280' }}>{module.description}</p>
                 </div>
-
-                {/* Highlight / Alert */}
-                {module.highlight && (
-                  <div className={`nucleus-module-highlight ${module.highlight.type}`}>
-                    {module.highlight.type === 'warning' && <AlertTriangle size={14} />}
-                    {module.highlight.type === 'success' && <CheckCircle size={14} />}
-                    {module.highlight.type === 'info' && <Activity size={14} />}
-                    {module.highlight.text}
-                  </div>
-                )}
-
-                <div className="nucleus-module-footer">
-                  <span className="nucleus-module-link">
-                    Open Module
-                    <ArrowRight size={16} />
-                  </span>
-                </div>
+                <ArrowRight size={18} style={{ color: '#d1d5db', flexShrink: 0 }} />
               </Link>
             ))}
           </div>
