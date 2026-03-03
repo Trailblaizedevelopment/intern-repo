@@ -78,11 +78,66 @@ export default function Nucleus() {
   const { profile, signOut, isAdmin } = useAuth();
   const [stats, setStats] = useState<ModuleStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [outreachStats, setOutreachStats] = useState<{
+    chapters: { id: string; name: string; school: string; total: number; contacted: number; responded: number; signed_up: number; touch1_ready: number; touch2_due: number; touch3_due: number }[];
+    totals: { sends_today: number; responses_today: number; signups_today: number; followups_due: number };
+  } | null>(null);
 
   // Fetch all stats on mount
   useEffect(() => {
     fetchAllStats();
+    fetchOutreachOverview();
   }, []);
+
+  async function fetchOutreachOverview() {
+    if (!supabase) return;
+    try {
+      // Get all chapters with alumni
+      const { data: chapters } = await supabase.from('chapters').select('id, chapter_name, school');
+      if (!chapters) return;
+
+      const chapterStats = await Promise.all(
+        chapters.map(async (ch) => {
+          const res = await fetch(`/api/alumni/stats?chapter_id=${ch.id}`);
+          const json = await res.json();
+          if (!json.data || json.data.total === 0) return null;
+          return {
+            id: ch.id,
+            name: ch.chapter_name,
+            school: ch.school || '',
+            total: json.data.total,
+            contacted: json.data.contacted,
+            responded: json.data.responded,
+            signed_up: json.data.signed_up,
+            touch1_ready: json.data.touch1_ready,
+            touch2_due: json.data.touch2_due,
+            touch3_due: json.data.touch3_due,
+          };
+        })
+      );
+
+      const active = chapterStats.filter(Boolean) as NonNullable<typeof chapterStats[number]>[];
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+
+      // Get today's daily log
+      const { data: todayLog } = await supabase
+        .from('outreach_daily_log')
+        .select('sends_count, responses_count, signups_count')
+        .gte('date', todayStart.toISOString().split('T')[0]);
+
+      const sends_today = (todayLog || []).reduce((s, r) => s + (r.sends_count || 0), 0);
+      const responses_today = (todayLog || []).reduce((s, r) => s + (r.responses_count || 0), 0);
+      const signups_today = (todayLog || []).reduce((s, r) => s + (r.signups_count || 0), 0);
+      const followups_due = active.reduce((s, ch) => s + ch.touch2_due + ch.touch3_due, 0);
+
+      setOutreachStats({
+        chapters: active.sort((a, b) => (b.touch1_ready + b.touch2_due + b.touch3_due) - (a.touch1_ready + a.touch2_due + a.touch3_due)),
+        totals: { sends_today, responses_today, signups_today, followups_due },
+      });
+    } catch (err) {
+      console.error('Failed to fetch outreach overview:', err);
+    }
+  }
 
   async function fetchAllStats() {
     if (!supabase) {
@@ -420,6 +475,81 @@ export default function Nucleus() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Outreach Operations */}
+        {outreachStats && outreachStats.chapters.length > 0 && (
+          <section style={{ marginBottom: '24px' }}>
+            {/* Ops Strip */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px',
+            }}>
+              {[
+                { label: 'Sends Today', value: outreachStats.totals.sends_today, max: 150, color: '#8b5cf6' },
+                { label: 'Responses Today', value: outreachStats.totals.responses_today, color: '#2563eb' },
+                { label: 'Sign-ups Today', value: outreachStats.totals.signups_today, color: '#16a34a' },
+                { label: 'Follow-ups Due', value: outreachStats.totals.followups_due, color: '#d97706' },
+              ].map(s => (
+                <div key={s.label} style={{
+                  padding: '16px 20px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb',
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700, color: s.color }}>
+                    {s.value}{s.max ? <span style={{ fontSize: '0.875rem', color: '#9ca3af', fontWeight: 400 }}>/{s.max}</span> : null}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Active Chapter Cards */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px',
+            }}>
+              {outreachStats.chapters.slice(0, 6).map(ch => {
+                const actionCount = ch.touch1_ready + ch.touch2_due + ch.touch3_due;
+                const responseRate = ch.contacted > 0 ? Math.round((ch.responded / ch.contacted) * 100) : 0;
+                const funnelPct = ch.total > 0 ? Math.round((ch.signed_up / ch.total) * 100) : 0;
+                return (
+                  <Link key={ch.id} href={`/dashboard/clients/${ch.id}/alumni`} style={{ textDecoration: 'none' }}>
+                    <div style={{
+                      padding: '16px 20px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb',
+                      cursor: 'pointer', transition: 'border-color 0.15s ease',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = '#8b5cf6')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1f2937' }}>{ch.name}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>{ch.school}</div>
+                        </div>
+                        {actionCount > 0 && (
+                          <span style={{
+                            padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 600,
+                            color: '#d97706', backgroundColor: '#fef3c7',
+                          }}>
+                            {actionCount} actions
+                          </span>
+                        )}
+                      </div>
+                      {/* Mini funnel bar */}
+                      <div style={{ display: 'flex', height: '4px', borderRadius: '2px', overflow: 'hidden', background: '#f3f4f6', marginBottom: '8px' }}>
+                        <div style={{ width: `${ch.total > 0 ? (ch.contacted / ch.total) * 100 : 0}%`, background: '#d97706', transition: 'width 0.3s' }} />
+                        <div style={{ width: `${ch.total > 0 ? (ch.responded / ch.total) * 100 : 0}%`, background: '#2563eb', transition: 'width 0.3s' }} />
+                        <div style={{ width: `${funnelPct}%`, background: '#16a34a', transition: 'width 0.3s' }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#6b7280' }}>
+                        <span>{ch.contacted}/{ch.total} contacted</span>
+                        <span>{ch.responded} responded ({responseRate}%)</span>
+                        <span style={{ color: '#16a34a', fontWeight: 600 }}>{ch.signed_up} signed up</span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
         )}
 
         {/* Company Stats */}
