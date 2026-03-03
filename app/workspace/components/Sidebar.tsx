@@ -43,6 +43,7 @@ const iconMap: Record<string, LucideIcon> = {
   Zap,
   TrendingUp,
   Ticket,
+  Building2,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
@@ -90,13 +91,22 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     { name: 'Employees', href: '/nucleus/employees', icon: Users },
   ];
 
-  // Mobile bottom tabs — same 4 tabs for ALL roles, no conditional rendering
-  const bottomTabItems = [
-    { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
-    { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
-    { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', badge: openTicketCount },
-    { name: 'Whiteboard', href: '/workspace/whiteboard', icon: 'PenLine', badge: 0 },
-  ];
+  // Mobile bottom tabs — role-aware
+  const isFounderRole = role === 'founder' || role === 'cofounder';
+  const bottomTabItems = isFounderRole
+    ? [
+        { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
+        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
+        { name: 'Nucleus', href: '/nucleus', icon: 'Zap', badge: 0 },
+        { name: 'Enterprise', href: '/nucleus/enterprise', icon: 'Building2', badge: 0 },
+        { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', badge: openTicketCount },
+      ]
+    : [
+        { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
+        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
+        { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', badge: openTicketCount },
+        { name: 'Whiteboard', href: '/workspace/whiteboard', icon: 'PenLine', badge: 0 },
+      ];
 
   // Get the page title from the current path
   const getPageTitle = () => {
