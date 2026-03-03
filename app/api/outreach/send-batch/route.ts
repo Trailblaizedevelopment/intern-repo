@@ -3,12 +3,30 @@ import { messaging, renderTemplate } from '@/lib/messaging';
 import { SENDING_LINES } from '@/lib/supabase';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-const TEMPLATES = {
+const DEFAULT_TEMPLATES = {
   touch1: `Hey is this {first_name} {last_name}? My name is {sender_name}, and I am checking to verify your phone number for the {school} {fraternity} alumni list.`,
   touch2_confirmed: `Great, I'm reaching out because we partnered with {school} {fraternity} to launch Trailblaize, a free LinkedIn-style platform that connects actives and alumni. Here's the signup link: {signup_link}`,
   touch2_no_response: `Hey {first_name}, following up — we partnered with {school} {fraternity} to launch Trailblaize, a free platform that connects actives and alumni. Here's the signup link if you're interested: {signup_link}`,
   touch3: `Hey {first_name}, just checking back in — did you get a chance to sign up? Happy to answer any questions.`,
 };
+
+/** Fetch chapter-specific template from DB, falling back to defaults */
+async function getTemplate(supabase: ReturnType<typeof getSupabaseAdmin>, chapterId: string, touchNumber: number, isConfirmed: boolean): Promise<string> {
+  if (supabase) {
+    const { data } = await supabase
+      .from('outreach_templates')
+      .select('template_text')
+      .eq('chapter_id', chapterId)
+      .eq('touch_number', touchNumber)
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+    if (data?.template_text) return data.template_text;
+  }
+  if (touchNumber === 1) return DEFAULT_TEMPLATES.touch1;
+  if (touchNumber === 2) return isConfirmed ? DEFAULT_TEMPLATES.touch2_confirmed : DEFAULT_TEMPLATES.touch2_no_response;
+  return DEFAULT_TEMPLATES.touch3;
+}
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabaseAdmin();
@@ -158,14 +176,8 @@ export async function POST(request: NextRequest) {
         let template: string;
         if (template_override) {
           template = template_override;
-        } else if (touch === 1) {
-          template = TEMPLATES.touch1;
-        } else if (touch === 2) {
-          template = contact.response_classification === 'confirmed'
-            ? TEMPLATES.touch2_confirmed
-            : TEMPLATES.touch2_no_response;
         } else {
-          template = TEMPLATES.touch3;
+          template = await getTemplate(supabase, chapter_id, touch, contact.response_classification === 'confirmed');
         }
 
         const result = await messaging.sendOutreach({
