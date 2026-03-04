@@ -425,56 +425,8 @@ export default function Nucleus() {
 
   return (
     <div className="nucleus">
-      {/* Header */}
-      <header className="nucleus-header">
-        <div className="nucleus-header-content">
-          <a href="/" className="nucleus-logo">
-            <img src="/logo-icon.svg" alt="Trailblaize" className="nucleus-logo-icon" />
-          </a>
-          <div className="nucleus-title">
-            <h1>Nucleus</h1>
-            <span className="nucleus-subtitle">Command Center</span>
-          </div>
-        </div>
-        <div className="nucleus-header-user">
-          <Link href="/workspace" className="nucleus-back-to-workspace">
-            <LayoutDashboard size={16} />
-            <span>Back to Workspace</span>
-          </Link>
-          {isAdmin && (
-            <span className="nucleus-admin-badge">
-              <Shield size={14} />
-              Admin
-            </span>
-          )}
-          <span className="nucleus-user-name">{profile?.name}</span>
-          <button onClick={signOut} className="nucleus-logout-btn">
-            <LogOut size={16} />
-          </button>
-        </div>
-      </header>
-
       {/* Main Content */}
-      <main className="nucleus-main">
-        {/* Attention Banner */}
-        {urgentItems.length > 0 && (
-          <div className="nucleus-attention-banner">
-            <div className="nucleus-attention-icon">
-              <Zap size={18} />
-            </div>
-            <div className="nucleus-attention-content">
-              <span className="nucleus-attention-title">Needs Attention</span>
-              <div className="nucleus-attention-items">
-                {urgentItems.map((item, idx) => (
-                  <Link key={idx} href={item.href} className="nucleus-attention-item">
-                    {item.text}
-                    <ArrowRight size={14} />
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+      <main className="nucleus-main nucleus-main--compact">
 
         {/* Modules Grid */}
         <section className="nucleus-modules">

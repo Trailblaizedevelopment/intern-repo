@@ -31512,3 +31512,14 @@ body { background: #FAFAFA; }
 
   .sn__stats { padding: 0.75rem 1rem; gap: 1rem; }
 }
+
+/* Nucleus compact mode — no redundant header, tighter padding */
+.nucleus-main--compact {
+  padding: 1rem 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .nucleus-main--compact {
+    padding: 0.75rem 1rem;
+  }
+}
