@@ -98,14 +98,14 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
         { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
         { name: 'Nucleus', href: '/nucleus', icon: 'Zap', badge: 0 },
-        { name: 'Enterprise', href: '/nucleus/enterprise', icon: 'Building2', badge: 0 },
+        { name: 'Projects', href: '/workspace/projects', icon: 'Building2', badge: 0 },
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', badge: openTicketCount },
       ]
     : [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
         { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
+        { name: 'Projects', href: '/workspace/projects', icon: 'Building2', badge: 0 },
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', badge: openTicketCount },
-        { name: 'Whiteboard', href: '/workspace/whiteboard', icon: 'PenLine', badge: 0 },
       ];
 
   // Get the page title from the current path

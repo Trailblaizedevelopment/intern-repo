@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, X, Building2, ChevronLeft, FileText, Milestone, Ticket, Loader2,
-  Calendar, Target, Edit3, Trash2, ChevronDown, ChevronRight, GripVertical,
+  Plus, X, ChevronLeft, FileText, Ticket, Loader2, Calendar, Target,
+  Edit3, Trash2, Image, Upload, Users, MessageSquare, Send, Paperclip,
+  StickyNote, MoreHorizontal, Camera, Link2, ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { supabase, Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
 
@@ -19,6 +20,7 @@ interface Project {
   name: string;
   description: string | null;
   status: string;
+  color: string | null;
   start_date: string | null;
   target_date: string | null;
   created_by: string | null;
@@ -29,6 +31,8 @@ interface Project {
   milestones?: MilestoneData[];
   tickets?: TicketRef[];
   documents?: DocData[];
+  screenshots?: ScreenshotData[];
+  members?: MemberData[];
 }
 
 interface MilestoneData {
@@ -47,6 +51,8 @@ interface TicketRef {
   title: string;
   status: string;
   priority: string;
+  type: string;
+  due_date: string | null;
   assignee?: { id: string; name: string } | null;
 }
 
@@ -61,16 +67,76 @@ interface DocData {
   author?: { id: string; name: string } | null;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  planning: '#9ca3af',
-  active: '#10b981',
-  paused: '#f59e0b',
-  completed: '#3b82f6',
-  archived: '#6b7280',
-};
+interface ScreenshotData {
+  id: string;
+  project_id: string;
+  url: string;
+  caption: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+interface MemberData {
+  id: string;
+  employee_id: string;
+  role: string;
+  employee?: { id: string; name: string; email: string; role: string } | null;
+}
+
+interface CommentData {
+  id: string;
+  project_id: string;
+  author_id: string | null;
+  content: string;
+  created_at: string;
+  author?: { id: string; name: string } | null;
+}
 
 // ═══════════════════════════════════════════
-// MAIN
+// CONSTANTS
+// ═══════════════════════════════════════════
+
+const STATUS_CONFIG: Record<string, { label: string; }> = {
+  planning: { label: 'Planning' },
+  active: { label: 'Active' },
+  paused: { label: 'Paused' },
+  completed: { label: 'Completed' },
+  archived: { label: 'Archived' },
+};
+
+// Sticky note color palettes — each note gets one
+const NOTE_COLORS = [
+  { bg: '#FEF3C7', border: '#F59E0B', text: '#92400E', accent: '#D97706' },  // amber
+  { bg: '#DBEAFE', border: '#3B82F6', text: '#1E3A5F', accent: '#2563EB' },  // blue
+  { bg: '#D1FAE5', border: '#10B981', text: '#065F46', accent: '#059669' },  // emerald
+  { bg: '#FCE7F3', border: '#EC4899', text: '#831843', accent: '#DB2777' },  // pink
+  { bg: '#EDE9FE', border: '#8B5CF6', text: '#4C1D95', accent: '#7C3AED' },  // violet
+  { bg: '#FEE2E2', border: '#EF4444', text: '#7F1D1D', accent: '#DC2626' },  // red
+  { bg: '#E0F2FE', border: '#0EA5E9', text: '#0C4A6E', accent: '#0284C7' },  // sky
+  { bg: '#F3E8FF', border: '#A855F7', text: '#581C87', accent: '#9333EA' },  // purple
+  { bg: '#CCFBF1', border: '#14B8A6', text: '#134E4A', accent: '#0D9488' },  // teal
+  { bg: '#FFF7ED', border: '#F97316', text: '#7C2D12', accent: '#EA580C' },  // orange
+];
+
+const PRIORITY_COLORS: Record<string, string> = {
+  critical: '#EF4444',
+  high: '#F59E0B',
+  medium: '#3B82F6',
+  low: '#6B7280',
+  none: '#D1D5DB',
+};
+
+const STATUS_PILL: Record<string, string> = {
+  backlog: '#9ca3af', todo: '#6b7280', open: '#6b7280', in_progress: '#f59e0b',
+  in_review: '#8b5cf6', testing: '#3b82f6', done: '#10b981', canceled: '#ef4444',
+};
+
+function getNoteColor(index: number) {
+  return NOTE_COLORS[index % NOTE_COLORS.length];
+}
+
+// ═══════════════════════════════════════════
+// MAIN PAGE
 // ═══════════════════════════════════════════
 
 export default function ProjectsPage() {
@@ -80,11 +146,17 @@ export default function ProjectsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string>('');
 
   useEffect(() => {
     if (!supabase || !user) return;
-    supabase.from('employees').select('id').eq('email', user.email).single().then(({ data }) => {
-      if (data) setCurrentEmployeeId(data.id);
+    supabase.from('employees').select('*').eq('status', 'active').order('name').then(({ data }) => {
+      if (data) {
+        setEmployees(data);
+        const me = data.find(e => e.email === user.email);
+        if (me) setCurrentEmployeeId(me.id);
+      }
     });
   }, [user]);
 
@@ -112,66 +184,110 @@ export default function ProjectsPage() {
     }
   }, []);
 
+  const filteredProjects = filterStatus
+    ? projects.filter(p => p.status === filterStatus)
+    : projects;
+
+  // Stats
+  const activeCount = projects.filter(p => p.status === 'active').length;
+  const totalTickets = projects.reduce((s, p) => s + (p.ticket_count || 0), 0);
+  const totalDone = projects.reduce((s, p) => s + (p.tickets_done || 0), 0);
+
   if (selectedProject) {
     return (
       <ProjectDetailView
         project={selectedProject}
         currentEmployeeId={currentEmployeeId}
-        onBack={() => setSelectedProject(null)}
+        employees={employees}
+        onBack={() => { setSelectedProject(null); fetchProjects(); }}
         onRefresh={() => fetchProjectDetail(selectedProject.id)}
       />
     );
   }
 
   return (
-    <div className="proj">
-      <header className="proj__header">
-        <div className="proj__header-left">
-          <Building2 size={22} />
+    <div className="sn">
+      {/* Header */}
+      <header className="sn__header">
+        <div className="sn__header-left">
+          <StickyNote size={22} />
           <h1>Projects</h1>
+          <span className="sn__header-count">{projects.length}</span>
         </div>
-        <button className="tkt__create-btn" onClick={() => setShowCreate(true)}>
-          <Plus size={16} /> New Project
-        </button>
+        <div className="sn__header-right">
+          <div className="sn__filter-pills">
+            <button className={`sn__pill ${!filterStatus ? 'active' : ''}`} onClick={() => setFilterStatus('')}>
+              All
+            </button>
+            <button className={`sn__pill ${filterStatus === 'active' ? 'active' : ''}`} onClick={() => setFilterStatus('active')}>
+              Active
+            </button>
+            <button className={`sn__pill ${filterStatus === 'planning' ? 'active' : ''}`} onClick={() => setFilterStatus('planning')}>
+              Planning
+            </button>
+            <button className={`sn__pill ${filterStatus === 'completed' ? 'active' : ''}`} onClick={() => setFilterStatus('completed')}>
+              Done
+            </button>
+          </div>
+          <button className="sn__create-btn" onClick={() => setShowCreate(true)}>
+            <Plus size={16} /> New Project
+          </button>
+        </div>
       </header>
 
+      {/* Quick Stats */}
+      <div className="sn__stats">
+        <div className="sn__stat">
+          <span className="sn__stat-value">{activeCount}</span>
+          <span className="sn__stat-label">Active</span>
+        </div>
+        <div className="sn__stat">
+          <span className="sn__stat-value">{totalTickets}</span>
+          <span className="sn__stat-label">Tickets</span>
+        </div>
+        <div className="sn__stat">
+          <span className="sn__stat-value">{totalTickets > 0 ? Math.round((totalDone / totalTickets) * 100) : 0}%</span>
+          <span className="sn__stat-label">Complete</span>
+        </div>
+      </div>
+
+      {/* Sticky Notes Grid */}
       {loading ? (
         <div className="tkt__loading"><Loader2 size={24} className="tkt__spinner" /><p>Loading projects...</p></div>
-      ) : projects.length === 0 ? (
-        <div className="proj__empty">
-          <Building2 size={40} strokeWidth={1} />
-          <p>No projects yet. Create your first project to get started.</p>
+      ) : filteredProjects.length === 0 ? (
+        <div className="sn__empty">
+          <StickyNote size={48} strokeWidth={1} />
+          <h3>{filterStatus ? 'No projects with this status' : 'No projects yet'}</h3>
+          <p>Create your first project to start organizing work</p>
+          {!filterStatus && (
+            <button className="sn__create-btn" onClick={() => setShowCreate(true)}>
+              <Plus size={16} /> Create Project
+            </button>
+          )}
         </div>
       ) : (
-        <div className="proj__grid">
-          {projects.map(p => {
-            const pct = p.ticket_count && p.ticket_count > 0 ? Math.round(((p.tickets_done || 0) / p.ticket_count) * 100) : 0;
-            return (
-              <div key={p.id} className="proj__card" onClick={() => fetchProjectDetail(p.id)}>
-                <div className="proj__card-header">
-                  <h3>{p.name}</h3>
-                  <span className="proj__status-pill" style={{ color: STATUS_COLORS[p.status], background: `${STATUS_COLORS[p.status]}15` }}>
-                    {p.status}
-                  </span>
-                </div>
-                {p.description && <p className="proj__card-desc">{p.description.substring(0, 120)}{p.description.length > 120 ? '...' : ''}</p>}
-                <div className="proj__card-stats">
-                  <span><Ticket size={12} /> {p.ticket_count || 0} tickets</span>
-                  <span>{pct}% done</span>
-                  {p.target_date && <span><Calendar size={12} /> {new Date(p.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
-                </div>
-                {p.ticket_count && p.ticket_count > 0 ? (
-                  <div className="tkt__dash-progress"><div className="tkt__dash-progress-bar" style={{ width: `${pct}%` }} /></div>
-                ) : null}
-              </div>
-            );
-          })}
+        <div className="sn__grid">
+          {filteredProjects.map((project, i) => (
+            <StickyNoteCard
+              key={project.id}
+              project={project}
+              colorIndex={i}
+              onClick={() => fetchProjectDetail(project.id)}
+            />
+          ))}
+          {/* Add new note card */}
+          <button className="sn__add-card" onClick={() => setShowCreate(true)}>
+            <Plus size={28} strokeWidth={1.5} />
+            <span>New Project</span>
+          </button>
         </div>
       )}
 
+      {/* Create Modal */}
       {showCreate && (
         <CreateProjectModal
           currentEmployeeId={currentEmployeeId}
+          employees={employees}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); fetchProjects(); }}
         />
@@ -181,18 +297,100 @@ export default function ProjectsPage() {
 }
 
 // ═══════════════════════════════════════════
+// STICKY NOTE CARD
+// ═══════════════════════════════════════════
+
+function StickyNoteCard({ project, colorIndex, onClick }: {
+  project: Project;
+  colorIndex: number;
+  onClick: () => void;
+}) {
+  const color = getNoteColor(colorIndex);
+  const pct = project.ticket_count && project.ticket_count > 0
+    ? Math.round(((project.tickets_done || 0) / project.ticket_count) * 100)
+    : 0;
+
+  const isOverdue = project.target_date && new Date(project.target_date + 'T00:00:00') < new Date() && project.status !== 'completed';
+
+  return (
+    <div
+      className="sn__note"
+      style={{
+        '--note-bg': color.bg,
+        '--note-border': color.border,
+        '--note-text': color.text,
+        '--note-accent': color.accent,
+      } as React.CSSProperties}
+      onClick={onClick}
+    >
+      {/* Folded corner effect */}
+      <div className="sn__note-fold" />
+
+      {/* Status indicator */}
+      <div className="sn__note-status">
+        <span className="sn__note-status-dot" style={{
+          background: project.status === 'active' ? '#10B981'
+            : project.status === 'completed' ? '#3B82F6'
+            : project.status === 'paused' ? '#F59E0B'
+            : '#9CA3AF'
+        }} />
+        <span>{STATUS_CONFIG[project.status]?.label || project.status}</span>
+      </div>
+
+      {/* Title */}
+      <h3 className="sn__note-title">{project.name}</h3>
+
+      {/* Description snippet */}
+      {project.description && (
+        <p className="sn__note-desc">
+          {project.description.replace(/<[^>]*>/g, '').substring(0, 80)}
+          {project.description.length > 80 ? '...' : ''}
+        </p>
+      )}
+
+      {/* Ticket counter */}
+      <div className="sn__note-tickets">
+        <Ticket size={13} />
+        <span className="sn__note-ticket-count">{project.ticket_count || 0}</span>
+        <span className="sn__note-ticket-label">tickets</span>
+        {project.ticket_count && project.ticket_count > 0 && (
+          <span className="sn__note-pct">{pct}%</span>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      {project.ticket_count && project.ticket_count > 0 ? (
+        <div className="sn__note-progress">
+          <div className="sn__note-progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+      ) : null}
+
+      {/* Footer: date */}
+      {project.target_date && (
+        <div className={`sn__note-date ${isOverdue ? 'overdue' : ''}`}>
+          <Calendar size={11} />
+          <span>
+            {new Date(project.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
 // CREATE PROJECT MODAL
 // ═══════════════════════════════════════════
 
-function CreateProjectModal({ currentEmployeeId, onClose, onCreated }: {
+function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }: {
   currentEmployeeId: string | null;
+  employees: Employee[];
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('active');
-  const [startDate, setStartDate] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -207,7 +405,7 @@ function CreateProjectModal({ currentEmployeeId, onClose, onCreated }: {
           name: name.trim(),
           description: description.trim() || null,
           status,
-          start_date: startDate || null,
+          start_date: new Date().toISOString().split('T')[0],
           target_date: targetDate || null,
           created_by: currentEmployeeId,
         }),
@@ -225,12 +423,12 @@ function CreateProjectModal({ currentEmployeeId, onClose, onCreated }: {
         <div className="tkt__modal-header"><h2>New Project</h2><button onClick={onClose}><X size={18} /></button></div>
         <div className="tkt__modal-body">
           <div className="tkt__field">
-            <label>Name *</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Project name..." autoFocus />
+            <label>Project Name *</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Alumni Outreach V2, Mobile App Redesign..." autoFocus />
           </div>
           <div className="tkt__field">
             <label>Description</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What is this project about?" rows={3} style={{ width: '100%', resize: 'vertical' }} />
+            <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What's this project about?" rows={3} style={{ width: '100%', resize: 'vertical' }} />
           </div>
           <div className="tkt__field-row">
             <div className="tkt__field">
@@ -238,14 +436,7 @@ function CreateProjectModal({ currentEmployeeId, onClose, onCreated }: {
               <select value={status} onChange={e => setStatus(e.target.value)}>
                 <option value="planning">Planning</option>
                 <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                <option value="completed">Completed</option>
-                <option value="archived">Archived</option>
               </select>
-            </div>
-            <div className="tkt__field">
-              <label>Start Date</label>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
             </div>
             <div className="tkt__field">
               <label>Target Date</label>
@@ -266,20 +457,31 @@ function CreateProjectModal({ currentEmployeeId, onClose, onCreated }: {
 }
 
 // ═══════════════════════════════════════════
-// PROJECT DETAIL VIEW
+// PROJECT DETAIL VIEW — The "Juice"
 // ═══════════════════════════════════════════
 
-function ProjectDetailView({ project, currentEmployeeId, onBack, onRefresh }: {
+function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRefresh }: {
   project: Project;
   currentEmployeeId: string | null;
+  employees: Employee[];
   onBack: () => void;
   onRefresh: () => void;
 }) {
-  const [activeSection, setActiveSection] = useState<'milestones' | 'tickets' | 'docs'>('tickets');
+  const [activeTab, setActiveTab] = useState<'tickets' | 'screenshots' | 'docs' | 'milestones'>('tickets');
   const [editingProject, setEditingProject] = useState(false);
   const [editName, setEditName] = useState(project.name);
   const [editDesc, setEditDesc] = useState(project.description || '');
   const [editStatus, setEditStatus] = useState(project.status);
+  const [comments, setComments] = useState<CommentData[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [showLinkTicket, setShowLinkTicket] = useState(false);
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<TicketRef[]>([]);
+  const [searchingTickets, setSearchingTickets] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
 
   // Milestones
   const [showAddMilestone, setShowAddMilestone] = useState(false);
@@ -291,6 +493,35 @@ function ProjectDetailView({ project, currentEmployeeId, onBack, onRefresh }: {
   const [docTitle, setDocTitle] = useState('');
   const [docContent, setDocContent] = useState('');
   const [editingDoc, setEditingDoc] = useState<DocData | null>(null);
+
+  const milestones = project.milestones || [];
+  const tickets = project.tickets || [];
+  const docs = project.documents || [];
+  const screenshots = project.screenshots || [];
+  const ticketsDone = tickets.filter(t => t.status === 'done').length;
+  const pct = tickets.length > 0 ? Math.round((ticketsDone / tickets.length) * 100) : 0;
+
+  // Fetch comments
+  const fetchComments = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${project.id}/comments`);
+      const { data } = await res.json();
+      if (data) setComments(data);
+    } catch { /* silent */ }
+  }, [project.id]);
+
+  useEffect(() => { fetchComments(); }, [fetchComments]);
+
+  useEffect(() => {
+    commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [comments]);
+
+  // Update project fields
+  useEffect(() => {
+    setEditName(project.name);
+    setEditDesc(project.description || '');
+    setEditStatus(project.status);
+  }, [project]);
 
   const saveProject = async () => {
     try {
@@ -304,6 +535,109 @@ function ProjectDetailView({ project, currentEmployeeId, onBack, onRefresh }: {
     } catch (err) { console.error(err); }
   };
 
+  const deleteProject = async () => {
+    if (!confirm('Delete this project? Tickets will be unlinked but not deleted.')) return;
+    try {
+      await fetch(`/api/projects/${project.id}`, { method: 'DELETE' });
+      onBack();
+    } catch (err) { console.error(err); }
+  };
+
+  // Comments
+  const postComment = async () => {
+    if (!commentText.trim()) return;
+    setSending(true);
+    try {
+      await fetch(`/api/projects/${project.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: commentText.trim(), author_id: currentEmployeeId }),
+      });
+      setCommentText('');
+      fetchComments();
+    } catch (err) { console.error(err); }
+    finally { setSending(false); }
+  };
+
+  // Screenshot upload
+  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', `projects/${project.id}`);
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+        const uploadResult = await uploadRes.json();
+        if (uploadResult.data?.url) {
+          await fetch(`/api/projects/${project.id}/screenshots`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: uploadResult.data.url,
+              caption: file.name,
+              created_by: currentEmployeeId,
+            }),
+          });
+        }
+      }
+      onRefresh();
+    } catch (err) { console.error(err); }
+    finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+  };
+
+  const deleteScreenshot = async (ssId: string) => {
+    try {
+      await fetch(`/api/projects/${project.id}/screenshots/${ssId}`, { method: 'DELETE' });
+      onRefresh();
+    } catch (err) { console.error(err); }
+  };
+
+  // Link existing ticket
+  const searchTickets = async (q: string) => {
+    setTicketSearch(q);
+    if (!q.trim()) { setSearchResults([]); return; }
+    setSearchingTickets(true);
+    try {
+      const res = await fetch(`/api/tickets?search=${encodeURIComponent(q)}`);
+      const { data } = await res.json();
+      if (data) {
+        // Filter out already linked tickets
+        const linkedIds = new Set(tickets.map(t => t.id));
+        setSearchResults(data.filter((t: TicketRef) => !linkedIds.has(t.id)).slice(0, 8));
+      }
+    } catch { /* silent */ }
+    finally { setSearchingTickets(false); }
+  };
+
+  const linkTicket = async (ticketId: string) => {
+    try {
+      await fetch(`/api/tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: project.id, actor_id: currentEmployeeId }),
+      });
+      setShowLinkTicket(false);
+      setTicketSearch('');
+      setSearchResults([]);
+      onRefresh();
+    } catch (err) { console.error(err); }
+  };
+
+  const unlinkTicket = async (ticketId: string) => {
+    try {
+      await fetch(`/api/tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: null, actor_id: currentEmployeeId }),
+      });
+      onRefresh();
+    } catch (err) { console.error(err); }
+  };
+
+  // Milestones
   const addMilestone = async () => {
     if (!msName.trim()) return;
     try {
@@ -336,6 +670,7 @@ function ProjectDetailView({ project, currentEmployeeId, onBack, onRefresh }: {
     } catch (err) { console.error(err); }
   };
 
+  // Docs
   const addDoc = async () => {
     if (!docTitle.trim()) return;
     try {
@@ -370,33 +705,45 @@ function ProjectDetailView({ project, currentEmployeeId, onBack, onRefresh }: {
     } catch (err) { console.error(err); }
   };
 
-  const milestones = project.milestones || [];
-  const tickets = project.tickets || [];
-  const docs = project.documents || [];
-  const ticketsDone = tickets.filter(t => t.status === 'done').length;
-  const pct = tickets.length > 0 ? Math.round((ticketsDone / tickets.length) * 100) : 0;
-
-  const STATUS_PILL_COLORS: Record<string, string> = {
-    backlog: '#9ca3af', todo: '#6b7280', open: '#6b7280', in_progress: '#f59e0b',
-    in_review: '#8b5cf6', testing: '#3b82f6', done: '#10b981', canceled: '#ef4444',
-  };
+  // Group tickets by status for a mini board
+  const ticketsByStatus: Record<string, TicketRef[]> = {};
+  tickets.forEach(t => {
+    if (!ticketsByStatus[t.status]) ticketsByStatus[t.status] = [];
+    ticketsByStatus[t.status].push(t);
+  });
 
   return (
-    <div className="proj">
-      <header className="proj__header">
-        <div className="proj__header-left">
-          <button className="proj__back-btn" onClick={onBack}><ChevronLeft size={18} /> Back</button>
-          {!editingProject ? (
-            <>
-              <h1>{project.name}</h1>
-              <span className="proj__status-pill" style={{ color: STATUS_COLORS[project.status], background: `${STATUS_COLORS[project.status]}15` }}>
-                {project.status}
+    <div className="sn__detail">
+      {/* Header */}
+      <header className="sn__detail-header">
+        <button className="sn__back-btn" onClick={onBack}>
+          <ChevronLeft size={18} /> Projects
+        </button>
+        <div className="sn__detail-actions">
+          <button className="tkt__icon-btn" onClick={() => setEditingProject(!editingProject)} title="Edit"><Edit3 size={14} /></button>
+          <button className="tkt__icon-btn" onClick={deleteProject} title="Delete project"><Trash2 size={14} /></button>
+        </div>
+      </header>
+
+      {/* Project Hero */}
+      <div className="sn__hero">
+        {!editingProject ? (
+          <>
+            <div className="sn__hero-top">
+              <h1 className="sn__hero-title">{project.name}</h1>
+              <span className="sn__hero-status" style={{
+                color: project.status === 'active' ? '#10B981' : project.status === 'completed' ? '#3B82F6' : '#9CA3AF',
+              }}>
+                {STATUS_CONFIG[project.status]?.label || project.status}
               </span>
-              <button className="tkt__icon-btn" onClick={() => setEditingProject(true)} title="Edit project"><Edit3 size={14} /></button>
-            </>
-          ) : (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1 }}>
-              <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ flex: 1 }} />
+            </div>
+            {project.description && <p className="sn__hero-desc">{project.description}</p>}
+          </>
+        ) : (
+          <div className="sn__hero-edit">
+            <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="sn__hero-edit-title" />
+            <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={2} className="sn__hero-edit-desc" placeholder="Description..." />
+            <div className="sn__hero-edit-row">
               <select value={editStatus} onChange={e => setEditStatus(e.target.value)}>
                 <option value="planning">Planning</option>
                 <option value="active">Active</option>
@@ -404,148 +751,293 @@ function ProjectDetailView({ project, currentEmployeeId, onBack, onRefresh }: {
                 <option value="completed">Completed</option>
                 <option value="archived">Archived</option>
               </select>
-              <button className="tkt__btn-primary" onClick={saveProject} style={{ padding: '4px 12px' }}>Save</button>
-              <button className="tkt__btn-secondary" onClick={() => setEditingProject(false)} style={{ padding: '4px 12px' }}>Cancel</button>
+              <button className="tkt__btn-primary" onClick={saveProject} style={{ padding: '6px 16px' }}>Save</button>
+              <button className="tkt__btn-secondary" onClick={() => setEditingProject(false)} style={{ padding: '6px 16px' }}>Cancel</button>
             </div>
-          )}
-        </div>
-      </header>
+          </div>
+        )}
 
-      {/* Project Info */}
-      <div className="proj__info">
-        {project.description && <p className="proj__desc">{project.description}</p>}
-        <div className="proj__meta">
-          <span>{tickets.length} tickets · {pct}% complete</span>
-          {project.start_date && <span>Started: {new Date(project.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
-          {project.target_date && <span>Target: {new Date(project.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+        {/* Progress + Stats */}
+        <div className="sn__hero-stats">
+          <div className="sn__hero-stat">
+            <span className="sn__hero-stat-value">{tickets.length}</span>
+            <span className="sn__hero-stat-label">Tickets</span>
+          </div>
+          <div className="sn__hero-stat">
+            <span className="sn__hero-stat-value">{ticketsDone}</span>
+            <span className="sn__hero-stat-label">Done</span>
+          </div>
+          <div className="sn__hero-stat">
+            <span className="sn__hero-stat-value">{pct}%</span>
+            <span className="sn__hero-stat-label">Complete</span>
+          </div>
+          <div className="sn__hero-stat">
+            <span className="sn__hero-stat-value">{milestones.length}</span>
+            <span className="sn__hero-stat-label">Milestones</span>
+          </div>
         </div>
         {tickets.length > 0 && (
-          <div className="tkt__dash-progress" style={{ marginTop: '0.5rem' }}>
-            <div className="tkt__dash-progress-bar" style={{ width: `${pct}%` }} />
+          <div className="sn__hero-progress">
+            <div className="sn__hero-progress-fill" style={{ width: `${pct}%` }} />
           </div>
         )}
       </div>
 
-      {/* Section Tabs */}
-      <div className="proj__tabs">
-        <button className={activeSection === 'tickets' ? 'active' : ''} onClick={() => setActiveSection('tickets')}>
+      {/* Tabs */}
+      <div className="sn__tabs">
+        <button className={activeTab === 'tickets' ? 'active' : ''} onClick={() => setActiveTab('tickets')}>
           <Ticket size={14} /> Tickets ({tickets.length})
         </button>
-        <button className={activeSection === 'milestones' ? 'active' : ''} onClick={() => setActiveSection('milestones')}>
-          <Target size={14} /> Milestones ({milestones.length})
+        <button className={activeTab === 'screenshots' ? 'active' : ''} onClick={() => setActiveTab('screenshots')}>
+          <Camera size={14} /> Screenshots ({screenshots.length})
         </button>
-        <button className={activeSection === 'docs' ? 'active' : ''} onClick={() => setActiveSection('docs')}>
+        <button className={activeTab === 'docs' ? 'active' : ''} onClick={() => setActiveTab('docs')}>
           <FileText size={14} /> Docs ({docs.length})
+        </button>
+        <button className={activeTab === 'milestones' ? 'active' : ''} onClick={() => setActiveTab('milestones')}>
+          <Target size={14} /> Milestones ({milestones.length})
         </button>
       </div>
 
-      {/* Tickets Section */}
-      {activeSection === 'tickets' && (
-        <div className="proj__section">
-          {tickets.length === 0 ? (
-            <p className="proj__empty-text">No tickets linked to this project yet. Assign tickets via the ticket detail panel.</p>
-          ) : (
-            <div className="proj__ticket-list">
-              {tickets.map(t => (
-                <div key={t.id} className="proj__ticket-row">
-                  <span className="proj__ticket-num">#{t.number}</span>
-                  <span className="proj__ticket-title">{t.title}</span>
-                  <span className="tkt__status-pill" style={{ color: STATUS_PILL_COLORS[t.status], background: `${STATUS_PILL_COLORS[t.status]}15` }}>
-                    {t.status.replace('_', ' ')}
-                  </span>
-                  <span className="proj__ticket-assignee">{t.assignee?.name || 'Unassigned'}</span>
-                </div>
-              ))}
+      {/* Tab Content */}
+      <div className="sn__tab-content">
+        {/* TICKETS TAB */}
+        {activeTab === 'tickets' && (
+          <div className="sn__tickets">
+            <div className="sn__tickets-header">
+              <h3>Linked Tickets</h3>
+              <button className="sn__link-btn" onClick={() => setShowLinkTicket(!showLinkTicket)}>
+                <Link2 size={14} /> Link Ticket
+              </button>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* Milestones Section */}
-      {activeSection === 'milestones' && (
-        <div className="proj__section">
-          {milestones.map(ms => (
-            <div key={ms.id} className="proj__milestone">
-              <div className="proj__milestone-header">
-                <span className="proj__milestone-name">{ms.name}</span>
+            {showLinkTicket && (
+              <div className="sn__link-search">
+                <input
+                  type="text"
+                  placeholder="Search tickets by title or #number..."
+                  value={ticketSearch}
+                  onChange={e => searchTickets(e.target.value)}
+                  autoFocus
+                />
+                {searchResults.length > 0 && (
+                  <div className="sn__link-results">
+                    {searchResults.map(t => (
+                      <div key={t.id} className="sn__link-result" onClick={() => linkTicket(t.id)}>
+                        <span className="sn__link-result-num">#{t.number}</span>
+                        <span className="sn__link-result-title">{t.title}</span>
+                        <span className="tkt__status-pill" style={{ color: STATUS_PILL[t.status], background: `${STATUS_PILL[t.status]}15`, fontSize: '0.65rem', padding: '1px 6px' }}>
+                          {t.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {searchingTickets && <div className="sn__link-searching"><Loader2 size={14} className="tkt__spinner" /> Searching...</div>}
+              </div>
+            )}
+
+            {tickets.length === 0 ? (
+              <p className="sn__empty-text">No tickets linked yet. Use "Link Ticket" to connect existing tickets to this project.</p>
+            ) : (
+              <div className="sn__ticket-list">
+                {tickets.map(t => (
+                  <div key={t.id} className="sn__ticket-row">
+                    <span className="sn__ticket-priority" style={{ background: PRIORITY_COLORS[t.priority] || '#D1D5DB' }} />
+                    <span className="sn__ticket-num">#{t.number}</span>
+                    <span className="sn__ticket-title">{t.title}</span>
+                    <span className="tkt__status-pill" style={{ color: STATUS_PILL[t.status], background: `${STATUS_PILL[t.status]}15` }}>
+                      {t.status.replace('_', ' ')}
+                    </span>
+                    {t.assignee && <span className="sn__ticket-assignee">{t.assignee.name}</span>}
+                    {t.due_date && (
+                      <span className="sn__ticket-due">
+                        <Calendar size={10} />
+                        {new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                    <button className="sn__ticket-unlink" onClick={(e) => { e.stopPropagation(); unlinkTicket(t.id); }} title="Unlink from project">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SCREENSHOTS TAB */}
+        {activeTab === 'screenshots' && (
+          <div className="sn__screenshots">
+            <div className="sn__screenshots-header">
+              <h3>Product Screenshots</h3>
+              <button className="sn__link-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                {uploading ? <Loader2 size={14} className="tkt__spinner" /> : <Upload size={14} />}
+                {uploading ? 'Uploading...' : 'Upload'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={handleScreenshotUpload}
+              />
+            </div>
+
+            {screenshots.length === 0 ? (
+              <div className="sn__screenshots-empty">
+                <Image size={40} strokeWidth={1} />
+                <p>No screenshots yet. Upload product screenshots, mockups, or designs.</p>
+              </div>
+            ) : (
+              <div className="sn__screenshots-grid">
+                {screenshots.map(ss => (
+                  <div key={ss.id} className="sn__screenshot">
+                    <img src={ss.url} alt={ss.caption || 'Screenshot'} loading="lazy" />
+                    <div className="sn__screenshot-overlay">
+                      {ss.caption && <span>{ss.caption}</span>}
+                      <button onClick={() => deleteScreenshot(ss.id)}><Trash2 size={12} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* DOCS TAB */}
+        {activeTab === 'docs' && (
+          <div className="sn__docs">
+            {editingDoc ? (
+              <div className="sn__doc-editor">
+                <input type="text" value={editingDoc.title} onChange={e => setEditingDoc({ ...editingDoc, title: e.target.value })} className="sn__doc-title-input" placeholder="Document title..." />
+                <RichTextEditor content={editingDoc.content || ''} onChange={val => setEditingDoc({ ...editingDoc, content: val })} placeholder="Write documentation..." />
+                <div className="sn__doc-editor-actions">
+                  <button className="tkt__btn-primary" onClick={saveDoc}>Save</button>
+                  <button className="tkt__btn-secondary" onClick={() => setEditingDoc(null)}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {docs.map(d => (
+                  <div key={d.id} className="sn__doc">
+                    <div className="sn__doc-header">
+                      <FileText size={14} />
+                      <span className="sn__doc-name">{d.title}</span>
+                      <span className="sn__doc-meta">{d.author?.name} · {new Date(d.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      <button className="tkt__icon-btn" onClick={() => setEditingDoc(d)}><Edit3 size={12} /></button>
+                      <button className="tkt__icon-btn" onClick={() => deleteDoc(d.id)}><Trash2 size={12} /></button>
+                    </div>
+                    {d.content && <div className="sn__doc-content"><RichTextDisplay content={d.content} /></div>}
+                  </div>
+                ))}
+                {!showAddDoc ? (
+                  <button className="sn__add-btn" onClick={() => setShowAddDoc(true)}>
+                    <Plus size={14} /> Add Document
+                  </button>
+                ) : (
+                  <div className="sn__doc-editor">
+                    <input type="text" placeholder="Document title..." value={docTitle} onChange={e => setDocTitle(e.target.value)} className="sn__doc-title-input" autoFocus />
+                    <RichTextEditor content={docContent} onChange={setDocContent} placeholder="Write documentation..." />
+                    <div className="sn__doc-editor-actions">
+                      <button className="tkt__btn-primary" onClick={addDoc} disabled={!docTitle.trim()}>Add</button>
+                      <button className="tkt__btn-secondary" onClick={() => setShowAddDoc(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* MILESTONES TAB */}
+        {activeTab === 'milestones' && (
+          <div className="sn__milestones">
+            {milestones.map(ms => (
+              <div key={ms.id} className={`sn__milestone ${ms.status === 'completed' ? 'completed' : ''}`}>
+                <div className="sn__milestone-check">
+                  <input
+                    type="checkbox"
+                    checked={ms.status === 'completed'}
+                    onChange={() => updateMilestone(ms.id, { status: ms.status === 'completed' ? 'open' : 'completed' })}
+                  />
+                </div>
+                <div className="sn__milestone-body">
+                  <span className="sn__milestone-name">{ms.name}</span>
+                  {ms.target_date && (
+                    <span className="sn__milestone-date">
+                      <Calendar size={11} />
+                      {new Date(ms.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
                 <select
                   value={ms.status}
                   onChange={e => updateMilestone(ms.id, { status: e.target.value })}
-                  className="proj__milestone-status"
+                  className="sn__milestone-status"
                 >
                   <option value="open">Open</option>
                   <option value="in_progress">In Progress</option>
                   <option value="completed">Completed</option>
                 </select>
-                {ms.target_date && (
-                  <span className="proj__milestone-date">
-                    <Calendar size={11} /> {new Date(ms.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                )}
-                <button className="tkt__icon-btn" onClick={() => deleteMilestone(ms.id)} title="Delete"><Trash2 size={12} /></button>
+                <button className="tkt__icon-btn" onClick={() => deleteMilestone(ms.id)}><Trash2 size={12} /></button>
               </div>
-              {ms.description && <p className="proj__milestone-desc">{ms.description}</p>}
+            ))}
+            {!showAddMilestone ? (
+              <button className="sn__add-btn" onClick={() => setShowAddMilestone(true)}>
+                <Plus size={14} /> Add Milestone
+              </button>
+            ) : (
+              <div className="sn__add-form">
+                <input type="text" placeholder="Milestone name..." value={msName} onChange={e => setMsName(e.target.value)} autoFocus />
+                <input type="date" value={msDate} onChange={e => setMsDate(e.target.value)} />
+                <button className="tkt__btn-primary" onClick={addMilestone} disabled={!msName.trim()} style={{ padding: '6px 14px' }}>Add</button>
+                <button className="tkt__btn-secondary" onClick={() => setShowAddMilestone(false)} style={{ padding: '6px 14px' }}>Cancel</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Collaboration: Comments at the bottom */}
+      <div className="sn__collab">
+        <h3><MessageSquare size={14} /> Discussion ({comments.length})</h3>
+        <div className="sn__comments">
+          {comments.length === 0 && <p className="sn__empty-text">No comments yet. Start the conversation about this project.</p>}
+          {comments.map(c => (
+            <div key={c.id} className="sn__comment">
+              <div className="sn__comment-avatar">
+                {c.author?.name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
+              </div>
+              <div className="sn__comment-body">
+                <div className="sn__comment-meta">
+                  <span className="sn__comment-author">{c.author?.name || 'Unknown'}</span>
+                  <span className="sn__comment-time">
+                    {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {' '}
+                    {new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                </div>
+                <p className="sn__comment-text">{c.content}</p>
+              </div>
             </div>
           ))}
-          {!showAddMilestone ? (
-            <button className="proj__add-btn" onClick={() => setShowAddMilestone(true)}>
-              <Plus size={14} /> Add Milestone
-            </button>
-          ) : (
-            <div className="proj__add-form">
-              <input type="text" placeholder="Milestone name..." value={msName} onChange={e => setMsName(e.target.value)} autoFocus />
-              <input type="date" value={msDate} onChange={e => setMsDate(e.target.value)} />
-              <button className="tkt__btn-primary" onClick={addMilestone} disabled={!msName.trim()} style={{ padding: '4px 12px' }}>Add</button>
-              <button className="tkt__btn-secondary" onClick={() => setShowAddMilestone(false)} style={{ padding: '4px 12px' }}>Cancel</button>
-            </div>
-          )}
+          <div ref={commentsEndRef} />
         </div>
-      )}
-
-      {/* Docs Section */}
-      {activeSection === 'docs' && (
-        <div className="proj__section">
-          {editingDoc ? (
-            <div className="proj__doc-editor">
-              <input type="text" value={editingDoc.title} onChange={e => setEditingDoc({ ...editingDoc, title: e.target.value })} style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }} />
-              <RichTextEditor content={editingDoc.content || ''} onChange={val => setEditingDoc({ ...editingDoc, content: val })} placeholder="Write documentation..." />
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button className="tkt__btn-primary" onClick={saveDoc} style={{ padding: '4px 12px' }}>Save</button>
-                <button className="tkt__btn-secondary" onClick={() => setEditingDoc(null)} style={{ padding: '4px 12px' }}>Cancel</button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {docs.map(d => (
-                <div key={d.id} className="proj__doc">
-                  <div className="proj__doc-header">
-                    <FileText size={14} />
-                    <span className="proj__doc-title">{d.title}</span>
-                    <span className="proj__doc-meta">{d.author?.name} · {new Date(d.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                    <button className="tkt__icon-btn" onClick={() => setEditingDoc(d)} title="Edit"><Edit3 size={12} /></button>
-                    <button className="tkt__icon-btn" onClick={() => deleteDoc(d.id)} title="Delete"><Trash2 size={12} /></button>
-                  </div>
-                  {d.content && <div className="proj__doc-content"><RichTextDisplay content={d.content} /></div>}
-                </div>
-              ))}
-              {!showAddDoc ? (
-                <button className="proj__add-btn" onClick={() => setShowAddDoc(true)}>
-                  <Plus size={14} /> Add Document
-                </button>
-              ) : (
-                <div className="proj__doc-editor">
-                  <input type="text" placeholder="Document title..." value={docTitle} onChange={e => setDocTitle(e.target.value)} autoFocus />
-                  <RichTextEditor content={docContent} onChange={setDocContent} placeholder="Write documentation..." />
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <button className="tkt__btn-primary" onClick={addDoc} disabled={!docTitle.trim()} style={{ padding: '4px 12px' }}>Add</button>
-                    <button className="tkt__btn-secondary" onClick={() => setShowAddDoc(false)} style={{ padding: '4px 12px' }}>Cancel</button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+        <div className="sn__comment-input">
+          <textarea
+            placeholder="Add a comment..."
+            value={commentText}
+            onChange={e => setCommentText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) postComment(); }}
+            rows={2}
+          />
+          <button className="sn__send-btn" onClick={postComment} disabled={!commentText.trim() || sending}>
+            {sending ? <Loader2 size={14} className="tkt__spinner" /> : <Send size={14} />}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -29,11 +29,12 @@ export async function GET(
 
     const { id } = await params;
 
-    const [projectRes, milestonesRes, ticketsRes, docsRes] = await Promise.all([
+    const [projectRes, milestonesRes, ticketsRes, docsRes, screenshotsRes] = await Promise.all([
       supabase.from('projects').select('*, created_by_employee:employees!projects_created_by_fkey(id, name, email)').eq('id', id).single(),
       supabase.from('milestones').select('*').eq('project_id', id).order('sort_order'),
       supabase.from('tickets').select(TICKET_SELECT).eq('project_id', id).order('created_at', { ascending: false }),
       supabase.from('project_documents').select('*, author:employees!project_documents_created_by_fkey(id, name)').eq('project_id', id).order('updated_at', { ascending: false }),
+      supabase.from('project_screenshots').select('*').eq('project_id', id).order('created_at', { ascending: false }),
     ]);
 
     if (projectRes.error) {
@@ -46,6 +47,7 @@ export async function GET(
         milestones: milestonesRes.data || [],
         tickets: ticketsRes.data || [],
         documents: docsRes.data || [],
+        screenshots: screenshotsRes.data || [],
       },
       error: null,
     });
