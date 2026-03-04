@@ -147,6 +147,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       return [
         ...baseItems,
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
+        { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Whiteboard', href: '/workspace/whiteboard', icon: 'PenLine' },
         { name: 'My Leads', href: '/workspace/leads', icon: 'Target' },
@@ -156,6 +157,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       return [
         ...baseItems,
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
+        { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Whiteboard', href: '/workspace/whiteboard', icon: 'PenLine' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
@@ -165,6 +167,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       return [
         ...baseItems,
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
+        { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'My Leads', href: '/workspace/leads', icon: 'Target' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
