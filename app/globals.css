@@ -29912,3 +29912,733 @@ body { background: #FAFAFA; }
 .rte-display--plain p {
   white-space: pre-wrap;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Ticket System V2 — New styles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Board horizontal scroll fix */
+.tkt__board {
+  overflow-x: auto;
+}
+
+.tkt__column {
+  min-width: 220px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.tkt__drag-over {
+  background: rgba(99, 102, 241, 0.06) !important;
+  border-radius: 8px;
+}
+
+.tkt__card[draggable="true"] {
+  cursor: grab;
+}
+
+.tkt__card[draggable="true"]:active {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+
+/* Labels */
+.tkt__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.tkt__labels--inline {
+  display: inline-flex;
+  margin-left: 6px;
+  margin-top: 0;
+}
+
+.tkt__label-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #6366f1;
+  background: #eef2ff;
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.tkt__label-pill button {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6366f1;
+  padding: 0;
+  margin-left: 2px;
+}
+
+.tkt__label-pill--sm {
+  font-size: 0.58rem;
+  padding: 0 5px;
+}
+
+.tkt__label-more {
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.tkt__labels-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--ws-border, #d1d5db);
+  border-radius: 6px;
+  background: white;
+  align-items: center;
+  min-height: 34px;
+}
+
+.tkt__labels-input input {
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 100px;
+  font-size: 0.82rem;
+  padding: 0;
+}
+
+/* Card due date */
+.tkt__card-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+/* Sort headers */
+.tkt__sort-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tkt__sort-header:hover {
+  color: #111827;
+}
+
+/* Detail sections */
+.tkt__detail-section {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.tkt__detail-section > label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tkt__detail-parent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #6366f1;
+  padding: 6px 10px;
+  background: #eef2ff;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+.tkt__subtasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tkt__subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  background: #f9fafb;
+}
+
+.tkt__subtask-num {
+  font-weight: 600;
+  color: #6366f1;
+  font-family: monospace;
+  font-size: 0.72rem;
+}
+
+.tkt__subtask-title {
+  flex: 1;
+  color: #374151;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Timeline View
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tkt__timeline {
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.tkt__timeline-header {
+  position: relative;
+  display: flex;
+  height: 32px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 0.5rem;
+}
+
+.tkt__timeline-month {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7280;
+  border-left: 1px solid #e5e7eb;
+}
+
+.tkt__timeline-today {
+  position: absolute;
+  top: 0;
+  bottom: -999px;
+  width: 2px;
+  background: #ef4444;
+  z-index: 2;
+  opacity: 0.5;
+}
+
+.tkt__timeline-body {
+  min-width: 600px;
+}
+
+.tkt__timeline-group {
+  margin-bottom: 1rem;
+}
+
+.tkt__timeline-group-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #374151;
+  padding: 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tkt__timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+.tkt__timeline-row:hover {
+  background: #f9fafb;
+}
+
+.tkt__timeline-row-label {
+  flex: 0 0 200px;
+  font-size: 0.75rem;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tkt__timeline-track {
+  flex: 1;
+  position: relative;
+  height: 16px;
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.tkt__timeline-bar {
+  position: absolute;
+  top: 2px;
+  height: 12px;
+  border-radius: 2px;
+  min-width: 4px;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.tkt__timeline-bar:hover {
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dashboard View
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tkt__dashboard {
+  padding: 1rem;
+}
+
+.tkt__dash-section {
+  margin-bottom: 1.5rem;
+}
+
+.tkt__dash-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 0.75rem;
+}
+
+.tkt__dash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.tkt__dash-card {
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+}
+
+.tkt__dash-card-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1;
+}
+
+.tkt__dash-card-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.tkt__dash-card-label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.tkt__dash-progress {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.tkt__dash-progress-bar {
+  height: 100%;
+  background: #6366f1;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.tkt__dash-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tkt__dash-activity-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  background: #f9fafb;
+}
+
+.tkt__dash-activity-num {
+  font-weight: 700;
+  color: #6366f1;
+  font-family: monospace;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+.tkt__dash-activity-title {
+  flex: 1;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tkt__dash-activity-time {
+  font-size: 0.68rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Projects Page
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.proj {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.proj__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.proj__header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.proj__header-left h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.proj__back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.proj__back-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.proj__empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #9ca3af;
+}
+
+.proj__empty p {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.proj__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.proj__card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: white;
+}
+
+.proj__card:hover {
+  border-color: #6366f1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
+}
+
+.proj__card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.proj__card-header h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  color: #111827;
+}
+
+.proj__status-pill {
+  display: inline-flex;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: capitalize;
+}
+
+.proj__card-desc {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.proj__card-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.7rem;
+  color: #9ca3af;
+}
+
+.proj__card-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Project Detail */
+.proj__info {
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  background: #f9fafb;
+}
+
+.proj__desc {
+  font-size: 0.85rem;
+  color: #374151;
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+.proj__meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.75rem;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.proj__tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1rem;
+}
+
+.proj__tabs button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.proj__tabs button:hover {
+  color: #111827;
+}
+
+.proj__tabs button.active {
+  color: #6366f1;
+  border-bottom-color: #6366f1;
+}
+
+.proj__section {
+  min-height: 100px;
+}
+
+.proj__empty-text {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.proj__ticket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.proj__ticket-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  transition: background 0.1s;
+}
+
+.proj__ticket-row:hover {
+  background: #f3f4f6;
+}
+
+.proj__ticket-num {
+  font-weight: 700;
+  color: #6366f1;
+  font-family: monospace;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.proj__ticket-title {
+  flex: 1;
+  color: #374151;
+}
+
+.proj__ticket-assignee {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* Milestones */
+.proj__milestone {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: white;
+}
+
+.proj__milestone-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.proj__milestone-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #111827;
+  flex: 1;
+}
+
+.proj__milestone-status {
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+}
+
+.proj__milestone-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  color: #9ca3af;
+}
+
+.proj__milestone-desc {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.proj__add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #6366f1;
+  background: #eef2ff;
+  border: 1px dashed #c7d2fe;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: 8px;
+}
+
+.proj__add-btn:hover {
+  background: #e0e7ff;
+}
+
+.proj__add-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.proj__add-form input {
+  flex: 1;
+  min-width: 150px;
+}
+
+/* Docs */
+.proj__doc {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.proj__doc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.proj__doc-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #111827;
+  flex: 1;
+}
+
+.proj__doc-meta {
+  font-size: 0.68rem;
+  color: #9ca3af;
+}
+
+.proj__doc-content {
+  padding: 10px 12px;
+}
+
+.proj__doc-editor {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.proj__doc-editor input {
+  width: 100%;
+  margin-bottom: 8px;
+}
