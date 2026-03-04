@@ -1,0 +1,75 @@
+import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+function getAdmin() {
+  if (!supabaseUrl || !supabaseServiceKey) return null;
+  return createClient(supabaseUrl, supabaseServiceKey);
+}
+
+export async function GET(req: NextRequest) {
+  const admin = getAdmin();
+  if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
+
+  const url = req.nextUrl;
+  const stage = url.searchParams.get('stage');
+  const assigned_to = url.searchParams.get('assigned_to');
+  const school_id = url.searchParams.get('school_id');
+  const deal_type = url.searchParams.get('deal_type');
+  const temperature = url.searchParams.get('temperature');
+  const conference = url.searchParams.get('conference');
+  const search = url.searchParams.get('search');
+  const overdue = url.searchParams.get('overdue');
+
+  let query = admin
+    .from('pipeline_deals')
+    .select(`
+      *,
+      organization:organizations(*, school:schools(*), national_org:national_orgs(*)),
+      contact:contacts(*)
+    `)
+    .order('next_followup', { ascending: true, nullsFirst: false });
+
+  if (stage && stage !== 'all') query = query.eq('stage', stage);
+  if (assigned_to) query = query.eq('assigned_to', assigned_to);
+  if (deal_type) query = query.eq('deal_type', deal_type);
+  if (temperature) query = query.eq('temperature', temperature);
+  if (conference) query = query.eq('conference', conference);
+  if (school_id) query = query.eq('organization.school_id', school_id);
+  if (overdue === 'true') {
+    query = query.lt('next_followup', new Date().toISOString().split('T')[0]);
+  }
+  if (search) {
+    query = query.or(`notes.ilike.%${search}%,conference.ilike.%${search}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Post-filter for search on joined fields
+  let results = data || [];
+  if (search) {
+    const s = search.toLowerCase();
+    results = results.filter(d =>
+      d.organization?.name?.toLowerCase().includes(s) ||
+      d.organization?.school?.name?.toLowerCase().includes(s) ||
+      d.contact?.name?.toLowerCase().includes(s) ||
+      d.notes?.toLowerCase().includes(s) ||
+      d.conference?.toLowerCase().includes(s)
+    );
+  }
+
+  return NextResponse.json(results);
+}
+
+export async function POST(req: NextRequest) {
+  const admin = getAdmin();
+  if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
+
+  const body = await req.json();
+  const { data, error } = await admin.from('pipeline_deals').insert(body).select().single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data, { status: 201 });
+}

@@ -720,3 +720,77 @@ export interface OutreachQueueEntry {
   created_at: string;
   contact?: AlumniContact;
 }
+
+// ============================================
+// Pipeline V2 Types
+// ============================================
+
+export interface School {
+  id: string;
+  name: string;
+  state: string | null;
+  conference: string | null;
+  enrollment: number | null;
+  total_greek_orgs: number | null;
+  chapters_sold: number;
+  alumni_estimated: number | null;
+  alumni_onboarded: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NationalOrg {
+  id: string;
+  name: string;
+  abbreviation: string | null;
+  type: 'fraternity' | 'sorority';
+  nic_npc: boolean;
+  chapter_count: number | null;
+  stage: 'prospect' | 'outreach' | 'demo' | 'negotiation' | 'contract_sent' | 'signed' | 'lost';
+  value: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Organization {
+  id: string;
+  school_id: string | null;
+  national_org_id: string | null;
+  name: string;
+  type: 'chapter' | 'ifc' | 'phc' | 'club' | 'athletic';
+  status: 'prospect' | 'active_customer' | 'churned' | 'hold';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PipelineContact {
+  id: string;
+  org_id: string | null;
+  national_org_id: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: 'president' | 'advisor' | 'fsl_director' | 'nationals_rep' | 'alumni_chair' | 'board_member' | 'other' | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PipelineDeal {
+  id: string;
+  org_id: string | null;
+  contact_id: string | null;
+  assigned_to: string | null;
+  deal_type: 'local' | 'council' | 'national';
+  stage: DealStage;
+  value: number;
+  temperature: 'hot' | 'warm' | 'cold';
+  next_followup: string | null;
+  last_touched: string | null;
+  followup_count: number;
+  notes: string | null;
+  conference: string | null;
+  created_at: string;
+  updated_at: string;
+}
