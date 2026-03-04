@@ -9,6 +9,7 @@ import {
 import { supabase, STAGE_CONFIG, DealStage } from '@/lib/supabase';
 import { useToast } from '@/components/Toast';
 import FollowUpPicker from './FollowUpPicker';
+import DealEditPanel from './DealEditPanel';
 
 /* ─── Types ─── */
 interface PipelineDeal {
@@ -167,6 +168,31 @@ export default function PipelineV2() {
   // Nationals filters
   const [natStageFilter, setNatStageFilter] = useState<string>('all');
   const [natTypeFilter, setNatTypeFilter] = useState<string>('');
+
+  // Deal edit panel
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<PipelineDeal | null>(null);
+  const [isNewDeal, setIsNewDeal] = useState(false);
+
+  function openDeal(deal: PipelineDeal | null) {
+    setEditingDeal(deal);
+    setIsNewDeal(deal === null);
+    setPanelOpen(true);
+  }
+  function closePanel() {
+    setPanelOpen(false);
+  }
+  function handlePanelSaved() {
+    closePanel();
+    loadDeals();
+    loadSchools();
+    showToast(isNewDeal ? 'Deal created!' : 'Deal saved!', 'success');
+  }
+  function handlePanelDeleted() {
+    closePanel();
+    loadDeals();
+    showToast('Deal deleted', 'success');
+  }
 
   /* ─── Data Loading ─── */
   const loadDeals = useCallback(async () => {
@@ -335,7 +361,7 @@ export default function PipelineV2() {
     const assignee = showAssigned ? employees.find(e => e.id === deal.assigned_to) : null;
 
     return (
-      <div className={`pl2__deal-card pl2__deal-card--${urgency}`}>
+      <div className={`pl2__deal-card pl2__deal-card--${urgency}`} onClick={() => openDeal(deal)} style={{ cursor: 'pointer' }}>
         <div className="pl2__deal-header">
           <div className="pl2__deal-org">
             <span className="pl2__temp-dot" style={{ background: TEMP_COLORS[deal.temperature] }} />
@@ -374,7 +400,7 @@ export default function PipelineV2() {
             )}
           </div>
 
-          <div className="pl2__deal-actions">
+          <div className="pl2__deal-actions" onClick={e => e.stopPropagation()}>
             {deal.contact?.phone && (
               <a href={`tel:${deal.contact.phone}`} className="pl2__action-btn pl2__action-btn--call" title="Call">
                 <Phone size={14} />
@@ -596,6 +622,11 @@ export default function PipelineV2() {
               <Filter size={16} /> Filters
             </button>
           )}
+          {(activeTab === 'my-deals' || activeTab === 'all-deals') && (
+            <button className="pl2__add-deal-btn" onClick={() => openDeal(null)} title="Add deal">
+              <Plus size={16} /> New Deal
+            </button>
+          )}
         </div>
       )}
 
@@ -791,6 +822,19 @@ export default function PipelineV2() {
         {/* Leaderboard */}
         {activeTab === 'leaderboard' && <Leaderboard />}
       </div>
+
+      {/* Deal Edit / Create Panel */}
+      {panelOpen && (
+        <DealEditPanel
+          deal={isNewDeal ? null : editingDeal}
+          employees={employees}
+          schools={schools}
+          nationals={nationals}
+          onClose={closePanel}
+          onSaved={handlePanelSaved}
+          onDeleted={handlePanelDeleted}
+        />
+      )}
 
       {/* Follow-up Picker Bottom Sheet */}
       {followupDeal && (
