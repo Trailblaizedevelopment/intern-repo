@@ -51,7 +51,18 @@ export async function GET(request: NextRequest) {
     if (priority) query = query.eq('priority', priority);
     if (type) query = query.eq('type', type);
     if (project) query = query.eq('project', project);
-    if (search) query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    if (search) {
+      // Support searching by ticket number: #238 or TRA-238
+      const numberMatch = search.match(/^#?(\d+)$/) || search.match(/^TRA-(\d+)$/i);
+      if (numberMatch) {
+        query = query.eq('number', parseInt(numberMatch[1], 10));
+      } else {
+        query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+      }
+    }
+
+    const parentTicketId = searchParams.get('parent_ticket_id');
+    if (parentTicketId) query = query.eq('parent_ticket_id', parentTicketId);
 
     const { data, error } = await query;
 
@@ -76,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, type, priority, assignee_id, creator_id } = body;
+    const { title, description, type, priority, assignee_id, creator_id, due_date, labels, project_id, parent_ticket_id, milestone_id, sprint, story_points } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -96,6 +107,13 @@ export async function POST(request: NextRequest) {
         assignee_id: assignee_id || null,
         creator_id: creator_id || null,
         status: 'open',
+        due_date: due_date || null,
+        labels: labels || [],
+        project_id: project_id || null,
+        parent_ticket_id: parent_ticket_id || null,
+        milestone_id: milestone_id || null,
+        sprint: sprint || null,
+        story_points: story_points || null,
       }])
       .select(TICKET_SELECT)
       .single();

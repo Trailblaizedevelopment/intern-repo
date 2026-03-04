@@ -113,7 +113,7 @@ export async function PATCH(
     }
 
     const updateData: Record<string, unknown> = {};
-    const allowedFields = ['title', 'description', 'type', 'priority', 'status', 'assignee_id', 'reviewer_id'];
+    const allowedFields = ['title', 'description', 'type', 'priority', 'status', 'assignee_id', 'reviewer_id', 'due_date', 'labels', 'project_id', 'parent_ticket_id', 'milestone_id', 'sprint', 'story_points'];
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
