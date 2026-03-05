@@ -686,6 +686,15 @@ export interface AlumniContact {
   last_response_at: string | null;
   response_text: string | null;
   response_classification: string | null;
+  // Enrichment fields (populated when alumni signs up on platform)
+  platform_user_id: string | null;
+  platform_chapter_id: string | null;
+  grad_year: number | null;
+  major: string | null;
+  pledge_class: string | null;
+  linkedin_url: string | null;
+  location_city: string | null;
+  signed_up_at: string | null;
   created_at: string;
   updated_at: string;
 }
