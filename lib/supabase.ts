@@ -681,6 +681,7 @@ export interface PlatformMember {
   pledge_class: string | null;
   linkedin_url: string | null;
   location: string | null;
+  avatar_url: string | null;
   member_status: string | null;
   onboarding_completed: boolean;
   signed_up_at: string | null;

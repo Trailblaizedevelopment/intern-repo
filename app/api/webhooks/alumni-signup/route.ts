@@ -63,6 +63,7 @@ interface ExternalProfile {
   pledge_class?: string | null;
   linkedin_url?: string | null;
   location?: string | null;
+  avatar_url?: string | null;
   member_status?: string | null;
   onboarding_completed?: boolean | null;
   created_at?: string | null;
@@ -139,6 +140,7 @@ export async function POST(request: NextRequest) {
     pledge_class:         profile.pledge_class  || null,
     linkedin_url:         profile.linkedin_url  || null,
     location:             profile.location      || null,
+    avatar_url:           profile.avatar_url    || null,
     member_status:        profile.member_status || null,
     onboarding_completed: profile.onboarding_completed ?? false,
     signed_up_at:         profile.created_at || now,

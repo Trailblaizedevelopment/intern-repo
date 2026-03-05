@@ -97,18 +97,26 @@ async function main() {
   // Build ext_chapter_id → int_chapter_id lookup
   const extToInt = Object.fromEntries(validMappings.map(m => [m.external_chapter_id, m.internal_chapter_id]));
 
-  // 3. Fetch all alumni from external platform (exclude bulk import + demos)
-  const { data: allProfiles, error: extErr } = await extDb
-    .from('profiles')
-    .select('id,role,phone,email,first_name,last_name,chapter_id,chapter,grad_year,major,minor,pledge_class,linkedin_url,location,member_status,onboarding_completed,created_at')
-    .eq('role', 'alumni');
+  // 3. Fetch ALL real alumni — paginated, 2026+ filter excludes all bulk imports
+  const PAGE_SIZE = 1000;
+  const allProfiles = [];
+  let page = 0;
+  while (true) {
+    const { data, error: extErr } = await extDb
+      .from('profiles')
+      .select('id,role,phone,email,first_name,last_name,chapter_id,chapter,grad_year,major,minor,pledge_class,linkedin_url,location,avatar_url,member_status,onboarding_completed,created_at')
+      .eq('role', 'alumni')
+      .gte('created_at', '2026-01-01')
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (extErr) { console.error('External fetch error:', extErr.message); return; }
+    if (!data?.length) break;
+    allProfiles.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    page++;
+  }
 
-  if (extErr) { console.error('External fetch error:', extErr.message); return; }
-
-  const profiles = allProfiles.filter(p =>
-    p.chapter_id !== BULK_IMPORT_EXT_ID && !DEMO_NAMES.includes(p.chapter)
-  );
-  console.log('Alumni profiles to sync (excl. bulk/demo):', profiles.length);
+  const profiles = allProfiles.filter(p => !DEMO_NAMES.includes(p.chapter));
+  console.log('Real alumni profiles to sync (2026+, excl. demo):', profiles.length);
 
   // 4. Fetch internal contacts for cross-linking
   const { data: contacts } = await db.from('alumni_contacts').select('id,email,phone_primary,phone_secondary,first_name,last_name');
@@ -158,6 +166,7 @@ async function main() {
       pledge_class:        p.pledge_class,
       linkedin_url:        p.linkedin_url,
       location:            p.location,
+      avatar_url:          p.avatar_url || null,
       member_status:       p.member_status,
       onboarding_completed: p.onboarding_completed || false,
       signed_up_at:        p.created_at,

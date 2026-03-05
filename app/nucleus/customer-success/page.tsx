@@ -922,7 +922,12 @@ export default function CustomerSuccessModule() {
                                   {platformMembers[chapter.id].map(m => (
                                     <div key={m.id} className="cs-pm-row">
                                       <div className="cs-pm-avatar">
-                                        {(m.first_name?.[0] || '?')}{(m.last_name?.[0] || '')}
+                                        {m.avatar_url ? (
+                                          // eslint-disable-next-line @next/next/no-img-element
+                                          <img src={m.avatar_url} alt={m.first_name || ''} className="cs-pm-avatar-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                        ) : (
+                                          <span>{(m.first_name?.[0] || '?')}{(m.last_name?.[0] || '')}</span>
+                                        )}
                                       </div>
                                       <div className="cs-pm-info">
                                         <div className="cs-pm-name">
