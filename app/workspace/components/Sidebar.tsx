@@ -24,7 +24,7 @@ import {
   Wallet,
   Building2,
   Rocket,
-  Bell,
+
   Ticket,
 } from 'lucide-react';
 
@@ -122,20 +122,6 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile Header — compact, 56px */}
-      <header className="ws-mobile-header">
-        <div className="ws-mobile-logo">
-          <img src="/logo-icon.svg" alt="Trailblaize" />
-        </div>
-        <span className="ws-mobile-page-title">{getPageTitle()}</span>
-        <button 
-          className="ws-mobile-menu-btn"
-          aria-label="Notifications"
-        >
-          <Bell size={20} />
-        </button>
-      </header>
-
       {/* Desktop Sidebar */}
       <aside className={`ws-sidebar ${collapsed ? 'collapsed' : ''}`}>
         <div className="ws-sidebar-header">
