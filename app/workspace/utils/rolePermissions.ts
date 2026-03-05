@@ -139,7 +139,6 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
   const baseItems: NavItem[] = [
     { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
     { name: 'Inbox', href: '/workspace/inbox', icon: 'Inbox', badge: unreadCount },
-    { name: 'Messages', href: '/workspace/messages', icon: 'MessageCircle' },
   ];
 
   switch (workspaceRole) {
@@ -149,8 +148,6 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
-        { name: 'Whiteboard', href: '/workspace/whiteboard', icon: 'PenLine' },
-        { name: 'My Leads', href: '/workspace/leads', icon: 'Target' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
     case 'engineer':
@@ -159,7 +156,6 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
-        { name: 'Whiteboard', href: '/workspace/whiteboard', icon: 'PenLine' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
     case 'growth_intern':
@@ -169,7 +165,6 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
-        { name: 'My Leads', href: '/workspace/leads', icon: 'Target' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
   }
