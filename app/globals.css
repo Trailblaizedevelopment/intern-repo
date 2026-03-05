@@ -33559,3 +33559,121 @@ body { background: #FAFAFA; }
   .cs-member-form-grid { grid-template-columns: 1fr; }
   .cs-card-badges { flex-wrap: wrap; }
 }
+
+/* ─── Platform Members tab ─── */
+.cs-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #8b5cf6;
+  color: #fff;
+  border-radius: 9px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-left: 4px;
+}
+.cs-pm-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #6b7280;
+  padding: 8px 0 12px;
+}
+.cs-pm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cs-pm-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+.cs-pm-row:hover { background: #f3f4f6; }
+.cs-pm-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.cs-pm-info { flex: 1; min-width: 0; }
+.cs-pm-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cs-pm-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.cs-pm-meta span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.cs-pm-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+.cs-pm-badge--complete {
+  background: #d1fae5;
+  color: #065f46;
+}
+.cs-pm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.cs-pm-linkedin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #e0f2fe;
+  color: #0077b5;
+  transition: background 0.15s;
+  text-decoration: none;
+}
+.cs-pm-linkedin:hover { background: #bae6fd; }
+.cs-pm-date {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .cs-pm-meta { gap: 6px; }
+  .cs-pm-date { display: none; }
+}

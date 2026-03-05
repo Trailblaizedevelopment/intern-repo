@@ -666,6 +666,30 @@ export const OUTREACH_STATUS_CONFIG: Record<OutreachStatus, { label: string; col
   opted_out: { label: 'Opted Out', color: '#4b5563', bg: '#e5e7eb' },
 };
 
+export interface PlatformMember {
+  id: string;
+  chapter_id: string | null;
+  external_user_id: string;
+  external_chapter_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  grad_year: number | null;
+  major: string | null;
+  minor: string | null;
+  pledge_class: string | null;
+  linkedin_url: string | null;
+  location: string | null;
+  member_status: string | null;
+  onboarding_completed: boolean;
+  signed_up_at: string | null;
+  last_synced_at: string | null;
+  alumni_contact_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AlumniContact {
   id: string;
   chapter_id: string;

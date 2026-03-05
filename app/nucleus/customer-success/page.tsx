@@ -5,7 +5,8 @@ import {
   ArrowLeft, HeartHandshake, Plus, Search, X, Trash2, Edit2, Check, ChevronDown,
   ChevronRight, CreditCard, Calendar, DollarSign, Clock, MessageSquare, Copy,
   ExternalLink, Eye, Undo2, AlertTriangle, Sparkles, Settings, Link as LinkIcon,
-  LayoutDashboard, Users, Briefcase, Lock, GraduationCap,
+  LayoutDashboard, Users, Briefcase, Lock, GraduationCap, UserCheck, Linkedin,
+  MapPin, BookOpen,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -13,7 +14,7 @@ import {
   CHECK_IN_FREQUENCY_LABELS, HealthScore, HEALTH_SCORE_LABELS, HEALTH_SCORE_COLORS,
   ChapterExecutive, ChapterOutreachChannel, EXECUTIVE_POSITION_LABELS,
   OUTREACH_CHANNEL_LABELS, ChapterWithOnboarding,
-  ChapterMember, MemberStatus, MEMBER_STATUS_CONFIG,
+  ChapterMember, MemberStatus, MEMBER_STATUS_CONFIG, PlatformMember,
 } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
@@ -30,14 +31,15 @@ interface ConfettiParticle {
   color: string; rotation: number; scale: number;
 }
 
-type ChapterTab = 'overview' | 'alumni' | 'headhunting' | 'links' | 'payment';
+type ChapterTab = 'overview' | 'alumni' | 'platform' | 'headhunting' | 'links' | 'payment';
 
 const TAB_CONFIG: { id: ChapterTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview',     label: 'Overview',     icon: <LayoutDashboard size={13} /> },
-  { id: 'alumni',       label: 'Alumni',        icon: <Users size={13} /> },
-  { id: 'headhunting',  label: 'Headhunting',   icon: <Briefcase size={13} /> },
-  { id: 'links',        label: 'Signup Links',  icon: <Lock size={13} /> },
-  { id: 'payment',      label: 'Payment',       icon: <CreditCard size={13} /> },
+  { id: 'overview',     label: 'Overview',      icon: <LayoutDashboard size={13} /> },
+  { id: 'alumni',       label: 'Alumni',         icon: <Users size={13} /> },
+  { id: 'platform',     label: 'Members',        icon: <UserCheck size={13} /> },
+  { id: 'headhunting',  label: 'Headhunting',    icon: <Briefcase size={13} /> },
+  { id: 'links',        label: 'Signup Links',   icon: <Lock size={13} /> },
+  { id: 'payment',      label: 'Payment',        icon: <CreditCard size={13} /> },
 ];
 
 export default function CustomerSuccessModule() {
@@ -89,6 +91,10 @@ export default function CustomerSuccessModule() {
   /* ─── Signup links (per-chapter, stored locally before save) ─── */
   const [linkEdits, setLinkEdits] = useState<Record<string, { alumni: string; actives: string }>>({});
   const [savingLinks, setSavingLinks] = useState<string | null>(null);
+
+  /* ─── Platform members ─── */
+  const [platformMembers, setPlatformMembers] = useState<Record<string, PlatformMember[]>>({});
+  const [loadingPlatformMembers, setLoadingPlatformMembers] = useState<Record<string, boolean>>({});
 
   /* ─── Headhunting ─── */
   const [members, setMembers] = useState<Record<string, ChapterMember[]>>({});
@@ -204,6 +210,21 @@ export default function CustomerSuccessModule() {
       if (json.data) setMembers(p => ({ ...p, [chapterId]: json.data }));
     } finally {
       setLoadingMembers(p => ({ ...p, [chapterId]: false }));
+    }
+  }
+
+  async function fetchPlatformMembers(chapterId: string) {
+    if (!supabase) return;
+    setLoadingPlatformMembers(p => ({ ...p, [chapterId]: true }));
+    try {
+      const { data } = await supabase
+        .from('platform_members')
+        .select('*')
+        .eq('chapter_id', chapterId)
+        .order('signed_up_at', { ascending: false });
+      setPlatformMembers(p => ({ ...p, [chapterId]: data || [] }));
+    } finally {
+      setLoadingPlatformMembers(p => ({ ...p, [chapterId]: false }));
     }
   }
 
@@ -447,6 +468,7 @@ export default function CustomerSuccessModule() {
   function handleTabChange(tab: ChapterTab, chapterId: string) {
     setActiveTab(tab);
     if (tab === 'headhunting' && !members[chapterId]) fetchMembers(chapterId);
+    if (tab === 'platform' && !platformMembers[chapterId]) fetchPlatformMembers(chapterId);
   }
 
   function getCompletionPercentage(chapter: ChapterWithOnboarding): number {
@@ -708,15 +730,21 @@ export default function CustomerSuccessModule() {
                       <div className="chapter-card-body">
                         {/* Tab bar */}
                         <div className="cs-tabs">
-                          {TAB_CONFIG.map(t => (
-                            <button
-                              key={t.id}
-                              className={`cs-tab ${activeTab === t.id ? 'active' : ''}`}
-                              onClick={() => handleTabChange(t.id, chapter.id)}
-                            >
-                              {t.icon} {t.label}
-                            </button>
-                          ))}
+                          {TAB_CONFIG.map(t => {
+                            const pmCount = t.id === 'platform' ? (platformMembers[chapter.id]?.length ?? null) : null;
+                            return (
+                              <button
+                                key={t.id}
+                                className={`cs-tab ${activeTab === t.id ? 'active' : ''}`}
+                                onClick={() => handleTabChange(t.id, chapter.id)}
+                              >
+                                {t.icon} {t.label}
+                                {pmCount !== null && pmCount > 0 && (
+                                  <span className="cs-tab-badge">{pmCount}</span>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
 
                         {/* ── Overview tab ── */}
@@ -862,6 +890,79 @@ export default function CustomerSuccessModule() {
                             <Link href={`/dashboard/clients/${chapter.id}/alumni`} className="cs-view-full-link">
                               View Full Alumni List <ExternalLink size={13} />
                             </Link>
+                          </div>
+                        )}
+
+                        {/* ── Platform Members tab ── */}
+                        {activeTab === 'platform' && (
+                          <div className="cs-tab-body">
+                            {loadingPlatformMembers[chapter.id] ? (
+                              <div className="cs-empty-state">Loading…</div>
+                            ) : !platformMembers[chapter.id] ? (
+                              <div className="cs-empty-state">Loading members…</div>
+                            ) : platformMembers[chapter.id].length === 0 ? (
+                              <div className="cs-empty-state">
+                                No alumni have signed up through the platform yet.<br />
+                                <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>Members will appear here once they create accounts via the alumni signup link.</span>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="cs-pm-summary">
+                                  <span><strong>{platformMembers[chapter.id].length}</strong> signed up</span>
+                                  <span className="cs-dot">·</span>
+                                  <span style={{ color: '#059669' }}>
+                                    <strong>{platformMembers[chapter.id].filter(m => m.onboarding_completed).length}</strong> onboarding complete
+                                  </span>
+                                  <span className="cs-dot">·</span>
+                                  <span style={{ color: '#8b5cf6' }}>
+                                    <strong>{platformMembers[chapter.id].filter(m => m.linkedin_url).length}</strong> LinkedIn
+                                  </span>
+                                </div>
+                                <div className="cs-pm-list">
+                                  {platformMembers[chapter.id].map(m => (
+                                    <div key={m.id} className="cs-pm-row">
+                                      <div className="cs-pm-avatar">
+                                        {(m.first_name?.[0] || '?')}{(m.last_name?.[0] || '')}
+                                      </div>
+                                      <div className="cs-pm-info">
+                                        <div className="cs-pm-name">
+                                          {m.first_name} {m.last_name}
+                                          {m.onboarding_completed && (
+                                            <span className="cs-pm-badge cs-pm-badge--complete">✓ Onboarded</span>
+                                          )}
+                                        </div>
+                                        <div className="cs-pm-meta">
+                                          {m.grad_year && (
+                                            <span><GraduationCap size={11} /> {m.grad_year}</span>
+                                          )}
+                                          {m.major && (
+                                            <span><BookOpen size={11} /> {m.major}</span>
+                                          )}
+                                          {m.location && (
+                                            <span><MapPin size={11} /> {m.location}</span>
+                                          )}
+                                          {m.email && (
+                                            <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>{m.email}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="cs-pm-actions">
+                                        {m.linkedin_url && (
+                                          <a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" className="cs-pm-linkedin" title="LinkedIn">
+                                            <Linkedin size={14} />
+                                          </a>
+                                        )}
+                                        {m.signed_up_at && (
+                                          <span className="cs-pm-date">
+                                            {new Date(m.signed_up_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
                           </div>
                         )}
 
