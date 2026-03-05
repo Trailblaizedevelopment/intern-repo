@@ -33612,6 +33612,8 @@ body { background: #FAFAFA; }
   justify-content: center;
   flex-shrink: 0;
   text-transform: uppercase;
+  overflow: hidden;
+  position: relative;
 }
 .cs-pm-info { flex: 1; min-width: 0; }
 .cs-pm-name {
@@ -33679,8 +33681,10 @@ body { background: #FAFAFA; }
 }
 
 .cs-pm-avatar-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  border-radius: 50%;
   object-fit: cover;
+  border-radius: 50%;
 }

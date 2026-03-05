@@ -924,10 +924,21 @@ export default function CustomerSuccessModule() {
                                       <div className="cs-pm-avatar">
                                         {m.avatar_url ? (
                                           // eslint-disable-next-line @next/next/no-img-element
-                                          <img src={m.avatar_url} alt={m.first_name || ''} className="cs-pm-avatar-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                                        ) : (
-                                          <span>{(m.first_name?.[0] || '?')}{(m.last_name?.[0] || '')}</span>
-                                        )}
+                                          <img
+                                            src={`/api/avatar-proxy?url=${encodeURIComponent(m.avatar_url!)}`}
+                                            alt={m.first_name || ''}
+                                            className="cs-pm-avatar-img"
+                                            onError={e => {
+                                              const img = e.target as HTMLImageElement;
+                                              img.style.display = 'none';
+                                              const fallback = img.nextElementSibling as HTMLElement | null;
+                                              if (fallback) fallback.style.display = 'flex';
+                                            }}
+                                          />
+                                        ) : null}
+                                        <span style={{ display: m.avatar_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                                          {(m.first_name?.[0] || '?')}{(m.last_name?.[0] || '')}
+                                        </span>
                                       </div>
                                       <div className="cs-pm-info">
                                         <div className="cs-pm-name">
