@@ -30,11 +30,14 @@ export function middleware(req: NextRequest) {
     // If no key is configured, allow through (dev mode / not set up yet)
     if (!apiKey) return NextResponse.next();
 
-    // Allow browser sessions: Supabase sets sb-* cookies on login
-    const hasBrowserSession = [...req.cookies.getAll()].some(c =>
-      c.name.startsWith('sb-') || c.name === 'supabase-auth-token'
-    );
-    if (hasBrowserSession) return NextResponse.next();
+    // Allow same-origin browser requests — browsers always send Origin header
+    // for same-site fetches. This app uses localStorage for auth (not cookies).
+    const origin  = req.headers.get('origin')  || '';
+    const referer = req.headers.get('referer') || '';
+    const host    = req.headers.get('host')    || '';
+    const isBrowser = origin.includes(host) || referer.includes(host) ||
+      req.headers.get('sec-fetch-site') === 'same-origin';
+    if (isBrowser) return NextResponse.next();
 
     // Check for API key in Authorization header or x-api-key header
     const authHeader = req.headers.get('authorization') || '';
