@@ -270,7 +270,11 @@ export interface Chapter {
   payment_start_date: string | null;
   last_payment_date: string | null;
   next_payment_date: string | null;
-  
+
+  // Signup links
+  alumni_join_link: string | null;
+  actives_join_link: string | null;
+
   created_at: string;
   updated_at: string;
 }
@@ -791,6 +795,32 @@ export interface PipelineDeal {
   followup_count: number;
   notes: string | null;
   conference: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
+// Chapter Member (Headhunting) Types
+// ============================================
+
+export type MemberStatus = 'looking' | 'in_progress' | 'placed' | 'not_tracking';
+
+export const MEMBER_STATUS_CONFIG: Record<MemberStatus, { label: string; color: string; bg: string }> = {
+  looking:      { label: 'Looking',     color: '#d97706', bg: '#fef3c7' },
+  in_progress:  { label: 'In Progress', color: '#2563eb', bg: '#dbeafe' },
+  placed:       { label: 'Placed 🎉',   color: '#16a34a', bg: '#dcfce7' },
+  not_tracking: { label: 'Not Tracking',color: '#6b7280', bg: '#f3f4f6' },
+};
+
+export interface ChapterMember {
+  id: string;
+  chapter_id: string;
+  name: string;
+  grad_year: number | null;
+  major: string | null;
+  career_interest: string | null;
+  status: MemberStatus;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
