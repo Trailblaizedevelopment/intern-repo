@@ -108,58 +108,34 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
     fetchData();
   }, [currentEmployee?.id, isFounder, isEngineer]);
 
-  // --- Follow-up lists (founders) ---
-  const overdueFollowups = useMemo(() =>
-    myDeals.filter(d =>
-      d.next_followup &&
-      new Date(d.next_followup) < now &&
-      !['closed_won', 'closed_lost', 'hold_off'].includes(d.stage)
-    ),
-    [myDeals, now]
+  // --- My active deals (all, sorted by stage urgency then value) ---
+  const STAGE_PRIORITY: Record<string, number> = {
+    contract_sent: 0, second_call: 1, first_demo: 2, demo_booked: 3, lead: 4,
+  };
+
+  const myActiveDealsAll = useMemo(() =>
+    myDeals
+      .filter(d => !['closed_won', 'closed_lost', 'hold_off'].includes(d.stage))
+      .sort((a, b) => {
+        const sp = (STAGE_PRIORITY[a.stage] ?? 5) - (STAGE_PRIORITY[b.stage] ?? 5);
+        if (sp !== 0) return sp;
+        return (b.value || 0) - (a.value || 0);
+      }),
+    [myDeals]
   );
 
-  const todayFollowups = useMemo(() =>
-    myDeals.filter(d =>
-      d.next_followup?.startsWith(todayStr) &&
-      !['closed_won', 'closed_lost', 'hold_off'].includes(d.stage)
-    ),
-    [myDeals, todayStr]
+  // Overdue count for badge
+  const overdueCount = useMemo(() =>
+    myActiveDealsAll.filter(d =>
+      d.next_followup && new Date(d.next_followup) < now
+    ).length,
+    [myActiveDealsAll, now]
   );
-
-  // Deduplicated combined list: overdue first, then today, then upcoming (next 7 days)
-  const priorityFollowups = useMemo(() => {
-    const sevenDays = new Date();
-    sevenDays.setDate(sevenDays.getDate() + 7);
-    const seen = new Set<string>();
-    const result: Deal[] = [];
-
-    const addDeals = (arr: Deal[]) => {
-      for (const d of arr) {
-        if (!seen.has(d.id)) {
-          seen.add(d.id);
-          result.push(d);
-        }
-      }
-    };
-
-    addDeals(overdueFollowups);
-    addDeals(todayFollowups);
-    addDeals(
-      myDeals.filter(d =>
-        d.next_followup &&
-        new Date(d.next_followup) > now &&
-        new Date(d.next_followup) <= sevenDays &&
-        !['closed_won', 'closed_lost', 'hold_off'].includes(d.stage)
-      )
-    );
-
-    return result;
-  }, [myDeals, overdueFollowups, todayFollowups, now]);
 
   // --- Personal metrics (founders) ---
   const myClosedWon = useMemo(() => myDeals.filter(d => d.stage === 'closed_won'), [myDeals]);
   const myARR = useMemo(() => myClosedWon.reduce((s, d) => s + (d.value || 0), 0), [myClosedWon]);
-  const myActiveDeals = useMemo(() => myDeals.filter(d => !['closed_won', 'closed_lost', 'hold_off'].includes(d.stage)), [myDeals]);
+
 
   // --- Company-wide metrics ---
   const totalARR = useMemo(() =>
@@ -190,7 +166,7 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
       });
   }, [google.calendarEvents, todayStr]);
 
-  const urgentCount = overdueFollowups.length + todayFollowups.length;
+  const urgentCount = overdueCount;
 
   return (
     <div className="cc-dashboard">
@@ -254,23 +230,28 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
           )}
         </div>
 
-        {/* Follow-ups: Founders */}
+        {/* My Deals: Founders */}
         {isFounder && (
           <div className="cc-card">
             <div className="cc-card-header">
-              <span className="cc-card-title">Follow-ups</span>
-              {urgentCount > 0 && (
-                <span className="cc-badge cc-badge--red">{urgentCount} due</span>
-              )}
+              <span className="cc-card-title">My Deals</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                {overdueCount > 0 && (
+                  <span className="cc-badge cc-badge--red">{overdueCount} overdue</span>
+                )}
+                {myActiveDealsAll.length > 0 && (
+                  <span className="cc-badge">{myActiveDealsAll.length}</span>
+                )}
+              </div>
             </div>
-            {priorityFollowups.length === 0 ? (
+            {myActiveDealsAll.length === 0 ? (
               <div className="cc-empty">
                 <CheckCircle size={15} />
-                All caught up
+                No active deals
               </div>
             ) : (
               <div className="cc-list">
-                {priorityFollowups.slice(0, 8).map(d => {
+                {myActiveDealsAll.slice(0, 10).map(d => {
                   const rel = d.next_followup ? relativeDate(d.next_followup) : '';
                   const isOverdue = d.next_followup && new Date(d.next_followup) < now;
                   return (
@@ -287,9 +268,9 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
                 })}
               </div>
             )}
-            {priorityFollowups.length > 8 && (
+            {myActiveDealsAll.length > 10 && (
               <Link href="/nucleus/pipeline" className="cc-view-all">
-                View all {priorityFollowups.length} <ArrowRight size={11} />
+                View all {myActiveDealsAll.length} <ArrowRight size={11} />
               </Link>
             )}
           </div>
@@ -381,7 +362,7 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
             <div className="cc-metric-label">Deals Closed</div>
           </div>
           <div className="cc-metric-tile">
-            <div className="cc-metric-number">{myActiveDeals.length}</div>
+            <div className="cc-metric-number">{myActiveDealsAll.length}</div>
             <div className="cc-metric-label">Active Pipeline</div>
           </div>
           <div className="cc-metric-tile cc-metric-tile--amber">
