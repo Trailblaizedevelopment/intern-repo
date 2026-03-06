@@ -18,6 +18,7 @@ import {
 } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
+import ConversationsTab from './ConversationsTab';
 
 interface Toast {
   id: string;
@@ -43,6 +44,9 @@ const TAB_CONFIG: { id: ChapterTab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function CustomerSuccessModule() {
+  /* ─── Module-level view ─── */
+  const [moduleView, setModuleView] = useState<'chapters' | 'conversations'>('chapters');
+
   /* ─── Core state ─── */
   const [chapters, setChapters] = useState<ChapterWithOnboarding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -579,7 +583,37 @@ export default function CustomerSuccessModule() {
       </header>
 
       <main className="module-main">
-        {loading ? (
+        {/* ─── Module-level navigation ─── */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #f3f4f6', paddingBottom: 0 }}>
+          {([
+            { id: 'chapters', label: 'Chapters', icon: <HeartHandshake size={14} /> },
+            { id: 'conversations', label: 'Conversations', icon: <MessageSquare size={14} /> },
+          ] as const).map(view => (
+            <button
+              key={view.id}
+              onClick={() => setModuleView(view.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px',
+                border: 'none',
+                borderBottom: moduleView === view.id ? '2px solid #ec4899' : '2px solid transparent',
+                background: 'none',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: moduleView === view.id ? 600 : 400,
+                color: moduleView === view.id ? '#ec4899' : '#6b7280',
+                marginBottom: -2,
+                transition: 'all 0.15s',
+              }}
+            >
+              {view.icon} {view.label}
+            </button>
+          ))}
+        </div>
+
+        {moduleView === 'conversations' ? (
+          <ConversationsTab showToast={showToast} />
+        ) : loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
             {[1,2,3,4,5].map(i => (
               <div key={i} style={{ height: 72, background: '#f3f4f6', borderRadius: 12, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i*0.1}s` }} />
