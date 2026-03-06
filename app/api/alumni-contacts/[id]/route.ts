@@ -41,7 +41,7 @@ const ALLOWED_FIELDS: Record<string, 'string' | 'boolean' | 'number' | 'timestam
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = getSupabaseAdmin();
@@ -52,7 +52,7 @@ export async function PATCH(
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     if (!id) {
       return NextResponse.json(
         { data: null, error: { message: 'Contact ID is required', code: 'VALIDATION_ERROR' } },
