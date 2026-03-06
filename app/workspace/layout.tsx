@@ -3,6 +3,7 @@
 import { ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { ToastProvider } from '@/components/Toast';
 import { Sidebar } from './components/Sidebar';
 import { Search, Bell, Settings } from 'lucide-react';
 import Link from 'next/link';
@@ -47,7 +48,9 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <ProtectedRoute>
-        <WorkspaceLayoutInner>{children}</WorkspaceLayoutInner>
+        <ToastProvider>
+          <WorkspaceLayoutInner>{children}</WorkspaceLayoutInner>
+        </ToastProvider>
       </ProtectedRoute>
     </AuthProvider>
   );

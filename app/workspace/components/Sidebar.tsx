@@ -24,8 +24,8 @@ import {
   Wallet,
   Building2,
   Rocket,
-
   Ticket,
+  GraduationCap,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -44,6 +44,8 @@ const iconMap: Record<string, LucideIcon> = {
   TrendingUp,
   Ticket,
   Building2,
+  HeartHandshake,
+  GraduationCap,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
@@ -93,6 +95,8 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
 
   // Mobile bottom tabs — role-aware
   const isFounderRole = role === 'founder' || role === 'cofounder';
+  const isInternRole = role === 'growth_intern' || role === 'sales_intern' || role === 'marketing_intern';
+
   const bottomTabItems = isFounderRole
     ? [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
@@ -100,6 +104,13 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
         { name: 'Nucleus', href: '/nucleus', icon: 'Zap', badge: 0 },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2', badge: 0 },
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', badge: openTicketCount },
+      ]
+    : isInternRole
+    ? [
+        // Interns: exactly 3 tabs — Dashboard, My Deals, Schools
+        { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
+        { name: 'My Deals', href: '/workspace/my-deals', icon: 'HeartHandshake', badge: 0 },
+        { name: 'Schools', href: '/workspace/schools', icon: 'GraduationCap', badge: 0 },
       ]
     : [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },

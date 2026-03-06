@@ -136,9 +136,16 @@ function formatDate(d: string | null): string {
 }
 
 /* ─── Main Component ─── */
-export default function PipelineV2() {
+interface PipelineV2Props {
+  /** Pre-select and lock to a specific tab (used by intern workspace pages) */
+  initialTab?: Tab;
+  /** When true, hides the tab bar so users can't switch tabs */
+  lockedTab?: boolean;
+}
+
+export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false }: PipelineV2Props = {}) {
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<Tab>('my-deals');
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [deals, setDeals] = useState<PipelineDeal[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [nationals, setNationals] = useState<NationalOrg[]>([]);
@@ -587,22 +594,24 @@ export default function PipelineV2() {
 
   return (
     <div className="pl2">
-      {/* Tabs */}
-      <div className="pl2__tabs">
-        {TABS.filter(t => t.key !== 'leaderboard' || isFounder).map(t => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.key}
-              className={`pl2__tab ${activeTab === t.key ? 'pl2__tab--active' : ''}`}
-              onClick={() => { setActiveTab(t.key); setSelectedSchool(null); setSelectedNational(null); }}
-            >
-              <Icon size={16} />
-              <span className="pl2__tab-label">{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Tabs — hidden when locked to a single tab (intern workspace pages) */}
+      {!lockedTab && (
+        <div className="pl2__tabs">
+          {TABS.filter(t => t.key !== 'leaderboard' || isFounder).map(t => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.key}
+                className={`pl2__tab ${activeTab === t.key ? 'pl2__tab--active' : ''}`}
+                onClick={() => { setActiveTab(t.key); setSelectedSchool(null); setSelectedNational(null); }}
+              >
+                <Icon size={16} />
+                <span className="pl2__tab-label">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Search + Filters */}
       {(activeTab === 'my-deals' || activeTab === 'all-deals' || activeTab === 'contacts') && (

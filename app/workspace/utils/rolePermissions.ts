@@ -136,6 +136,8 @@ export interface NavItem {
 
 export function getNavigationItems(role: EmployeeRole, unreadCount?: number): NavItem[] {
   const workspaceRole = getWorkspaceRole(role);
+
+  // Shared base for roles that have Inbox
   const baseItems: NavItem[] = [
     { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
     { name: 'Inbox', href: '/workspace/inbox', icon: 'Inbox', badge: unreadCount },
@@ -160,11 +162,13 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       ];
     case 'growth_intern':
     default:
+      // Interns: no Inbox, no Tickets, no My Tasks
+      // Gets: Dashboard, My Deals (filtered pipeline), Schools (read-only pipeline view), Projects, Team
       return [
-        ...baseItems,
-        { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
+        { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
+        { name: 'My Deals', href: '/workspace/my-deals', icon: 'HeartHandshake', emphasized: true },
+        { name: 'Schools', href: '/workspace/schools', icon: 'GraduationCap' },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
-        { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
   }
