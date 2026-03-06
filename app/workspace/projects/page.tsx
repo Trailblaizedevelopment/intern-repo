@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, X, ChevronLeft, FileText, Ticket, Loader2, Calendar, Target,
   Edit3, Trash2, Image, Upload, Users, MessageSquare, Send, Paperclip,
-  StickyNote, MoreHorizontal, Camera, Link2, ExternalLink,
+  StickyNote, MoreHorizontal, Camera, Link2, ExternalLink, Globe, Smartphone,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase, Employee } from '@/lib/supabase';
@@ -20,6 +20,7 @@ interface Project {
   name: string;
   description: string | null;
   status: string;
+  platform: 'web' | 'ios';
   color: string | null;
   start_date: string | null;
   target_date: string | null;
@@ -148,6 +149,7 @@ export default function ProjectsPage() {
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('');
+  const [filterPlatform, setFilterPlatform] = useState<'all' | 'web' | 'ios'>('all');
 
   useEffect(() => {
     if (!supabase || !user) return;
@@ -184,9 +186,9 @@ export default function ProjectsPage() {
     }
   }, []);
 
-  const filteredProjects = filterStatus
-    ? projects.filter(p => p.status === filterStatus)
-    : projects;
+  const filteredProjects = projects
+    .filter(p => !filterStatus || p.status === filterStatus)
+    .filter(p => filterPlatform === 'all' || (p.platform || 'web') === filterPlatform);
 
   // Stats
   const activeCount = projects.filter(p => p.status === 'active').length;
@@ -215,19 +217,26 @@ export default function ProjectsPage() {
           <span className="sn__header-count">{projects.length}</span>
         </div>
         <div className="sn__header-right">
+          {/* Platform toggle */}
+          <div className="sn__platform-toggle">
+            <button
+              className={`sn__platform-btn ${filterPlatform === 'all' ? 'active' : ''}`}
+              onClick={() => setFilterPlatform('all')}
+            >All</button>
+            <button
+              className={`sn__platform-btn ${filterPlatform === 'web' ? 'active' : ''}`}
+              onClick={() => setFilterPlatform('web')}
+            ><Globe size={13} /> Web</button>
+            <button
+              className={`sn__platform-btn ${filterPlatform === 'ios' ? 'active' : ''}`}
+              onClick={() => setFilterPlatform('ios')}
+            ><Smartphone size={13} /> iOS</button>
+          </div>
           <div className="sn__filter-pills">
-            <button className={`sn__pill ${!filterStatus ? 'active' : ''}`} onClick={() => setFilterStatus('')}>
-              All
-            </button>
-            <button className={`sn__pill ${filterStatus === 'active' ? 'active' : ''}`} onClick={() => setFilterStatus('active')}>
-              Active
-            </button>
-            <button className={`sn__pill ${filterStatus === 'planning' ? 'active' : ''}`} onClick={() => setFilterStatus('planning')}>
-              Planning
-            </button>
-            <button className={`sn__pill ${filterStatus === 'completed' ? 'active' : ''}`} onClick={() => setFilterStatus('completed')}>
-              Done
-            </button>
+            <button className={`sn__pill ${!filterStatus ? 'active' : ''}`} onClick={() => setFilterStatus('')}>All</button>
+            <button className={`sn__pill ${filterStatus === 'active' ? 'active' : ''}`} onClick={() => setFilterStatus('active')}>Active</button>
+            <button className={`sn__pill ${filterStatus === 'planning' ? 'active' : ''}`} onClick={() => setFilterStatus('planning')}>Planning</button>
+            <button className={`sn__pill ${filterStatus === 'completed' ? 'active' : ''}`} onClick={() => setFilterStatus('completed')}>Done</button>
           </div>
           <button className="sn__create-btn" onClick={() => setShowCreate(true)}>
             <Plus size={16} /> New Project
@@ -326,7 +335,7 @@ function StickyNoteCard({ project, colorIndex, onClick }: {
       {/* Folded corner effect */}
       <div className="sn__note-fold" />
 
-      {/* Status indicator */}
+      {/* Status + platform indicator */}
       <div className="sn__note-status">
         <span className="sn__note-status-dot" style={{
           background: project.status === 'active' ? '#10B981'
@@ -335,6 +344,11 @@ function StickyNoteCard({ project, colorIndex, onClick }: {
             : '#9CA3AF'
         }} />
         <span>{STATUS_CONFIG[project.status]?.label || project.status}</span>
+        <span className="sn__note-platform-badge">
+          {(project.platform || 'web') === 'ios'
+            ? <><Smartphone size={10} /> iOS</>
+            : <><Globe size={10} /> Web</>}
+        </span>
       </div>
 
       {/* Title */}
@@ -391,6 +405,7 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('active');
+  const [platform, setPlatform] = useState<'web' | 'ios'>('web');
   const [targetDate, setTargetDate] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -405,6 +420,7 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
           name: name.trim(),
           description: description.trim() || null,
           status,
+          platform,
           start_date: new Date().toISOString().split('T')[0],
           target_date: targetDate || null,
           created_by: currentEmployeeId,
@@ -429,6 +445,17 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
           <div className="tkt__field">
             <label>Description</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What's this project about?" rows={3} style={{ width: '100%', resize: 'vertical' }} />
+          </div>
+          <div className="tkt__field">
+            <label>Platform</label>
+            <div className="sn__platform-toggle" style={{ marginTop: 4 }}>
+              <button type="button" className={`sn__platform-btn ${platform === 'web' ? 'active' : ''}`} onClick={() => setPlatform('web')}>
+                <Globe size={13} /> Web App
+              </button>
+              <button type="button" className={`sn__platform-btn ${platform === 'ios' ? 'active' : ''}`} onClick={() => setPlatform('ios')}>
+                <Smartphone size={13} /> iOS App
+              </button>
+            </div>
           </div>
           <div className="tkt__field-row">
             <div className="tkt__field">
@@ -731,11 +758,18 @@ function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRe
           <>
             <div className="sn__hero-top">
               <h1 className="sn__hero-title">{project.name}</h1>
-              <span className="sn__hero-status" style={{
-                color: project.status === 'active' ? '#10B981' : project.status === 'completed' ? '#3B82F6' : '#9CA3AF',
-              }}>
-                {STATUS_CONFIG[project.status]?.label || project.status}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="sn__hero-platform-badge">
+                  {(project.platform || 'web') === 'ios'
+                    ? <><Smartphone size={12} /> iOS App</>
+                    : <><Globe size={12} /> Web App</>}
+                </span>
+                <span className="sn__hero-status" style={{
+                  color: project.status === 'active' ? '#10B981' : project.status === 'completed' ? '#3B82F6' : '#9CA3AF',
+                }}>
+                  {STATUS_CONFIG[project.status]?.label || project.status}
+                </span>
+              </div>
             </div>
             {project.description && <p className="sn__hero-desc">{project.description}</p>}
           </>
