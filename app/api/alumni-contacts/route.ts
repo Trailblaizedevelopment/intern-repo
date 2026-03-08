@@ -34,21 +34,25 @@ export async function GET(request: NextRequest) {
     }
 
     const outreachStatus = searchParams.get('outreach_status');
-    const limit  = Math.min(parseInt(searchParams.get('limit')  || '100'), 500);
-    const offset = Math.max(parseInt(searchParams.get('offset') || '0'),   0);
+    // Allow full export when export=true (no page cap)
+    const isExport = searchParams.get('export') === 'true';
+    const limit  = isExport ? 10000 : Math.min(parseInt(searchParams.get('limit') || '100'), 500);
+    const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
 
     let query = supabase
       .from('alumni_contacts')
       .select(
         `id,
         first_name, last_name,
+        email, year,
         phone_primary, phone_secondary,
         outreach_status, is_imessage, assigned_line,
         linq_chat_id,
         touch1_sent_at, touch2_sent_at, touch3_sent_at,
         last_response_at, response_text, response_classification,
         flagged, flagged_reason,
-        signed_up_at, platform_user_id`,
+        signed_up_at, platform_user_id,
+        created_at`,
         { count: 'exact' }
       )
       .eq('chapter_id', chapterId)

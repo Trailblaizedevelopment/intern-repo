@@ -179,6 +179,7 @@ export default function AlumniPage() {
     return false;
   });
   const [activityItems, setActivityItems] = useState<AlumniContact[]>([]);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
   const limit = 25;
   const totalPages = Math.ceil(total / limit);
@@ -351,14 +352,49 @@ export default function AlumniPage() {
     try { await fetch('/api/alumni', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: Array.from(selected) }) }); setSelected(new Set()); setDeleteConfirm(false); fetchContacts(); fetchStats(); } catch (err) { console.error('Bulk delete failed:', err); }
   }
 
-  function exportCSV() {
-    const toExport = selected.size > 0 ? contacts.filter(c => selected.has(c.id)) : contacts;
+  async function exportCSV() {
+    if (exportingCSV) return;
     const header = 'First Name,Last Name,Phone,Phone 2,Email,Year,Status,Line,Date Added';
-    const rows = toExport.map(c => [c.first_name, c.last_name, c.phone_primary || '', c.phone_secondary || '', c.email || '', c.year || '', c.outreach_status, c.assigned_line || '', formatDate(c.created_at)].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
-    const csv = [header, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `alumni-${chapter?.chapter_name || chapterId}-${new Date().toISOString().split('T')[0]}.csv`; a.click(); URL.revokeObjectURL(url);
+    function buildRows(list: AlumniContact[]) {
+      return list.map(c => [
+        c.first_name, c.last_name,
+        c.phone_primary || '', c.phone_secondary || '',
+        c.email || '', c.year || '',
+        c.outreach_status, c.assigned_line || '',
+        formatDate(c.created_at),
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+    }
+    function download(rows: string[]) {
+      const csv = [header, ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `alumni-${chapter?.chapter_name || chapterId}-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    if (selected.size > 0) {
+      download(buildRows(contacts.filter(c => selected.has(c.id))));
+      return;
+    }
+    setExportingCSV(true);
+    try {
+      const p = new URLSearchParams({ chapter_id: chapterId, export: 'true', sort_by: sortBy, sort_dir: sortDir });
+      if (filterStatus) p.set('outreach_status', filterStatus);
+      const res = await fetch(`/api/alumni-contacts?${p}`);
+      const json = await res.json();
+      if (json.data?.contacts) {
+        download(buildRows(json.data.contacts));
+        showToast(`Exported ${json.data.contacts.length} contacts`, 'success');
+      } else {
+        showToast('Export failed', 'error');
+      }
+    } catch {
+      showToast('Export failed — network error', 'error');
+    } finally {
+      setExportingCSV(false);
+    }
   }
 
   function handleSort(field: SortField) { if (sortBy === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(field); setSortDir('asc'); } }
@@ -554,7 +590,7 @@ export default function AlumniPage() {
                 <button className="module-filter-btn" style={{ color: '#dc2626', borderColor: '#fecaca' }} onClick={() => setDeleteConfirm(true)}><Trash2 size={16} /> Delete ({selected.size})</button>
               </>
             )}
-            {selected.size === 0 && <button className="module-filter-btn" onClick={exportCSV} disabled={contacts.length === 0}><Download size={16} /> Export CSV</button>}
+            {selected.size === 0 && <button className="module-filter-btn" onClick={exportCSV} disabled={contacts.length === 0 || exportingCSV}><Download size={16} /> {exportingCSV ? 'Exporting...' : 'Export CSV'}</button>}
             <button className="module-primary-btn" onClick={() => setShowImportModal(true)}><Upload size={18} /> Import CSV</button>
           </div>
         </div>
