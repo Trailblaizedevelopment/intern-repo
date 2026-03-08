@@ -19,6 +19,7 @@ import {
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
 import ConversationsTab from './ConversationsTab';
+import OutreachPage from '@/app/workspace/outreach/page';
 
 interface Toast {
   id: string;
@@ -45,7 +46,7 @@ const TAB_CONFIG: { id: ChapterTab; label: string; icon: React.ReactNode }[] = [
 
 export default function CustomerSuccessModule() {
   /* ─── Module-level view ─── */
-  const [moduleView, setModuleView] = useState<'chapters' | 'conversations'>('chapters');
+  const [moduleView, setModuleView] = useState<'chapters' | 'conversations' | 'outreach'>('chapters');
 
   /* ─── Core state ─── */
   const [chapters, setChapters] = useState<ChapterWithOnboarding[]>([]);
@@ -588,6 +589,7 @@ export default function CustomerSuccessModule() {
           {([
             { id: 'chapters', label: 'Chapters', icon: <HeartHandshake size={14} /> },
             { id: 'conversations', label: 'Conversations', icon: <MessageSquare size={14} /> },
+            { id: 'outreach', label: 'Outreach', icon: <MessageSquare size={14} /> },
           ] as const).map(view => (
             <button
               key={view.id}
@@ -611,7 +613,9 @@ export default function CustomerSuccessModule() {
           ))}
         </div>
 
-        {moduleView === 'conversations' ? (
+        {moduleView === 'outreach' ? (
+          <OutreachPage />
+        ) : moduleView === 'conversations' ? (
           <ConversationsTab showToast={showToast} />
         ) : loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>

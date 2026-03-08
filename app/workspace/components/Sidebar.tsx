@@ -102,7 +102,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const bottomTabItems = isFounderRole
     ? [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
-        { name: 'Outreach', href: '/workspace/outreach', icon: 'MessageSquare', badge: 0 },
+        { name: 'Customer Success', href: '/nucleus/customer-success', icon: 'HeartHandshake', badge: 0 },
         { name: 'Nucleus', href: '/nucleus', icon: 'Zap', badge: 0 },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2', badge: 0 },
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', badge: openTicketCount },
