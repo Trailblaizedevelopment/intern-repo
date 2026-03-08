@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageCircle,
+  MessageSquare,
   LucideIcon,
   TrendingUp,
   HeartHandshake,
@@ -40,6 +41,7 @@ const iconMap: Record<string, LucideIcon> = {
   Target,
   Users,
   MessageCircle,
+  MessageSquare,
   Zap,
   TrendingUp,
   Ticket,
@@ -100,7 +102,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const bottomTabItems = isFounderRole
     ? [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
-        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
+        { name: 'Outreach', href: '/workspace/outreach', icon: 'MessageSquare', badge: 0 },
         { name: 'Nucleus', href: '/nucleus', icon: 'Zap', badge: 0 },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2', badge: 0 },
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', badge: openTicketCount },

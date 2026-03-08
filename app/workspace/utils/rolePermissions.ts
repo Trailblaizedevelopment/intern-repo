@@ -147,6 +147,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
     case 'founder':
       return [
         ...baseItems,
+        { name: 'Outreach', href: '/workspace/outreach', icon: 'MessageSquare', emphasized: true },
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
