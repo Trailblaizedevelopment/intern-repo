@@ -228,22 +228,46 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
     setActionLoading(batchId + ':approve');
     try {
       const approverName = profile?.name || 'Employee';
-      const res = await fetch(`/api/outreach/batches/${batchId}/approve`, {
+      const approveRes = await fetch(`/api/outreach/batches/${batchId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approved_by: approverName }),
       });
-      const json = await res.json();
-      if (json.error) {
-        showToast(json.error, 'error');
+      const approveJson = await approveRes.json();
+      if (approveJson.error) { showToast(approveJson.error, 'error'); return; }
+
+      showToast('✅ Approved — executing sends now…', 'success');
+      setBatches(prev => prev.map(b => b.id === batchId ? { ...b, ...approveJson.data } : b));
+
+      // Immediately trigger execution
+      const execRes = await fetch(`/api/outreach/batches/${batchId}/execute`, { method: 'POST' });
+      const execJson = await execRes.json();
+      if (execJson.error) {
+        showToast(`Approved but execute failed: ${execJson.error}`, 'error');
       } else {
-        showToast('✅ Batch approved! Outreach will execute shortly.', 'success');
-        setBatches(prev => prev.map(b =>
-          b.id === batchId ? { ...b, ...json.data } : b
-        ));
+        const d = execJson.data;
+        showToast(`🚀 Sent ${d.sent} messages${d.failed ? ` · ${d.failed} failed` : ''}${d.skipped ? ` · ${d.skipped} SMS skipped` : ''}`, 'success');
+        fetchBatches();
       }
     } catch {
       showToast('Failed to approve batch', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function executeBatch(batchId: string) {
+    if (!confirm('Execute this approved batch now? This will send Linq messages. Do NOT run twice.')) return;
+    setActionLoading(batchId + ':execute');
+    try {
+      const res = await fetch(`/api/outreach/batches/${batchId}/execute`, { method: 'POST' });
+      const json = await res.json();
+      if (json.error) { showToast(`Execute failed: ${json.error}`, 'error'); return; }
+      const d = json.data;
+      showToast(`🚀 Sent ${d.sent} messages${d.failed ? ` · ${d.failed} failed` : ''}${d.skipped ? ` · ${d.skipped} SMS skipped` : ''}`, 'success');
+      fetchBatches();
+    } catch {
+      showToast('Execute failed', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -564,11 +588,43 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
               </div>
             )}
 
-            {batch.notes && (
-              <div style={{ fontSize: '0.8125rem', color: '#6b7280', fontStyle: 'italic' }}>
-                Note: {batch.notes}
-              </div>
-            )}
+            {/* Chapter + Touch breakdown (parsed from notes JSON) */}
+            {batch.notes && (() => {
+              try {
+                const n = typeof batch.notes === 'string' ? JSON.parse(batch.notes) : batch.notes;
+                const chapters: { chapter_name: string; total: number; by_touch: Record<string, number> }[] = n?.chapters || [];
+                const tb = n?.touch_breakdown || {};
+                if (!chapters.length) return null;
+                return (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Batch Breakdown</div>
+                    {/* Touch summary row */}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                      {tb.total_selected != null && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#f3f4f6', fontSize: '0.75rem', fontWeight: 700, color: '#374151' }}>Total: {tb.total_selected}</span>}
+                      {tb.touch1_new_outreach > 0 && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#dbeafe', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8' }}>T1 New: {tb.touch1_new_outreach}</span>}
+                      {tb.touch2_follow_up > 0 && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#fef3c7', fontSize: '0.75rem', fontWeight: 700, color: '#b45309' }}>T2 Follow-up: {tb.touch2_follow_up}</span>}
+                      {tb.touch3_final > 0 && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#fce7f3', fontSize: '0.75rem', fontWeight: 700, color: '#9d174d' }}>T3 Final: {tb.touch3_final}</span>}
+                    </div>
+                    {/* Per-chapter rows */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {chapters.map((ch) => (
+                        <div key={ch.chapter_name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 8, fontSize: '0.8125rem' }}>
+                          <span style={{ fontWeight: 700, color: '#111827' }}>{ch.chapter_name}</span>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            {Object.entries(ch.by_touch || {}).map(([touch, count]) => (
+                              <span key={touch} style={{ padding: '2px 8px', borderRadius: 12, background: touch.includes('touch1') ? '#dbeafe' : touch.includes('touch2') ? '#fef3c7' : touch.includes('touch3') ? '#fce7f3' : '#f3f4f6', color: touch.includes('touch1') ? '#1d4ed8' : touch.includes('touch2') ? '#b45309' : touch.includes('touch3') ? '#9d174d' : '#374151', fontSize: '0.7rem', fontWeight: 700 }}>
+                                {touch === 'touch1_sent' ? 'T2 follow-up' : touch === 'not_contacted' ? 'T1 new' : touch === 'touch2_sent' ? 'T3 final' : touch}: {count as number}
+                              </span>
+                            ))}
+                            <span style={{ fontWeight: 700, color: '#6b7280', fontSize: '0.75rem' }}>{ch.total} total</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
 
             {/* Approve / Reject buttons for pending batches */}
             {isPending && (
@@ -648,22 +704,24 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
               </div>
             )}
 
-            {/* Approved state confirmation */}
+            {/* Approved state — show Execute button (sends haven't run yet) */}
             {batch.status === 'approved' && batch.approved_by && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 16px', borderRadius: 10,
-                background: '#f0fdf4', border: '1px solid #86efac',
-              }}>
-                <CheckCircle2 size={20} style={{ color: '#16a34a', flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontWeight: 600, color: '#14532d', fontSize: '0.875rem' }}>
-                    Approved by {batch.approved_by}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, background: '#fef3c7', border: '1px solid #fcd34d', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, color: '#78350f', fontSize: '0.875rem' }}>
+                    ✅ Approved by {batch.approved_by} — sends not yet executed
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#16a34a' }}>
-                    {formatTs(batch.approved_at)} · Outreach will execute automatically.
+                  <div style={{ fontSize: '0.75rem', color: '#b45309', marginTop: 2 }}>
+                    {formatTs(batch.approved_at)} · Click Execute to send the Linq messages now.
                   </div>
                 </div>
+                <button
+                  onClick={() => executeBatch(batch.id)}
+                  disabled={actionLoading === batch.id + ':execute'}
+                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#d97706', color: '#fff', fontWeight: 700, fontSize: '0.875rem', cursor: actionLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {actionLoading === batch.id + ':execute' ? '⏳ Sending…' : '🚀 Execute Sends'}
+                </button>
               </div>
             )}
           </div>
