@@ -21,6 +21,7 @@ import ModalOverlay from '@/components/ModalOverlay';
 import ConversationsTab from './ConversationsTab';
 import LinqOutreachTab from './LinqOutreachTab';
 import EmailTemplatesTab from './EmailTemplatesTab';
+import EmailOutreachTab from './EmailOutreachTab';
 
 interface Toast {
   id: string;
@@ -47,7 +48,7 @@ const TAB_CONFIG: { id: ChapterTab; label: string; icon: React.ReactNode }[] = [
 
 export default function CustomerSuccessModule() {
   /* ─── Module-level view ─── */
-  const [moduleView, setModuleView] = useState<'chapters' | 'conversations' | 'outreach' | 'templates'>('chapters');
+  const [moduleView, setModuleView] = useState<'chapters' | 'conversations' | 'outreach' | 'templates' | 'email'>('chapters');
 
   /* ─── Core state ─── */
   const [chapters, setChapters] = useState<ChapterWithOnboarding[]>([]);
@@ -592,6 +593,7 @@ export default function CustomerSuccessModule() {
             { id: 'conversations', label: 'Conversations', icon: <MessageSquare size={14} /> },
             { id: 'outreach', label: 'Linq Outreach', icon: <Send size={14} /> },
             { id: 'templates', label: 'Email Templates', icon: <Mail size={14} /> },
+            { id: 'email', label: 'Email Outreach', icon: <Send size={14} /> },
           ] as const).map(view => (
             <button
               key={view.id}
@@ -623,6 +625,8 @@ export default function CustomerSuccessModule() {
           <LinqOutreachTab showToast={showToast} />
         ) : moduleView === 'templates' ? (
           <EmailTemplatesTab showToast={showToast} />
+        ) : moduleView === 'email' ? (
+          <EmailOutreachTab showToast={showToast} />
         ) : loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
             {[1,2,3,4,5].map(i => (
