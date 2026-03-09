@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, status, start_date, target_date, created_by } = body;
+    const { name, description, status, platform, start_date, target_date, created_by } = body;
 
     if (!name) {
       return NextResponse.json({ data: null, error: { message: 'Name is required', code: 'VALIDATION_ERROR' } }, { status: 400 });
@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
         name,
         description: description || null,
         status: status || 'active',
+        platform: platform || 'web',
         start_date: start_date || null,
         target_date: target_date || null,
         created_by: created_by || null,

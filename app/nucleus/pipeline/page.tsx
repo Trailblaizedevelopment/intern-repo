@@ -220,12 +220,13 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     if (res.ok) setNationals(await res.json());
   }, [natStageFilter, natTypeFilter]);
 
-  const loadContacts = useCallback(async () => {
+  const loadContacts = useCallback(async (searchOverride?: string) => {
     const params = new URLSearchParams();
-    if (searchQuery && activeTab === 'contacts') params.set('search', searchQuery);
+    const q = searchOverride !== undefined ? searchOverride : '';
+    if (q && activeTab === 'contacts') params.set('search', q);
     const res = await fetch(`/api/pipeline/contacts?${params}`);
     if (res.ok) setContacts(await res.json());
-  }, [searchQuery, activeTab]);
+  }, [activeTab]); // searchQuery intentionally excluded — passed as arg to avoid re-triggering initial load effect
 
   const loadEmployees = useCallback(async () => {
     if (!supabase) return;
@@ -253,7 +254,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   }, [activeTab, natStageFilter, natTypeFilter, loadNationals]);
 
   useEffect(() => {
-    if (activeTab === 'contacts') loadContacts();
+    if (activeTab === 'contacts') loadContacts(searchQuery);
   }, [activeTab, searchQuery, loadContacts]);
 
   /* ─── Actions ─── */
