@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SENDING_LINES } from '@/lib/supabase';
-import { getPlatformAdmin } from '@/lib/supabase-platform';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
-  const supabase = getPlatformAdmin();
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Platform database not configured', code: 'DB_ERROR' } },

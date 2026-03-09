@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformAdmin as getSupabaseAdmin } from '@/lib/supabase-platform';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
  * POST /api/linq/flag

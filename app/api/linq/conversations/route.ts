@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listChats, LinqChat } from '@/lib/linq';
-import { getPlatformAdmin } from '@/lib/supabase-platform';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 const LINES = [
   { number: 1, label: 'Owen', phone: '+16462408056' },
@@ -9,7 +9,7 @@ const LINES = [
 ] as const;
 
 export async function GET(request: NextRequest) {
-  const supabase = getPlatformAdmin();
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Platform Supabase not configured', code: 'CONFIG_ERROR' } },

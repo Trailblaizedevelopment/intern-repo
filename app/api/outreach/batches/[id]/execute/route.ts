@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { getPlatformAdmin } from '@/lib/supabase-platform';
 import { createChat, getRecipientService, sleep } from '@/lib/linq';
 
 // Owen's line is FLAGGED READ-ONLY by Apple — never include in outreach
@@ -34,10 +33,9 @@ function buildT2Message(firstName: string, fraternityName: string): string {
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = getSupabaseAdmin();
-  const platform = getPlatformAdmin();
+  
 
-  if (!supabase) return NextResponse.json({ error: 'Internal DB not configured' }, { status: 500 });
-  if (!platform) return NextResponse.json({ error: 'Platform DB not configured — check PLATFORM_SUPABASE_URL env var' }, { status: 500 });
+  if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
   // 1. Fetch and check batch status
   const { data: batch, error: bErr } = await supabase
@@ -68,14 +66,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const cutoffT2 = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
     const [t1Res, t2Res] = await Promise.all([
-      platform
+      supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, assigned_line, outreach_status, is_imessage')
         .eq('outreach_status', 'not_contacted')
         .eq('is_imessage', true)
         .in('assigned_line', [2, 3])
         .limit(100),
-      platform
+      supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, assigned_line, outreach_status, is_imessage, touch1_sent_at')
         .eq('outreach_status', 'touch1_sent')
@@ -96,7 +94,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     // Load chapter info from platform DB
     const chapterIds = [...new Set(allContacts.map(c => c.chapter_id).filter(Boolean))];
-    const { data: chapters } = await platform
+    const { data: chapters } = await supabase
       .from('chapters')
       .select('id, fraternity_name, university')
       .in('id', chapterIds);
@@ -125,7 +123,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
           if (service === 'SMS') {
             // iMessage-only policy — skip and mark
-            await platform.from('alumni_contacts').update({ is_imessage: false }).eq('id', contact.id);
+            await supabase.from('alumni_contacts').update({ is_imessage: false }).eq('id', contact.id);
             results.skipped_sms++;
             continue;
           }
@@ -135,7 +133,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           const update = isT1
             ? { outreach_status: 'touch1_sent', touch1_sent_at: now, linq_chat_id: chat.id }
             : { outreach_status: 'touch2_sent', touch2_sent_at: now };
-          await platform.from('alumni_contacts').update(update).eq('id', contact.id);
+          await supabase.from('alumni_contacts').update(update).eq('id', contact.id);
           results.sent++;
 
           // Rate-limit: small pause between messages
