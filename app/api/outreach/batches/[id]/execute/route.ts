@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { createChat, getRecipientService, sleep } from '@/lib/linq';
 
-// Owen's line is ALWAYS blocked — flagged read-only by Apple
-const ALWAYS_BLOCKED_PHONES = new Set(['+16462408056']);
-
 const ALL_LINE_PHONES: Record<number, string> = {
-  1: '+16462408056', // Owen — always blocked
+  1: '+16462408056', // Owen
   2: '+16462668785', // Adam
   3: '+16462442696', // Ford
 };
@@ -71,11 +68,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       (lineConfigs || []).filter(l => l.is_paused).map(l => l.line_number)
     );
 
-    // Build active line numbers: not Owen's blocked phone, not paused
-    const activeLineNumbers = [1, 2, 3].filter(n => {
-      const phone = ALL_LINE_PHONES[n];
-      return !ALWAYS_BLOCKED_PHONES.has(phone) && !pausedLines.has(n);
-    });
+    // Build active line numbers: exclude paused lines (from linq_line_config)
+    const activeLineNumbers = [1, 2, 3].filter(n => !pausedLines.has(n));
 
     if (activeLineNumbers.length === 0) {
       await supabase.from('outreach_batches').update({ status: 'approved' }).eq('id', id);
@@ -125,6 +119,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     // 5. Send via Linq — active lines only
     for (const [lineNum, contacts] of Object.entries(byLine)) {
       const fromPhone = ALL_LINE_PHONES[Number(lineNum)];
+      if (!fromPhone) continue;
 
       for (const contact of contacts) {
         const chapter = chapterMap[contact.chapter_id] || { fraternity_name: 'your fraternity', university: 'your school' };
