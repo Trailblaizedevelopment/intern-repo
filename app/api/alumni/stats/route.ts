@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, SENDING_LINES } from '@/lib/supabase';
+import { SENDING_LINES } from '@/lib/supabase';
+import { getPlatformAdmin } from '@/lib/supabase-platform';
 
 export async function GET(request: NextRequest) {
+  const supabase = getPlatformAdmin();
   if (!supabase) {
     return NextResponse.json(
-      { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },
+      { data: null, error: { message: 'Platform database not configured', code: 'DB_ERROR' } },
       { status: 500 }
     );
   }
@@ -13,11 +15,60 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const chapterId = searchParams.get('chapter_id');
 
+    // ─── No chapter_id: return summary for all chapters ───
     if (!chapterId) {
-      return NextResponse.json(
-        { data: null, error: { message: 'chapter_id is required', code: 'VALIDATION_ERROR' } },
-        { status: 400 }
-      );
+      const { data: contacts, error } = await supabase
+        .from('alumni_contacts')
+        .select('chapter_id, phone_primary, is_imessage, outreach_status, last_response_at, touch1_sent_at, touch2_sent_at, touch3_sent_at, response_classification');
+
+      if (error) throw new Error(error.message);
+
+      const { data: chapters } = await supabase
+        .from('chapters')
+        .select('id, chapter_name');
+
+      const chapterMap = new Map<string, string>();
+      for (const ch of chapters || []) chapterMap.set(ch.id, ch.chapter_name);
+
+      // Group by chapter
+      const byChapter = new Map<string, typeof contacts>();
+      for (const c of contacts || []) {
+        if (!byChapter.has(c.chapter_id)) byChapter.set(c.chapter_id, []);
+        byChapter.get(c.chapter_id)!.push(c);
+      }
+
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+      const summaries = [];
+
+      for (const [cid, rows] of byChapter.entries()) {
+        const total = rows.length;
+        const have_phone = rows.filter(r => r.phone_primary).length;
+        const imessage = rows.filter(r => r.is_imessage === true).length;
+        const contacted = rows.filter(r => r.outreach_status && r.outreach_status !== 'not_contacted').length;
+        const responded = rows.filter(r => r.last_response_at).length;
+        const signed_up = rows.filter(r => r.outreach_status === 'signed_up').length;
+        const touch1_ready = rows.filter(r => r.is_imessage && r.outreach_status === 'not_contacted' && !r.touch1_sent_at).length;
+        const touch2_due = rows.filter(r =>
+          r.is_imessage && r.touch1_sent_at && !r.touch2_sent_at &&
+          (r.response_classification === 'confirmed' || r.touch1_sent_at < twoDaysAgo)
+        ).length;
+        const touch3_due = rows.filter(r =>
+          r.is_imessage && r.touch2_sent_at && !r.touch3_sent_at &&
+          r.touch2_sent_at < twoDaysAgo &&
+          !['signed_up', 'wrong_number', 'opted_out'].includes(r.outreach_status || '')
+        ).length;
+
+        summaries.push({
+          chapter_id: cid,
+          chapter_name: chapterMap.get(cid) || cid,
+          total, have_phone, imessage, contacted, responded, signed_up,
+          touch1_ready, touch2_due, touch3_due,
+        });
+      }
+
+      summaries.sort((a, b) => b.contacted - a.contacted);
+
+      return NextResponse.json({ data: summaries, error: null });
     }
 
     const { count: total } = await supabase

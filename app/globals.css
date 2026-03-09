@@ -33484,17 +33484,25 @@ body { background: #FAFAFA; }
 /* ─── Alumni tab stats ─── */
 .cs-alumni-stats {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  padding: 14px;
+  padding: 12px;
   background: #f9fafb;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
   margin-bottom: 12px;
 }
-.cs-alumni-stat { text-align: center; }
-.cs-alumni-stat-val { font-size: 1.1rem; font-weight: 700; color: #374151; }
-.cs-alumni-stat-label { font-size: 0.62rem; color: #9ca3af; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+.cs-alumni-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+}
+.cs-alumni-stat-val { font-size: 1.25rem; font-weight: 800; color: #374151; line-height: 1; }
+.cs-alumni-stat-label { font-size: 0.7rem; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 
 .cs-touch-queue {
   display: flex;
@@ -33555,7 +33563,7 @@ body { background: #FAFAFA; }
 @media (max-width: 768px) {
   .cs-card-metrics { display: none; }
   .cs-links-grid { grid-template-columns: 1fr; }
-  .cs-alumni-stats { grid-template-columns: repeat(4, 1fr); }
+  .cs-alumni-stats { grid-template-columns: repeat(2, 1fr); }
   .cs-member-form-grid { grid-template-columns: 1fr; }
   .cs-card-badges { flex-wrap: wrap; }
 }

@@ -6,7 +6,7 @@ import {
   ChevronRight, CreditCard, Calendar, DollarSign, Clock, MessageSquare, Copy,
   ExternalLink, Eye, Undo2, AlertTriangle, Sparkles, Settings, Link as LinkIcon,
   LayoutDashboard, Users, Briefcase, Lock, GraduationCap, UserCheck, Linkedin,
-  MapPin, BookOpen,
+  MapPin, BookOpen, Send,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -19,7 +19,7 @@ import {
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
 import ConversationsTab from './ConversationsTab';
-import OutreachPage from '@/app/workspace/outreach/page';
+import LinqOutreachTab from './LinqOutreachTab';
 
 interface Toast {
   id: string;
@@ -589,7 +589,7 @@ export default function CustomerSuccessModule() {
           {([
             { id: 'chapters', label: 'Chapters', icon: <HeartHandshake size={14} /> },
             { id: 'conversations', label: 'Conversations', icon: <MessageSquare size={14} /> },
-            { id: 'outreach', label: 'Outreach', icon: <MessageSquare size={14} /> },
+            { id: 'outreach', label: 'Linq Outreach', icon: <Send size={14} /> },
           ] as const).map(view => (
             <button
               key={view.id}
@@ -617,6 +617,8 @@ export default function CustomerSuccessModule() {
           <OutreachPage />
         ) : moduleView === 'conversations' ? (
           <ConversationsTab showToast={showToast} />
+        ) : moduleView === 'outreach' ? (
+          <LinqOutreachTab showToast={showToast} />
         ) : loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
             {[1,2,3,4,5].map(i => (
