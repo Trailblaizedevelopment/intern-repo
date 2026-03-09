@@ -617,9 +617,7 @@ export default function CustomerSuccessModule() {
           ))}
         </div>
 
-        {moduleView === 'outreach' ? (
-          <OutreachPage />
-        ) : moduleView === 'conversations' ? (
+        {moduleView === 'conversations' ? (
           <ConversationsTab showToast={showToast} />
         ) : moduleView === 'outreach' ? (
           <LinqOutreachTab showToast={showToast} />

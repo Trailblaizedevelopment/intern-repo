@@ -23,5 +23,6 @@ CREATE INDEX IF NOT EXISTS idx_chapter_members_chapter_id ON chapter_members(cha
 
 -- RLS: allow authenticated read/write (adjust to your policy)
 ALTER TABLE chapter_members ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "chapter_members_all" ON chapter_members
+DROP POLICY IF EXISTS "chapter_members_all" ON chapter_members;
+CREATE POLICY "chapter_members_all" ON chapter_members
   FOR ALL USING (true) WITH CHECK (true);

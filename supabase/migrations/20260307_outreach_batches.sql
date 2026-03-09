@@ -28,6 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_outreach_batches_status
 -- RLS: allow all authenticated employees to read/write
 ALTER TABLE outreach_batches ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "outreach_batches_all"
+DROP POLICY IF EXISTS "outreach_batches_all" ON outreach_batches;
+CREATE POLICY "outreach_batches_all"
   ON outreach_batches FOR ALL
   USING (true) WITH CHECK (true);

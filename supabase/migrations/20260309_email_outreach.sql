@@ -82,9 +82,12 @@ ALTER TABLE email_campaigns    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_sends        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_unsubscribes ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "ec_all"  ON email_campaigns    FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "es_all"  ON email_sends        FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "eu_all"  ON email_unsubscribes FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "ec_all" ON email_campaigns;
+CREATE POLICY "ec_all"  ON email_campaigns    FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "es_all" ON email_sends;
+CREATE POLICY "es_all"  ON email_sends        FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "eu_all" ON email_unsubscribes;
+CREATE POLICY "eu_all"  ON email_unsubscribes FOR ALL USING (true) WITH CHECK (true);
 
 -- ── Stat increment helper (called by webhook handler) ────────────────────────
 CREATE OR REPLACE FUNCTION increment_campaign_stat(campaign_id uuid, stat text)
