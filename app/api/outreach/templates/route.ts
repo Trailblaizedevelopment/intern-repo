@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { chapter_id, touch_number, template_text } = await request.json();
+    const { chapter_id, touch_number, template_text, subject_line } = await request.json();
 
     if (!chapter_id || !touch_number || !template_text) {
       return NextResponse.json({ data: null, error: { message: 'chapter_id, touch_number, and template_text required', code: 'VALIDATION_ERROR' } }, { status: 400 });
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     // Insert new template
     const { data, error } = await supabase
       .from('outreach_templates')
-      .insert({ chapter_id, touch_number, template_text, is_active: true })
+      .insert({ chapter_id, touch_number, template_text, subject_line: subject_line || null, is_active: true })
       .select()
       .single();
 
