@@ -45,7 +45,7 @@ interface OutreachBatch {
   id: string;
   created_at: string;
   scheduled_date: string;
-  status: 'pending_approval' | 'approved' | 'rejected' | 'completed' | 'cancelled';
+  status: 'pending_approval' | 'approved' | 'sending' | 'rejected' | 'completed' | 'cancelled';
   approved_by: string | null;
   approved_at: string | null;
   executed_at: string | null;
@@ -83,6 +83,12 @@ const STATUS_CONFIG: Record<OutreachBatch['status'], {
     bg: '#fef2f2',
     color: '#dc2626',
     icon: <XCircle size={13} />,
+  },
+  sending: {
+    label: 'Sending…',
+    bg: '#eff6ff',
+    color: '#2563eb',
+    icon: <Clock size={13} />,
   },
   completed: {
     label: 'Completed',
@@ -701,6 +707,14 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Sending state — in-flight indicator */}
+            {batch.status === 'sending' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #3b82f6', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1d4ed8' }}>Sends in progress — do not refresh</div>
               </div>
             )}
 
