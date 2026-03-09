@@ -300,9 +300,19 @@ export default function EmailTemplatesTab({ showToast }: EmailTemplatesTabProps)
                       ))}
                     </div>
                     {previewMode === 'rendered' ? (
-                      <div style={{ padding: '14px 16px', background: '#f9fafb', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 60 }}>
-                        <RichTextDisplay content={template.template_text} />
-                      </div>
+                      <div
+                        style={{
+                          padding: '14px 20px',
+                          background: '#ffffff',
+                          borderRadius: 10,
+                          border: '1px solid #e5e7eb',
+                          minHeight: 60,
+                          fontSize: '0.9rem',
+                          lineHeight: 1.7,
+                          color: '#374151',
+                        }}
+                        dangerouslySetInnerHTML={{ __html: template.template_text || '<p style="color:#9ca3af">No content yet</p>' }}
+                      />
                     ) : (
                       <pre style={{ margin: 0, padding: '12px 16px', background: '#1e1e2e', color: '#cdd6f4', borderRadius: 10, fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.6 }}>
                         {template.template_text}
