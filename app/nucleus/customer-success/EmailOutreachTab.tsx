@@ -57,7 +57,21 @@ interface EmailOutreachTabProps {
 
 /* ─── Email preview builder ─── */
 
-function buildPreviewHtml(bodyHtml: string): string {
+/** Detects whether the input contains HTML tags */
+function isHtml(content: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(content);
+}
+
+/** Converts plain text to basic HTML paragraphs */
+function plainTextToHtml(text: string): string {
+  return text
+    .split(/\n\n+/)
+    .map(para => `<p>${para.replace(/\n/g, '<br />')}</p>`)
+    .join('\n');
+}
+
+function buildPreviewHtml(body: string): string {
+  const bodyHtml = isHtml(body) ? body : plainTextToHtml(body);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -384,27 +398,38 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
 
             {/* Body */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#374151' }}>Email Body *</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#374151' }}>Email Body *</label>
+                  <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#9ca3af', fontWeight: 400 }}>
+                    Plain text or HTML — both work
+                  </span>
+                </div>
                 <button onClick={() => setPreviewMode(!previewMode)} style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid #e5e7eb', background: previewMode ? '#111827' : '#fff', color: previewMode ? '#fff' : '#374151', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Eye size={12} /> {previewMode ? 'Edit' : 'Preview'}
+                  <Eye size={12} /> {previewMode ? 'Edit' : 'Preview Email'}
                 </button>
               </div>
               {previewMode ? (
                 <iframe
                   key={form.template_html}
                   srcDoc={buildPreviewHtml(form.template_html || '')}
-                  style={{ width: '100%', height: 600, border: 'none', borderRadius: 8, background: '#f9fafb' }}
+                  style={{ width: '100%', height: 580, border: '1px solid #e5e7eb', borderRadius: 8, background: '#f9fafb' }}
                   title="Email Preview"
                 />
               ) : (
-                <textarea
-                  value={form.template_html}
-                  onChange={e => setForm(f => ({ ...f, template_html: e.target.value }))}
-                  placeholder="Paste HTML or type your email body. Use {first_name}, {last_name}, {chapter} as variables."
-                  rows={10}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: '0.8125rem', fontFamily: 'monospace', boxSizing: 'border-box', resize: 'vertical', outline: 'none', lineHeight: 1.6 }}
-                />
+                <>
+                  <textarea
+                    value={form.template_html}
+                    onChange={e => setForm(f => ({ ...f, template_html: e.target.value }))}
+                    placeholder={`Write your email body here.\n\nYou can write plain text (paragraphs auto-formatted) or paste HTML for full control.\n\nVariables: {first_name} {last_name} {chapter}`}
+                    rows={12}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: '0.875rem', fontFamily: form.template_html && isHtml(form.template_html) ? 'monospace' : 'inherit', boxSizing: 'border-box', resize: 'vertical', outline: 'none', lineHeight: 1.65 }}
+                  />
+                  <p style={{ margin: '4px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
+                    {form.template_html && isHtml(form.template_html) ? '✦ HTML mode detected' : '✦ Plain text — click Preview to see how it looks'}
+                    {' · '}Variables: {'{first_name}'}, {'{last_name}'}, {'{chapter}'}
+                  </p>
+                </>
               )}
             </div>
 
