@@ -90,7 +90,8 @@ export async function listChats(fromPhone: string, limit = 100, cursor?: string)
 }
 
 export function getRecipientService(chat: LinqChat): 'iMessage' | 'SMS' | 'RCS' | null {
-  const recipient = chat.handles.find(h => !h.is_me);
+  const handles = chat?.handles ?? [];
+  const recipient = handles.find(h => !h.is_me);
   return recipient?.service ?? null;
 }
 
