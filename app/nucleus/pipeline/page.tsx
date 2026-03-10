@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   TrendingUp, Search, Filter, Phone, MessageSquare, Clock, Mail,
   ChevronRight, ChevronDown, Building2, Users, Trophy, Globe, X,
-  Calendar, Flame, BarChart3, MapPin, ArrowUpRight, Plus, Edit2, Check
+  Calendar, Flame, BarChart3, MapPin, ArrowUpRight, Plus, Edit2, Check, Download
 } from 'lucide-react';
 import { supabase, STAGE_CONFIG, DealStage } from '@/lib/supabase';
 import { useToast } from '@/components/Toast';
@@ -583,6 +583,57 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     );
   };
 
+  /* ─── CSV Export ─── */
+  function exportPipelineCSV() {
+    const escapeCell = (val: string | number | null | undefined): string => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    };
+
+    const headers = [
+      'Deal Name', 'Organization', 'School', 'Stage', 'Type',
+      'Value ($)', 'Assigned To', 'Conference', 'Temperature',
+      'Last Touched', 'Follow-up Count', 'Notes', 'Created At',
+    ];
+
+    const rows = deals.map(d => {
+      const assignee = employees.find(e => e.id === d.assigned_to);
+      const conference = d.conference || d.organization?.school?.conference || '';
+      return [
+        escapeCell(d.organization?.name),
+        escapeCell(d.organization?.name),
+        escapeCell(d.organization?.school?.name),
+        escapeCell(STAGE_CONFIG[d.stage]?.label || d.stage),
+        escapeCell(d.organization?.type || d.deal_type),
+        escapeCell(d.value),
+        escapeCell(assignee?.name),
+        escapeCell(conference),
+        escapeCell(d.temperature),
+        escapeCell(d.last_touched ? new Date(d.last_touched).toLocaleDateString('en-US') : ''),
+        escapeCell(d.followup_count),
+        escapeCell(d.notes),
+        escapeCell(d.created_at ? new Date(d.created_at).toLocaleDateString('en-US') : ''),
+      ].join(',');
+    });
+
+    const csv = [headers.map(escapeCell).join(','), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const today = new Date().toISOString().split('T')[0];
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trailblaize-pipeline-${today}.csv`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   /* ─── Render ─── */
   if (loading) {
     return (
@@ -635,6 +686,28 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
           {(activeTab === 'my-deals' || activeTab === 'all-deals') && (
             <button className="pl2__add-deal-btn" onClick={() => openDeal(null)} title="Add deal">
               <Plus size={16} /> New Deal
+            </button>
+          )}
+          {(activeTab === 'my-deals' || activeTab === 'all-deals') && (
+            <button
+              onClick={exportPipelineCSV}
+              title="Export pipeline as CSV"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                border: '1px solid var(--ws-border)',
+                borderRadius: '8px',
+                background: 'var(--ws-surface)',
+                color: 'var(--ws-text-secondary)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Download size={14} /> Export CSV
             </button>
           )}
         </div>
