@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Mail, Plus, Edit2, Copy, Check, ChevronDown, ChevronRight, Loader2, X, Eye, Code2, Trash2 } from 'lucide-react';
-import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
+import { Mail, Plus, Edit2, Copy, Check, Loader2, X, Eye, Code2 } from 'lucide-react';
 
 /* ─── Types ─── */
 
@@ -377,22 +376,50 @@ export default function EmailTemplatesTab({ showToast }: EmailTemplatesTabProps)
 
                     {/* Body editor */}
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#374151', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Message Body
-                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          HTML Body
+                        </label>
+                        <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Plain text also works — auto-formatted on preview</span>
+                      </div>
                       {/* Variable chips */}
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
                         {TEMPLATE_VARS.map(v => (
-                          <span key={v} style={{ padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', color: '#6b7280', fontSize: '0.7rem', fontFamily: 'monospace', cursor: 'default' }}>
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setEditorContent(prev => prev + v)}
+                            style={{ padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', color: '#6b7280', fontSize: '0.7rem', fontFamily: 'monospace', cursor: 'pointer', border: '1px solid #e5e7eb' }}
+                            title={`Insert ${v}`}
+                          >
                             {v}
-                          </span>
+                          </button>
                         ))}
                       </div>
-                      <RichTextEditor
-                        content={editorContent}
-                        onChange={setEditorContent}
-                        placeholder="Type your message…"
+                      <textarea
+                        value={editorContent}
+                        onChange={e => setEditorContent(e.target.value)}
+                        placeholder={`Paste your HTML or write your email here.\n\nExample:\n<h2>Hey {first_name}!</h2>\n<p>We're rebuilding the {fraternity} alumni network...</p>\n<p><a href="{signup_link}">Join here →</a></p>`}
+                        rows={14}
+                        spellCheck={false}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: 8,
+                          fontSize: '0.8125rem',
+                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                          boxSizing: 'border-box',
+                          resize: 'vertical',
+                          outline: 'none',
+                          lineHeight: 1.6,
+                          color: '#111827',
+                          background: '#fafafa',
+                        }}
                       />
+                      <p style={{ margin: '4px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
+                        Write full HTML for rich emails, or plain text for simple ones. Click variable buttons above to insert them.
+                      </p>
                     </div>
 
                     {/* Save / Cancel */}
