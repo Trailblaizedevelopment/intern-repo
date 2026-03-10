@@ -34,15 +34,20 @@ function buildT3Message(firstName: string, fraternityName: string): string {
 
 /**
  * POST /api/outreach/batches/[id]/execute
- * Executes actual Linq sends for an approved batch.
+ *
+ * IDEMPOTENCY:
+ *   Each contact is claimed atomically via a conditional UPDATE before any Linq call.
+ *   The claim checks the *current* outreach_status AND the relevant sent_at timestamp.
+ *   If the conditional UPDATE matches 0 rows, the contact was already processed by
+ *   a prior run (or a concurrent request) and is silently skipped.
+ *   This means running Execute multiple times is always safe — no double-sends.
  *
  * Caps:
  *   - T1 new chats:        45/active line  (Linq daily new-chat limit)
  *   - T2/T3 follow-ups:   150/active line  (existing threads, no daily cap risk)
  *
  * - Paused lines (linq_line_config.is_paused) are always skipped
- * - Status must be 'approved' — prevents double-runs
- * - Rolls back to 'approved' on hard failure so it can be retried
+ * - Batch status must be 'approved' — prevents double-runs at the batch level too
  */
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,10 +63,29 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   if (bErr || !batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 });
   if (batch.status !== 'approved') {
-    return NextResponse.json({ error: `Cannot execute: batch status is '${batch.status}' (must be 'approved')` }, { status: 409 });
+    return NextResponse.json({
+      error: `Cannot execute: batch status is '${batch.status}' (must be 'approved'). Each batch can only be executed once.`
+    }, { status: 409 });
   }
 
-  const results = { sent: 0, failed: 0, skipped_sms: 0, skipped_paused_line: 0, t1_sent: 0, t2t3_sent: 0, errors: [] as string[] };
+  // Immediately mark the batch as 'completed' to prevent a second Execute click
+  // from racing through. We'll overwrite with real results at the end.
+  // If we crash before that, the batch stays 'completed' — intentional, use a new batch to retry.
+  await supabase
+    .from('outreach_batches')
+    .update({ status: 'completed', sent_at: new Date().toISOString(), notes: 'Executing…' })
+    .eq('id', id);
+
+  const results = {
+    sent: 0,
+    failed: 0,
+    skipped_sms: 0,
+    skipped_already_sent: 0,
+    skipped_paused_line: 0,
+    t1_sent: 0,
+    t2t3_sent: 0,
+    errors: [] as string[],
+  };
 
   try {
     // 2. Check paused lines
@@ -75,37 +99,47 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const activeLineNumbers = [1, 2, 3].filter(n => !pausedLines.has(n));
 
     if (activeLineNumbers.length === 0) {
-      await supabase.from('outreach_batches').update({ status: 'approved' }).eq('id', id);
+      await supabase.from('outreach_batches').update({
+        status: 'approved',
+        sent_at: null,
+        notes: 'Rolled back — all lines are paused.',
+      }).eq('id', id);
       return NextResponse.json({ error: 'All lines are paused — resume at least one line first.' }, { status: 409 });
     }
 
-    // 3. Load eligible contacts — two separate pools with different caps
-    const cutoffT2 = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
-    const cutoffT3 = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(); // 4 days ago
+    // 3. Load eligible contacts — two separate pools with separate caps
+    //    Safety filters on timestamp fields prevent re-selecting already-processed contacts
+    //    even if status somehow got out of sync.
+    const cutoffT2 = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const cutoffT3 = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString();
 
     const [t1Res, t2Res, t3Res] = await Promise.all([
-      // T1: brand new contacts
+      // T1: brand new contacts — must have no sent timestamp AND no existing chat
       supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage')
         .eq('outreach_status', 'not_contacted')
+        .is('touch1_sent_at', null)
+        .is('linq_chat_id', null)
         .neq('is_imessage', false)
         .not('phone_primary', 'is', null)
         .limit(activeLineNumbers.length * T1_CAP_PER_LINE + 50),
-      // T2: touch1_sent and 2+ days have passed
+      // T2: touch1 sent, 2+ days old, no T2 sent yet
       supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at')
         .eq('outreach_status', 'touch1_sent')
+        .is('touch2_sent_at', null)
         .neq('is_imessage', false)
         .lte('touch1_sent_at', cutoffT2)
         .not('phone_primary', 'is', null)
         .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
-      // T3: touch2_sent and 4+ days have passed
+      // T3: touch2 sent, 4+ days old, no T3 sent yet
       supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch2_sent_at')
         .eq('outreach_status', 'touch2_sent')
+        .is('touch3_sent_at', null)
         .neq('is_imessage', false)
         .lte('touch2_sent_at', cutoffT3)
         .not('phone_primary', 'is', null)
@@ -137,11 +171,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       if (activeLineNumbers.every(n => byLineT2T3[n].length >= T2T3_CAP_PER_LINE)) break;
     }
 
-    // Merge per line: T2/T3 first (warm follow-ups priority), then T1 new
     type Contact = typeof t1Pool[0] | typeof t2t3Pool[0];
     const byLine: Record<number, Contact[]> = {};
     for (const n of activeLineNumbers) {
-      byLine[n] = [...byLineT2T3[n], ...byLineT1[n]];
+      byLine[n] = [...byLineT2T3[n], ...byLineT1[n]]; // warm follow-ups first
     }
 
     // 4. Load chapter info
@@ -154,7 +187,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const chapterMap: Record<string, { fraternity_name: string; university: string }> = {};
     for (const ch of (chapters || [])) chapterMap[ch.id] = ch;
 
-    // 5. Send via Linq — active lines only, T2/T3 before T1 per line
+    // 5. Send — with atomic pre-claim before each Linq call
     for (const [lineNum, contacts] of Object.entries(byLine)) {
       const fromPhone = ALL_LINE_PHONES[Number(lineNum)];
       if (!fromPhone) continue;
@@ -163,6 +196,47 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         const chapter  = chapterMap[contact.chapter_id] || { fraternity_name: 'your fraternity', university: 'your school' };
         const joinLink = CHAPTER_JOIN_LINKS[contact.chapter_id] || 'https://trailblaize.net';
         const status   = contact.outreach_status;
+        const now      = new Date().toISOString();
+
+        // ── Atomic claim ──────────────────────────────────────────────────────
+        // Conditionally update the contact to the next status BEFORE calling Linq.
+        // The WHERE clause checks the *current* status + confirms no timestamp collision.
+        // If 0 rows are affected, this contact was already processed → skip.
+        let claimQuery;
+        if (status === 'not_contacted') {
+          claimQuery = supabase
+            .from('alumni_contacts')
+            .update({ outreach_status: 'touch1_sent', touch1_sent_at: now })
+            .eq('id', contact.id)
+            .eq('outreach_status', 'not_contacted')
+            .is('touch1_sent_at', null)
+            .select('id');
+        } else if (status === 'touch1_sent') {
+          claimQuery = supabase
+            .from('alumni_contacts')
+            .update({ outreach_status: 'touch2_sent', touch2_sent_at: now })
+            .eq('id', contact.id)
+            .eq('outreach_status', 'touch1_sent')
+            .is('touch2_sent_at', null)
+            .select('id');
+        } else {
+          // touch2_sent → T3
+          claimQuery = supabase
+            .from('alumni_contacts')
+            .update({ outreach_status: 'touch3_sent', touch3_sent_at: now })
+            .eq('id', contact.id)
+            .eq('outreach_status', 'touch2_sent')
+            .is('touch3_sent_at', null)
+            .select('id');
+        }
+
+        const { data: claimed } = await claimQuery;
+        if (!claimed || claimed.length === 0) {
+          // Already processed by a prior run — safe to skip
+          results.skipped_already_sent++;
+          continue;
+        }
+        // ── End atomic claim ──────────────────────────────────────────────────
 
         const message =
           status === 'not_contacted' ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
@@ -174,51 +248,62 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           const service = getRecipientService(chat);
 
           if (service === 'SMS') {
-            await supabase.from('alumni_contacts').update({ is_imessage: false }).eq('id', contact.id);
+            // Revert claim and mark as SMS-only
+            const revertStatus = status === 'not_contacted' ? 'not_contacted' : status;
+            await supabase.from('alumni_contacts').update({
+              is_imessage: false,
+              outreach_status: revertStatus,
+              touch1_sent_at: status === 'not_contacted' ? null : undefined,
+              touch2_sent_at: status === 'touch1_sent'   ? null : undefined,
+              touch3_sent_at: status === 'touch2_sent'   ? null : undefined,
+            }).eq('id', contact.id);
             results.skipped_sms++;
             continue;
           }
 
-          const now = new Date().toISOString();
-          const update =
-            status === 'not_contacted' ? { outreach_status: 'touch1_sent', touch1_sent_at: now, linq_chat_id: chat.id } :
-            status === 'touch2_sent'   ? { outreach_status: 'touch3_sent', touch3_sent_at: now } :
-                                         { outreach_status: 'touch2_sent', touch2_sent_at: now };
+          // For T1: also store the linq_chat_id for future sends to this thread
+          if (status === 'not_contacted') {
+            await supabase.from('alumni_contacts').update({ linq_chat_id: chat.id }).eq('id', contact.id);
+          }
 
-          await supabase.from('alumni_contacts').update(update).eq('id', contact.id);
           results.sent++;
           if (status === 'not_contacted') results.t1_sent++;
           else results.t2t3_sent++;
 
           await sleep(300);
         } catch (e) {
-          results.errors.push(`${contact.first_name} (${contact.phone_primary}): ${String(e)}`);
+          const errMsg = String(e);
+          results.errors.push(`${contact.first_name} (${contact.phone_primary}): ${errMsg}`);
           results.failed++;
+          // Note: we do NOT revert the claim on Linq failure.
+          // The DB status is already advanced — this prevents retry loops from re-sending.
+          // If a manual fix is needed, update the contact status directly in the DB.
         }
       }
     }
 
-    // 6. Mark complete — write results to notes (JSON) until schema migration adds results column
+    // 6. Write final results
     await supabase
       .from('outreach_batches')
       .update({
         status: 'completed',
         sent_at: new Date().toISOString(),
-        notes: JSON.stringify({ ...results, active_lines: activeLineNumbers, paused_lines: [...pausedLines] }),
+        notes: JSON.stringify({
+          ...results,
+          active_lines: activeLineNumbers,
+          paused_lines: [...pausedLines],
+        }),
       })
       .eq('id', id);
 
     return NextResponse.json({
-      data: {
-        ...results,
-        active_lines: activeLineNumbers,
-        paused_lines: [...pausedLines],
-      },
+      data: { ...results, active_lines: activeLineNumbers, paused_lines: [...pausedLines] },
       error: null,
     });
 
   } catch (err) {
-    await supabase.from('outreach_batches').update({ status: 'approved' }).eq('id', id);
+    // Hard crash — batch is already marked 'completed' (set at top of handler).
+    // Leave it that way to prevent automatic retry. Partial sends already happened.
     console.error('[execute batch] hard error:', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
