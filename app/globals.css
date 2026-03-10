@@ -1361,6 +1361,8 @@ input:focus {
 @media (max-width: 640px) {
   .nucleus-main {
     padding: 1rem;
+    /* ws-content.nucleus-content strips padding:0, so add bottom clearance here */
+    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 1rem);
   }
   
   .nucleus-stats {
@@ -22226,7 +22228,8 @@ input:focus {
   .chat-page {
     border-radius: 0;
     margin: 0;
-    height: 100vh;
+    /* Subtract nav bar height + ws-content top padding so input doesn't hide behind nav */
+    height: calc(100dvh - var(--bottom-nav-h) - env(safe-area-inset-bottom, 0px) - 1rem);
     box-shadow: none;
   }
   
@@ -24445,7 +24448,8 @@ input:focus {
   .toast-container {
     left: 1rem;
     right: 1rem;
-    bottom: 1rem;
+    /* Lift toast above the fixed bottom nav bar (64px) */
+    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 1rem);
   }
   
   .toast {
@@ -29352,12 +29356,34 @@ body { background: #FAFAFA; }
     align-items: stretch;
   }
 
-  .tkt__header-left,
-  .tkt__header-right {
+  .tkt__header-left {
     width: 100%;
   }
 
-  .tkt__search { width: 100%; }
+  /* Scrollable controls row — ensures "New Ticket" is never clipped by overflow */
+  .tkt__header-right {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    padding-bottom: 2px; /* space for scroll momentum */
+  }
+
+  .tkt__header-right::-webkit-scrollbar { display: none; }
+
+  /* Pin "New Ticket" button first in the row — always visible without scrolling */
+  .tkt__create-btn {
+    order: -1;
+    flex-shrink: 0;
+  }
+
+  /* Search: don't expand to 100% in a scrollable row */
+  .tkt__search {
+    flex-shrink: 1;
+    min-width: 120px;
+    max-width: 200px;
+  }
   .tkt__search input { width: 100%; }
 
   /* ── Ticket Detail: full-screen slide-over ── */

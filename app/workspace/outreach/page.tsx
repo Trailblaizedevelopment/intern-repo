@@ -1082,7 +1082,7 @@ export default function OutreachPage() {
       {/* ════════════════════════ Toast ═══════════════════════════════════════ */}
       {toast && (
         <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          position: 'fixed', bottom: 'calc(var(--bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px) + 24px)', right: 24, zIndex: 9999,
           background: toast.type === 'error' ? '#dc2626' : toast.type === 'success' ? '#059669' : '#374151',
           color: '#fff', padding: '10px 18px', borderRadius: 10,
           fontSize: '0.875rem', fontWeight: 500,
