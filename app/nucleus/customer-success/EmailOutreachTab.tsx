@@ -7,8 +7,6 @@ import {
   Loader2, ArrowLeft, MousePointer, Inbox, Trash2, Calendar,
   TrendingUp, Copy, Check,
 } from 'lucide-react';
-import { RichTextDisplay } from '@/components/RichTextEditor';
-
 /* ─── Types ─── */
 
 interface Campaign {
@@ -55,6 +53,39 @@ interface Template { id: string; touch_number: number; template_text: string; su
 
 interface EmailOutreachTabProps {
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+}
+
+/* ─── Email preview builder ─── */
+
+function buildPreviewHtml(bodyHtml: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; color: #111827; }
+    .email-wrap { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .email-header { background: linear-gradient(135deg, #6d28d9, #8b5cf6); padding: 24px 32px; }
+    .email-header span { color: #fff; font-weight: 700; font-size: 1.125rem; letter-spacing: -0.01em; }
+    .email-body { padding: 32px; font-size: 0.9375rem; line-height: 1.65; color: #374151; }
+    .email-body p { margin: 0 0 16px; }
+    .email-body a { color: #7c3aed; text-decoration: underline; }
+    .email-footer { padding: 20px 32px; background: #f9fafb; border-top: 1px solid #e5e7eb; font-size: 0.75rem; color: #9ca3af; text-align: center; }
+    .email-footer a { color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="email-wrap">
+    <div class="email-header"><span>Trailblaize</span></div>
+    <div class="email-body">${bodyHtml}</div>
+    <div class="email-footer">
+      <p>You received this because you're listed as an alumni of your chapter.<br/>
+      <a href="#">Unsubscribe</a> &nbsp;·&nbsp; Trailblaize, Inc.</p>
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
 /* ─── Constants ─── */
@@ -361,9 +392,12 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
                 </button>
               </div>
               {previewMode ? (
-                <div style={{ padding: '14px 16px', background: '#f9fafb', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 120 }}>
-                  <RichTextDisplay content={form.template_html || '<p style="color:#9ca3af">No content yet</p>'} />
-                </div>
+                <iframe
+                  srcDoc={buildPreviewHtml(form.template_html || '')}
+                  style={{ width: '100%', height: 600, border: 'none', borderRadius: 8, background: '#f9fafb' }}
+                  title="Email Preview"
+                  sandbox="allow-same-origin"
+                />
               ) : (
                 <textarea
                   value={form.template_html}
