@@ -5,6 +5,7 @@ import {
   Send, Clock, CheckCircle2, XCircle, AlertTriangle, RefreshCw,
   Users, Building2, Zap, MessageSquare, ChevronDown, ChevronRight,
   Ban, Loader2, TrendingUp, PauseCircle, PlayCircle, Phone,
+  Edit2, Save, X as XIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
@@ -121,6 +122,16 @@ interface LinqLineConfig {
   pause_reason: string | null;
 }
 
+interface LinqTemplate {
+  id: string;
+  chapter_id: string;
+  touch_number: number;
+  template_text: string;
+  subject_line?: string;
+  is_active: boolean;
+  is_default?: boolean;
+}
+
 interface ChapterOutreachSummary {
   chapter_id: string;
   chapter_name: string;
@@ -150,6 +161,16 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [rejectNotes, setRejectNotes] = useState('');
   const [showRejectInput, setShowRejectInput] = useState<string | null>(null);
+
+  // ── Linq Message Templates section ──
+  const [linqTemplatesExpanded, setLinqTemplatesExpanded] = useState(false);
+  const [linqTemplateChapter, setLinqTemplateChapter] = useState<string>('');
+  const [linqTemplates, setLinqTemplates] = useState<LinqTemplate[]>([]);
+  const [linqTemplatesLoading, setLinqTemplatesLoading] = useState(false);
+  const [linqEditingTouch, setLinqEditingTouch] = useState<number | null>(null);
+  const [linqEditorContent, setLinqEditorContent] = useState('');
+  const [linqEditorSubject, setLinqEditorSubject] = useState('');
+  const [linqSaving, setLinqSaving] = useState(false);
 
   /* ─── Data fetching ─── */
 
@@ -193,7 +214,23 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
     }
   }, []);
 
+  const fetchLinqTemplates = useCallback(async (chapterId: string) => {
+    if (!chapterId) return;
+    setLinqTemplatesLoading(true);
+    try {
+      const res = await fetch(`/api/outreach/templates?chapter_id=${chapterId}`);
+      const json = await res.json();
+      if (!json.error) setLinqTemplates(json.data?.templates || []);
+    } catch { /* silent */ } finally {
+      setLinqTemplatesLoading(false);
+    }
+  }, []);
+
   useEffect(() => { fetchBatches(); fetchChapterStats(); fetchLines(); }, [fetchBatches, fetchChapterStats, fetchLines]);
+
+  useEffect(() => {
+    if (linqTemplateChapter) fetchLinqTemplates(linqTemplateChapter);
+  }, [linqTemplateChapter, fetchLinqTemplates]);
 
   async function togglePause(line: LinqLineConfig) {
     if (!line.is_paused && !showPauseReason) {
@@ -302,6 +339,50 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
       showToast('Failed to reject batch', 'error');
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  /* ─── Linq template helpers ─── */
+
+  const LINQ_TOUCH_CONFIG: Record<number, { label: string; color: string; bg: string }> = {
+    1: { label: 'Touch 1 — Verify',    color: '#7c3aed', bg: '#ede9fe' },
+    2: { label: 'Touch 2 — Pitch',     color: '#d97706', bg: '#fef3c7' },
+    3: { label: 'Touch 3 — Follow-up', color: '#2563eb', bg: '#dbeafe' },
+  };
+
+  function openLinqEditor(touch: number) {
+    const existing = linqTemplates.find(t => t.touch_number === touch);
+    setLinqEditorContent(existing?.template_text || '');
+    setLinqEditorSubject(existing?.subject_line || '');
+    setLinqEditingTouch(touch);
+  }
+
+  async function saveLinqTemplate() {
+    if (!linqTemplateChapter || linqEditingTouch === null) return;
+    setLinqSaving(true);
+    try {
+      const res = await fetch('/api/outreach/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chapter_id: linqTemplateChapter,
+          touch_number: linqEditingTouch,
+          template_text: linqEditorContent,
+          subject_line: linqEditorSubject.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        showToast(json.error.message || 'Failed to save template', 'error');
+      } else {
+        showToast('Template saved', 'success');
+        setLinqEditingTouch(null);
+        fetchLinqTemplates(linqTemplateChapter);
+      }
+    } catch {
+      showToast('Failed to save template', 'error');
+    } finally {
+      setLinqSaving(false);
     }
   }
 
@@ -1045,6 +1126,229 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
           )}
         </>
       )}
+
+      {/* ══════════════════════════════════════════════════════
+          ── Linq Message Templates (collapsible, bottom) ──
+          ══════════════════════════════════════════════════ */}
+      <div style={{ borderRadius: 14, border: '1px solid #e5e7eb', background: '#fff', overflow: 'hidden' }}>
+
+        {/* Section toggle header */}
+        <button
+          onClick={() => setLinqTemplatesExpanded(prev => !prev)}
+          style={{
+            width: '100%', padding: '13px 18px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: 'none', border: 'none', cursor: 'pointer',
+            borderBottom: linqTemplatesExpanded ? '1px solid #f3f4f6' : 'none',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{
+            width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+            background: 'linear-gradient(135deg, #ec4899, #db2777)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+          }}>
+            <MessageSquare size={14} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827' }}>
+              Linq Message Templates
+            </span>
+            <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: 8 }}>
+              Touch 1 / 2 / 3 SMS scripts per chapter
+            </span>
+          </div>
+          {linqTemplatesExpanded
+            ? <ChevronDown size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+            : <ChevronRight size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+          }
+        </button>
+
+        {linqTemplatesExpanded && (
+          <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Chapter selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151', flexShrink: 0 }}>
+                Chapter:
+              </label>
+              <select
+                value={linqTemplateChapter}
+                onChange={e => { setLinqTemplateChapter(e.target.value); setLinqEditingTouch(null); }}
+                style={{
+                  padding: '7px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
+                  background: '#fff', fontSize: '0.875rem', color: '#111827',
+                  cursor: 'pointer', minWidth: 200,
+                }}
+              >
+                <option value="">Select chapter…</option>
+                {chapterStats.map(ch => (
+                  <option key={ch.chapter_id} value={ch.chapter_id}>{ch.chapter_name}</option>
+                ))}
+              </select>
+            </div>
+
+            {!linqTemplateChapter ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '0.8125rem', background: '#f9fafb', borderRadius: 10 }}>
+                Select a chapter to view or edit its Linq SMS templates.
+              </div>
+            ) : linqTemplatesLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#6b7280', fontSize: '0.8125rem', padding: '8px 0' }}>
+                <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                Loading templates…
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[1, 2, 3].map(touch => {
+                  const cfg = LINQ_TOUCH_CONFIG[touch];
+                  const template = linqTemplates.find(t => t.touch_number === touch);
+                  const isEditing = linqEditingTouch === touch;
+
+                  return (
+                    <div
+                      key={touch}
+                      style={{
+                        borderRadius: 10,
+                        border: isEditing ? `1.5px solid ${cfg.color}40` : '1px solid #f3f4f6',
+                        background: isEditing ? cfg.bg + '30' : '#f9fafb',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Touch header */}
+                      <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          padding: '2px 9px', borderRadius: 20,
+                          background: cfg.bg, color: cfg.color,
+                          fontWeight: 700, fontSize: '0.7rem', flexShrink: 0,
+                        }}>
+                          {cfg.label}
+                        </span>
+                        {template && !template.is_default && (
+                          <span style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 600, background: '#f0fdf4', padding: '1px 7px', borderRadius: 20 }}>
+                            Custom
+                          </span>
+                        )}
+                        {template?.is_default && (
+                          <span style={{ fontSize: '0.65rem', color: '#9ca3af', fontWeight: 600, background: '#f3f4f6', padding: '1px 7px', borderRadius: 20 }}>
+                            Default
+                          </span>
+                        )}
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                          {!isEditing && (
+                            <button
+                              onClick={() => openLinqEditor(touch)}
+                              style={{
+                                padding: '4px 10px', borderRadius: 7,
+                                border: '1px solid #e5e7eb', background: '#fff',
+                                color: '#374151', cursor: 'pointer',
+                                fontSize: '0.7rem', fontWeight: 600,
+                                display: 'flex', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              <Edit2 size={11} /> {template ? 'Edit' : 'Create'}
+                            </button>
+                          )}
+                          {isEditing && (
+                            <button
+                              onClick={() => setLinqEditingTouch(null)}
+                              style={{
+                                padding: '4px 10px', borderRadius: 7,
+                                border: '1px solid #fecaca', background: '#fef2f2',
+                                color: '#dc2626', cursor: 'pointer',
+                                fontSize: '0.7rem', fontWeight: 600,
+                                display: 'flex', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              <XIcon size={11} /> Cancel
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Preview of existing template text (not editing) */}
+                      {!isEditing && template && (
+                        <div style={{ padding: '0 14px 10px' }}>
+                          <p style={{
+                            margin: 0, fontSize: '0.8rem', color: '#374151',
+                            lineHeight: 1.5, fontStyle: 'italic',
+                            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                          }}>
+                            &ldquo;{template.template_text?.slice(0, 180)}{(template.template_text?.length || 0) > 180 ? '…' : ''}&rdquo;
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Editor */}
+                      {isEditing && (
+                        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {/* Subject line (optional) */}
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              Subject <span style={{ color: '#9ca3af', fontWeight: 400, textTransform: 'none' }}>(optional)</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={linqEditorSubject}
+                              onChange={e => setLinqEditorSubject(e.target.value)}
+                              placeholder="Subject line (if applicable)"
+                              style={{
+                                width: '100%', padding: '7px 10px', border: '1px solid #e5e7eb',
+                                borderRadius: 7, fontSize: '0.8125rem', color: '#111827',
+                                outline: 'none', boxSizing: 'border-box', background: '#fff',
+                              }}
+                            />
+                          </div>
+
+                          {/* Message body */}
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              Message Body
+                            </label>
+                            <textarea
+                              value={linqEditorContent}
+                              onChange={e => setLinqEditorContent(e.target.value)}
+                              rows={6}
+                              spellCheck={false}
+                              placeholder="Hey {first_name}, this is {sender_name}…"
+                              style={{
+                                width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb',
+                                borderRadius: 7, fontSize: '0.8125rem', color: '#111827',
+                                fontFamily: 'inherit', boxSizing: 'border-box',
+                                resize: 'vertical', outline: 'none', lineHeight: 1.5,
+                                background: '#fff',
+                              }}
+                            />
+                          </div>
+
+                          {/* Save */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={saveLinqTemplate}
+                              disabled={linqSaving || !linqEditorContent.trim()}
+                              style={{
+                                padding: '7px 16px', borderRadius: 8, border: 'none',
+                                background: linqSaving || !linqEditorContent.trim() ? '#9ca3af' : `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)`,
+                                color: '#fff', cursor: linqSaving || !linqEditorContent.trim() ? 'not-allowed' : 'pointer',
+                                fontSize: '0.8125rem', fontWeight: 700,
+                                display: 'flex', alignItems: 'center', gap: 6,
+                              }}
+                            >
+                              {linqSaving
+                                ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+                                : <><Save size={13} /> Save Template</>
+                              }
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
