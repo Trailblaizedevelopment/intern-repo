@@ -597,6 +597,7 @@ export const UNIVERSITIES = [
   'SMU',
   'Ole Miss',
   'Mississippi State University',
+  'Miami University',
 ];
 
 // List of common Greek organizations
