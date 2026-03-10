@@ -37,6 +37,52 @@ const TEMPLATE_VARS = [
   '{school}', '{fraternity}', '{signup_link}',
 ];
 
+/* ─── Email preview builder ─── */
+
+function isHtmlContent(content: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(content);
+}
+
+function plainTextToHtml(text: string): string {
+  return text
+    .split(/\n\n+/)
+    .map(para => `<p>${para.replace(/\n/g, '<br />')}</p>`)
+    .join('\n');
+}
+
+function buildPreviewHtml(body: string): string {
+  const bodyHtml = isHtmlContent(body) ? body : plainTextToHtml(body);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; color: #111827; }
+    .email-wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .email-header { background: linear-gradient(135deg, #6d28d9, #8b5cf6); padding: 24px 32px; }
+    .email-header span { color: #fff; font-weight: 700; font-size: 1.125rem; letter-spacing: -0.01em; }
+    .email-body { padding: 32px; font-size: 0.9375rem; line-height: 1.65; color: #374151; }
+    .email-body p { margin: 0 0 16px; }
+    .email-body a { color: #7c3aed; text-decoration: underline; }
+    .email-body strong { color: #111827; }
+    .email-footer { padding: 20px 32px; background: #f9fafb; border-top: 1px solid #e5e7eb; font-size: 0.75rem; color: #9ca3af; text-align: center; }
+    .email-footer a { color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="email-wrap">
+    <div class="email-header"><span>Trailblaize</span></div>
+    <div class="email-body">${bodyHtml}</div>
+    <div class="email-footer">
+      <p>You received this because you're listed as an alumni of your chapter.<br/>
+      <a href="#">Unsubscribe</a> &nbsp;·&nbsp; Trailblaize, Inc.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 /* ─── Component ─── */
 
 export default function EmailTemplatesTab({ showToast }: EmailTemplatesTabProps) {
@@ -66,12 +112,10 @@ export default function EmailTemplatesTab({ showToast }: EmailTemplatesTabProps)
       const json = await res.json();
       if (!json.error && json.data) {
         setChapters(json.data);
-        if (json.data.length > 0 && !selectedChapter) {
-          setSelectedChapter(json.data[0].id);
-        }
+        // Do NOT auto-select — let the user pick the chapter explicitly
       }
     } catch { /* silent */ }
-  }, [selectedChapter]);
+  }, []);
 
   const fetchTemplates = useCallback(async (chapterId: string) => {
     if (!chapterId) return;
@@ -300,18 +344,11 @@ export default function EmailTemplatesTab({ showToast }: EmailTemplatesTabProps)
                       ))}
                     </div>
                     {previewMode === 'rendered' ? (
-                      <div
-                        style={{
-                          padding: '14px 20px',
-                          background: '#ffffff',
-                          borderRadius: 10,
-                          border: '1px solid #e5e7eb',
-                          minHeight: 60,
-                          fontSize: '0.9rem',
-                          lineHeight: 1.7,
-                          color: '#374151',
-                        }}
-                        dangerouslySetInnerHTML={{ __html: template.template_text || '<p style="color:#9ca3af">No content yet</p>' }}
+                      <iframe
+                        key={template.template_text}
+                        srcDoc={buildPreviewHtml(template.template_text || '')}
+                        style={{ width: '100%', height: 520, border: '1px solid #e5e7eb', borderRadius: 10, background: '#f9fafb', display: 'block' }}
+                        title={`Preview Touch ${touch}`}
                       />
                     ) : (
                       <pre style={{ margin: 0, padding: '12px 16px', background: '#1e1e2e', color: '#cdd6f4', borderRadius: 10, fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.6 }}>
