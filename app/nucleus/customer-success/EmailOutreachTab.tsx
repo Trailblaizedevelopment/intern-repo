@@ -49,7 +49,7 @@ interface EmailSend {
 }
 
 interface Chapter { id: string; chapter_name: string; }
-interface Template { id: string; touch_number: number; template_text: string; subject_line?: string; }
+interface Template { id: string; touch_number?: number; template_text?: string; html_content?: string; subject_line?: string; name?: string; }
 
 interface EmailOutreachTabProps {
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
@@ -160,12 +160,11 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
     } catch { /* silent */ }
   }, []);
 
-  const fetchTemplates = useCallback(async (chapterId: string) => {
-    if (!chapterId) return;
+  const fetchTemplates = useCallback(async () => {
     try {
-      const res = await fetch(`/api/outreach/templates?chapter_id=${chapterId}`);
+      const res = await fetch(`/api/email-templates`);
       const json = await res.json();
-      if (!json.error) setTemplates(json.data?.templates || []);
+      if (!json.error) setTemplates(json.data || []);
     } catch { /* silent */ }
   }, []);
 
@@ -182,8 +181,7 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
     finally { setDetailLoading(false); }
   }, []);
 
-  useEffect(() => { fetchCampaigns(); fetchChapters(); }, [fetchCampaigns, fetchChapters]);
-  useEffect(() => { if (selectedChapter) fetchTemplates(selectedChapter); }, [selectedChapter, fetchTemplates]);
+  useEffect(() => { fetchCampaigns(); fetchChapters(); fetchTemplates(); }, [fetchCampaigns, fetchChapters, fetchTemplates]);
 
   /* ─── Actions ─── */
 
@@ -232,16 +230,17 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
   }
 
   function loadTemplate(touch: number) {
-    const t = templates.find(t => t.touch_number === touch);
+    // Email templates don't have touch_number — just load the first/best available
+    const t = templates[0];
     if (t) {
       setForm(f => ({
         ...f,
-        template_html: t.template_text,
+        template_html: t.html_content || t.template_text || '',
         subject_line: t.subject_line || f.subject_line,
       }));
-      showToast('Template loaded', 'success');
+      showToast(`Template "${t.name || 'Untitled'}" loaded`, 'success');
     } else {
-      showToast('No saved template for this touch — write one in Email Templates tab first', 'info');
+      showToast('No email templates saved yet — create one in the Email Templates tab first', 'info');
     }
   }
 
@@ -393,10 +392,10 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
               </div>
               {previewMode ? (
                 <iframe
+                  key={form.template_html}
                   srcDoc={buildPreviewHtml(form.template_html || '')}
                   style={{ width: '100%', height: 600, border: 'none', borderRadius: 8, background: '#f9fafb' }}
                   title="Email Preview"
-                  sandbox="allow-same-origin"
                 />
               ) : (
                 <textarea
