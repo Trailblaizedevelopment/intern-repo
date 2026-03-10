@@ -76,35 +76,44 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'All lines are paused or blocked — no sends executed. Resume a line first.' }, { status: 409 });
     }
 
-    // 4. Load eligible contacts for active lines only
+    // 4. Load eligible contacts — do NOT filter by assigned_line (most contacts have null)
+    //    Skip only contacts explicitly marked is_imessage=false (confirmed SMS)
     const cutoffT2 = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const totalCap = activeLineNumbers.length * 45;
 
     const [t1Res, t2Res] = await Promise.all([
       supabase
         .from('alumni_contacts')
-        .select('id, first_name, phone_primary, chapter_id, assigned_line, outreach_status, is_imessage')
+        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage')
         .eq('outreach_status', 'not_contacted')
-        .eq('is_imessage', true)
-        .in('assigned_line', activeLineNumbers)
-        .limit(200),
+        .neq('is_imessage', false)           // allow null (unverified) + true
+        .not('phone_primary', 'is', null)
+        .limit(totalCap + 50),
       supabase
         .from('alumni_contacts')
-        .select('id, first_name, phone_primary, chapter_id, assigned_line, outreach_status, is_imessage, touch1_sent_at')
+        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at')
         .eq('outreach_status', 'touch1_sent')
-        .eq('is_imessage', true)
+        .neq('is_imessage', false)
         .lte('touch1_sent_at', cutoffT2)
-        .in('assigned_line', activeLineNumbers)
-        .limit(200),
+        .not('phone_primary', 'is', null)
+        .limit(totalCap + 50),
     ]);
 
-    const allContacts = [...(t1Res.data || []), ...(t2Res.data || [])];
+    // T2 follow-ups first, then T1 new outreach
+    const allContacts = [...(t2Res.data || []), ...(t1Res.data || [])];
 
-    // Cap at 45 per active line
+    // Distribute round-robin across active lines, cap 45/line
     const byLine: Record<number, typeof allContacts> = {};
     for (const n of activeLineNumbers) byLine[n] = [];
+    let lineIdx = 0;
     for (const c of allContacts) {
-      const line = c.assigned_line as number;
-      if (byLine[line] !== undefined && byLine[line].length < 45) byLine[line].push(c);
+      const lineNum = activeLineNumbers[lineIdx % activeLineNumbers.length];
+      if (byLine[lineNum].length < 45) {
+        byLine[lineNum].push(c);
+      }
+      lineIdx++;
+      // Stop if all lines are full
+      if (activeLineNumbers.every(n => byLine[n].length >= 45)) break;
     }
 
     // Load chapter names + fraternity info
