@@ -26,8 +26,7 @@ function buildT2Message(firstName: string, fraternityName: string): string {
  * POST /api/outreach/batches/[id]/execute
  * Executes actual Linq sends for an approved batch.
  * - Respects linq_line_config pause state (paused lines are skipped)
- * - Always blocks Owen's line
- * - Atomically locks to 'sending' before any sends to prevent double-runs
+ * - Status check (must be 'approved') prevents double-runs
  * - Rolls back to 'approved' on hard failure so it can be retried
  */
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +34,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
-  // 1. Fetch and verify batch
+  // 1. Fetch and verify batch — status must be 'approved' to prevent double-runs
   const { data: batch, error: bErr } = await supabase
     .from('outreach_batches')
     .select('*')
@@ -47,19 +46,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: `Cannot execute: batch status is '${batch.status}' (must be 'approved')` }, { status: 409 });
   }
 
-  // 2. Lock to 'sending' atomically — prevents double-runs
-  const { error: lockErr } = await supabase
-    .from('outreach_batches')
-    .update({ status: 'sending' })
-    .eq('id', id)
-    .eq('status', 'approved');
-
-  if (lockErr) return NextResponse.json({ error: 'Failed to lock batch' }, { status: 500 });
-
   const results = { sent: 0, failed: 0, skipped_sms: 0, skipped_paused_line: 0, errors: [] as string[] };
 
   try {
-    // 3. Check which lines are paused in linq_line_config
+    // 2. Check which lines are paused in linq_line_config
     const { data: lineConfigs } = await supabase
       .from('linq_line_config')
       .select('line_number, is_paused, label');
@@ -76,7 +66,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'All lines are paused or blocked — no sends executed. Resume a line first.' }, { status: 409 });
     }
 
-    // 4. Load eligible contacts — do NOT filter by assigned_line (most contacts have null)
+    // 3. Load eligible contacts — do NOT filter by assigned_line (most contacts have null)
     //    Skip only contacts explicitly marked is_imessage=false (confirmed SMS)
     const cutoffT2 = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
     const totalCap = activeLineNumbers.length * 45;
@@ -125,7 +115,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const chapterMap: Record<string, { fraternity_name: string; university: string }> = {};
     for (const ch of (chapters || [])) chapterMap[ch.id] = ch;
 
-    // 5. Send via Linq — active lines only
+    // 4. Send via Linq — active lines only
     for (const [lineNum, contacts] of Object.entries(byLine)) {
       const fromPhone = ALL_LINE_PHONES[Number(lineNum)];
       if (!fromPhone) continue;
@@ -163,7 +153,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    // 6. Mark complete
+    // 5. Mark complete
     await supabase
       .from('outreach_batches')
       .update({ status: 'completed', sent_at: new Date().toISOString() })
