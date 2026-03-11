@@ -8,11 +8,6 @@ const ALL_LINE_PHONES: Record<number, string> = {
   3: '+16462442696', // Ford
 };
 
-const CHAPTER_JOIN_LINKS: Record<string, string> = {
-  'c15ddcc2-341b-459a-b508-16aa65d56d8f': 'https://www.trailblaize.net/alumni-join/dFxw7fYkiK8dUCl8xwC7UFbuMwIC3Fpt',
-  '57dde7fc-e048-430b-b872-b1baedda0263': 'https://www.trailblaize.net/join/9LiZS3SVKrvBCM8N6QLvgsoMW3undNn5',
-  'a2cc8a73-ec38-489c-b6f0-640871293fda': 'https://www.trailblaize.net/alumni-join/DGY5vgkFAve9DKC0Azcg6hu4XFCJtdJC',
-};
 
 // Per-line caps:
 // T1 (new chats)     — strict Linq daily limit, never exceed 45
@@ -182,10 +177,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const chapterIds = [...new Set(allContacts.map(c => c.chapter_id).filter(Boolean))];
     const { data: chapters } = await supabase
       .from('chapters')
-      .select('id, fraternity_name, university')
+      .select('id, fraternity, school, alumni_join_link')
       .in('id', chapterIds);
     const chapterMap: Record<string, { fraternity_name: string; university: string }> = {};
-    for (const ch of (chapters || [])) chapterMap[ch.id] = ch;
+    for (const ch of (chapters || [])) chapterMap[ch.id] = { fraternity_name: ch.fraternity, university: ch.school, alumni_join_link: ch.alumni_join_link };
 
     // 5. Send — with atomic pre-claim before each Linq call
     for (const [lineNum, contacts] of Object.entries(byLine)) {
@@ -194,7 +189,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
       for (const contact of contacts) {
         const chapter  = chapterMap[contact.chapter_id] || { fraternity_name: 'your fraternity', university: 'your school' };
-        const joinLink = CHAPTER_JOIN_LINKS[contact.chapter_id] || 'https://trailblaize.net';
+        const joinLink = chapter.alumni_join_link || 'https://trailblaize.net';
         const status   = contact.outreach_status;
         const now      = new Date().toISOString();
 
