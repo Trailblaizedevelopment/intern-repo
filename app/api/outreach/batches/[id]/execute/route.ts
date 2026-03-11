@@ -179,7 +179,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       .from('chapters')
       .select('id, fraternity, school, alumni_join_link')
       .in('id', chapterIds);
-    const chapterMap: Record<string, { fraternity_name: string; university: string }> = {};
+    const chapterMap: Record<string, { fraternity_name: string; university: string; alumni_join_link: string | null }> = {};
     for (const ch of (chapters || [])) chapterMap[ch.id] = { fraternity_name: ch.fraternity, university: ch.school, alumni_join_link: ch.alumni_join_link };
 
     // 5. Send — with atomic pre-claim before each Linq call
