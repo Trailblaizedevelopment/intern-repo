@@ -799,24 +799,17 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
               </div>
             )}
 
-            {/* Approved state — show Execute button (sends haven't run yet) */}
-            {batch.status === 'approved' && batch.approved_by && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, background: '#fef3c7', border: '1px solid #fcd34d', flexWrap: 'wrap' }}>
+            {/* Approved state — execute runs automatically on approval, no manual button needed */}
+            {batch.status === 'approved' && batch.approved_by && !batch.executed_at && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, background: '#fef3c7', border: '1px solid #fcd34d' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, color: '#78350f', fontSize: '0.875rem' }}>
-                    ✅ Approved by {batch.approved_by} — sends not yet executed
+                    ✅ Approved by {batch.approved_by} — sends executing automatically
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#b45309', marginTop: 2 }}>
-                    {formatTs(batch.approved_at)} · Click Execute to send the Linq messages now.
+                    {formatTs(batch.approved_at)}
                   </div>
                 </div>
-                <button
-                  onClick={() => executeBatch(batch.id)}
-                  disabled={actionLoading === batch.id + ':execute'}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#d97706', color: '#fff', fontWeight: 700, fontSize: '0.875rem', cursor: actionLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  {actionLoading === batch.id + ':execute' ? '⏳ Sending…' : '🚀 Execute Sends'}
-                </button>
               </div>
             )}
           </div>
