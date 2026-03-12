@@ -75,14 +75,22 @@ export async function POST(request: NextRequest) {
     let query = supabase
       .from('alumni_contacts')
       .select('id, first_name, last_name, phone_primary, provider_conversation_id, assigned_line, response_classification, outreach_status, touch1_sent_at, touch2_sent_at')
-      .eq('chapter_id', chapter_id)
-      .eq('is_imessage', true);
+      .eq('chapter_id', chapter_id);
 
     if (touch === 1) {
-      query = query.eq('outreach_status', 'not_contacted').is('touch1_sent_at', null);
+      // Allow is_imessage=null (unverified) so Linq handles inline verification;
+      // skip contacts already confirmed as SMS-only.
+      query = query
+        .or('is_imessage.is.null,is_imessage.eq.true')
+        .eq('outreach_status', 'not_contacted')
+        .is('touch1_sent_at', null);
     } else if (touch === 2) {
-      query = query.not('touch1_sent_at', 'is', null).is('touch2_sent_at', null);
+      query = query
+        .eq('is_imessage', true)
+        .not('touch1_sent_at', 'is', null)
+        .is('touch2_sent_at', null);
     } else if (touch === 3) {
+      query = query.eq('is_imessage', true);
       query = query
         .not('touch2_sent_at', 'is', null)
         .is('touch3_sent_at', null)
