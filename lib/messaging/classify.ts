@@ -22,7 +22,34 @@ const DECLINED_PATTERNS = /\b(stop|unsubscribe|remove|not interested|no thanks|d
 const CONFIRMED_PATTERNS = /\b(yes|yeah|yep|yea|this is|correct|that's me|thats me|sure|speaking|hey|what's up|sup)\b/i;
 const SIGNED_UP_PATTERNS = /\b(signed up|joined|registered|created|done|got it set up|just signed|i'm in|im in)\b/i;
 
-const HUMAN_REVIEW_PATTERNS = /\b(lawyer|legal|report|harassment|money|pay|hire|job|intern|business|homeless|help)\b/i;
+/**
+ * Patterns that require a human to review before any further automated send.
+ * Covers: call/phone requests, wrong number/identity confusion, deceased/sensitive,
+ * anger/legal threats, and opt-out/confusion signals.
+ */
+const HUMAN_REVIEW_PATTERNS = new RegExp(
+  [
+    // Call / phone requests
+    'call me', 'call you', 'give me a call', 'phone number', 'reach me', 'contact me',
+    // Wrong number / identity confusion
+    'wrong number', 'wrong person', 'not me', 'not him', 'not her',
+    'who is this', 'who are you', 'how did you get my number', 'how did you get this',
+    // Deceased / sensitive
+    'passed away', 'no longer with us', 'he died', 'she died',
+    'my husband', 'my wife', 'my son', 'my daughter', 'my father', 'my mother',
+    // Anger / legal
+    'stop texting', 'stop contacting', 'leave me alone', 'report you',
+    'harassment', 'sue', 'block',
+    // Single-word high-signal terms (word-boundary wrapped separately)
+    '\\blawyer\\b', '\\blegal\\b', '\\bspam\\b', '\\bdeceased\\b', '\\bpassed\\b',
+    // Opt-out / confusion
+    'what is this', 'what is trailblaize', 'remove me', 'unsubscribe', 'opt out',
+    // Legacy patterns
+    '\\bmoney\\b', '\\bpay\\b', '\\bhire\\b', '\\bjob\\b', '\\bintern\\b',
+    '\\bbusiness\\b', '\\bhomeless\\b', '\\bhelp\\b',
+  ].join('|'),
+  'i'
+);
 
 export function classifyResponse(text: string): ClassificationResult {
   const trimmed = text.trim();
