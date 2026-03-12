@@ -15,17 +15,25 @@ const ALL_LINE_PHONES: Record<number, string> = {
 const T1_CAP_PER_LINE   = 45;
 const T2T3_CAP_PER_LINE = 150;
 
+// T1 — identity verify ONLY. No link, no pitch.
 function buildT1Message(firstName: string, fraternityName: string, school: string): string {
-  // T1 = identity verify ONLY. No link, no pitch. Keeps lines from being flagged by Apple/Linq.
   return `Hey ${firstName}, is this you? Just verifying we have the right number for the ${fraternityName} alumni list at ${school}.`;
 }
 
-function buildT2Message(firstName: string, fraternityName: string): string {
-  return `Hey ${firstName}, just following up! Wanted to make sure you saw our message about the ${fraternityName} alumni network. Would love to get you connected - interested?`;
+// Track A — they confirmed identity (touch1_confirmed)
+function buildT2AMessage(firstName: string, fraternityName: string, school: string, joinLink: string): string {
+  return `Hey ${firstName}, great! Here's the link to join the ${fraternityName} alumni network at ${school} - free, takes 2 min: ${joinLink}`;
+}
+function buildT3AMessage(firstName: string): string {
+  return `Hey ${firstName}, just checking - did you get a chance to join? Happy to answer any questions.`;
 }
 
-function buildT3Message(firstName: string, fraternityName: string): string {
-  return `Hey ${firstName} - last follow-up from us. Still happy to get you connected to the ${fraternityName} alumni network on Trailblaize if you're interested. Totally free, takes 30 sec.`;
+// Track B — no response to T1 (touch1_sent, 2+ days)
+function buildT2BMessage(firstName: string, fraternityName: string, school: string, joinLink: string): string {
+  return `Hey ${firstName}, just following up - we're building out the ${fraternityName} alumni network at ${school}. Here's the link if you're interested: ${joinLink}`;
+}
+function buildT3BMessage(firstName: string, fraternityName: string): string {
+  return `Hey ${firstName}, last one from us. If you ever want to connect with other ${fraternityName} guys, we're at trailblaize.net. No pressure.`;
 }
 
 /**
@@ -132,7 +140,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       // T3: touch2 sent, 4+ days old, no T3 sent yet
       supabase
         .from('alumni_contacts')
-        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch2_sent_at')
+        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch2_sent_at, linq_chat_id')
         .eq('outreach_status', 'touch2_sent')
         .is('touch3_sent_at', null)
         .neq('is_imessage', false)
@@ -234,9 +242,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         // ── End atomic claim ──────────────────────────────────────────────────
 
         const message =
-          status === 'not_contacted'                                  ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university) :
-          (status === 'touch1_sent' || status === 'touch1_confirmed') ? buildT2Message(contact.first_name, chapter.fraternity_name) :
-                                                                        buildT3Message(contact.first_name, chapter.fraternity_name);
+          status === 'not_contacted'   ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university) :
+          status === 'touch1_confirmed'? buildT2AMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
+          status === 'touch1_sent'     ? buildT2BMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
+          // T3: check original track — touch1_confirmed track gets T3A, touch1_sent track gets T3B
+          // We infer track from whether they ever confirmed (touch2 from A would have had confirmed prior)
+          // Simplification: T3A only fires when contact has a linq_chat_id (replied), else T3B
+          contact.linq_chat_id         ? buildT3AMessage(contact.first_name) :
+                                         buildT3BMessage(contact.first_name, chapter.fraternity_name);
 
         try {
           const chat    = await createChat(fromPhone, contact.phone_primary, message);
