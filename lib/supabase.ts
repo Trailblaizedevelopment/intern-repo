@@ -655,16 +655,19 @@ export const GREEK_ORGANIZATIONS = [...FRATERNITIES, ...SORORITIES].sort();
 // Alumni Contact Types
 // ============================================
 
-export type OutreachStatus = 'not_contacted' | 'verified' | 'pitched' | 'responded' | 'signed_up' | 'wrong_number' | 'opted_out';
+export type OutreachStatus = 'not_contacted' | 'touch1_sent' | 'touch2_sent' | 'touch3_sent' | 'verified' | 'pitched' | 'responded' | 'signed_up' | 'wrong_number' | 'opted_out';
 
 export const OUTREACH_STATUS_CONFIG: Record<OutreachStatus, { label: string; color: string; bg: string }> = {
   not_contacted: { label: 'Not Contacted', color: '#6b7280', bg: '#f3f4f6' },
-  verified: { label: 'Verified', color: '#2563eb', bg: '#dbeafe' },
-  pitched: { label: 'Pitched', color: '#d97706', bg: '#fef3c7' },
-  responded: { label: 'Responded', color: '#2563eb', bg: '#dbeafe' },
-  signed_up: { label: 'Signed Up', color: '#16a34a', bg: '#dcfce7' },
-  wrong_number: { label: 'Wrong Number', color: '#dc2626', bg: '#fee2e2' },
-  opted_out: { label: 'Opted Out', color: '#4b5563', bg: '#e5e7eb' },
+  touch1_sent:   { label: 'Touch 1 Sent',  color: '#7c3aed', bg: '#ede9fe' },
+  touch2_sent:   { label: 'Touch 2 Sent',  color: '#9333ea', bg: '#f3e8ff' },
+  touch3_sent:   { label: 'Touch 3 Sent',  color: '#a855f7', bg: '#faf5ff' },
+  verified:      { label: 'Verified',       color: '#2563eb', bg: '#dbeafe' },
+  pitched:       { label: 'Pitched',        color: '#d97706', bg: '#fef3c7' },
+  responded:     { label: 'Responded',      color: '#2563eb', bg: '#dbeafe' },
+  signed_up:     { label: 'Signed Up',      color: '#16a34a', bg: '#dcfce7' },
+  wrong_number:  { label: 'Wrong Number',   color: '#dc2626', bg: '#fee2e2' },
+  opted_out:     { label: 'Opted Out',      color: '#4b5563', bg: '#e5e7eb' },
 };
 
 export interface PlatformMember {

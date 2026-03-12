@@ -69,7 +69,7 @@ function timeAgo(iso: string): string {
 }
 
 function StatusBadge({ status }: { status: OutreachStatus }) {
-  const cfg = OUTREACH_STATUS_CONFIG[status];
+  const cfg = OUTREACH_STATUS_CONFIG[status] ?? { label: status, color: '#6b7280', bg: '#f3f4f6' };
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600, color: cfg.color, backgroundColor: cfg.bg, whiteSpace: 'nowrap' }}>
       {cfg.label}
@@ -174,10 +174,10 @@ export default function AlumniPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Activity feed
-  const [activityOpen, setActivityOpen] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('alumni_activity_open') === 'true';
-    return false;
-  });
+  const [activityOpen, setActivityOpen] = useState(false);
+  useEffect(() => {
+    setActivityOpen(localStorage.getItem('alumni_activity_open') === 'true');
+  }, []);
   const [activityItems, setActivityItems] = useState<AlumniContact[]>([]);
   const [exportingCSV, setExportingCSV] = useState(false);
 
