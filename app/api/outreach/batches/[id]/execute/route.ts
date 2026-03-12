@@ -121,20 +121,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       // T1: brand new contacts — must have no sent timestamp AND no existing chat
       supabase
         .from('alumni_contacts')
-        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage')
+        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id')
         .eq('outreach_status', 'not_contacted')
         .is('touch1_sent_at', null)
         .is('linq_chat_id', null)
         .neq('is_imessage', false)
+        .not('flagged', 'is', true)
         .not('phone_primary', 'is', null)
         .limit(activeLineNumbers.length * T1_CAP_PER_LINE + 50),
       // T2: touch1_sent (2+ days old) OR touch1_confirmed (replied — no wait required), no T2 yet
       supabase
         .from('alumni_contacts')
-        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at')
+        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at, linq_chat_id')
         .in('outreach_status', ['touch1_sent', 'touch1_confirmed'])
         .is('touch2_sent_at', null)
         .neq('is_imessage', false)
+        .not('flagged', 'is', true)
         .not('phone_primary', 'is', null)
         .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
       // T3: touch2 sent, 4+ days old, no T3 sent yet
@@ -144,6 +146,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         .eq('outreach_status', 'touch2_sent')
         .is('touch3_sent_at', null)
         .neq('is_imessage', false)
+        .not('flagged', 'is', true)
         .lte('touch2_sent_at', cutoffT3)
         .not('phone_primary', 'is', null)
         .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
