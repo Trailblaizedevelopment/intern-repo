@@ -15,8 +15,9 @@ const ALL_LINE_PHONES: Record<number, string> = {
 const T1_CAP_PER_LINE   = 45;
 const T2T3_CAP_PER_LINE = 150;
 
-function buildT1Message(firstName: string, fraternityName: string, school: string, joinLink: string): string {
-  return `Hey ${firstName}! Reaching out on behalf of ${fraternityName} at ${school}. We're rebuilding our alumni network and would love to have you involved. Join here: ${joinLink} - takes 2 min!`;
+function buildT1Message(firstName: string, fraternityName: string, school: string): string {
+  // T1 = identity verify ONLY. No link, no pitch. Keeps lines from being flagged by Apple/Linq.
+  return `Hey ${firstName}, is this you? Just verifying we have the right number for the ${fraternityName} alumni list at ${school}.`;
 }
 
 function buildT2Message(firstName: string, fraternityName: string): string {
@@ -119,14 +120,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         .neq('is_imessage', false)
         .not('phone_primary', 'is', null)
         .limit(activeLineNumbers.length * T1_CAP_PER_LINE + 50),
-      // T2: touch1 sent, 2+ days old, no T2 sent yet
+      // T2: touch1_sent (2+ days old) OR touch1_confirmed (replied — no wait required), no T2 yet
       supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at')
-        .eq('outreach_status', 'touch1_sent')
+        .in('outreach_status', ['touch1_sent', 'touch1_confirmed'])
         .is('touch2_sent_at', null)
         .neq('is_imessage', false)
-        .lte('touch1_sent_at', cutoffT2)
         .not('phone_primary', 'is', null)
         .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
       // T3: touch2 sent, 4+ days old, no T3 sent yet
@@ -206,12 +206,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
             .eq('outreach_status', 'not_contacted')
             .is('touch1_sent_at', null)
             .select('id');
-        } else if (status === 'touch1_sent') {
+        } else if (status === 'touch1_sent' || status === 'touch1_confirmed') {
           claimQuery = supabase
             .from('alumni_contacts')
             .update({ outreach_status: 'touch2_sent', touch2_sent_at: now })
             .eq('id', contact.id)
-            .eq('outreach_status', 'touch1_sent')
+            .in('outreach_status', ['touch1_sent', 'touch1_confirmed'])
             .is('touch2_sent_at', null)
             .select('id');
         } else {
@@ -234,9 +234,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         // ── End atomic claim ──────────────────────────────────────────────────
 
         const message =
-          status === 'not_contacted' ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
-          status === 'touch2_sent'   ? buildT3Message(contact.first_name, chapter.fraternity_name) :
-                                       buildT2Message(contact.first_name, chapter.fraternity_name);
+          status === 'not_contacted'                                  ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university) :
+          (status === 'touch1_sent' || status === 'touch1_confirmed') ? buildT2Message(contact.first_name, chapter.fraternity_name) :
+                                                                        buildT3Message(contact.first_name, chapter.fraternity_name);
 
         try {
           const chat    = await createChat(fromPhone, contact.phone_primary, message);
