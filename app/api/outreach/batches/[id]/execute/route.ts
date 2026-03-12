@@ -21,8 +21,13 @@ function buildT1Message(firstName: string, fraternityName: string, school: strin
 }
 
 // Track A — they confirmed identity (touch1_confirmed)
+// Short-gap variant (< 7 days since T1): warm callback to their confirmation
 function buildT2AMessage(firstName: string, fraternityName: string, school: string, joinLink: string): string {
   return `Hey ${firstName}, great! Here's the link to join the ${fraternityName} alumni network at ${school} - free, takes 2 min: ${joinLink}`;
+}
+// Long-gap variant (>= 7 days since T1): no "great!", no callback — fresh re-intro
+function buildT2ALongGapMessage(firstName: string, fraternityName: string, school: string, joinLink: string): string {
+  return `Hey ${firstName}, checking back in - we're still building out the ${fraternityName} alumni network at ${school} and would love to have you. Here's the link if you're interested: ${joinLink}`;
 }
 function buildT3AMessage(firstName: string): string {
   return `Hey ${firstName}, just checking - did you get a chance to join? Happy to answer any questions.`;
@@ -287,8 +292,17 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         }
         // ── End atomic claim ──────────────────────────────────────────────────
 
+        // For touch1_confirmed T2A: if >7 days since T1, use long-gap variant
+        // (no "great!" callback — they likely don't remember the ping from weeks ago)
+        const t1SentAt = (contact as { touch1_sent_at?: string }).touch1_sent_at;
+        const daysSinceT1 = t1SentAt
+          ? (Date.now() - new Date(t1SentAt).getTime()) / (1000 * 60 * 60 * 24)
+          : 0;
+        const useT2ALongGap = status === 'touch1_confirmed' && daysSinceT1 >= 7;
+
         const message =
           status === 'not_contacted'   ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university) :
+          useT2ALongGap                ? buildT2ALongGapMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
           status === 'touch1_confirmed'? buildT2AMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
           status === 'touch1_sent'     ? buildT2BMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
           // T3: check original track — touch1_confirmed track gets T3A, touch1_sent track gets T3B
