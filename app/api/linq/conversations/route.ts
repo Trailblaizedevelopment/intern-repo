@@ -28,8 +28,20 @@ export async function GET(request: NextRequest) {
       ? LINES.filter(l => l.number === parseInt(lineFilter))
       : [...LINES];
 
+    // Paginate through all chats per line (Linq returns max 150/page with cursor)
+    async function fetchAllChats(phone: string): Promise<LinqChat[]> {
+      const all: LinqChat[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await listChats(phone, 150, cursor);
+        all.push(...page.chats);
+        cursor = page.next_cursor;
+      } while (cursor);
+      return all;
+    }
+
     const results = await Promise.allSettled(
-      targetLines.map(line => listChats(line.phone, 150).then(r => ({ line, chats: r.chats })))
+      targetLines.map(line => fetchAllChats(line.phone).then(chats => ({ line, chats })))
     );
 
     // Flatten + attach line metadata
