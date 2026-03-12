@@ -11,9 +11,10 @@
  *   {
  *     external_url:  string,   // external Supabase project URL
  *     external_key:  string,   // external service role key
- *     secret:        string,   // ALUMNI_WEBHOOK_SECRET
  *     dry_run?:      boolean   // if true, returns matches without writing
  *   }
+ *
+ * Auth: INTERNAL_API_KEY middleware header (same as all other internal routes).
  *
  * Returns:
  *   { total_profiles, matched, updated, unmatched: [...], errors: [...] }
@@ -22,7 +23,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-const WEBHOOK_SECRET     = process.env.ALUMNI_WEBHOOK_SECRET    || '';
 const internalUrl        = process.env.NEXT_PUBLIC_SUPABASE_URL  || '';
 const internalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
@@ -69,13 +69,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json() as {
     external_url: string;
     external_key: string;
-    secret?: string;
     dry_run?: boolean;
   };
-
-  if (WEBHOOK_SECRET && body.secret !== WEBHOOK_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
 
   if (!body.external_url || !body.external_key) {
     return NextResponse.json({ error: 'external_url and external_key required' }, { status: 400 });
