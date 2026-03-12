@@ -134,10 +134,15 @@ export default function ConversationsTab({ showToast }: ConversationsTabProps) {
     setLoadingMessages(true);
     setMessages([]);
     try {
-      const res = await fetch(`/api/linq/messages?chat_id=${encodeURIComponent(chatId)}&limit=60`);
+      const res = await fetch(`/api/linq/messages?chat_id=${encodeURIComponent(chatId)}&limit=500`);
       const json = await res.json();
       if (json.error) throw new Error(json.error.message || json.error);
-      setMessages(json.data || []);
+      // Sort oldest → newest for correct chronological display
+      const sorted = (json.data || []).slice().sort(
+        (a: { created_at: string }, b: { created_at: string }) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      setMessages(sorted);
     } catch (e) {
       showToast('Failed to load messages', 'error');
     } finally {
