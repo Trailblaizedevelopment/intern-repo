@@ -117,18 +117,61 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const cutoffT2 = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
     const cutoffT3 = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString();
 
-    const [t1Res, t2Res, t3Res] = await Promise.all([
-      // T1: brand new contacts — must have no sent timestamp AND no existing chat
-      supabase
+    // T1 chapter-priority ordering: chapters with the most not_contacted contacts
+    // get T1 slots first, preventing large chapters from being starved by small ones.
+    const t1Cap = activeLineNumbers.length * T1_CAP_PER_LINE + 50;
+
+    type T1Contact = {
+      id: string;
+      first_name: string;
+      phone_primary: string | null;
+      chapter_id: string;
+      outreach_status: string;
+      is_imessage: boolean | null;
+      linq_chat_id: string | null;
+    };
+
+    // Step 1: count not_contacted per chapter (lightweight — only chapter_id)
+    const { data: countRows } = await supabase
+      .from('alumni_contacts')
+      .select('chapter_id')
+      .eq('outreach_status', 'not_contacted')
+      .is('touch1_sent_at', null)
+      .is('linq_chat_id', null)
+      .neq('is_imessage', false)
+      .not('flagged', 'is', true)
+      .not('phone_primary', 'is', null);
+
+    // Sort chapters by count descending
+    const countByChapter: Record<string, number> = {};
+    for (const row of (countRows || [])) {
+      countByChapter[row.chapter_id] = (countByChapter[row.chapter_id] || 0) + 1;
+    }
+    const prioritizedChapterIds = Object.entries(countByChapter)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id]) => id);
+
+    // Step 2: fetch full contact records per chapter in priority order, up to cap
+    const t1ContactsOrdered: T1Contact[] = [];
+    for (const chId of prioritizedChapterIds) {
+      if (t1ContactsOrdered.length >= t1Cap) break;
+      const remaining = t1Cap - t1ContactsOrdered.length;
+      const { data: chContacts } = await supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id')
+        .eq('chapter_id', chId)
         .eq('outreach_status', 'not_contacted')
         .is('touch1_sent_at', null)
         .is('linq_chat_id', null)
         .neq('is_imessage', false)
         .not('flagged', 'is', true)
         .not('phone_primary', 'is', null)
-        .limit(activeLineNumbers.length * T1_CAP_PER_LINE + 50),
+        .order('created_at', { ascending: true })
+        .limit(remaining);
+      if (chContacts) t1ContactsOrdered.push(...(chContacts as T1Contact[]));
+    }
+
+    const [t2Res, t3Res] = await Promise.all([
       // T2: touch1_sent (2+ days old) OR touch1_confirmed (replied — no wait required), no T2 yet
       supabase
         .from('alumni_contacts')
@@ -152,7 +195,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
     ]);
 
-    const t1Pool   = t1Res.data   || [];
+    const t1Pool   = t1ContactsOrdered;
     const t2t3Pool = [...(t2Res.data || []), ...(t3Res.data || [])];
 
     // Distribute T1 round-robin — strict 45/line cap
@@ -177,7 +220,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       if (activeLineNumbers.every(n => byLineT2T3[n].length >= T2T3_CAP_PER_LINE)) break;
     }
 
-    type Contact = typeof t1Pool[0] | typeof t2t3Pool[0];
+    type Contact = T1Contact | NonNullable<typeof t2Res.data>[0] | NonNullable<typeof t3Res.data>[0];
     const byLine: Record<number, Contact[]> = {};
     for (const n of activeLineNumbers) {
       byLine[n] = [...byLineT2T3[n], ...byLineT1[n]]; // warm follow-ups first
@@ -272,9 +315,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
             continue;
           }
 
-          // For T1: also store the linq_chat_id for future sends to this thread
+          // For T1: store linq_chat_id and mark is_imessage=true (confirmed iMessage delivery)
           if (status === 'not_contacted') {
-            await supabase.from('alumni_contacts').update({ linq_chat_id: chat.id }).eq('id', contact.id);
+            await supabase.from('alumni_contacts')
+              .update({ linq_chat_id: chat.id, is_imessage: true })
+              .eq('id', contact.id);
           }
 
           results.sent++;
