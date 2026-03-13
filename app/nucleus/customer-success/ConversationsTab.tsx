@@ -578,19 +578,22 @@ export default function ConversationsTab({ showToast }: ConversationsTabProps) {
                             {conv.chapter_name}
                           </span>
                         )}
-                        <span
-                          style={{
-                            background: lineColors.bg,
-                            color: lineColors.text,
-                            fontSize: '0.7rem',
-                            fontWeight: 600,
-                            padding: '1px 6px',
-                            borderRadius: 10,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {conv.line_label}
-                        </span>
+                        {/* Only show line badge when not filtered to a single line */}
+                        {lineFilter === 'all' && (
+                          <span
+                            style={{
+                              background: lineColors.bg,
+                              color: lineColors.text,
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              padding: '1px 6px',
+                              borderRadius: 10,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {conv.line_label}
+                          </span>
+                        )}
                         {conv.flagged && (
                           <Flag size={11} style={{ color: '#d97706', flexShrink: 0 }} />
                         )}

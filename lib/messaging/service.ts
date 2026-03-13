@@ -216,17 +216,20 @@ export function createMessagingService(provider: MessagingProvider) {
           batch.map(async (contact) => {
             const messages = await provider.getMessages({
               conversation_id: contact.provider_conversation_id!,
-              limit: 10,
+              limit: 50,
             });
 
+            // Sort all messages chronologically
+            const sorted = [...messages].sort(
+              (a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
+            );
+
             // Find newest inbound message
-            const inbound = messages
-              .filter(m => m.direction === 'inbound')
-              .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime());
+            const inbound = sorted.filter(m => m.direction === 'inbound');
 
             if (inbound.length === 0) return null;
 
-            const newest = inbound[0];
+            const newest = inbound[inbound.length - 1];
             // Skip if we already processed this response
             if (contact.last_response_at) {
               const lastProcessed = new Date(contact.last_response_at).getTime();
@@ -234,7 +237,18 @@ export function createMessagingService(provider: MessagingProvider) {
               if (newestTime <= lastProcessed) return null;
             }
 
-            return { contact, message: newest };
+            // Behavioral flags (independent of keyword classification):
+            // 1. Long message (> 150 chars) — likely nuanced, needs human eye
+            // 2. Multiple inbound messages (2+) — ongoing back-and-forth
+            // 3. Unanswered: last message in thread is inbound with no outbound after it
+            const lastMsg = sorted[sorted.length - 1];
+            const isLastMsgUnanswered = lastMsg?.direction === 'inbound';
+            const hasBehavioralFlag =
+              newest.body.length > 150 ||
+              inbound.length >= 2 ||
+              isLastMsgUnanswered;
+
+            return { contact, message: newest, hasBehavioralFlag, inboundCount: inbound.length };
           })
         );
 
@@ -245,12 +259,21 @@ export function createMessagingService(provider: MessagingProvider) {
           const { classification, needs_human_review, reason } = classifyResponse(result.message.body);
           classifications[classification] = (classifications[classification] || 0) + 1;
 
-          if (needs_human_review) {
+          // Flag if keyword match OR behavioral signal
+          const behavioralReason = result.hasBehavioralFlag
+            ? [
+                result.message.body.length > 150 ? 'long message (>150 chars)' : null,
+                result.inboundCount >= 2 ? `${result.inboundCount} inbound messages` : null,
+                result.inboundCount >= 1 && !needs_human_review && result.hasBehavioralFlag ? 'unanswered inbound' : null,
+              ].filter(Boolean).join(', ')
+            : null;
+
+          if (needs_human_review || result.hasBehavioralFlag) {
             flagged.push({
               contact_id: result.contact.id,
               phone: result.contact.phone_primary || '',
               text: result.message.body,
-              reason,
+              reason: [reason, behavioralReason].filter(Boolean).join(' | ') || 'behavioral flag',
             });
           }
 

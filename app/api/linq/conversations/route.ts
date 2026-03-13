@@ -23,10 +23,11 @@ export async function GET(request: NextRequest) {
     const flaggedOnly = searchParams.get('flagged') === 'true';
     const search = searchParams.get('search') || '';
 
-    // Fetch chats from relevant lines in parallel
-    const targetLines = lineFilter
-      ? LINES.filter(l => l.number === parseInt(lineFilter))
-      : [...LINES];
+    // When flaggedOnly, always fetch all lines regardless of lineFilter —
+    // flagged contacts may exist on any line (including paused ones).
+    const targetLines = (flaggedOnly || !lineFilter)
+      ? [...LINES]
+      : LINES.filter(l => l.number === parseInt(lineFilter));
 
     // Paginate through all chats per line (Linq returns max 150/page with cursor)
     async function fetchAllChats(phone: string): Promise<LinqChat[]> {

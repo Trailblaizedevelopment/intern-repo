@@ -80,14 +80,24 @@ export async function POST(request: NextRequest) {
   const db  = getInternal();
   if (!db) return NextResponse.json({ error: 'Internal DB not configured' }, { status: 500 });
 
-  // Fetch all alumni profiles from external platform
-  const { data: profiles, error: extErr } = await ext
-    .from('profiles')
-    .select('id, role, phone, email, first_name, last_name, chapter_id, grad_year, major, pledge_class, linkedin_url, location, created_at')
-    .eq('role', 'alumni');
+  // Paginate through all alumni profiles from external platform (Supabase caps at 1000/page)
+  const profiles: ExternalProfile[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
+  while (true) {
+    const { data: page, error: extErr } = await ext
+      .from('profiles')
+      .select('id, role, phone, email, first_name, last_name, chapter_id, grad_year, major, pledge_class, linkedin_url, location, created_at')
+      .eq('role', 'alumni')
+      .range(from, from + PAGE_SIZE - 1);
+    if (extErr) return NextResponse.json({ error: `External fetch failed: ${extErr.message}` }, { status: 500 });
+    if (!page || page.length === 0) break;
+    profiles.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
 
-  if (extErr) return NextResponse.json({ error: `External fetch failed: ${extErr.message}` }, { status: 500 });
-  if (!profiles?.length) return NextResponse.json({ ok: true, total_profiles: 0, matched: 0 });
+  if (!profiles.length) return NextResponse.json({ ok: true, total_profiles: 0, matched: 0 });
 
   // Fetch all internal contacts once (bulk match is faster than N queries)
   const { data: allContacts, error: intErr } = await db
@@ -161,7 +171,7 @@ export async function POST(request: NextRequest) {
     if (profile.last_name)    update.last_name            = profile.last_name;
     if (profile.email)        update.email                = profile.email;
     if (profile.major)        update.major                = profile.major;
-    if (profile.grad_year)    update.grad_year            = typeof profile.grad_year === 'string' ? parseInt(profile.grad_year) : profile.grad_year;
+    if (profile.grad_year)    update.year                 = typeof profile.grad_year === 'string' ? parseInt(profile.grad_year) : profile.grad_year;
     if (profile.pledge_class) update.pledge_class         = profile.pledge_class;
     if (profile.linkedin_url) update.linkedin_url         = profile.linkedin_url;
     if (profile.location)     update.location_city        = profile.location;
