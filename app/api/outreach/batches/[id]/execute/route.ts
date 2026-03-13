@@ -143,7 +143,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       .eq('outreach_status', 'not_contacted')
       .is('touch1_sent_at', null)
       .is('linq_chat_id', null)
-      .neq('is_imessage', false)
+      .not('is_imessage', 'is', false)
       .not('flagged', 'is', true)
       .not('phone_primary', 'is', null);
 
@@ -168,7 +168,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         .eq('outreach_status', 'not_contacted')
         .is('touch1_sent_at', null)
         .is('linq_chat_id', null)
-        .neq('is_imessage', false)
+        .not('is_imessage', 'is', false)
         .not('flagged', 'is', true)
         .not('phone_primary', 'is', null)
         .order('created_at', { ascending: true })
@@ -183,7 +183,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at, linq_chat_id')
         .in('outreach_status', ['touch1_sent', 'touch1_confirmed'])
         .is('touch2_sent_at', null)
-        .neq('is_imessage', false)
+        .not('is_imessage', 'is', false)
         .not('flagged', 'is', true)
         .not('phone_primary', 'is', null)
         .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
@@ -193,7 +193,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch2_sent_at, linq_chat_id')
         .eq('outreach_status', 'touch2_sent')
         .is('touch3_sent_at', null)
-        .neq('is_imessage', false)
+        .not('is_imessage', 'is', false)
         .not('flagged', 'is', true)
         .lte('touch2_sent_at', cutoffT3)
         .not('phone_primary', 'is', null)
