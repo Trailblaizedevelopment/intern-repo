@@ -156,7 +156,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStage, setFilterStage] = useState<string>('all');
+  const [filterStage, setFilterStage] = useState<string>('lead');
   const [filterConference, setFilterConference] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('');
   const [filterTemp, setFilterTemp] = useState<string>('');
@@ -710,6 +710,70 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
               <Download size={14} /> Export CSV
             </button>
           )}
+        </div>
+      )}
+
+      {/* Stage tabs — My Deals only */}
+      {activeTab === 'my-deals' && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '0 16px 0',
+          overflowX: 'auto',
+          borderBottom: '1px solid var(--ws-border)',
+        }}>
+          {([
+            { key: 'all', label: 'All', emoji: '📋' },
+            ...Object.entries(STAGE_CONFIG)
+              .filter(([k]) => k !== 'closed_lost' && k !== 'hold_off')
+              .map(([k, v]) => ({ key: k, label: v.label, emoji: v.emoji, color: v.color })),
+            { key: 'closed_lost', label: 'Closed Lost', emoji: '❌', color: '#ef4444' },
+            { key: 'hold_off', label: 'Hold Off', emoji: '⏸️', color: '#9ca3af' },
+          ] as { key: string; label: string; emoji: string; color?: string }[]).map(stage => {
+            const isActive = filterStage === stage.key;
+            const count = deals.filter(d =>
+              d.assigned_to === currentUser?.id &&
+              (stage.key === 'all' || d.stage === stage.key)
+            ).length;
+            return (
+              <button
+                key={stage.key}
+                onClick={() => setFilterStage(stage.key)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '8px 12px',
+                  fontSize: '0.8125rem',
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? (stage.color || 'var(--ws-accent)') : 'var(--ws-text-secondary)',
+                  borderBottom: isActive ? `2px solid ${stage.color || 'var(--ws-accent)'}` : '2px solid transparent',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'color 0.15s',
+                  marginBottom: -1,
+                }}
+              >
+                <span>{stage.emoji}</span>
+                <span>{stage.label}</span>
+                {count > 0 && (
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: 10,
+                    background: isActive ? (stage.color || 'var(--ws-accent)') + '22' : 'var(--ws-border)',
+                    color: isActive ? (stage.color || 'var(--ws-accent)') : 'var(--ws-text-secondary)',
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
