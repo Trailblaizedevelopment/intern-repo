@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { createChat, getRecipientService, sleep } from '@/lib/linq';
+import { createChat, getChat, sendMessage, getRecipientService, sleep } from '@/lib/linq';
 
 const ALL_LINE_PHONES: Record<number, string> = {
   1: '+16462408056', // Owen
@@ -241,21 +241,38 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const chapterMap: Record<string, { fraternity_name: string; university: string; alumni_join_link: string | null }> = {};
     for (const ch of (chapters || [])) chapterMap[ch.id] = { fraternity_name: ch.fraternity, university: ch.school, alumni_join_link: ch.alumni_join_link };
 
-    // 5. Send — with atomic pre-claim before each Linq call
+    // 5. Send — two-phase approach for reliable SMS detection.
+    //
+    //    The root problem: Linq resolves iMessage/SMS asynchronously. The POST /chats
+    //    response often returns service=null or a stale value. Checking it immediately
+    //    after chat creation is unreliable and causes SMS contacts to slip through.
+    //
+    //    Fix:
+    //    Phase A — atomically claim each contact, create an EMPTY Linq chat (no message).
+    //    Phase B — after a shared 10-second wait, GET each chat to read the resolved
+    //              service, then send the message only to confirmed iMessage/RCS chats.
+    //              SMS and still-unresolved chats are reverted in the DB and skipped.
+
+    type PendingChat = {
+      contact: Contact;
+      chatId: string;
+      message: string;
+      originalStatus: string;
+    };
+    const pendingChats: PendingChat[] = [];
+
+    // ── Phase A: claim + create empty chat ────────────────────────────────────
     for (const [lineNum, contacts] of Object.entries(byLine)) {
       const fromPhone = ALL_LINE_PHONES[Number(lineNum)];
       if (!fromPhone) continue;
 
       for (const contact of contacts) {
-        const chapter  = chapterMap[contact.chapter_id] || { fraternity_name: 'your fraternity', university: 'your school' };
+        const chapter  = chapterMap[contact.chapter_id] || { fraternity_name: 'your fraternity', university: 'your school', alumni_join_link: null };
         const joinLink = chapter.alumni_join_link || 'https://trailblaize.net';
         const status   = contact.outreach_status;
         const now      = new Date().toISOString();
 
-        // ── Atomic claim ──────────────────────────────────────────────────────
-        // Conditionally update the contact to the next status BEFORE calling Linq.
-        // The WHERE clause checks the *current* status + confirms no timestamp collision.
-        // If 0 rows are affected, this contact was already processed → skip.
+        // ── Atomic claim ────────────────────────────────────────────────────
         let claimQuery;
         if (status === 'not_contacted') {
           claimQuery = supabase
@@ -274,7 +291,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
             .is('touch2_sent_at', null)
             .select('id');
         } else {
-          // touch2_sent → T3
           claimQuery = supabase
             .from('alumni_contacts')
             .update({ outreach_status: 'touch3_sent', touch3_sent_at: now })
@@ -286,14 +302,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
         const { data: claimed } = await claimQuery;
         if (!claimed || claimed.length === 0) {
-          // Already processed by a prior run — safe to skip
           results.skipped_already_sent++;
           continue;
         }
-        // ── End atomic claim ──────────────────────────────────────────────────
+        // ── End atomic claim ─────────────────────────────────────────────────
 
-        // For touch1_confirmed T2A: if >7 days since T1, use long-gap variant
-        // (no "great!" callback — they likely don't remember the ping from weeks ago)
         const t1SentAt = (contact as { touch1_sent_at?: string }).touch1_sent_at;
         const daysSinceT1 = t1SentAt
           ? (Date.now() - new Date(t1SentAt).getTime()) / (1000 * 60 * 60 * 24)
@@ -301,53 +314,66 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         const useT2ALongGap = status === 'touch1_confirmed' && daysSinceT1 >= 7;
 
         const message =
-          status === 'not_contacted'   ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university) :
-          useT2ALongGap                ? buildT2ALongGapMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
-          status === 'touch1_confirmed'? buildT2AMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
-          status === 'touch1_sent'     ? buildT2BMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
-          // T3: check original track — touch1_confirmed track gets T3A, touch1_sent track gets T3B
-          // We infer track from whether they ever confirmed (touch2 from A would have had confirmed prior)
-          // Simplification: T3A only fires when contact has a linq_chat_id (replied), else T3B
-          contact.linq_chat_id         ? buildT3AMessage(contact.first_name) :
-                                         buildT3BMessage(contact.first_name, chapter.fraternity_name);
+          status === 'not_contacted'    ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university) :
+          useT2ALongGap                 ? buildT2ALongGapMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
+          status === 'touch1_confirmed' ? buildT2AMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
+          status === 'touch1_sent'      ? buildT2BMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
+          contact.linq_chat_id          ? buildT3AMessage(contact.first_name) :
+                                          buildT3BMessage(contact.first_name, chapter.fraternity_name);
 
         try {
-          const chat    = await createChat(fromPhone, contact.phone_primary, message);
-          const service = getRecipientService(chat);
+          // Create chat with NO message — service resolves in ~5-10s
+          const chat = await createChat(fromPhone, contact.phone_primary!);
+          pendingChats.push({ contact, chatId: chat.id, message, originalStatus: status });
+          await sleep(200);
+        } catch (e) {
+          const errMsg = String(e);
+          results.errors.push(`${contact.first_name} (${contact.phone_primary}): createChat failed: ${errMsg}`);
+          results.failed++;
+        }
+      }
+    }
 
-          if (service === 'SMS') {
-            // Revert claim and mark as SMS-only
-            const revertStatus = status === 'not_contacted' ? 'not_contacted' : status;
+    // ── Phase B: verify service, send messages ────────────────────────────────
+    if (pendingChats.length > 0) {
+      // One shared wait — Linq resolves service within ~5s for most numbers
+      await sleep(10000);
+
+      for (const { contact, chatId, message, originalStatus } of pendingChats) {
+        try {
+          const resolvedChat = await getChat(chatId);
+          const service = getRecipientService(resolvedChat);
+
+          // Skip SMS and unresolved (null) — only send to confirmed iMessage or RCS
+          if (service !== 'iMessage' && service !== 'RCS') {
             await supabase.from('alumni_contacts').update({
               is_imessage: false,
-              outreach_status: revertStatus,
-              touch1_sent_at: status === 'not_contacted' ? null : undefined,
-              touch2_sent_at: status === 'touch1_sent'   ? null : undefined,
-              touch3_sent_at: status === 'touch2_sent'   ? null : undefined,
+              outreach_status: originalStatus,
+              ...(originalStatus === 'not_contacted'                                          && { touch1_sent_at: null }),
+              ...((originalStatus === 'touch1_sent' || originalStatus === 'touch1_confirmed') && { touch2_sent_at: null }),
+              ...(originalStatus === 'touch2_sent'                                            && { touch3_sent_at: null }),
             }).eq('id', contact.id);
             results.skipped_sms++;
             continue;
           }
 
-          // For T1: store linq_chat_id and mark is_imessage=true (confirmed iMessage delivery)
-          if (status === 'not_contacted') {
-            await supabase.from('alumni_contacts')
-              .update({ linq_chat_id: chat.id, is_imessage: true })
-              .eq('id', contact.id);
-          }
+          // Confirmed iMessage/RCS — now send the message
+          await sendMessage(chatId, message);
+
+          // Store chat ID and iMessage flag
+          await supabase.from('alumni_contacts')
+            .update({ linq_chat_id: chatId, is_imessage: true })
+            .eq('id', contact.id);
 
           results.sent++;
-          if (status === 'not_contacted') results.t1_sent++;
+          if (originalStatus === 'not_contacted') results.t1_sent++;
           else results.t2t3_sent++;
 
           await sleep(300);
         } catch (e) {
           const errMsg = String(e);
-          results.errors.push(`${contact.first_name} (${contact.phone_primary}): ${errMsg}`);
+          results.errors.push(`${contact.first_name} (${contact.phone_primary}): send failed: ${errMsg}`);
           results.failed++;
-          // Note: we do NOT revert the claim on Linq failure.
-          // The DB status is already advanced — this prevents retry loops from re-sending.
-          // If a manual fix is needed, update the contact status directly in the DB.
         }
       }
     }

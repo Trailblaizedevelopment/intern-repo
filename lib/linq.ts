@@ -95,6 +95,33 @@ export function getRecipientService(chat: LinqChat): 'iMessage' | 'SMS' | 'RCS' 
   return recipient?.service ?? null;
 }
 
+export async function getChat(chatId: string): Promise<LinqChat> {
+  const res = await fetch(`${LINQ_BASE}/chats/${chatId}`, {
+    headers: { 'Authorization': `Bearer ${getToken()}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Linq getChat failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
+export async function sendMessage(chatId: string, message: string): Promise<LinqMessage> {
+  const res = await fetch(`${LINQ_BASE}/chats/${chatId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${getToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ parts: [{ type: 'text', value: message }] }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Linq sendMessage failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
