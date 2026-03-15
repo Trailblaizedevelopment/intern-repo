@@ -322,9 +322,20 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
                                           buildT3BMessage(contact.first_name, chapter.fraternity_name);
 
         try {
-          // Create chat with NO message — service resolves in ~5-10s
-          const chat = await createChat(fromPhone, contact.phone_primary!);
+          // Create chat WITH message — Linq requires at least one message part.
+          // Service type resolves asynchronously; Phase B reads it back to update is_imessage.
+          const chat = await createChat(fromPhone, contact.phone_primary!, message);
           pendingChats.push({ contact, chatId: chat.id, message, originalStatus: status });
+
+          // Store chat ID immediately so T3 lookups work even if Phase B crashes
+          await supabase.from('alumni_contacts')
+            .update({ linq_chat_id: chat.id })
+            .eq('id', contact.id);
+
+          results.sent++;
+          if (status === 'not_contacted') results.t1_sent++;
+          else results.t2t3_sent++;
+
           await sleep(200);
         } catch (e) {
           const errMsg = String(e);
@@ -334,46 +345,27 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    // ── Phase B: verify service, send messages ────────────────────────────────
+    // ── Phase B: verify service, update is_imessage flag ─────────────────────
+    // Messages were already sent in Phase A. This phase just reads back the
+    // resolved service type from Linq and marks contacts accordingly in the DB.
     if (pendingChats.length > 0) {
       // One shared wait — Linq resolves service within ~5s for most numbers
       await sleep(10000);
 
-      for (const { contact, chatId, message, originalStatus } of pendingChats) {
+      for (const { contact, chatId } of pendingChats) {
         try {
           const resolvedChat = await getChat(chatId);
           const service = getRecipientService(resolvedChat);
+          const isImessage = service === 'iMessage' || service === 'RCS';
 
-          // Skip SMS and unresolved (null) — only send to confirmed iMessage or RCS
-          if (service !== 'iMessage' && service !== 'RCS') {
-            await supabase.from('alumni_contacts').update({
-              is_imessage: false,
-              outreach_status: originalStatus,
-              ...(originalStatus === 'not_contacted'                                          && { touch1_sent_at: null }),
-              ...((originalStatus === 'touch1_sent' || originalStatus === 'touch1_confirmed') && { touch2_sent_at: null }),
-              ...(originalStatus === 'touch2_sent'                                            && { touch3_sent_at: null }),
-            }).eq('id', contact.id);
-            results.skipped_sms++;
-            continue;
-          }
-
-          // Confirmed iMessage/RCS — now send the message
-          await sendMessage(chatId, message);
-
-          // Store chat ID and iMessage flag
           await supabase.from('alumni_contacts')
-            .update({ linq_chat_id: chatId, is_imessage: true })
+            .update({ is_imessage: isImessage })
             .eq('id', contact.id);
 
-          results.sent++;
-          if (originalStatus === 'not_contacted') results.t1_sent++;
-          else results.t2t3_sent++;
-
-          await sleep(300);
-        } catch (e) {
-          const errMsg = String(e);
-          results.errors.push(`${contact.first_name} (${contact.phone_primary}): send failed: ${errMsg}`);
-          results.failed++;
+          if (!isImessage) results.skipped_sms++; // informational — message already sent
+          await sleep(100);
+        } catch (_e) {
+          // Non-fatal — message was already sent, just couldn't confirm service type
         }
       }
     }
