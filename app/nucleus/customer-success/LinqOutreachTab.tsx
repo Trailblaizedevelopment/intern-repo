@@ -769,13 +769,51 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
       setInboxLoading(true);
       setInboxError(null);
       try {
+        // Use /api/linq/conversations — fetches ALL chats from Linq API (full cursor pagination),
+        // enriched with contact + chapter data. This gives the complete 2.5-month history.
         const params = new URLSearchParams();
         if (lineFilter !== 'all') params.set('line', lineFilter);
-        const res = await fetch(`/api/outreach/conversations/responses?${params}`);
+        const res = await fetch(`/api/linq/conversations?${params}`);
         const json = await res.json();
         if (json.error) throw new Error(json.error.message || String(json.error));
-        setConversations(json.data || []);
-        if (json.handled_at_missing) setHandledAtMissing(true);
+
+        // Transform to InboxConversation shape
+        const raw: Array<{
+          chat_id: string; line_number: number; line_label: string;
+          phone: string | null; service: string | null;
+          contact_id: string | null; contact_name: string | null;
+          first_name: string | null; last_name: string | null;
+          chapter_id: string | null; chapter_name: string | null;
+          flagged: boolean; flagged_reason: string | null;
+          last_response_text: string | null; last_response_at: string | null;
+          updated_at: string; is_archived: boolean;
+        }> = json.data || [];
+
+        // Only show conversations that have an inbound response (last_response_at set)
+        const withResponses = raw.filter(c => c.last_response_at);
+
+        const mapped: InboxConversation[] = withResponses.map(c => ({
+          contact_id: c.contact_id || c.chat_id,
+          contact_name: c.contact_name || 'Unknown',
+          first_name: c.first_name,
+          last_name: c.last_name,
+          grad_year: null,
+          chapter_name: c.chapter_name || 'Unknown',
+          chapter_id: c.chapter_id || '',
+          line_number: c.line_number,
+          line_label: c.line_label,
+          last_response_text: c.last_response_text,
+          last_response_at: c.last_response_at,
+          linq_chat_id: c.chat_id,
+          outreach_status: null,
+          flagged: c.flagged || false,
+          flagged_reason: c.flagged_reason,
+          phone_primary: c.phone,
+          response_classification: null,
+        }));
+
+        setConversations(mapped);
+        setHandledAtMissing(false); // handled_at migration is done
       } catch (e) {
         // Use local error state — NOT showToast — to avoid parent re-render loop
         setInboxError(e instanceof Error ? e.message : 'Failed to load inbox');
