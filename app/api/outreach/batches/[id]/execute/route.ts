@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { createChat, getChat, getRecipientService, sleep } from '@/lib/linq';
 
+// Vercel Pro: allow up to 300s for this route (batch sends take time)
+export const maxDuration = 300;
+
 const ALL_LINE_PHONES: Record<number, string> = {
   1: '+16462408056', // Owen
   2: '+16462668785', // Adam
@@ -314,21 +317,43 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     };
     const pendingChats: PendingChat[] = [];
 
-    // ── Phase A: claim + create chat — sequential lines, staggered ───────────
-    for (let lineIdx = 0; lineIdx < activeLineNumbers.length; lineIdx++) {
-      const lineNum  = activeLineNumbers[lineIdx];
-      const fromPhone = ALL_LINE_PHONES[lineNum];
-      if (!fromPhone) continue;
+    // ── Phase A: claim + create chat ─────────────────────────────────────────
+    // Round-robin across lines (Line1 → Line2 → Line1 → Line2...) with 1.5s
+    // between each send. NO inter-line sleep — that caused serverless timeouts.
+    // Phone-level dedup: a phone number can only receive ONE message per execution.
+    const sentPhones = new Set<string>();
+    const maxContacts = activeLineNumbers.length > 0
+      ? Math.max(...activeLineNumbers.map(n => (byLine[n] || []).length))
+      : 0;
 
-      const contacts = byLine[lineNum];
+    for (let i = 0; i < maxContacts; i++) {
+      for (const lineNum of activeLineNumbers) {
+        const contact = (byLine[lineNum] || [])[i];
+        if (!contact) continue;
 
-      for (const contact of contacts) {
+        const fromPhone = ALL_LINE_PHONES[lineNum];
+        if (!fromPhone) continue;
+
+        // ── Hard guards BEFORE any DB claim ─────────────────────────────────
+        // 1. iMessage-only: skip any number confirmed as SMS
+        if ((contact as Contact & { is_imessage?: boolean | null }).is_imessage === false) {
+          results.skipped_sms++;
+          continue;
+        }
+        // 2. Phone dedup: never contact the same number twice in one job
+        if (!contact.phone_primary || sentPhones.has(contact.phone_primary)) {
+          if (contact.phone_primary) results.skipped_already_sent++;
+          continue;
+        }
+        sentPhones.add(contact.phone_primary);
+        // ── End hard guards ──────────────────────────────────────────────────
+
         const chapter  = chapterMap[contact.chapter_id] || { fraternity_name: 'your fraternity', university: 'your school', alumni_join_link: null };
         const joinLink = chapter.alumni_join_link || 'https://trailblaize.net';
         const status   = contact.outreach_status;
         const now      = new Date().toISOString();
 
-        // ── Atomic claim ────────────────────────────────────────────────────
+        // ── Atomic claim ─────────────────────────────────────────────────────
         let claimQuery;
         if (status === 'not_contacted') {
           claimQuery = supabase
@@ -378,10 +403,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
                                           buildT3BMessage(contact.first_name, chapter.fraternity_name);
 
         try {
-          const chat = await createChat(fromPhone, contact.phone_primary!, message);
+          const chat = await createChat(fromPhone, contact.phone_primary, message);
           pendingChats.push({ contact, chatId: chat.id, message, originalStatus: status });
 
-          // Store chat ID immediately so T3 lookups work even if Phase B crashes
+          // Store chat ID immediately — protects against Phase B timeout
           await supabase.from('alumni_contacts')
             .update({ linq_chat_id: chat.id })
             .eq('id', contact.id);
@@ -390,18 +415,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           if (status === 'not_contacted') results.t1_sent++;
           else results.t2t3_sent++;
 
-          // 3 seconds between sends per line (rate limit protection)
-          await sleep(3000);
+          // 1.5s between sends — enough spacing without blowing the timeout budget
+          await sleep(1500);
         } catch (e) {
           const errMsg = String(e);
           results.errors.push(`${contact.first_name} (${contact.phone_primary}): createChat failed: ${errMsg}`);
           results.failed++;
         }
-      }
-
-      // 2-minute gap between lines (sequential stagger — not parallel)
-      if (lineIdx < activeLineNumbers.length - 1) {
-        await sleep(120000);
       }
     }
 

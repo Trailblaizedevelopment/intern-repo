@@ -1776,7 +1776,8 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
               {todayBatch && <BatchCard batch={todayBatch} featured />}
 
               {/* Compile button: shown when no batch, or batch is rejected/completed */}
-              {(!todayBatch || todayBatch.status === 'rejected' || todayBatch.status === 'completed') && (
+              {/* Only show compile button when no batch OR batch was rejected. Hide for completed — today's batch already ran. */}
+              {(!todayBatch || todayBatch.status === 'rejected') && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', padding: todayBatch ? '4px 0' : '20px 0' }}>
                   {!todayBatch && (
                     <div style={{ textAlign: 'center' }}>
