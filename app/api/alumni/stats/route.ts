@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
         const total = rows.length;
         const have_phone = rows.filter(r => r.phone_primary).length;
         const imessage = rows.filter(r => r.is_imessage === true).length;
+        const sms = rows.filter(r => r.is_imessage === false).length;
         const contacted = rows.filter(r => r.outreach_status && r.outreach_status !== 'not_contacted').length;
         const responded = rows.filter(r => r.last_response_at).length;
         const signed_up = rows.filter(r => r.outreach_status === 'signed_up').length;
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
         summaries.push({
           chapter_id: cid,
           chapter_name: chapterMap.get(cid) || cid,
-          total, have_phone, imessage, contacted, responded, signed_up,
+          total, have_phone, imessage, sms, contacted, responded, signed_up,
           touch1_ready, touch2_due, touch3_due,
         });
       }
