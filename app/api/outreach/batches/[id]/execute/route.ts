@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { createChat, getChat, sendMessage, getRecipientService, sleep } from '@/lib/linq';
+import { createChat, getChat, getRecipientService, sleep } from '@/lib/linq';
 
 const ALL_LINE_PHONES: Record<number, string> = {
   1: '+16462408056', // Owen
@@ -8,12 +8,34 @@ const ALL_LINE_PHONES: Record<number, string> = {
   3: '+16462442696', // Ford
 };
 
-
 // Per-line caps:
-// T1 (new chats)     — strict Linq daily limit, never exceed 45
+// T1 (new chats)     — per-line dynamic cap via getLineT1Cap (warm-up aware)
 // T2/T3 (follow-ups) — existing open threads, safe to do more; cap at 150
-const T1_CAP_PER_LINE   = 45;
+const T1_CAP_PER_LINE   = 45; // fallback default for warmed lines
 const T2T3_CAP_PER_LINE = 150;
+
+/**
+ * Warm-up-aware T1 cap for a single line.
+ * - is_warmed_up: null → treat as warmed (return daily_limit)
+ * - is_warmed_up: true → return daily_limit
+ * - is_warmed_up: false + no warmup_start_date → return 10 (safety default)
+ * - is_warmed_up: false + warmup_start_date → ramp up over 3 weeks
+ */
+function getLineT1Cap(line: {
+  is_warmed_up: boolean | null;
+  warmup_start_date: string | null;
+  daily_limit: number;
+}): number {
+  if (line.is_warmed_up !== false) return line.daily_limit; // null treated as warmed up
+  if (!line.warmup_start_date) return 10; // safety default for new untracked lines
+  const daysSinceStart = Math.floor(
+    (Date.now() - new Date(line.warmup_start_date).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  if (daysSinceStart < 7)  return 10;
+  if (daysSinceStart < 14) return 20;
+  if (daysSinceStart < 21) return 30;
+  return line.daily_limit; // fully warmed
+}
 
 // T1 — identity verify ONLY. No link, no pitch.
 function buildT1Message(firstName: string, fraternityName: string, school: string): string {
@@ -52,8 +74,13 @@ function buildT3BMessage(firstName: string, fraternityName: string): string {
  *   This means running Execute multiple times is always safe — no double-sends.
  *
  * Caps:
- *   - T1 new chats:        45/active line  (Linq daily new-chat limit)
+ *   - T1 new chats:        getLineT1Cap() per line (warm-up aware, default 45)
  *   - T2/T3 follow-ups:   150/active line  (existing threads, no daily cap risk)
+ *
+ * Send safety:
+ *   - Lines fire SEQUENTIALLY with a 2-minute gap between each line
+ *   - 3-second sleep between each send within a line
+ *   - Phase B reverts SMS contacts back to their pre-send status
  *
  * - Paused lines (linq_line_config.is_paused) are always skipped
  * - Batch status must be 'approved' — prevents double-runs at the batch level too
@@ -87,6 +114,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const results = {
     sent: 0,
+    sent_to_sms: 0,
     failed: 0,
     skipped_sms: 0,
     skipped_already_sent: 0,
@@ -97,13 +125,27 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   };
 
   try {
-    // 2. Check paused lines
+    // 2. Check paused lines — fetch full config including warm-up fields
     const { data: lineConfigs } = await supabase
       .from('linq_line_config')
-      .select('line_number, is_paused, label');
+      .select('line_number, is_paused, label, daily_limit, is_warmed_up, warmup_start_date');
+
+    type LineConfig = {
+      line_number: number;
+      is_paused: boolean;
+      label: string;
+      daily_limit: number;
+      is_warmed_up: boolean | null;
+      warmup_start_date: string | null;
+    };
+
+    const lineConfigMap: Record<number, LineConfig> = {};
+    for (const lc of (lineConfigs || []) as LineConfig[]) {
+      lineConfigMap[lc.line_number] = lc;
+    }
 
     const pausedLines = new Set(
-      (lineConfigs || []).filter(l => l.is_paused).map(l => l.line_number)
+      (lineConfigs || []).filter((l: LineConfig) => l.is_paused).map((l: LineConfig) => l.line_number)
     );
     const activeLineNumbers = [1, 2, 3].filter(n => !pausedLines.has(n));
 
@@ -116,15 +158,23 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'All lines are paused — resume at least one line first.' }, { status: 409 });
     }
 
+    // Build per-line T1 cap using warm-up logic
+    const lineT1Caps: Record<number, number> = {};
+    for (const n of activeLineNumbers) {
+      const lc = lineConfigMap[n];
+      lineT1Caps[n] = lc
+        ? getLineT1Cap(lc)
+        : T1_CAP_PER_LINE;
+    }
+
     // 3. Load eligible contacts — two separate pools with separate caps
     //    Safety filters on timestamp fields prevent re-selecting already-processed contacts
     //    even if status somehow got out of sync.
-    const cutoffT2 = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
     const cutoffT3 = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString();
 
     // T1 chapter-priority ordering: chapters with the most not_contacted contacts
     // get T1 slots first, preventing large chapters from being starved by small ones.
-    const t1Cap = activeLineNumbers.length * T1_CAP_PER_LINE + 50;
+    const totalT1Cap = activeLineNumbers.reduce((sum, n) => sum + lineT1Caps[n], 0) + 50;
 
     type T1Contact = {
       id: string;
@@ -154,13 +204,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }
     const prioritizedChapterIds = Object.entries(countByChapter)
       .sort((a, b) => b[1] - a[1])
-      .map(([id]) => id);
+      .map(([cid]) => cid);
 
     // Step 2: fetch full contact records per chapter in priority order, up to cap
     const t1ContactsOrdered: T1Contact[] = [];
     for (const chId of prioritizedChapterIds) {
-      if (t1ContactsOrdered.length >= t1Cap) break;
-      const remaining = t1Cap - t1ContactsOrdered.length;
+      if (t1ContactsOrdered.length >= totalT1Cap) break;
+      const remaining = totalT1Cap - t1ContactsOrdered.length;
       const { data: chContacts } = await supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id')
@@ -203,15 +253,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const t1Pool   = t1ContactsOrdered;
     const t2t3Pool = [...(t2Res.data || []), ...(t3Res.data || [])];
 
-    // Distribute T1 round-robin — strict 45/line cap
+    // Distribute T1 round-robin — per-line warm-up-aware cap
     const byLineT1: Record<number, typeof t1Pool> = {};
     for (const n of activeLineNumbers) byLineT1[n] = [];
     let idx = 0;
     for (const c of t1Pool) {
       const ln = activeLineNumbers[idx % activeLineNumbers.length];
-      if (byLineT1[ln].length < T1_CAP_PER_LINE) byLineT1[ln].push(c);
+      if (byLineT1[ln].length < lineT1Caps[ln]) byLineT1[ln].push(c);
       idx++;
-      if (activeLineNumbers.every(n => byLineT1[n].length >= T1_CAP_PER_LINE)) break;
+      if (activeLineNumbers.every(n => byLineT1[n].length >= lineT1Caps[n])) break;
     }
 
     // Distribute T2/T3 round-robin — 150/line cap
@@ -248,10 +298,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     //    after chat creation is unreliable and causes SMS contacts to slip through.
     //
     //    Fix:
-    //    Phase A — atomically claim each contact, create an EMPTY Linq chat (no message).
+    //    Phase A — atomically claim each contact, create a Linq chat with message.
+    //              Lines are processed SEQUENTIALLY with a 2-minute gap between them.
+    //              3-second sleep between sends within each line (rate limit protection).
     //    Phase B — after a shared 10-second wait, GET each chat to read the resolved
-    //              service, then send the message only to confirmed iMessage/RCS chats.
-    //              SMS and still-unresolved chats are reverted in the DB and skipped.
+    //              service, then REVERT SMS contacts back to their pre-send DB state.
+    //              SMS chats are tracked as sent_to_sms (message was sent but we revert
+    //              status so the next batch can detect and handle properly).
 
     type PendingChat = {
       contact: Contact;
@@ -261,10 +314,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     };
     const pendingChats: PendingChat[] = [];
 
-    // ── Phase A: claim + create empty chat ────────────────────────────────────
-    for (const [lineNum, contacts] of Object.entries(byLine)) {
-      const fromPhone = ALL_LINE_PHONES[Number(lineNum)];
+    // ── Phase A: claim + create chat — sequential lines, staggered ───────────
+    for (let lineIdx = 0; lineIdx < activeLineNumbers.length; lineIdx++) {
+      const lineNum  = activeLineNumbers[lineIdx];
+      const fromPhone = ALL_LINE_PHONES[lineNum];
       if (!fromPhone) continue;
+
+      const contacts = byLine[lineNum];
 
       for (const contact of contacts) {
         const chapter  = chapterMap[contact.chapter_id] || { fraternity_name: 'your fraternity', university: 'your school', alumni_join_link: null };
@@ -322,8 +378,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
                                           buildT3BMessage(contact.first_name, chapter.fraternity_name);
 
         try {
-          // Create chat WITH message — Linq requires at least one message part.
-          // Service type resolves asynchronously; Phase B reads it back to update is_imessage.
           const chat = await createChat(fromPhone, contact.phone_primary!, message);
           pendingChats.push({ contact, chatId: chat.id, message, originalStatus: status });
 
@@ -336,33 +390,66 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           if (status === 'not_contacted') results.t1_sent++;
           else results.t2t3_sent++;
 
-          await sleep(200);
+          // 3 seconds between sends per line (rate limit protection)
+          await sleep(3000);
         } catch (e) {
           const errMsg = String(e);
           results.errors.push(`${contact.first_name} (${contact.phone_primary}): createChat failed: ${errMsg}`);
           results.failed++;
         }
       }
+
+      // 2-minute gap between lines (sequential stagger — not parallel)
+      if (lineIdx < activeLineNumbers.length - 1) {
+        await sleep(120000);
+      }
     }
 
-    // ── Phase B: verify service, update is_imessage flag ─────────────────────
-    // Messages were already sent in Phase A. This phase just reads back the
-    // resolved service type from Linq and marks contacts accordingly in the DB.
+    // ── Phase B: verify service, revert SMS contacts ──────────────────────────
+    // Phase A already sent messages. This phase reads back the resolved service
+    // type from Linq and REVERTS SMS contacts to their pre-send DB state so they
+    // can be properly handled in future runs.
     if (pendingChats.length > 0) {
-      // One shared wait — Linq resolves service within ~5s for most numbers
+      // Shared wait — Linq resolves service within ~5s for most numbers
       await sleep(10000);
 
-      for (const { contact, chatId } of pendingChats) {
+      for (const { contact, chatId, originalStatus } of pendingChats) {
         try {
           const resolvedChat = await getChat(chatId);
           const service = getRecipientService(resolvedChat);
           const isImessage = service === 'iMessage' || service === 'RCS';
 
-          await supabase.from('alumni_contacts')
-            .update({ is_imessage: isImessage })
-            .eq('id', contact.id);
+          if (isImessage) {
+            // Happy path — confirm iMessage status
+            await supabase.from('alumni_contacts')
+              .update({ is_imessage: true })
+              .eq('id', contact.id);
+          } else {
+            // SMS detected — revert DB to pre-send state so next batch skips this contact
+            results.sent_to_sms++;
+            results.skipped_sms++;
 
-          if (!isImessage) results.skipped_sms++; // informational — message already sent
+            const revertFields: Record<string, unknown> = { is_imessage: false };
+
+            if (originalStatus === 'not_contacted') {
+              // T1 was sent to SMS — roll back to not_contacted
+              revertFields.outreach_status = 'not_contacted';
+              revertFields.touch1_sent_at  = null;
+            } else if (originalStatus === 'touch1_sent' || originalStatus === 'touch1_confirmed') {
+              // T2 was sent to SMS — roll back touch2 claim only, keep T1 status
+              revertFields.outreach_status = originalStatus;
+              revertFields.touch2_sent_at  = null;
+            } else if (originalStatus === 'touch2_sent') {
+              // T3 was sent to SMS — roll back touch3 claim only
+              revertFields.outreach_status = 'touch2_sent';
+              revertFields.touch3_sent_at  = null;
+            }
+
+            await supabase.from('alumni_contacts')
+              .update(revertFields)
+              .eq('id', contact.id);
+          }
+
           await sleep(100);
         } catch (_e) {
           // Non-fatal — message was already sent, just couldn't confirm service type
@@ -380,6 +467,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           ...results,
           active_lines: activeLineNumbers,
           paused_lines: [...pausedLines],
+          line_t1_caps: lineT1Caps,
         }),
       })
       .eq('id', id);
