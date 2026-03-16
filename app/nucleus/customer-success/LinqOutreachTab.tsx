@@ -734,6 +734,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
     flagged_reason: string | null;
     phone_primary: string | null;
     response_classification: string | null;
+    handled_at?: string | null;
   };
 
   const LINE_COLORS_MAP: Record<number, { bg: string; text: string }> = {
@@ -761,6 +762,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
     const [handledIds, setHandledIds] = React.useState<Set<string>>(new Set());
     const [handledAtMissing, setHandledAtMissing] = React.useState(false);
     const [inboxError, setInboxError] = React.useState<string | null>(null);
+    const [showAllResponses, setShowAllResponses] = React.useState(false);
     const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
     const fetchInbox = React.useCallback(async () => {
@@ -892,25 +894,96 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
       }
     }
 
-    function formatTime(iso: string) {
+    function formatTime(iso: string): { label: string; relative: string; recent: boolean } {
       const d = new Date(iso);
       const now = new Date();
       const diffMs = now.getTime() - d.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);
-      const isRecent = diffMs < 24 * 60 * 60 * 1000;
-      if (diffDays === 0) return { label: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), recent: isRecent };
-      if (diffDays === 1) return { label: 'Yesterday', recent: false };
-      if (diffDays < 7) return { label: d.toLocaleDateString('en-US', { weekday: 'short' }), recent: false };
-      return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), recent: false };
+
+      let label: string;
+      let relative: string;
+
+      if (diffMins < 60) { label = `${diffMins}m ago`; relative = ''; }
+      else if (diffHours < 24) { label = `${diffHours}h ago`; relative = ''; }
+      else if (diffDays === 1) { label = 'Yesterday'; relative = ''; }
+      else if (diffDays < 7) { label = d.toLocaleDateString('en-US', { weekday: 'short' }); relative = `${diffDays}d ago`; }
+      else { label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); relative = `${diffDays}d ago`; }
+
+      return { label, relative, recent: diffDays < 1 };
     }
 
     // Filter out locally-handled conversations
     const displayed = conversations.filter(c => !handledIds.has(c.contact_id));
+
+    // Two-tier inbox: active (unhandled + flagged) vs all
+    const activeConvs = handledAtMissing
+      ? displayed // nothing is "handled" yet — show all in active tier
+      : displayed.filter(c => !c.handled_at || c.flagged);
+    const allConvs = displayed;
+
     const INBOX_LINES = [
       { number: 1, label: 'Owen' },
       { number: 2, label: 'Adam' },
       { number: 3, label: 'Ford' },
     ];
+
+    function renderConvRow(conv: InboxConversation) {
+      const isSelected = selected?.contact_id === conv.contact_id;
+      const lineColors = conv.line_number ? LINE_COLORS_MAP[conv.line_number] : { bg: '#f3f4f6', text: '#6b7280' };
+      const timeInfo = conv.last_response_at ? formatTime(conv.last_response_at) : null;
+      return (
+        <div
+          key={conv.contact_id}
+          onClick={() => setSelected(conv)}
+          style={{
+            padding: '10px 12px',
+            cursor: 'pointer',
+            borderBottom: '1px solid #f0f0f0',
+            borderLeft: isSelected ? '3px solid #2563eb' : conv.flagged ? '3px solid #f59e0b' : '3px solid transparent',
+            background: isSelected ? '#eff6ff' : conv.flagged ? '#fffbeb' : '#fafafa',
+            transition: 'background 0.1s',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: conv.flagged ? '#fef3c7' : '#e9eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: conv.flagged ? '#d97706' : '#64748b' }}>
+              {conv.contact_name !== 'Unknown'
+                ? conv.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                : <User size={14} />}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                <span style={{ fontWeight: timeInfo?.recent ? 700 : 600, fontSize: '0.8375rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                  {conv.contact_name}
+                  {conv.grad_year && <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 4 }}>&apos;{String(conv.grad_year).slice(-2)}</span>}
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.7rem', color: timeInfo?.recent ? '#dc2626' : '#9ca3af', fontWeight: timeInfo?.recent ? 700 : 400 }}>
+                    {timeInfo?.label}
+                  </span>
+                  {timeInfo?.relative && (
+                    <span style={{ fontSize: '0.63rem', color: '#c4c4c4' }}>{timeInfo.relative}</span>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                <span style={{ fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{conv.chapter_name}</span>
+                {conv.line_number && (
+                  <span style={{ background: lineColors.bg, color: lineColors.text, fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10, flexShrink: 0 }}>{conv.line_label}</span>
+                )}
+                {conv.flagged && <Flag size={11} style={{ color: '#d97706', flexShrink: 0 }} />}
+              </div>
+              {conv.last_response_text && (
+                <div style={{ marginTop: 3, fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {conv.last_response_text.slice(0, 60)}{conv.last_response_text.length > 60 ? '…' : ''}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -923,8 +996,8 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
             </span>
           )}
           {handledAtMissing && (
-            <span style={{ fontSize: '0.7rem', color: '#d97706', background: '#fffbeb', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
-              ⚠️ Run migration to enable Mark Handled
+            <span style={{ fontSize: '0.7rem', color: '#9ca3af', background: '#f9fafb', padding: '2px 8px', borderRadius: 20, fontWeight: 500, border: '1px solid #e5e7eb' }}>
+              Run migration to enable conversation archiving
             </span>
           )}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -967,57 +1040,30 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                 <p style={{ margin: 0, fontSize: '0.75rem', textAlign: 'center', padding: '0 20px' }}>When alumni reply to outreach messages, they&apos;ll appear here.</p>
               </div>
             ) : (
-              displayed.map(conv => {
-                const isSelected = selected?.contact_id === conv.contact_id;
-                const lineColors = conv.line_number ? LINE_COLORS_MAP[conv.line_number] : { bg: '#f3f4f6', text: '#6b7280' };
-                const timeInfo = conv.last_response_at ? formatTime(conv.last_response_at) : null;
-
-                return (
-                  <div
-                    key={conv.contact_id}
-                    onClick={() => setSelected(conv)}
-                    style={{
-                      padding: '10px 12px',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #f0f0f0',
-                      borderLeft: isSelected ? '3px solid #2563eb' : conv.flagged ? '3px solid #f59e0b' : '3px solid transparent',
-                      background: isSelected ? '#eff6ff' : conv.flagged ? '#fffbeb' : '#fafafa',
-                      transition: 'background 0.1s',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: conv.flagged ? '#fef3c7' : '#e9eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: conv.flagged ? '#d97706' : '#64748b' }}>
-                        {conv.contact_name !== 'Unknown'
-                          ? conv.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-                          : <User size={14} />}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                          <span style={{ fontWeight: timeInfo?.recent ? 700 : 600, fontSize: '0.8375rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-                            {conv.contact_name}
-                            {conv.grad_year && <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 4 }}>&apos;{String(conv.grad_year).slice(-2)}</span>}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: timeInfo?.recent ? '#dc2626' : '#9ca3af', flexShrink: 0, fontWeight: timeInfo?.recent ? 700 : 400 }}>
-                            {timeInfo?.label}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
-                          <span style={{ fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{conv.chapter_name}</span>
-                          {conv.line_number && (
-                            <span style={{ background: lineColors.bg, color: lineColors.text, fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10, flexShrink: 0 }}>{conv.line_label}</span>
-                          )}
-                          {conv.flagged && <Flag size={11} style={{ color: '#d97706', flexShrink: 0 }} />}
-                        </div>
-                        {conv.last_response_text && (
-                          <div style={{ marginTop: 3, fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {conv.last_response_text.slice(0, 60)}{conv.last_response_text.length > 60 ? '…' : ''}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+              <>
+                {/* Tier 1: Active Conversations */}
+                <div style={{ padding: '6px 12px 4px', fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#f3f4f6', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Active Conversations</span>
+                  <span style={{ background: activeConvs.length > 0 ? '#fef2f2' : '#f0fdf4', color: activeConvs.length > 0 ? '#dc2626' : '#16a34a', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>{activeConvs.length}</span>
+                </div>
+                {activeConvs.length === 0 ? (
+                  <div style={{ padding: '14px 12px', fontSize: '0.8rem', color: '#9ca3af', textAlign: 'center' }}>
+                    All caught up ✓
                   </div>
-                );
-              })
+                ) : (
+                  activeConvs.map(conv => renderConvRow(conv))
+                )}
+
+                {/* Tier 2: All Responses (collapsed by default) */}
+                <button
+                  onClick={() => setShowAllResponses(prev => !prev)}
+                  style={{ width: '100%', padding: '6px 12px', background: '#f9fafb', cursor: 'pointer', border: 'none', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.68rem', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}
+                >
+                  {showAllResponses ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                  {showAllResponses ? 'Hide All Responses' : `All Responses (${allConvs.length})`}
+                </button>
+                {showAllResponses && allConvs.map(conv => renderConvRow(conv))}
+              </>
             )}
           </div>
 
@@ -1063,6 +1109,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                     <button
                       onClick={() => handleMarkHandled(selected)}
                       disabled={handlingId === selected.contact_id}
+                      title={handledAtMissing ? 'Migration required' : undefined}
                       style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
                     >
                       {handlingId === selected.contact_id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCheck size={12} />}
@@ -1685,42 +1732,50 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
         <div style={{ padding: '16px 18px' }}>
           {loading ? (
             <div style={{ height: 60, borderRadius: 10, background: '#f3f4f6', animation: 'pulse 1.5s ease-in-out infinite' }} />
-          ) : todayBatch ? (
-            <BatchCard batch={todayBatch} featured />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', padding: '20px 0' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#374151', marginBottom: 4 }}>
-                  No outreach compiled for today
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Show batch card when one exists */}
+              {todayBatch && <BatchCard batch={todayBatch} featured />}
+
+              {/* Compile button: shown when no batch, or batch is rejected/completed */}
+              {(!todayBatch || todayBatch.status === 'rejected' || todayBatch.status === 'completed') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', padding: todayBatch ? '4px 0' : '20px 0' }}>
+                  {!todayBatch && (
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#374151', marginBottom: 4 }}>
+                        No outreach compiled for today
+                      </div>
+                      <div style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>
+                        Click below to compile a fresh batch from eligible contacts.
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={compileOutreach}
+                    disabled={compiling}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '12px 28px', borderRadius: 10, border: 'none',
+                      background: compiling ? '#fde68a' : 'linear-gradient(135deg, #f59e0b, #fbbf24)',
+                      color: compiling ? '#78350f' : '#fff', fontWeight: 700, fontSize: '0.9375rem',
+                      cursor: compiling ? 'not-allowed' : 'pointer',
+                      boxShadow: compiling ? 'none' : '0 2px 10px rgba(245,158,11,0.3)',
+                    }}
+                  >
+                    {compiling ? (
+                      <>
+                        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                        Tony is compiling…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={18} />
+                        {todayBatch ? 'Compile New Batch' : 'Compile Today\'s Outreach'}
+                      </>
+                    )}
+                  </button>
                 </div>
-                <div style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>
-                  Click below to compile a fresh batch from eligible contacts.
-                </div>
-              </div>
-              <button
-                onClick={compileOutreach}
-                disabled={compiling}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '12px 28px', borderRadius: 10, border: 'none',
-                  background: compiling ? '#fde68a' : 'linear-gradient(135deg, #f59e0b, #fbbf24)',
-                  color: compiling ? '#78350f' : '#fff', fontWeight: 700, fontSize: '0.9375rem',
-                  cursor: compiling ? 'not-allowed' : 'pointer',
-                  boxShadow: compiling ? 'none' : '0 2px 10px rgba(245,158,11,0.3)',
-                }}
-              >
-                {compiling ? (
-                  <>
-                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                    Tony is compiling…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={18} />
-                    Compile Today&apos;s Outreach
-                  </>
-                )}
-              </button>
+              )}
             </div>
           )}
         </div>
