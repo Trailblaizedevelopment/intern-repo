@@ -67,7 +67,12 @@ export async function POST() {
       .limit(1);
 
     if (existingBatches && existingBatches.length > 0) {
-      return NextResponse.json({ existing: true, batch: existingBatches[0] });
+      const existing = existingBatches[0];
+      // Only block recompile if batch is actively pending or approved — not rejected/completed
+      if (existing.status === 'pending_approval' || existing.status === 'approved') {
+        return NextResponse.json({ existing: true, batch: existing });
+      }
+      // Rejected or completed — fall through and create a fresh batch
     }
 
     // ── 2. Fetch line configs ─────────────────────────────────────────────────

@@ -59,15 +59,30 @@ export async function GET(request: NextRequest) {
       query = query.eq('assigned_line', parseInt(lineFilter));
     }
 
-    // handled_at column doesn't exist yet — skip that filter until migration is run
-    // When it exists, uncomment: if (!includeHandled) query = query.is('handled_at', null);
+    // Filter out handled conversations (handled_at migration now applied)
+    if (!includeHandled) {
+      query = query.is('handled_at', null);
+    }
 
     const { data, error } = await query;
+
+    // Graceful fallback if handled_at column somehow missing
+    if (error && error.message?.includes('handled_at')) {
+      const { data: fallback, error: fallbackErr } = await supabase
+        .from('alumni_contacts')
+        .select(`id, first_name, last_name, year, phone_primary, outreach_status, last_response_at, response_classification, linq_chat_id, assigned_line, flagged, flagged_reason, chapter_id, chapters(chapter_name)`)
+        .not('last_response_at', 'is', null)
+        .order('last_response_at', { ascending: false })
+        .limit(100);
+      if (fallbackErr) throw new Error(fallbackErr.message);
+      return NextResponse.json({ data: transformContacts(fallback || []), handled_at_missing: true });
+    }
+
     if (error) throw new Error(error.message);
 
     return NextResponse.json({
       data: transformContacts(data || []),
-      handled_at_missing: true, // migration not yet run
+      handled_at_missing: false,
     });
   } catch (err) {
     console.error('Error fetching response inbox:', err);

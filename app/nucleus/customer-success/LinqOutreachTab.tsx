@@ -278,8 +278,8 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
         showToast(json.error, 'error');
       } else if (json.total === 0) {
         showToast(json.message || 'No eligible contacts found.', 'info');
-      } else if (json.existing) {
-        showToast('A batch for today already exists.', 'info');
+      } else if (json.existing && (json.batch?.status === 'pending_approval' || json.batch?.status === 'approved')) {
+        showToast('A batch is already awaiting approval.', 'info');
         await fetchBatches();
       } else {
         showToast(`✅ Compiled ${json.batch?.total_contacts || 0} contacts for today.`, 'success');
