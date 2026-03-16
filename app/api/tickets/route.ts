@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, type, priority, assignee_id, creator_id, due_date, labels, project_id, parent_ticket_id, milestone_id, sprint, story_points } = body;
+    const { title, description, type, priority, assignee_id, creator_id, due_date, labels, project, project_id, parent_ticket_id, milestone_id, sprint, story_points } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
         status: 'open',
         due_date: due_date || null,
         labels: labels || [],
+        project: project || 'Web App',
         project_id: project_id || null,
         parent_ticket_id: parent_ticket_id || null,
         milestone_id: milestone_id || null,

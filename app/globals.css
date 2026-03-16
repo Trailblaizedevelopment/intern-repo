@@ -27553,6 +27553,125 @@ body { background: #FAFAFA; }
 .tkt__notif-message { font-size: 0.78rem; margin: 0 0 0.2rem; color: var(--ws-text, #111827); }
 .tkt__notif-time { font-size: 0.68rem; color: #9ca3af; }
 
+/* ── Project Tabs ── */
+.tkt__project-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 1.25rem;
+  background: var(--ws-bg, white);
+  border-bottom: 2px solid var(--ws-border, #e5e7eb);
+  flex-shrink: 0;
+}
+
+.tkt__project-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 1.1rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ws-text-secondary, #6b7280);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.tkt__project-tab:hover {
+  color: var(--ws-text, #111827);
+}
+
+.tkt__project-tab.active {
+  color: #6366f1;
+  border-bottom-color: #6366f1;
+  font-weight: 600;
+}
+
+.tkt__project-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--ws-bg-secondary, #f3f4f6);
+  color: var(--ws-text-secondary, #6b7280);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.tkt__project-tab.active .tkt__project-tab-count {
+  background: #ede9fe;
+  color: #6366f1;
+}
+
+/* ── Project Badge ── */
+.tkt__project-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.tkt__project-badge--web {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+
+.tkt__project-badge--mobile {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.tkt__card-project {
+  margin: 0.15rem 0 0.25rem;
+}
+
+.tkt__list-col--project {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+/* ── Create Modal: App Selector ── */
+.tkt__project-tab-select {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tkt__project-tab-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1.5px solid var(--ws-border, #e5e7eb);
+  border-radius: 8px;
+  background: white;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ws-text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tkt__project-tab-btn:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.tkt__project-tab-btn.active {
+  border-color: #6366f1;
+  background: #ede9fe;
+  color: #6366f1;
+  font-weight: 600;
+}
+
 /* ── Filters ── */
 .tkt__filters {
   display: flex;

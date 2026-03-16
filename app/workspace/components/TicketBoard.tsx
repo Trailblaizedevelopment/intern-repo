@@ -43,6 +43,7 @@ type TicketStatus = 'backlog' | 'todo' | 'open' | 'in_progress' | 'in_review' | 
 type TicketType = 'bug' | 'feature_request' | 'issue' | 'improvement' | 'task' | 'epic';
 type TicketPriority = 'none' | 'low' | 'medium' | 'high' | 'critical';
 type ViewMode = 'board' | 'list' | 'timeline' | 'dashboard';
+type ProjectTab = 'all' | 'Web App' | 'Mobile App';
 
 interface TicketData {
   id: string;
@@ -167,6 +168,7 @@ export function TicketBoard() {
   const [loading, setLoading] = useState(true);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('board');
+  const [projectTab, setProjectTab] = useState<ProjectTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
@@ -209,7 +211,9 @@ export function TicketBoard() {
       if (filterAssignee) params.set('assignee_id', filterAssignee);
       if (filterPriority) params.set('priority', filterPriority);
       if (filterType) params.set('type', filterType);
-      if (filterProject) params.set('project', filterProject);
+      // projectTab takes priority over filterProject when set
+      if (projectTab !== 'all') params.set('project', projectTab);
+      else if (filterProject) params.set('project', filterProject);
       if (filterStatus) params.set('status', filterStatus);
       if (searchQuery) params.set('search', searchQuery);
 
@@ -221,7 +225,7 @@ export function TicketBoard() {
     } finally {
       setLoading(false);
     }
-  }, [filterAssignee, filterPriority, filterType, filterProject, filterStatus, searchQuery]);
+  }, [filterAssignee, filterPriority, filterType, filterProject, filterStatus, searchQuery, projectTab]);
 
   const fetchNotifications = useCallback(async () => {
     if (!currentEmployee) return;
@@ -278,6 +282,15 @@ export function TicketBoard() {
     const p = new Set<string>();
     tickets.forEach(t => { if (t.project) p.add(t.project); });
     return Array.from(p).sort();
+  }, [tickets]);
+
+  // Ticket counts per project tab (based on all loaded tickets when tab=all)
+  const projectTabCounts = useMemo(() => {
+    return {
+      'all': tickets.length,
+      'Web App': tickets.filter(t => t.project === 'Web App').length,
+      'Mobile App': tickets.filter(t => t.project === 'Mobile App').length,
+    };
   }, [tickets]);
 
   const activeFilterCount = [filterStatus, filterAssignee, filterPriority, filterType, filterProject].filter(Boolean).length;
@@ -375,6 +388,20 @@ export function TicketBoard() {
           </button>
         </div>
       </header>
+
+      {/* ── Project Tabs ── */}
+      <div className="tkt__project-tabs">
+        {(['all', 'Web App', 'Mobile App'] as ProjectTab[]).map(tab => (
+          <button
+            key={tab}
+            className={`tkt__project-tab ${projectTab === tab ? 'active' : ''}`}
+            onClick={() => { setProjectTab(tab); setLoading(true); }}
+          >
+            {tab === 'all' ? 'All Projects' : tab}
+            <span className="tkt__project-tab-count">{projectTab === tab || tab === 'all' ? projectTabCounts[tab] : '—'}</span>
+          </button>
+        ))}
+      </div>
 
       {/* ── Filters ── */}
       {showFilters && (
@@ -482,6 +509,7 @@ export function TicketBoard() {
           currentEmployee={currentEmployee}
           projects={projects}
           tickets={tickets}
+          defaultProject={projectTab !== 'all' ? projectTab : 'Web App'}
           onClose={() => setShowCreateModal(false)}
           onCreated={() => { setShowCreateModal(false); fetchTickets(); }}
         />
@@ -550,6 +578,13 @@ function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onCl
         <span className="tkt__card-priority" style={{ color: priorityCfg.color }}>{priorityCfg.icon}</span>
       </div>
       <h4 className="tkt__card-title">{ticket.title}</h4>
+      {ticket.project && (
+        <div className="tkt__card-project">
+          <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
+            {ticket.project === 'Mobile App' ? '📱' : '🌐'} {ticket.project}
+          </span>
+        </div>
+      )}
       {(ticket.labels && ticket.labels.length > 0) && (
         <div className="tkt__labels">
           {ticket.labels.slice(0, 3).map(l => <span key={l} className="tkt__label-pill">{l}</span>)}
@@ -636,6 +671,7 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
       <div className="tkt__list-header-row">
         <span className="tkt__list-col tkt__list-col--id tkt__sort-header" onClick={() => toggleSort('number')}>#{sortIndicator('number')}</span>
         <span className="tkt__list-col tkt__list-col--title tkt__sort-header" onClick={() => toggleSort('title')}>Title{sortIndicator('title')}</span>
+        <span className="tkt__list-col tkt__list-col--project">Project</span>
         <span className="tkt__list-col tkt__list-col--status tkt__sort-header" onClick={() => toggleSort('status')}>Status{sortIndicator('status')}</span>
         <span className="tkt__list-col tkt__list-col--priority tkt__sort-header" onClick={() => toggleSort('priority')}>Priority{sortIndicator('priority')}</span>
         <span className="tkt__list-col tkt__list-col--type tkt__sort-header" onClick={() => toggleSort('type')}>Type{sortIndicator('type')}</span>
@@ -660,6 +696,13 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
                 {ticket.labels && ticket.labels.length > 0 && (
                   <span className="tkt__labels tkt__labels--inline">
                     {ticket.labels.slice(0, 2).map(l => <span key={l} className="tkt__label-pill tkt__label-pill--sm">{l}</span>)}
+                  </span>
+                )}
+              </span>
+              <span className="tkt__list-col tkt__list-col--project">
+                {ticket.project && (
+                  <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
+                    {ticket.project === 'Mobile App' ? '📱' : '🌐'} {ticket.project}
                   </span>
                 )}
               </span>
@@ -868,6 +911,7 @@ function CreateTicketModal({
   tickets,
   onClose,
   onCreated,
+  defaultProject,
 }: {
   employees: Employee[];
   currentEmployee: Employee | null;
@@ -875,6 +919,7 @@ function CreateTicketModal({
   tickets: TicketData[];
   onClose: () => void;
   onCreated: () => void;
+  defaultProject?: string;
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -884,6 +929,7 @@ function CreateTicketModal({
   const [dueDate, setDueDate] = useState('');
   const [labelsInput, setLabelsInput] = useState('');
   const [labels, setLabels] = useState<string[]>([]);
+  const [projectApp, setProjectApp] = useState<string>(defaultProject && defaultProject !== 'all' ? defaultProject : 'Web App');
   const [projectId, setProjectId] = useState('');
   const [parentTicketId, setParentTicketId] = useState('');
   const [creating, setCreating] = useState(false);
@@ -921,6 +967,7 @@ function CreateTicketModal({
           creator_id: currentEmployee?.id || null,
           due_date: dueDate || null,
           labels,
+          project: projectApp || 'Web App',
           project_id: projectId || null,
           parent_ticket_id: parentTicketId || null,
         }),
@@ -950,6 +997,21 @@ function CreateTicketModal({
           <div className="tkt__field">
             <label>Description</label>
             <RichTextEditor content={description} onChange={setDescription} placeholder="Steps to reproduce, expected behavior..." />
+          </div>
+          <div className="tkt__field">
+            <label>App</label>
+            <div className="tkt__project-tab-select">
+              {(['Web App', 'Mobile App'] as const).map(p => (
+                <button
+                  key={p}
+                  type="button"
+                  className={`tkt__project-tab-btn ${projectApp === p ? 'active' : ''}`}
+                  onClick={() => setProjectApp(p)}
+                >
+                  {p === 'Mobile App' ? '📱' : '🌐'} {p}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="tkt__field-row">
             <div className="tkt__field">
