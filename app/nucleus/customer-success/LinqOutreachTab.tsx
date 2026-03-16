@@ -760,25 +760,29 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
     const [handlingId, setHandlingId] = React.useState<string | null>(null);
     const [handledIds, setHandledIds] = React.useState<Set<string>>(new Set());
     const [handledAtMissing, setHandledAtMissing] = React.useState(false);
+    const [inboxError, setInboxError] = React.useState<string | null>(null);
     const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
     const fetchInbox = React.useCallback(async () => {
       setInboxLoading(true);
+      setInboxError(null);
       try {
         const params = new URLSearchParams();
         if (lineFilter !== 'all') params.set('line', lineFilter);
         const res = await fetch(`/api/outreach/conversations/responses?${params}`);
         const json = await res.json();
-        if (json.error) throw new Error(json.error.message || json.error);
+        if (json.error) throw new Error(json.error.message || String(json.error));
         setConversations(json.data || []);
         if (json.handled_at_missing) setHandledAtMissing(true);
       } catch (e) {
-        showToast(`Failed to load inbox: ${e instanceof Error ? e.message : e}`, 'error');
+        // Use local error state — NOT showToast — to avoid parent re-render loop
+        setInboxError(e instanceof Error ? e.message : 'Failed to load inbox');
       } finally {
         setInboxLoading(false);
       }
     }, [lineFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Only run once on mount + when lineFilter changes — no auto-retry on failure
     React.useEffect(() => { fetchInbox(); }, [fetchInbox]);
 
     React.useEffect(() => {
@@ -949,6 +953,12 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
             {inboxLoading ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', gap: 8, fontSize: '0.875rem' }}>
                 <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
+              </div>
+            ) : inboxError ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, color: '#dc2626', gap: 10, padding: 20, textAlign: 'center' }}>
+                <AlertTriangle size={24} style={{ opacity: 0.6 }} />
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>{inboxError}</p>
+                <button onClick={fetchInbox} style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '0.75rem', color: '#374151' }}>Retry</button>
               </div>
             ) : displayed.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9ca3af', gap: 10 }}>

@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     const includeHandled = searchParams.get('handled') === 'true';
 
     // Base query: contacts with at least one inbound response
+    // Note: last_response_text and handled_at columns may not exist yet — omit them from select
     let query = supabase
       .from('alumni_contacts')
       .select(`
@@ -41,14 +42,13 @@ export async function GET(request: NextRequest) {
         phone_primary,
         outreach_status,
         last_response_at,
-        last_response_text,
         response_classification,
         linq_chat_id,
         assigned_line,
         flagged,
         flagged_reason,
         chapter_id,
-        chapters!inner(chapter_name)
+        chapters(chapter_name)
       `)
       .not('last_response_at', 'is', null)
       .order('last_response_at', { ascending: false })
@@ -59,57 +59,15 @@ export async function GET(request: NextRequest) {
       query = query.eq('assigned_line', parseInt(lineFilter));
     }
 
-    // Filter out handled conversations unless explicitly requested
-    // handled_at column may not exist — gracefully skip if so
-    if (!includeHandled) {
-      query = query.is('handled_at', null);
-    }
+    // handled_at column doesn't exist yet — skip that filter until migration is run
+    // When it exists, uncomment: if (!includeHandled) query = query.is('handled_at', null);
 
     const { data, error } = await query;
-
-    // If handled_at column doesn't exist, fall back without that filter
-    if (error && error.message?.includes('handled_at')) {
-      const fallbackQuery = supabase
-        .from('alumni_contacts')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          year,
-          phone_primary,
-          outreach_status,
-          last_response_at,
-          last_response_text,
-          response_classification,
-          linq_chat_id,
-          assigned_line,
-          flagged,
-          flagged_reason,
-          chapter_id,
-          chapters!inner(chapter_name)
-        `)
-        .not('last_response_at', 'is', null)
-        .order('last_response_at', { ascending: false })
-        .limit(100);
-
-      if (lineFilter) {
-        fallbackQuery.eq('assigned_line', parseInt(lineFilter));
-      }
-
-      const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-      if (fallbackError) throw new Error(fallbackError.message);
-
-      return NextResponse.json({
-        data: transformContacts(fallbackData || []),
-        handled_at_missing: true, // signal to UI that migration is needed
-      });
-    }
-
     if (error) throw new Error(error.message);
 
     return NextResponse.json({
       data: transformContacts(data || []),
-      handled_at_missing: false,
+      handled_at_missing: true, // migration not yet run
     });
   } catch (err) {
     console.error('Error fetching response inbox:', err);
@@ -128,7 +86,7 @@ type RawContact = {
   phone_primary: string | null;
   outreach_status: string | null;
   last_response_at: string | null;
-  last_response_text: string | null;
+  last_response_text?: string | null;
   response_classification: string | null;
   linq_chat_id: string | null;
   assigned_line: number | null;
@@ -159,7 +117,7 @@ function transformContacts(contacts: RawContact[]) {
       chapter_id: c.chapter_id,
       line_number: c.assigned_line,
       line_label: lineInfo?.label ?? `Line ${c.assigned_line}`,
-      last_response_text: c.last_response_text,
+      last_response_text: c.last_response_text ?? null,
       last_response_at: c.last_response_at,
       linq_chat_id: c.linq_chat_id,
       outreach_status: c.outreach_status,
