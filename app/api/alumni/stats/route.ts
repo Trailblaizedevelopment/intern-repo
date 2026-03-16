@@ -15,62 +15,60 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const chapterId = searchParams.get('chapter_id');
 
-    // ─── No chapter_id: return summary for all chapters ───
+    // ─── No chapter_id: return summary for all chapters via COUNT queries ───
     if (!chapterId) {
-      const { data: contacts, error } = await supabase
-        .from('alumni_contacts')
-        .select('chapter_id, phone_primary, is_imessage, outreach_status, last_response_at, touch1_sent_at, touch2_sent_at, touch3_sent_at, response_classification');
-
-      if (error) throw new Error(error.message);
-
-      const { data: chapters } = await supabase
+      const { data: chapters, error: chapError } = await supabase
         .from('chapters')
         .select('id, chapter_name');
 
-      const chapterMap = new Map<string, string>();
-      for (const ch of chapters || []) chapterMap.set(ch.id, ch.chapter_name);
+      if (chapError) throw new Error(chapError.message);
 
-      // Group by chapter
-      const byChapter = new Map<string, typeof contacts>();
-      for (const c of contacts || []) {
-        if (!byChapter.has(c.chapter_id)) byChapter.set(c.chapter_id, []);
-        byChapter.get(c.chapter_id)!.push(c);
-      }
+      const summaries = await Promise.all((chapters || []).map(async (ch) => {
+        const [
+          { count: total },
+          { count: have_phone },
+          { count: contacted },
+          { count: responded },
+          { count: signed_up },
+          { count: imessage },
+          { count: sms },
+        ] = await Promise.all([
+          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id),
+          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).not('phone_primary', 'is', null),
+          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).neq('outreach_status', 'not_contacted'),
+          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).not('last_response_at', 'is', null),
+          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).eq('outreach_status', 'signed_up'),
+          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).eq('is_imessage', true),
+          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).eq('is_imessage', false),
+        ]);
 
-      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
-      const summaries = [];
+        // Skip chapters with no alumni
+        if (!total || total === 0) return null;
 
-      for (const [cid, rows] of byChapter.entries()) {
-        const total = rows.length;
-        const have_phone = rows.filter(r => r.phone_primary).length;
-        const imessage = rows.filter(r => r.is_imessage === true).length;
-        const sms = rows.filter(r => r.is_imessage === false).length;
-        const contacted = rows.filter(r => r.outreach_status && r.outreach_status !== 'not_contacted').length;
-        const responded = rows.filter(r => r.last_response_at).length;
-        const signed_up = rows.filter(r => r.outreach_status === 'signed_up').length;
-        const touch1_ready = rows.filter(r => r.is_imessage && r.outreach_status === 'not_contacted' && !r.touch1_sent_at).length;
-        const touch2_due = rows.filter(r =>
-          r.is_imessage && r.touch1_sent_at && !r.touch2_sent_at &&
-          (r.response_classification === 'confirmed' || r.touch1_sent_at < twoDaysAgo)
-        ).length;
-        const touch3_due = rows.filter(r =>
-          r.is_imessage && r.touch2_sent_at && !r.touch3_sent_at &&
-          r.touch2_sent_at < twoDaysAgo &&
-          !['signed_up', 'wrong_number', 'opted_out'].includes(r.outreach_status || '')
-        ).length;
+        return {
+          chapter_id: ch.id,
+          chapter_name: ch.chapter_name,
+          total: total ?? 0,
+          have_phone: have_phone ?? 0,
+          contacted: contacted ?? 0,
+          responded: responded ?? 0,
+          signed_up: signed_up ?? 0,
+          imessage: imessage ?? 0,
+          sms: sms ?? 0,
+          // touch_ready fields omitted from all-chapters summary (expensive, unused by stats cards)
+          touch1_ready: 0,
+          touch2_due: 0,
+          touch3_due: 0,
+        };
+      }));
 
-        summaries.push({
-          chapter_id: cid,
-          chapter_name: chapterMap.get(cid) || cid,
-          total, have_phone, imessage, sms, contacted, responded, signed_up,
-          touch1_ready, touch2_due, touch3_due,
-        });
-      }
+      const filtered = summaries.filter(Boolean) as NonNullable<typeof summaries[0]>[];
+      filtered.sort((a, b) => b.contacted - a.contacted);
 
-      summaries.sort((a, b) => b.contacted - a.contacted);
-
-      return NextResponse.json({ data: summaries, error: null });
+      return NextResponse.json({ data: filtered, error: null });
     }
+
+    // ─── Per-chapter detail ───
 
     const { count: total } = await supabase
       .from('alumni_contacts')

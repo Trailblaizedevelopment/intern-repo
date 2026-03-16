@@ -18,7 +18,6 @@ import {
 } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
-import ConversationsTab from './ConversationsTab';
 import LinqOutreachTab from './LinqOutreachTab';
 import EmailTemplatesTab from './EmailTemplatesTab';
 import EmailOutreachTab from './EmailOutreachTab';
@@ -48,7 +47,7 @@ const TAB_CONFIG: { id: ChapterTab; label: string; icon: React.ReactNode }[] = [
 
 export default function CustomerSuccessModule() {
   /* ─── Module-level view ─── */
-  const [moduleView, setModuleView] = useState<'chapters' | 'conversations' | 'outreach' | 'templates' | 'email'>('chapters');
+  const [moduleView, setModuleView] = useState<'chapters' | 'outreach' | 'templates' | 'email'>('chapters');
 
   /* ─── Core state ─── */
   const [chapters, setChapters] = useState<ChapterWithOnboarding[]>([]);
@@ -590,7 +589,6 @@ export default function CustomerSuccessModule() {
         <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #f3f4f6', paddingBottom: 0 }}>
           {([
             { id: 'chapters', label: 'Chapters', icon: <HeartHandshake size={14} /> },
-            { id: 'conversations', label: 'Conversations', icon: <MessageSquare size={14} /> },
             { id: 'outreach', label: 'Linq Outreach', icon: <Send size={14} /> },
             { id: 'templates', label: 'Email Templates', icon: <Mail size={14} /> },
             { id: 'email', label: 'Email Outreach', icon: <Send size={14} /> },
@@ -617,9 +615,7 @@ export default function CustomerSuccessModule() {
           ))}
         </div>
 
-        {moduleView === 'conversations' ? (
-          <ConversationsTab showToast={showToast} />
-        ) : moduleView === 'outreach' ? (
+        {moduleView === 'outreach' ? (
           <LinqOutreachTab showToast={showToast} />
         ) : moduleView === 'templates' ? (
           <EmailTemplatesTab showToast={showToast} />

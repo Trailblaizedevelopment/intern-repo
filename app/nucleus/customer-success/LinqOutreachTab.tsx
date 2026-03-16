@@ -5,10 +5,10 @@ import {
   Send, Clock, CheckCircle2, XCircle, AlertTriangle, RefreshCw,
   Users, Building2, Zap, MessageSquare, ChevronDown, ChevronRight,
   Ban, Loader2, TrendingUp, PauseCircle, PlayCircle, Phone,
-  Edit2, Save, X as XIcon, Sparkles,
+  Edit2, Save, X as XIcon, Sparkles, Inbox, CheckCheck, Flag,
+  FlagOff, User, ChevronUp,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import ConversationsTab from './ConversationsTab';
 
 /* ─── Types ─── */
 
@@ -193,6 +193,9 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
 
   // ── Conversations ──
   const [conversationsExpanded, setConversationsExpanded] = useState(false);
+
+  // ── Batch contact preview expand state: { [batchId]: { t1: bool, t2: bool, t3: bool } }
+  const [contactsExpanded, setContactsExpanded] = useState<Record<string, { t1: boolean; t2: boolean; t3: boolean }>>({});
 
   // ── Templates ──
   const [linqTemplatesExpanded, setLinqTemplatesExpanded] = useState(false);
@@ -468,6 +471,65 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
   }
 
   /* ═══════════════════════════════════════════════
+     SUB-COMPONENT: ContactPreviewList
+     ══════════════════════════════════════════════ */
+
+  function ContactPreviewList({ ids }: { ids: string[] }) {
+    const [contacts, setContacts] = React.useState<{ id: string; first_name: string | null; last_name: string | null; year: number | null }[] | null>(null);
+    const [loading, setLoading] = React.useState(false);
+
+    React.useEffect(() => {
+      if (!ids.length) return;
+      setLoading(true);
+      fetch(`/api/outreach/batch-contacts?ids=${ids.slice(0, 200).join(',')}`)
+        .then(r => r.json())
+        .then(json => setContacts(json.data || []))
+        .catch(() => setContacts([]))
+        .finally(() => setLoading(false));
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    if (loading) {
+      return (
+        <div style={{ padding: '8px 0', fontSize: '0.75rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Loading contacts…
+        </div>
+      );
+    }
+
+    if (!contacts || contacts.length === 0) {
+      return <div style={{ padding: '6px 0', fontSize: '0.75rem', color: '#9ca3af' }}>No contacts found.</div>;
+    }
+
+    const MAX_SHOWN = 200;
+    const shown = contacts.slice(0, MAX_SHOWN);
+    const overflow = ids.length > MAX_SHOWN ? ids.length - MAX_SHOWN : 0;
+
+    const formatted = shown.map(c => {
+      const name = [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unknown';
+      const yr = c.year ? `'${String(c.year).slice(-2)}` : null;
+      return yr ? `${name} ${yr}` : name;
+    });
+
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div style={{
+          fontSize: '0.75rem', color: '#374151', lineHeight: 1.6,
+          maxHeight: 120, overflowY: 'auto',
+          padding: '8px 10px',
+          background: 'rgba(255,255,255,0.6)',
+          borderRadius: 8,
+          border: '1px solid rgba(0,0,0,0.06)',
+        }}>
+          {formatted.join(', ')}
+          {overflow > 0 && (
+            <span style={{ color: '#9ca3af', fontStyle: 'italic' }}> (+{overflow} more)</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════
      SUB-COMPONENT: Rich Touch Breakdown
      ══════════════════════════════════════════════ */
 
@@ -483,6 +545,26 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
 
     // Lines summary (new format)
     const lineSumm = isLineSummary(batch.lines) ? batch.lines as LineSummary : null;
+
+    // Contact IDs from batch notes for expandable preview
+    const batchNotes = (() => {
+      try {
+        return typeof batch.notes === 'string' ? JSON.parse(batch.notes) : batch.notes;
+      } catch { return null; }
+    })();
+    const contactIds: { t1: string[]; t2: string[]; t3: string[] } = {
+      t1: batchNotes?.contact_ids?.t1 || [],
+      t2: batchNotes?.contact_ids?.t2 || [],
+      t3: batchNotes?.contact_ids?.t3 || [],
+    };
+
+    const expanded = contactsExpanded[batch.id] || { t1: false, t2: false, t3: false };
+    const toggleExpand = (touch: 't1' | 't2' | 't3') => {
+      setContactsExpanded(prev => ({
+        ...prev,
+        [batch.id]: { ...expanded, [touch]: !expanded[touch] },
+      }));
+    };
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -519,6 +601,18 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                   ))}
               </div>
             )}
+            {/* Expandable contact list */}
+            {contactIds.t1.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={() => toggleExpand('t1')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#7c3aed', fontWeight: 600, padding: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  {expanded.t1 ? <><ChevronUp size={11} /> Hide contacts</> : <><ChevronDown size={11} /> View {contactIds.t1.length} contacts</>}
+                </button>
+                {expanded.t1 && <ContactPreviewList ids={contactIds.t1} />}
+              </div>
+            )}
           </div>
         )}
 
@@ -539,6 +633,18 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                 </span>
               ))}
             </div>
+            {/* Expandable contact list */}
+            {contactIds.t2.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={() => toggleExpand('t2')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#b45309', fontWeight: 600, padding: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  {expanded.t2 ? <><ChevronUp size={11} /> Hide contacts</> : <><ChevronDown size={11} /> View {contactIds.t2.length} contacts</>}
+                </button>
+                {expanded.t2 && <ContactPreviewList ids={contactIds.t2} />}
+              </div>
+            )}
           </div>
         )}
 
@@ -559,6 +665,18 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                 </span>
               ))}
             </div>
+            {/* Expandable contact list */}
+            {contactIds.t3.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={() => toggleExpand('t3')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 600, padding: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  {expanded.t3 ? <><ChevronUp size={11} /> Hide contacts</> : <><ChevronDown size={11} /> View {contactIds.t3.length} contacts</>}
+                </button>
+                {expanded.t3 && <ContactPreviewList ids={contactIds.t3} />}
+              </div>
+            )}
           </div>
         )}
 
@@ -587,6 +705,461 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════
+     SUB-COMPONENT: ResponseInbox
+     ══════════════════════════════════════════════ */
+
+  type InboxConversation = {
+    contact_id: string;
+    contact_name: string;
+    first_name: string | null;
+    last_name: string | null;
+    grad_year: number | null;
+    chapter_name: string;
+    chapter_id: string;
+    line_number: number | null;
+    line_label: string;
+    last_response_text: string | null;
+    last_response_at: string | null;
+    linq_chat_id: string | null;
+    outreach_status: string | null;
+    flagged: boolean;
+    flagged_reason: string | null;
+    phone_primary: string | null;
+    response_classification: string | null;
+  };
+
+  const LINE_COLORS_MAP: Record<number, { bg: string; text: string }> = {
+    1: { bg: '#ede9fe', text: '#7c3aed' },
+    2: { bg: '#dbeafe', text: '#1d4ed8' },
+    3: { bg: '#d1fae5', text: '#065f46' },
+  };
+
+  const LINE_PHONES_SET = new Set(['+16462408056', '+16462668785', '+16462442696']);
+
+  function ResponseInbox() {
+    const [conversations, setConversations] = React.useState<InboxConversation[]>([]);
+    const [inboxLoading, setInboxLoading] = React.useState(true);
+    const [lineFilter, setLineFilter] = React.useState<string>('all');
+    const [selected, setSelected] = React.useState<InboxConversation | null>(null);
+    const [messages, setMessages] = React.useState<Array<{ id: string; chat_id: string; from: string; parts: { type: string; value: string }[]; created_at: string }>>([]);
+    const [loadingMessages, setLoadingMessages] = React.useState(false);
+    const [replyText, setReplyText] = React.useState('');
+    const [sendingReply, setSendingReply] = React.useState(false);
+    const [showConfirmSend, setShowConfirmSend] = React.useState(false);
+    const [showFlagModal, setShowFlagModal] = React.useState(false);
+    const [flagReason, setFlagReason] = React.useState('');
+    const [flagging, setFlagging] = React.useState(false);
+    const [handlingId, setHandlingId] = React.useState<string | null>(null);
+    const [handledIds, setHandledIds] = React.useState<Set<string>>(new Set());
+    const [handledAtMissing, setHandledAtMissing] = React.useState(false);
+    const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+    const fetchInbox = React.useCallback(async () => {
+      setInboxLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (lineFilter !== 'all') params.set('line', lineFilter);
+        const res = await fetch(`/api/outreach/conversations/responses?${params}`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error.message || json.error);
+        setConversations(json.data || []);
+        if (json.handled_at_missing) setHandledAtMissing(true);
+      } catch (e) {
+        showToast(`Failed to load inbox: ${e instanceof Error ? e.message : e}`, 'error');
+      } finally {
+        setInboxLoading(false);
+      }
+    }, [lineFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    React.useEffect(() => { fetchInbox(); }, [fetchInbox]);
+
+    React.useEffect(() => {
+      if (!selected?.linq_chat_id) return;
+      setLoadingMessages(true);
+      setMessages([]);
+      fetch(`/api/linq/messages?chat_id=${encodeURIComponent(selected.linq_chat_id)}&limit=500`)
+        .then(r => r.json())
+        .then(json => {
+          const sorted = (json.data || []).slice().sort(
+            (a: { created_at: string }, b: { created_at: string }) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          setMessages(sorted);
+        })
+        .catch(() => setMessages([]))
+        .finally(() => setLoadingMessages(false));
+    }, [selected?.linq_chat_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    React.useEffect(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    async function handleSend() {
+      if (!selected?.linq_chat_id || !replyText.trim()) return;
+      setSendingReply(true);
+      setShowConfirmSend(false);
+      try {
+        const res = await fetch('/api/linq/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: selected.linq_chat_id, message: replyText.trim() }),
+        });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+        showToast('Message sent', 'success');
+        setReplyText('');
+        // Refresh messages
+        if (selected.linq_chat_id) {
+          fetch(`/api/linq/messages?chat_id=${encodeURIComponent(selected.linq_chat_id)}&limit=500`)
+            .then(r => r.json())
+            .then(json => {
+              const sorted = (json.data || []).slice().sort(
+                (a: { created_at: string }, b: { created_at: string }) =>
+                  new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              );
+              setMessages(sorted);
+            });
+        }
+      } catch (e) {
+        showToast(`Failed to send: ${e instanceof Error ? e.message : e}`, 'error');
+      } finally {
+        setSendingReply(false);
+      }
+    }
+
+    async function handleMarkHandled(conv: InboxConversation) {
+      setHandlingId(conv.contact_id);
+      try {
+        const res = await fetch('/api/outreach/conversations/responses', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contact_id: conv.contact_id }),
+        });
+        const json = await res.json();
+        if (json.error?.code === 'SCHEMA_MISSING') {
+          setHandledAtMissing(true);
+          showToast('⚠️ DB migration needed: ' + json.error.migration_sql, 'error');
+          return;
+        }
+        if (json.error) throw new Error(json.error.message || json.error);
+        setHandledIds(prev => new Set([...prev, conv.contact_id]));
+        if (selected?.contact_id === conv.contact_id) setSelected(null);
+        showToast('Marked handled — removed from inbox', 'success');
+      } catch (e) {
+        showToast(`Failed: ${e instanceof Error ? e.message : e}`, 'error');
+      } finally {
+        setHandlingId(null);
+      }
+    }
+
+    async function handleFlag(unflag = false) {
+      if (!selected?.contact_id) return;
+      setFlagging(true);
+      try {
+        const res = await fetch('/api/linq/flag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contact_id: selected.contact_id,
+            flagged: !unflag,
+            flagged_reason: unflag ? null : (flagReason.trim() || null),
+          }),
+        });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+        showToast(unflag ? 'Unflagged' : 'Flagged for review', 'success');
+        setShowFlagModal(false);
+        setFlagReason('');
+        const updated = { ...selected, flagged: !unflag, flagged_reason: unflag ? null : (flagReason.trim() || null) };
+        setSelected(updated);
+        setConversations(prev => prev.map(c => c.contact_id === selected.contact_id ? updated : c));
+      } catch (e) {
+        showToast(`Flag failed: ${e instanceof Error ? e.message : e}`, 'error');
+      } finally {
+        setFlagging(false);
+      }
+    }
+
+    function formatTime(iso: string) {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffDays = Math.floor(diffMs / 86400000);
+      const isRecent = diffMs < 24 * 60 * 60 * 1000;
+      if (diffDays === 0) return { label: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), recent: isRecent };
+      if (diffDays === 1) return { label: 'Yesterday', recent: false };
+      if (diffDays < 7) return { label: d.toLocaleDateString('en-US', { weekday: 'short' }), recent: false };
+      return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), recent: false };
+    }
+
+    // Filter out locally-handled conversations
+    const displayed = conversations.filter(c => !handledIds.has(c.contact_id));
+    const INBOX_LINES = [
+      { number: 1, label: 'Owen' },
+      { number: 2, label: 'Adam' },
+      { number: 3, label: 'Ford' },
+    ];
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {/* Inbox header */}
+        <div style={{ padding: '10px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Response Inbox</span>
+          {!inboxLoading && (
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: displayed.length > 0 ? '#dc2626' : '#16a34a', background: displayed.length > 0 ? '#fef2f2' : '#f0fdf4', padding: '2px 10px', borderRadius: 20 }}>
+              {displayed.length} {displayed.length === 1 ? 'response needs' : 'responses need'} attention
+            </span>
+          )}
+          {handledAtMissing && (
+            <span style={{ fontSize: '0.7rem', color: '#d97706', background: '#fffbeb', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
+              ⚠️ Run migration to enable Mark Handled
+            </span>
+          )}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* Line filter pills */}
+            {(['all', '1', '2', '3'] as const).map(l => {
+              const active = lineFilter === l;
+              const lineNum = parseInt(l as string);
+              const colors = LINE_COLORS_MAP[lineNum] || { bg: '#f3f4f6', text: '#6b7280' };
+              const lbl = l === 'all' ? 'All' : INBOX_LINES.find(x => x.number === lineNum)?.label;
+              return (
+                <button key={l} onClick={() => setLineFilter(l)} style={{ padding: '3px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 500, background: active ? (l === 'all' ? '#111827' : colors.bg) : '#f3f4f6', color: active ? (l === 'all' ? '#fff' : colors.text) : '#6b7280', transition: 'all 0.15s' }}>
+                  {lbl}
+                </button>
+              );
+            })}
+            <button onClick={fetchInbox} title="Refresh" style={{ padding: '3px 7px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center' }}>
+              <RefreshCw size={11} style={{ animation: inboxLoading ? 'spin 1s linear infinite' : 'none' }} />
+            </button>
+          </div>
+        </div>
+
+        {/* Two-panel layout */}
+        <div style={{ display: 'flex', height: 500, overflow: 'hidden' }}>
+          {/* Left: conversation list */}
+          <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fafafa' }}>
+            {inboxLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', gap: 8, fontSize: '0.875rem' }}>
+                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
+              </div>
+            ) : displayed.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9ca3af', gap: 10 }}>
+                <Inbox size={32} style={{ opacity: 0.3 }} />
+                <p style={{ margin: 0, fontSize: '0.875rem' }}>No responses yet</p>
+                <p style={{ margin: 0, fontSize: '0.75rem', textAlign: 'center', padding: '0 20px' }}>When alumni reply to outreach messages, they&apos;ll appear here.</p>
+              </div>
+            ) : (
+              displayed.map(conv => {
+                const isSelected = selected?.contact_id === conv.contact_id;
+                const lineColors = conv.line_number ? LINE_COLORS_MAP[conv.line_number] : { bg: '#f3f4f6', text: '#6b7280' };
+                const timeInfo = conv.last_response_at ? formatTime(conv.last_response_at) : null;
+
+                return (
+                  <div
+                    key={conv.contact_id}
+                    onClick={() => setSelected(conv)}
+                    style={{
+                      padding: '10px 12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #f0f0f0',
+                      borderLeft: isSelected ? '3px solid #2563eb' : conv.flagged ? '3px solid #f59e0b' : '3px solid transparent',
+                      background: isSelected ? '#eff6ff' : conv.flagged ? '#fffbeb' : '#fafafa',
+                      transition: 'background 0.1s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: conv.flagged ? '#fef3c7' : '#e9eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: conv.flagged ? '#d97706' : '#64748b' }}>
+                        {conv.contact_name !== 'Unknown'
+                          ? conv.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                          : <User size={14} />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                          <span style={{ fontWeight: timeInfo?.recent ? 700 : 600, fontSize: '0.8375rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                            {conv.contact_name}
+                            {conv.grad_year && <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 4 }}>&apos;{String(conv.grad_year).slice(-2)}</span>}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: timeInfo?.recent ? '#dc2626' : '#9ca3af', flexShrink: 0, fontWeight: timeInfo?.recent ? 700 : 400 }}>
+                            {timeInfo?.label}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                          <span style={{ fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{conv.chapter_name}</span>
+                          {conv.line_number && (
+                            <span style={{ background: lineColors.bg, color: lineColors.text, fontSize: '0.7rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10, flexShrink: 0 }}>{conv.line_label}</span>
+                          )}
+                          {conv.flagged && <Flag size={11} style={{ color: '#d97706', flexShrink: 0 }} />}
+                        </div>
+                        {conv.last_response_text && (
+                          <div style={{ marginTop: 3, fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {conv.last_response_text.slice(0, 60)}{conv.last_response_text.length > 60 ? '…' : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Right: thread panel */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#fff' }}>
+            {!selected ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', gap: 10 }}>
+                <MessageSquare size={40} style={{ opacity: 0.2 }} />
+                <p style={{ margin: 0, fontSize: '0.875rem' }}>Select a conversation to reply</p>
+              </div>
+            ) : (
+              <>
+                {/* Thread header */}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', background: '#fafafa', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {selected.contact_name}
+                      {selected.grad_year && <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '0.8rem' }}>&apos;{String(selected.grad_year).slice(-2)}</span>}
+                      {selected.flagged && <span style={{ background: '#fef3c7', color: '#d97706', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Flag size={10} /> Flagged</span>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>{selected.chapter_name}</span>
+                      {selected.line_number && (
+                        <span style={{ background: LINE_COLORS_MAP[selected.line_number]?.bg || '#f3f4f6', color: LINE_COLORS_MAP[selected.line_number]?.text || '#374151', fontSize: '0.75rem', fontWeight: 600, padding: '1px 8px', borderRadius: 10 }}>
+                          {selected.line_label}
+                        </span>
+                      )}
+                      {selected.outreach_status && (
+                        <span style={{ fontSize: '0.72rem', color: '#6b7280', background: '#f3f4f6', padding: '1px 6px', borderRadius: 10 }}>{selected.outreach_status.replace(/_/g, ' ')}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {/* Flag/Unflag */}
+                    <button
+                      onClick={() => selected.flagged ? handleFlag(true) : setShowFlagModal(true)}
+                      disabled={flagging}
+                      style={{ padding: '6px 12px', borderRadius: 7, border: `1px solid ${selected.flagged ? '#fbbf24' : '#e5e7eb'}`, background: selected.flagged ? '#fef3c7' : '#fff', color: selected.flagged ? '#d97706' : '#6b7280', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      {selected.flagged ? <><FlagOff size={12} /> Unflag</> : <><Flag size={12} /> Flag</>}
+                    </button>
+                    {/* Mark Handled */}
+                    <button
+                      onClick={() => handleMarkHandled(selected)}
+                      disabled={handlingId === selected.contact_id}
+                      style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      {handlingId === selected.contact_id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCheck size={12} />}
+                      Mark Handled
+                    </button>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {!selected.linq_chat_id ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: '0.875rem', flexDirection: 'column', gap: 8 }}>
+                      <AlertTriangle size={24} style={{ opacity: 0.4 }} />
+                      No Linq chat ID — cannot load thread
+                    </div>
+                  ) : loadingMessages ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', gap: 8 }}>
+                      <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading messages…
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: '0.875rem' }}>
+                      No messages yet.
+                    </div>
+                  ) : (
+                    messages.map(msg => {
+                      const isOutbound = LINE_PHONES_SET.has(msg.from);
+                      const text = msg.parts.filter(p => p.type === 'text').map(p => p.value).join(' ');
+                      if (!text) return null;
+                      return (
+                        <div key={msg.id} style={{ display: 'flex', flexDirection: isOutbound ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 8 }}>
+                          <div style={{ maxWidth: '72%', padding: '9px 13px', borderRadius: isOutbound ? '18px 4px 18px 18px' : '4px 18px 18px 18px', background: isOutbound ? '#1e293b' : '#f3f4f6', color: isOutbound ? '#f8fafc' : '#111827', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                            <div>{text}</div>
+                            <div style={{ fontSize: '0.68rem', color: isOutbound ? 'rgba(248,250,252,0.45)' : '#9ca3af', marginTop: 4, textAlign: isOutbound ? 'right' : 'left' }}>
+                              {new Date(msg.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Reply area */}
+                <div style={{ padding: '10px 16px 12px', borderTop: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    <textarea
+                      value={replyText}
+                      onChange={e => setReplyText(e.target.value)}
+                      placeholder={selected.linq_chat_id ? `Reply via ${selected.line_label}'s line…` : 'No Linq chat ID — cannot reply'}
+                      disabled={!selected.linq_chat_id}
+                      rows={2}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (replyText.trim()) setShowConfirmSend(true); } }}
+                      style={{ flex: 1, padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, resize: 'none', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5, background: '#fff', color: '#111827', opacity: selected.linq_chat_id ? 1 : 0.5 }}
+                    />
+                    <button
+                      onClick={() => replyText.trim() && setShowConfirmSend(true)}
+                      disabled={!replyText.trim() || sendingReply || !selected.linq_chat_id}
+                      style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: replyText.trim() && !sendingReply && selected.linq_chat_id ? '#1e293b' : '#e5e7eb', color: replyText.trim() && !sendingReply && selected.linq_chat_id ? '#fff' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.875rem', fontWeight: 500, flexShrink: 0 }}
+                    >
+                      {sendingReply ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={14} />}
+                      Send
+                    </button>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>No emojis · Enter to confirm · Shift+Enter for new line</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Confirm send modal */}
+        {showConfirmSend && selected && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowConfirmSend(false)}>
+            <div style={{ background: '#fff', borderRadius: 14, padding: '24px 28px', maxWidth: 420, width: '90%', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin: '0 0 10px', fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Confirm Send</h3>
+              <p style={{ margin: '0 0 14px', fontSize: '0.875rem', color: '#4b5563' }}>
+                Send to <strong>{selected.contact_name}</strong> via <strong>{selected.line_label}&apos;s line</strong>?
+              </p>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: '0.875rem', color: '#374151', fontStyle: 'italic', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                &ldquo;{replyText.trim()}&rdquo;
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowConfirmSend(false)} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#374151' }}>Cancel</button>
+                <button onClick={handleSend} disabled={sendingReply} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#1e293b', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {sendingReply ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={14} />}
+                  Send Message
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Flag modal */}
+        {showFlagModal && selected && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setShowFlagModal(false); setFlagReason(''); }}>
+            <div style={{ background: '#fff', borderRadius: 14, padding: '24px 28px', maxWidth: 420, width: '90%', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Flag for Review</h3>
+              <p style={{ margin: '0 0 14px', fontSize: '0.875rem', color: '#4b5563' }}>Flag <strong>{selected.contact_name}</strong> for follow-up.</p>
+              <input type="text" value={flagReason} onChange={e => setFlagReason(e.target.value)} placeholder="Reason (optional)" autoFocus onKeyDown={e => e.key === 'Enter' && handleFlag()} style={{ width: '100%', padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', color: '#111827', marginBottom: 16 }} />
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button onClick={() => { setShowFlagModal(false); setFlagReason(''); }} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#374151' }}>Cancel</button>
+                <button onClick={() => handleFlag()} disabled={flagging} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#d97706', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {flagging ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Flag size={14} />}
+                  Flag
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1144,7 +1717,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
       </div>
 
       {/* ═══════════════════════════════════════════════
-          SECTION 4 — Conversations
+          SECTION 4 — Conversations (Response Inbox)
           ═══════════════════════════════════════════════ */}
       <div style={{ borderRadius: 14, border: '1px solid #e5e7eb', background: '#fff', overflow: 'hidden' }}>
         <button
@@ -1158,12 +1731,12 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
           }}
         >
           <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0, background: 'linear-gradient(135deg, #2563eb, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-            <MessageSquare size={14} />
+            <Inbox size={14} />
           </div>
           <div style={{ flex: 1 }}>
             <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827' }}>Conversations</span>
             <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: 8 }}>
-              Responses, replies, and flags
+              Response inbox — human-in-the-loop replies
             </span>
           </div>
           {conversationsExpanded
@@ -1174,7 +1747,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
 
         {conversationsExpanded && (
           <div style={{ padding: '0' }}>
-            <ConversationsTab showToast={showToast} />
+            <ResponseInbox />
           </div>
         )}
       </div>
