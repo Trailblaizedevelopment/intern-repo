@@ -69,7 +69,7 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
 
   const [myDeals, setMyDeals] = useState<Deal[]>([]);
   const [allDeals, setAllDeals] = useState<Deal[]>([]);
-  const [activeChapters, setActiveChapters] = useState<number | null>(null);
+  const [chapters, setChapters] = useState<{ status: string; payment_amount: number | null; payment_type: string | null }[]>([]);
   const [metricsOpen, setMetricsOpen] = useState(false);
 
   const now = new Date();
@@ -98,10 +98,11 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
           .select('id, stage, value, assigned_to');
         if (d) setAllDeals(d as unknown as Deal[]);
 
-        const { count } = await supabase
+        const { data: chapterData } = await supabase
           .from('chapters')
-          .select('*', { count: 'exact', head: true });
-        setActiveChapters(count ?? 0);
+          .select('status, payment_amount, payment_type')
+          .in('status', ['active', 'onboarding']);
+        setChapters(chapterData ?? []);
       }
     }
 
@@ -137,11 +138,18 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
   const myARR = useMemo(() => myClosedWon.reduce((s, d) => s + (d.value || 0), 0), [myClosedWon]);
 
 
-  // --- Company-wide metrics ---
+  // --- Company-wide metrics (chapters-based) ---
   const totalARR = useMemo(() =>
-    allDeals.filter(d => d.stage === 'closed_won').reduce((s, d) => s + ((d as Deal).value || 0), 0),
-    [allDeals]
+    chapters.reduce((s, c) => {
+      const amt = c.payment_amount || 0;
+      if (!amt) return s;
+      // Monthly payment_type: annualize; annual/one_time: use as-is
+      return s + (c.payment_type === 'monthly' ? amt * 12 : amt);
+    }, 0),
+    [chapters]
   );
+  const activeChapters = useMemo(() => chapters.filter(c => c.status === 'active').length, [chapters]);
+  const activeAndOnboardingChapters = useMemo(() => chapters.length, [chapters]);
 
   // --- Intern: personal leads with activity needed ---
   const internLeads = useMemo(() => {
@@ -358,8 +366,8 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
             <div className="cc-metric-label">My ARR Sold</div>
           </div>
           <div className="cc-metric-tile">
-            <div className="cc-metric-number">{myClosedWon.length}</div>
-            <div className="cc-metric-label">Deals Closed</div>
+            <div className="cc-metric-number">{activeChapters}</div>
+            <div className="cc-metric-label">Chapters Active</div>
           </div>
           <div className="cc-metric-tile">
             <div className="cc-metric-number">{myActiveDealsAll.length}</div>
@@ -391,10 +399,8 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
                 <div className="cc-metric-label">Total ARR</div>
               </div>
               <div className="cc-metric-tile cc-metric-tile--blue">
-                <div className="cc-metric-number">
-                  {activeChapters !== null ? activeChapters : '—'}
-                </div>
-                <div className="cc-metric-label">Active Spaces</div>
+                <div className="cc-metric-number">{activeAndOnboardingChapters}</div>
+                <div className="cc-metric-label">Active + Onboarding</div>
               </div>
             </div>
           )}
