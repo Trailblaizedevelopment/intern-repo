@@ -81,12 +81,11 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
     async function fetchData() {
       if (!supabase) return;
 
-      // Founder: fetch own deals filtered by assigned_to
-      if (isFounder && currentEmployee?.id) {
+      // Founder: fetch all deals (no assigned_to column exists)
+      if (isFounder) {
         const { data: d } = await supabase
           .from('deals')
           .select('*')
-          .eq('assigned_to', currentEmployee.id)
           .order('next_followup', { ascending: true });
         if (d) setMyDeals(d as Deal[]);
       }
@@ -95,7 +94,7 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
       if (isFounder || isEngineer) {
         const { data: d } = await supabase
           .from('deals')
-          .select('id, stage, value, assigned_to');
+          .select('id, stage, value');
         if (d) setAllDeals(d as unknown as Deal[]);
 
         const { data: chapterData } = await supabase
@@ -138,15 +137,10 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
   const myARR = useMemo(() => myClosedWon.reduce((s, d) => s + (d.value || 0), 0), [myClosedWon]);
 
 
-  // --- Company-wide metrics (chapters-based) ---
+  // --- Company-wide metrics (deals-based for ARR) ---
   const totalARR = useMemo(() =>
-    chapters.reduce((s, c) => {
-      const amt = c.payment_amount || 0;
-      if (!amt) return s;
-      // Monthly payment_type: annualize; annual/one_time: use as-is
-      return s + (c.payment_type === 'monthly' ? amt * 12 : amt);
-    }, 0),
-    [chapters]
+    allDeals.filter(d => d.stage === 'closed_won').reduce((s, d) => s + ((d as Deal).value || 0), 0),
+    [allDeals]
   );
   const activeChapters = useMemo(() => chapters.filter(c => c.status === 'active').length, [chapters]);
   const activeAndOnboardingChapters = useMemo(() => chapters.length, [chapters]);
