@@ -108,6 +108,7 @@ export async function POST() {
       .eq('outreach_status', 'not_contacted')
       .not('is_imessage', 'is', false)
       .not('phone_primary', 'is', null)
+      .or('phone_type.is.null,and(phone_type.neq.landline,phone_type.neq.voip)')
       .gte('year', 1970)
       .limit(t1Total);
 
