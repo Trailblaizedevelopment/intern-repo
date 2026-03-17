@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { createClient } from '@supabase/supabase-js';
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
@@ -12,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   const { data: sample } = await supabase
     .from('alumni_contacts')
     .select('platform_chapter_id')
-    .eq('chapter_id', params.id)
+    .eq('chapter_id', id)
     .not('platform_chapter_id', 'is', null)
     .limit(1)
     .single();
