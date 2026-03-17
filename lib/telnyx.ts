@@ -40,7 +40,8 @@ export async function lookupPhoneType(phone: string): Promise<TelnyxLookupResult
   }
 
   const data = await res.json();
-  const lineType = data?.data?.carrier?.line_type?.toLowerCase() || 'unknown';
+  // Telnyx returns type at carrier.type (not carrier.line_type); portability.line_type is a fallback
+  const lineType = (data?.data?.carrier?.type || data?.data?.portability?.line_type || 'unknown').toLowerCase();
 
   let phoneType: PhoneType = 'unknown';
   if (lineType === 'mobile' || lineType === 'cell') {
