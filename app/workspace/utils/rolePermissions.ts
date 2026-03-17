@@ -149,16 +149,18 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         ...baseItems,
         { name: 'Customer Success', href: '/nucleus/customer-success', icon: 'HeartHandshake' },
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
-        { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
+        { name: 'Roadmap', href: '/dashboard/roadmap', icon: 'Map' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
+        { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
     case 'engineer':
       return [
         ...baseItems,
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
-        { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
+        { name: 'Roadmap', href: '/dashboard/roadmap', icon: 'Map' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
+        { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
     case 'growth_intern':

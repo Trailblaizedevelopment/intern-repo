@@ -27,6 +27,7 @@ import {
   Rocket,
   Ticket,
   GraduationCap,
+  Map,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -48,6 +49,7 @@ const iconMap: Record<string, LucideIcon> = {
   Building2,
   HeartHandshake,
   GraduationCap,
+  Map,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
