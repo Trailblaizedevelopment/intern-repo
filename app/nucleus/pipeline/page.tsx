@@ -595,6 +595,9 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   const [editingDeal, setEditingDeal] = useState<PipelineDeal | null>(null);
   const [isNewDeal, setIsNewDeal] = useState(false);
 
+  // Stage advance follow-up prompt
+  const [stageAdvancePrompt, setStageAdvancePrompt] = useState<{ dealId: string; followupDate: string } | null>(null);
+
   function openDeal(deal: PipelineDeal | null) {
     setEditingDeal(deal);
     setIsNewDeal(deal === null);
@@ -703,6 +706,10 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     if (res.ok) {
       showToast(`Advanced to ${STAGE_CONFIG[next].label}!`, 'success');
       loadDeals();
+      // FEATURE 3: show follow-up suggestion prompt (+3 days)
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      setStageAdvancePrompt({ dealId: deal.id, followupDate: d.toISOString().split('T')[0] });
     }
   };
 
@@ -1391,6 +1398,41 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
               <span className="pl2__stat-label">{STAGE_CONFIG[stage as DealStage]?.emoji} {STAGE_CONFIG[stage as DealStage]?.label}</span>
             </div>
           ))}
+          {/* FEATURE 4: Overdue triage button */}
+          {stats.overdue > 0 && (
+            <button
+              onClick={() => {
+                setFilterOverdueOnly(true);
+                if (activeTab !== 'all-deals') setActiveTab('all-deals');
+              }}
+              style={{
+                marginLeft: 'auto',
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '5px 12px', borderRadius: 20,
+                background: '#f59e0b18', border: '1.5px solid #f59e0b',
+                color: '#d97706', fontWeight: 600, fontSize: '0.8rem',
+                cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              ⚠️ Triage {stats.overdue} Overdue
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* FEATURE 4: Overdue-only banner */}
+      {filterOverdueOnly && (activeTab === 'my-deals' || activeTab === 'all-deals') && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 16px', background: '#fff7ed',
+          borderBottom: '1px solid #fed7aa', fontSize: '0.8125rem',
+          color: '#92400e',
+        }}>
+          <span>⚠️ Showing overdue deals only — {filteredDeals.filter(d => followupUrgency(d.next_followup) === 'overdue').length} deals need attention</span>
+          <button
+            onClick={() => setFilterOverdueOnly(false)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, color: '#92400e', padding: '0 2px' }}
+          >×</button>
         </div>
       )}
 
@@ -1578,6 +1620,44 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
           onChangeOverdueOnly={setFilterOverdueOnly}
           onClose={() => setFilterDrawerOpen(false)}
         />
+      )}
+
+      {/* FEATURE 3: Stage Advance Follow-up Prompt */}
+      {stageAdvancePrompt && (
+        <div style={{
+          position: 'fixed', bottom: 80, left: 16, right: 16,
+          background: 'var(--ws-surface,#fff)',
+          border: '1.5px solid #C9A84C', borderRadius: 12,
+          padding: '12px 16px', zIndex: 10000,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+          display: 'flex', flexDirection: 'column', gap: 8,
+          maxWidth: 420, margin: '0 auto',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>📅 Set a follow-up?</span>
+            <button onClick={() => setStageAdvancePrompt(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, color: 'var(--ws-text-secondary,#6b7280)', padding: '0 2px' }}>×</button>
+          </div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#6b7280)' }}>
+            Suggested: {formatDate(stageAdvancePrompt.followupDate)} (+3 days)
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => {
+                setFollowup(stageAdvancePrompt.dealId, stageAdvancePrompt.followupDate);
+                setStageAdvancePrompt(null);
+              }}
+              style={{ flex: 1, padding: '8px', borderRadius: 8, background: '#C9A84C', border: 'none', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              ✓ Set Follow-Up
+            </button>
+            <button
+              onClick={() => setStageAdvancePrompt(null)}
+              style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid var(--ws-border,#e5e7eb)', background: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              Skip
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Follow-up Picker Bottom Sheet */}
