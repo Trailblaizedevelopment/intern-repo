@@ -104,11 +104,10 @@ export async function POST() {
     // Exclude known landline/voip entirely — they'll never be iMessage
     const { data: t1Raw } = await supabase
       .from('alumni_contacts')
-      .select('id, chapter_id, year, phone_type')
+      .select('id, chapter_id, year')
       .eq('outreach_status', 'not_contacted')
       .not('is_imessage', 'is', false)
       .not('phone_primary', 'is', null)
-      .or('phone_type.is.null,and(phone_type.neq.landline,phone_type.neq.voip)')
       .gte('year', 1970)
       .limit(t1Total);
 
