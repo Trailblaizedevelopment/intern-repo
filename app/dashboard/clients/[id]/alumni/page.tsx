@@ -33,6 +33,23 @@ interface AlumniStats {
 }
 interface ImportResult { imported: number; skipped: number; duplicates: number; dual_phone_count: number; queue_assigned: number; errors: { row: number; message: string }[]; }
 
+interface PlatformMember {
+  id: string;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: string;
+  grad_year: number | null;
+  major: string | null;
+  gpa: number | null;
+  hometown: string | null;
+  bio: string | null;
+  phone: string | null;
+  email: string | null;
+  pledge_class: string | null;
+  avatar_url: string | null;
+}
+
 const LINE_COLORS: Record<number, string> = { 1: '#3b82f6', 2: '#16a34a', 3: '#f59e0b' };
 const LINE_LABELS: Record<number, string> = { 1: 'O', 2: 'A', 3: 'F' };
 
@@ -43,6 +60,13 @@ const CLASSIFICATION_COLORS: Record<string, { color: string; bg: string }> = {
   declined: { color: '#6b7280', bg: '#f3f4f6' },
   signed_up: { color: '#059669', bg: '#d1fae5' },
   no_response: { color: '#9ca3af', bg: '#f3f4f6' },
+};
+
+const PHONE_TYPE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  mobile:   { label: '📱 Mobile',   bg: '#dcfce7', color: '#15803d' },
+  voip:     { label: '☁️ VoIP',    bg: '#fef3c7', color: '#b45309' },
+  landline: { label: '🏠 Landline', bg: '#fee2e2', color: '#b91c1c' },
+  unknown:  { label: '? Unknown',  bg: '#f3f4f6', color: '#6b7280' },
 };
 
 function formatPhone(e164: string | null): string {
@@ -73,6 +97,20 @@ function StatusBadge({ status }: { status: OutreachStatus }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600, color: cfg.color, backgroundColor: cfg.bg, whiteSpace: 'nowrap' }}>
       {cfg.label}
+    </span>
+  );
+}
+
+function PhoneTypeBadge({ phoneType }: { phoneType: string | null }) {
+  const key = phoneType ?? 'unknown';
+  const badge = PHONE_TYPE_BADGE[key] ?? PHONE_TYPE_BADGE.unknown;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', padding: '2px 6px',
+      borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 600,
+      color: badge.color, backgroundColor: badge.bg, whiteSpace: 'nowrap',
+    }}>
+      {badge.label}
     </span>
   );
 }
@@ -115,6 +153,236 @@ function LineCapacityBar({ line }: { line: LineTodayStat }) {
   );
 }
 
+// ── Data Quality Card ──
+function DataQualityCard({ contacts, total }: { contacts: AlumniContact[]; total: number }) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const phoneCounts = {
+    mobile: contacts.filter(c => c.phone_type === 'mobile').length,
+    voip: contacts.filter(c => c.phone_type === 'voip').length,
+    landline: contacts.filter(c => c.phone_type === 'landline').length,
+    unknown: contacts.filter(c => !c.phone_type || c.phone_type === 'unknown').length,
+  };
+  const iMessageEligible = contacts.filter(c =>
+    c.phone_primary && c.is_imessage !== false &&
+    (!c.phone_type || c.phone_type === 'mobile')
+  ).length;
+
+  const signedUp = contacts.filter(c =>
+    c.platform_user_id || c.signed_up_at || c.outreach_status === 'signed_up'
+  ).length;
+  const conversionRate = total > 0 ? ((signedUp / total) * 100).toFixed(1) : '0.0';
+
+  const enriched = contacts.filter(c => c.phone_type && c.phone_type !== 'unknown').length;
+  const contacted = contacts.filter(c => c.touch1_sent_at || c.touch2_sent_at || c.touch3_sent_at).length;
+
+  const iMsgPct = total > 0 ? (iMessageEligible / total) * 100 : 0;
+  const signedUpPct = total > 0 ? (signedUp / total) * 100 : 0;
+
+  return (
+    <div style={{
+      background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px',
+      marginBottom: '16px', overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <button
+        onClick={() => setCollapsed(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          width: '100%', padding: '12px 16px', background: 'none', border: 'none',
+          cursor: 'pointer', borderBottom: collapsed ? 'none' : '1px solid #f3f4f6',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>
+          <span style={{ fontSize: '1rem' }}>📊</span> Data Quality
+          <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#9ca3af' }}>
+            — {total} total contacts loaded
+          </span>
+        </span>
+        <ChevronDown size={15} style={{ color: '#9ca3af', transform: collapsed ? 'none' : 'rotate(180deg)', transition: 'transform 0.15s ease' }} />
+      </button>
+
+      {!collapsed && (
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Section A: Phone Enrichment */}
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+              Phone Enrichment
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8125rem', fontWeight: 600, background: '#dcfce7', color: '#15803d' }}>
+                📱 Mobile: {phoneCounts.mobile}
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8125rem', fontWeight: 600, background: '#fef3c7', color: '#b45309' }}>
+                📞 VoIP: {phoneCounts.voip}
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8125rem', fontWeight: 600, background: '#fee2e2', color: '#b91c1c' }}>
+                🏠 Landline: {phoneCounts.landline}
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8125rem', fontWeight: 600, background: '#f3f4f6', color: '#6b7280' }}>
+                ❓ Unknown: {phoneCounts.unknown}
+              </span>
+              {/* iMessage Eligible with progress */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '9999px', background: '#dbeafe', border: '1px solid #bfdbfe' }}>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1d4ed8' }}>✉️ iMessage Eligible: {iMessageEligible}</span>
+                <div style={{ width: '60px', height: '4px', background: '#bfdbfe', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${iMsgPct}%`, background: '#3b82f6', borderRadius: '2px', transition: 'width 0.3s ease' }} />
+                </div>
+                <span style={{ fontSize: '0.7rem', color: '#3b82f6' }}>{iMsgPct.toFixed(0)}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: '1px', background: '#f3f4f6' }} />
+
+          {/* Section B: Platform Signups */}
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+              Platform Signups
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                <span style={{ fontWeight: 700, color: '#16a34a' }}>{signedUp}</span>
+                <span style={{ color: '#6b7280' }}> signed up on Trailblaize</span>
+                <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}> ({conversionRate}%)</span>
+              </span>
+              <div style={{ flex: 1, maxWidth: '200px', height: '6px', background: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${signedUpPct}%`, background: '#16a34a', borderRadius: '3px', transition: 'width 0.3s ease' }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: '1px', background: '#f3f4f6' }} />
+
+          {/* Section C: Enrichment vs Contacted */}
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+              Telnyx Enrichment
+            </div>
+            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              <span style={{ fontWeight: 600, color: '#374151' }}>{enriched}</span> of <span style={{ fontWeight: 600, color: '#374151' }}>{contacted}</span> contacted have enriched phone data from Telnyx
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Active Members Tab ──
+function ActiveMembersTab({ chapterId }: { chapterId: string }) {
+  const [members, setMembers] = useState<PlatformMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [platformChapterId, setPlatformChapterId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchMembers() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/chapters/${chapterId}/platform-members`);
+        const json = await res.json();
+        if (json.error) {
+          setError(json.error);
+        } else {
+          setMembers(json.members || []);
+          setPlatformChapterId(json.platform_chapter_id);
+        }
+      } catch {
+        setError('Failed to load active members');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchMembers();
+  }, [chapterId]);
+
+  if (loading) {
+    return <div className="module-loading">Loading active members from Trailblaize platform...</div>;
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '32px', textAlign: 'center', color: '#dc2626' }}>
+        <AlertCircle size={32} style={{ marginBottom: '8px' }} />
+        <p style={{ fontWeight: 600 }}>Error loading platform members</p>
+        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '4px' }}>{error}</p>
+      </div>
+    );
+  }
+
+  if (!platformChapterId || members.length === 0) {
+    return (
+      <div className="module-empty-state" style={{ padding: '64px' }}>
+        <Users size={48} />
+        <h3>No active members linked yet</h3>
+        <p>Alumni must sign up via the chapter join link to appear here.</p>
+        {!platformChapterId && (
+          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', marginTop: '8px' }}>
+            No platform chapter ID found for this chapter.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0',
+        borderRadius: '10px', marginBottom: '16px', fontSize: '0.8125rem', color: '#166534',
+      }}>
+        <span style={{ fontWeight: 600 }}>ℹ️ Platform data</span>
+        {' '}— These are current members on the Trailblaize platform — data sourced directly from their profiles.
+        {' '}<span style={{ color: '#6b7280' }}>(Chapter ID: {platformChapterId})</span>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="module-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Grad Year</th>
+              <th>Pledge Class</th>
+              <th>Major</th>
+              <th>GPA</th>
+              <th>Hometown</th>
+              <th>Phone</th>
+              <th>Bio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {members.map(m => (
+              <tr key={m.id}>
+                <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
+                  {m.full_name || `${m.first_name || ''} ${m.last_name || ''}`.trim() || '—'}
+                </td>
+                <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>{m.grad_year || '—'}</td>
+                <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>{m.pledge_class || '—'}</td>
+                <td style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                  {m.major || '—'}
+                </td>
+                <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                  {m.gpa != null ? m.gpa.toFixed(2) : '—'}
+                </td>
+                <td style={{ fontSize: '0.85rem', color: '#6b7280', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {m.hometown || '—'}
+                </td>
+                <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
+                  {m.phone ? formatPhone(m.phone) : '—'}
+                </td>
+                <td style={{ maxWidth: '200px', fontSize: '0.8rem', color: '#6b7280' }}>
+                  {m.bio ? (m.bio.length > 80 ? m.bio.slice(0, 80) + '…' : m.bio) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function AlumniPage() {
   const params = useParams();
   const chapterId = params.id as string;
@@ -134,6 +402,10 @@ export default function AlumniPage() {
   const [sortBy, setSortBy] = useState<SortField>('created_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState<'alumni' | 'active_members'>('alumni');
+  const [platformMemberCount, setPlatformMemberCount] = useState<number | null>(null);
 
   // Import
   const [showImportModal, setShowImportModal] = useState(false);
@@ -226,6 +498,14 @@ export default function AlumniPage() {
       .order('updated_at', { ascending: false })
       .limit(20);
     if (data) setActivityItems(data);
+  }, [chapterId]);
+
+  // Prefetch platform member count for tab badge
+  useEffect(() => {
+    fetch(`/api/chapters/${chapterId}/platform-members`)
+      .then(r => r.json())
+      .then(json => { if (json.members) setPlatformMemberCount(json.members.length); })
+      .catch(() => {});
   }, [chapterId]);
 
   useEffect(() => { fetchChapter(); fetchStats(); }, [fetchChapter, fetchStats]);
@@ -507,7 +787,6 @@ export default function AlumniPage() {
 
           {/* Right: Action Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {/* Outreach controls moved to Nucleus — these buttons are intentionally disabled */}
             <a
               href="/nucleus/customer-success"
               title="All outreach is managed from the Linq Outreach tab in Nucleus"
@@ -524,214 +803,285 @@ export default function AlumniPage() {
           </div>
         </div>
 
-        {/* ═══════ SECTION 3: Filters + Table + Conversation ═══════ */}
-        <div style={{ display: 'flex', gap: '0', minHeight: selectedContact ? '600px' : 'auto' }}>
-        <div style={{ flex: selectedContact ? '0 0 65%' : '1 1 100%', minWidth: 0, transition: 'flex 0.2s ease' }}>
-        <div className="module-actions-bar">
-          <div className="module-search">
-            <Search size={18} />
-            <input type="text" placeholder="Search by name, email, phone..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af' }}><X size={16} /></button>}
-          </div>
-          <div className="module-actions">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-              <Filter size={16} style={{ color: '#6b7280' }} />
-              <select className="module-filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                <option value="all">All Status</option>
-                {Object.entries(OUTREACH_STATUS_CONFIG).map(([key, cfg]) => (<option key={key} value={key}>{cfg.label}</option>))}
-              </select>
-              <select className="module-filter-select" value={imessageFilter} onChange={(e) => setImessageFilter(e.target.value as typeof imessageFilter)}>
-                <option value="all">All Numbers</option>
-                <option value="imessage">iMessage Only</option>
-                <option value="sms">SMS Only</option>
-                <option value="unverified">Unverified Only</option>
-              </select>
-              <select className="module-filter-select" value={lineFilter} onChange={(e) => setLineFilter(e.target.value)}>
-                <option value="all">All Lines</option>
-                {SENDING_LINES.map(l => <option key={l.number} value={String(l.number)}>{l.label}</option>)}
-              </select>
-              <select className="module-filter-select" value={touchFilter} onChange={(e) => setTouchFilter(e.target.value)}>
-                <option value="all">All Touches</option>
-                <option value="needs_touch1">Needs Touch 1</option>
-                <option value="needs_touch2">Needs Touch 2</option>
-                <option value="needs_touch3">Needs Touch 3</option>
-                <option value="complete">Complete</option>
-                <option value="no_response">No Response</option>
-              </select>
-            </div>
-            {selected.size > 0 && (
-              <>
-                <button className="module-filter-btn" onClick={() => setShowStatusModal(true)}>Update Status ({selected.size})</button>
-                <button className="module-filter-btn" onClick={exportCSV}><Download size={16} /> Export ({selected.size})</button>
-                <button className="module-filter-btn" style={{ color: '#dc2626', borderColor: '#fecaca' }} onClick={() => setDeleteConfirm(true)}><Trash2 size={16} /> Delete ({selected.size})</button>
-              </>
-            )}
-            {selected.size === 0 && <button className="module-filter-btn" onClick={exportCSV} disabled={contacts.length === 0 || exportingCSV}><Download size={16} /> {exportingCSV ? 'Exporting...' : 'Export CSV'}</button>}
-            <button className="module-primary-btn" onClick={() => setShowImportModal(true)}><Upload size={18} /> Import CSV</button>
-          </div>
-        </div>
-
-        {loading ? <div className="module-loading">Loading alumni contacts...</div>
-        : contacts.length === 0 && !search && filterStatus === 'all' && imessageFilter === 'all' && lineFilter === 'all' && touchFilter === 'all' ? (
-          <div className="module-empty-state"><FileSpreadsheet size={48} /><h3>No alumni contacts yet</h3><p>Import a CSV file to get started with alumni outreach.</p><button className="module-primary-btn" style={{ marginTop: '16px' }} onClick={() => setShowImportModal(true)}><Upload size={18} /> Import CSV</button></div>
-        ) : (
-          <>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="module-table">
-                <thead><tr>
-                  <th style={{ width: '40px' }}><input type="checkbox" checked={contacts.length > 0 && selected.size === contacts.length} onChange={toggleSelectAll} /></th>
-                  <SortHeader field="first_name">Name</SortHeader>
-                  <SortHeader field="phone_primary">Phone</SortHeader>
-                  <th style={{ whiteSpace: 'nowrap', width: '44px' }}>Type</th>
-                  <SortHeader field="assigned_line">Line</SortHeader>
-                  <SortHeader field="email">Email</SortHeader>
-                  <SortHeader field="year">Year</SortHeader>
-                  <SortHeader field="outreach_status">Status</SortHeader>
-                  <SortHeader field="touch1_sent_at">Touches</SortHeader>
-                  <SortHeader field="last_response_at">Last Response</SortHeader>
-                  <th style={{ width: '44px' }}></th>
-                </tr></thead>
-                <tbody>
-                  {contacts.map(contact => (
-                    <tr key={contact.id} style={{ background: selected.has(contact.id) ? '#f0f4ff' : undefined }}>
-                      <td><input type="checkbox" checked={selected.has(contact.id)} onChange={() => toggleSelect(contact.id)} /></td>
-                      <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{contact.first_name} {contact.last_name}</td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>{formatPhone(contact.phone_primary)}</td>
-                      <td>
-                        {contact.is_imessage === true && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, color: '#16a34a', backgroundColor: '#dcfce7' }}>iMsg</span>}
-                        {contact.is_imessage === false && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, color: '#6b7280', backgroundColor: '#f3f4f6' }}>SMS</span>}
-                        {contact.is_imessage === null && contact.phone_primary && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, color: '#d97706', backgroundColor: '#fef3c7' }}>?</span>}
-                      </td>
-                      <td>
-                        {contact.assigned_line ? (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: '22px', height: '22px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700,
-                            color: '#fff', backgroundColor: LINE_COLORS[contact.assigned_line] || '#6b7280',
-                          }}>
-                            {LINE_LABELS[contact.assigned_line] || contact.assigned_line}
-                          </span>
-                        ) : <span style={{ color: '#d1d5db' }}>—</span>}
-                      </td>
-                      <td style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact.email || '—'}</td>
-                      <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>{contact.year || '—'}</td>
-                      <td><StatusBadge status={contact.outreach_status} /></td>
-                      <td><TouchDots contact={contact} /></td>
-                      <td>
-                        {contact.response_classification ? (
-                          <span
-                            title={contact.response_text || ''}
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: '4px',
-                              fontSize: '0.7rem', fontWeight: 600, cursor: contact.response_text ? 'help' : 'default',
-                              color: CLASSIFICATION_COLORS[contact.response_classification]?.color || '#6b7280',
-                              backgroundColor: CLASSIFICATION_COLORS[contact.response_classification]?.bg || '#f3f4f6',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {contact.response_classification}
-                          </span>
-                        ) : <span style={{ color: '#d1d5db', fontSize: '0.85rem' }}>—</span>}
-                      </td>
-                      <td>
-                        <button
-                          onClick={() => setSelectedContact(contact)}
-                          title="View conversation"
-                          style={{
-                            background: selectedContact?.id === contact.id ? '#ede9fe' : 'none',
-                            border: '1px solid transparent',
-                            borderRadius: '6px', cursor: 'pointer', padding: '4px 6px',
-                            color: (contact.provider_conversation_id || contact.linq_chat_id) ? '#7c3aed' : '#d1d5db',
-                          }}
-                        >
-                          <MessageSquare size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '12px 16px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Showing {((page-1)*limit)+1}–{Math.min(page*limit, total)} of {total}</span>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button className="module-filter-btn" disabled={page<=1} onClick={() => setPage(p => p-1)}><ChevronLeft size={16} /> Prev</button>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Page {page} of {totalPages}</span>
-                  <button className="module-filter-btn" disabled={page>=totalPages} onClick={() => setPage(p => p+1)}>Next <ChevronRight size={16} /></button>
-                </div>
-              </div>
-            )}
-            {contacts.length === 0 && (search || filterStatus !== 'all' || imessageFilter !== 'all' || lineFilter !== 'all' || touchFilter !== 'all') && (
-              <div className="module-empty-state" style={{ padding: '48px' }}><Search size={36} /><h3>No results found</h3><p>Try adjusting your search or filter criteria.</p></div>
-            )}
-          </>
-        )}
-
-        </div>{/* end table column */}
-
-        {/* Conversation Viewer Side Panel */}
-        {selectedContact && (
-          <div style={{ flex: '0 0 35%', minWidth: '340px', maxWidth: '440px', borderRadius: '0 12px 12px 0', overflow: 'hidden', border: '1px solid #e5e7eb', borderLeft: 'none' }}>
-            <ConversationViewer
-              contact={selectedContact}
-              onClose={() => setSelectedContact(null)}
-              onStatusChange={(id, status) => {
-                fetchContacts();
-                fetchStats();
-                // Update selected contact status locally
-                setSelectedContact(prev => prev ? { ...prev, outreach_status: status } : null);
-              }}
-              onRefresh={() => { fetchContacts(); fetchStats(); }}
-            />
-          </div>
-        )}
-        </div>{/* end split layout */}
-
-        {/* ═══════ SECTION 4: Activity Feed ═══════ */}
-        <div style={{ marginTop: '24px' }}>
+        {/* ═══════ TAB NAV ═══════ */}
+        <div style={{ display: 'flex', gap: '0', borderBottom: '2px solid #e5e7eb', marginBottom: '20px' }}>
           <button
-            onClick={toggleActivity}
+            onClick={() => setActiveTab('alumni')}
             style={{
-              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
-              background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px',
-              cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, color: '#374151',
-              width: '100%', justifyContent: 'space-between',
+              padding: '10px 20px', background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '0.875rem', fontWeight: 600,
+              color: activeTab === 'alumni' ? '#8b5cf6' : '#6b7280',
+              borderBottom: activeTab === 'alumni' ? '2px solid #8b5cf6' : '2px solid transparent',
+              marginBottom: '-2px', transition: 'color 0.15s ease',
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={16} style={{ color: '#8b5cf6' }} /> Recent Activity
+            Alumni Contacts
+            <span style={{
+              marginLeft: '6px', padding: '1px 7px', borderRadius: '9999px', fontSize: '0.75rem',
+              background: activeTab === 'alumni' ? '#ede9fe' : '#f3f4f6',
+              color: activeTab === 'alumni' ? '#7c3aed' : '#9ca3af',
+            }}>
+              {total}
             </span>
-            <ChevronDown size={16} style={{ color: '#9ca3af', transform: activityOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
           </button>
-          {activityOpen && (
-            <div style={{ padding: '16px 20px', background: '#fff', border: '1px solid #e5e7eb', borderTop: 'none', borderRadius: '0 0 12px 12px' }}>
-              {activityItems.length === 0 ? (
-                <p style={{ fontSize: '0.8125rem', color: '#9ca3af', padding: '12px 0' }}>No outreach activity yet.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {activityItems.map(c => {
-                    const ev = getActivityEvent(c);
-                    if (!ev) return null;
-                    const isResponse = ev.text.includes('responded');
-                    return (
-                      <div key={c.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '6px 0', borderBottom: '1px solid #f3f4f6' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#9ca3af', minWidth: '60px', paddingTop: '2px', whiteSpace: 'nowrap' }}>
-                          {timeAgo(ev.time)}
-                        </span>
-                        <span style={{ fontSize: '0.8125rem', color: '#374151', lineHeight: 1.4 }}>
-                          {isResponse && <MessageCircle size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px', color: '#2563eb' }} />}
-                          {!isResponse && <Send size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px', color: '#8b5cf6' }} />}
-                          {ev.text}
-                        </span>
-                      </div>
-                    );
-                  })}
+          <button
+            onClick={() => setActiveTab('active_members')}
+            style={{
+              padding: '10px 20px', background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '0.875rem', fontWeight: 600,
+              color: activeTab === 'active_members' ? '#8b5cf6' : '#6b7280',
+              borderBottom: activeTab === 'active_members' ? '2px solid #8b5cf6' : '2px solid transparent',
+              marginBottom: '-2px', transition: 'color 0.15s ease',
+            }}
+          >
+            Active Members
+            {platformMemberCount !== null && (
+              <span style={{
+                marginLeft: '6px', padding: '1px 7px', borderRadius: '9999px', fontSize: '0.75rem',
+                background: activeTab === 'active_members' ? '#ede9fe' : '#f3f4f6',
+                color: activeTab === 'active_members' ? '#7c3aed' : '#9ca3af',
+              }}>
+                {platformMemberCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* ═══════ ACTIVE MEMBERS TAB ═══════ */}
+        {activeTab === 'active_members' && (
+          <ActiveMembersTab chapterId={chapterId} />
+        )}
+
+        {/* ═══════ ALUMNI TAB ═══════ */}
+        {activeTab === 'alumni' && (
+          <>
+            {/* ── Data Quality Card (above search bar) ── */}
+            <DataQualityCard contacts={contacts} total={total} />
+
+            {/* ═══════ SECTION 3: Filters + Table + Conversation ═══════ */}
+            <div style={{ display: 'flex', gap: '0', minHeight: selectedContact ? '600px' : 'auto' }}>
+            <div style={{ flex: selectedContact ? '0 0 65%' : '1 1 100%', minWidth: 0, transition: 'flex 0.2s ease' }}>
+            <div className="module-actions-bar">
+              <div className="module-search">
+                <Search size={18} />
+                <input type="text" placeholder="Search by name, email, phone..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af' }}><X size={16} /></button>}
+              </div>
+              <div className="module-actions">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                  <Filter size={16} style={{ color: '#6b7280' }} />
+                  <select className="module-filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                    <option value="all">All Status</option>
+                    {Object.entries(OUTREACH_STATUS_CONFIG).map(([key, cfg]) => (<option key={key} value={key}>{cfg.label}</option>))}
+                  </select>
+                  <select className="module-filter-select" value={imessageFilter} onChange={(e) => setImessageFilter(e.target.value as typeof imessageFilter)}>
+                    <option value="all">All Numbers</option>
+                    <option value="imessage">iMessage Only</option>
+                    <option value="sms">SMS Only</option>
+                    <option value="unverified">Unverified Only</option>
+                  </select>
+                  <select className="module-filter-select" value={lineFilter} onChange={(e) => setLineFilter(e.target.value)}>
+                    <option value="all">All Lines</option>
+                    {SENDING_LINES.map(l => <option key={l.number} value={String(l.number)}>{l.label}</option>)}
+                  </select>
+                  <select className="module-filter-select" value={touchFilter} onChange={(e) => setTouchFilter(e.target.value)}>
+                    <option value="all">All Touches</option>
+                    <option value="needs_touch1">Needs Touch 1</option>
+                    <option value="needs_touch2">Needs Touch 2</option>
+                    <option value="needs_touch3">Needs Touch 3</option>
+                    <option value="complete">Complete</option>
+                    <option value="no_response">No Response</option>
+                  </select>
+                </div>
+                {selected.size > 0 && (
+                  <>
+                    <button className="module-filter-btn" onClick={() => setShowStatusModal(true)}>Update Status ({selected.size})</button>
+                    <button className="module-filter-btn" onClick={exportCSV}><Download size={16} /> Export ({selected.size})</button>
+                    <button className="module-filter-btn" style={{ color: '#dc2626', borderColor: '#fecaca' }} onClick={() => setDeleteConfirm(true)}><Trash2 size={16} /> Delete ({selected.size})</button>
+                  </>
+                )}
+                {selected.size === 0 && <button className="module-filter-btn" onClick={exportCSV} disabled={contacts.length === 0 || exportingCSV}><Download size={16} /> {exportingCSV ? 'Exporting...' : 'Export CSV'}</button>}
+                <button className="module-primary-btn" onClick={() => setShowImportModal(true)}><Upload size={18} /> Import CSV</button>
+              </div>
+            </div>
+
+            {loading ? <div className="module-loading">Loading alumni contacts...</div>
+            : contacts.length === 0 && !search && filterStatus === 'all' && imessageFilter === 'all' && lineFilter === 'all' && touchFilter === 'all' ? (
+              <div className="module-empty-state"><FileSpreadsheet size={48} /><h3>No alumni contacts yet</h3><p>Import a CSV file to get started with alumni outreach.</p><button className="module-primary-btn" style={{ marginTop: '16px' }} onClick={() => setShowImportModal(true)}><Upload size={18} /> Import CSV</button></div>
+            ) : (
+              <>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="module-table">
+                    <thead><tr>
+                      <th style={{ width: '40px' }}><input type="checkbox" checked={contacts.length > 0 && selected.size === contacts.length} onChange={toggleSelectAll} /></th>
+                      <SortHeader field="first_name">Name</SortHeader>
+                      <SortHeader field="phone_primary">Phone</SortHeader>
+                      <th style={{ whiteSpace: 'nowrap', width: '90px' }}>Phone Type</th>
+                      <th style={{ whiteSpace: 'nowrap', width: '44px' }}>Type</th>
+                      <SortHeader field="assigned_line">Line</SortHeader>
+                      <SortHeader field="email">Email</SortHeader>
+                      <SortHeader field="year">Year</SortHeader>
+                      <SortHeader field="outreach_status">Status</SortHeader>
+                      <SortHeader field="touch1_sent_at">Touches</SortHeader>
+                      <SortHeader field="last_response_at">Last Response</SortHeader>
+                      <th style={{ width: '44px' }}></th>
+                    </tr></thead>
+                    <tbody>
+                      {contacts.map(contact => (
+                        <tr key={contact.id} style={{ background: selected.has(contact.id) ? '#f0f4ff' : undefined }}>
+                          <td><input type="checkbox" checked={selected.has(contact.id)} onChange={() => toggleSelect(contact.id)} /></td>
+                          <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
+                            {contact.first_name} {contact.last_name}
+                            {contact.platform_user_id && (
+                              <span style={{
+                                marginLeft: '6px', display: 'inline-flex', alignItems: 'center',
+                                padding: '1px 5px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700,
+                                color: '#15803d', background: '#dcfce7', verticalAlign: 'middle',
+                              }}>
+                                ✓ On Platform
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>{formatPhone(contact.phone_primary)}</td>
+                          <td>
+                            <PhoneTypeBadge phoneType={contact.phone_type} />
+                          </td>
+                          <td>
+                            {contact.is_imessage === true && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, color: '#16a34a', backgroundColor: '#dcfce7' }}>iMsg</span>}
+                            {contact.is_imessage === false && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, color: '#6b7280', backgroundColor: '#f3f4f6' }}>SMS</span>}
+                            {contact.is_imessage === null && contact.phone_primary && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, color: '#d97706', backgroundColor: '#fef3c7' }}>?</span>}
+                          </td>
+                          <td>
+                            {contact.assigned_line ? (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: '22px', height: '22px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700,
+                                color: '#fff', backgroundColor: LINE_COLORS[contact.assigned_line] || '#6b7280',
+                              }}>
+                                {LINE_LABELS[contact.assigned_line] || contact.assigned_line}
+                              </span>
+                            ) : <span style={{ color: '#d1d5db' }}>—</span>}
+                          </td>
+                          <td style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact.email || '—'}</td>
+                          <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>{contact.year || '—'}</td>
+                          <td><StatusBadge status={contact.outreach_status} /></td>
+                          <td><TouchDots contact={contact} /></td>
+                          <td>
+                            {contact.response_classification ? (
+                              <span
+                                title={contact.response_text || ''}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: '4px',
+                                  fontSize: '0.7rem', fontWeight: 600, cursor: contact.response_text ? 'help' : 'default',
+                                  color: CLASSIFICATION_COLORS[contact.response_classification]?.color || '#6b7280',
+                                  backgroundColor: CLASSIFICATION_COLORS[contact.response_classification]?.bg || '#f3f4f6',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {contact.response_classification}
+                              </span>
+                            ) : <span style={{ color: '#d1d5db', fontSize: '0.85rem' }}>—</span>}
+                          </td>
+                          <td>
+                            <button
+                              onClick={() => setSelectedContact(contact)}
+                              title="View conversation"
+                              style={{
+                                background: selectedContact?.id === contact.id ? '#ede9fe' : 'none',
+                                border: '1px solid transparent',
+                                borderRadius: '6px', cursor: 'pointer', padding: '4px 6px',
+                                color: (contact.provider_conversation_id || contact.linq_chat_id) ? '#7c3aed' : '#d1d5db',
+                              }}
+                            >
+                              <MessageSquare size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '12px 16px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Showing {((page-1)*limit)+1}–{Math.min(page*limit, total)} of {total}</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button className="module-filter-btn" disabled={page<=1} onClick={() => setPage(p => p-1)}><ChevronLeft size={16} /> Prev</button>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Page {page} of {totalPages}</span>
+                      <button className="module-filter-btn" disabled={page>=totalPages} onClick={() => setPage(p => p+1)}>Next <ChevronRight size={16} /></button>
+                    </div>
+                  </div>
+                )}
+                {contacts.length === 0 && (search || filterStatus !== 'all' || imessageFilter !== 'all' || lineFilter !== 'all' || touchFilter !== 'all') && (
+                  <div className="module-empty-state" style={{ padding: '48px' }}><Search size={36} /><h3>No results found</h3><p>Try adjusting your search or filter criteria.</p></div>
+                )}
+              </>
+            )}
+
+            </div>{/* end table column */}
+
+            {/* Conversation Viewer Side Panel */}
+            {selectedContact && (
+              <div style={{ flex: '0 0 35%', minWidth: '340px', maxWidth: '440px', borderRadius: '0 12px 12px 0', overflow: 'hidden', border: '1px solid #e5e7eb', borderLeft: 'none' }}>
+                <ConversationViewer
+                  contact={selectedContact}
+                  onClose={() => setSelectedContact(null)}
+                  onStatusChange={(id, status) => {
+                    fetchContacts();
+                    fetchStats();
+                    setSelectedContact(prev => prev ? { ...prev, outreach_status: status } : null);
+                  }}
+                  onRefresh={() => { fetchContacts(); fetchStats(); }}
+                />
+              </div>
+            )}
+            </div>{/* end split layout */}
+
+            {/* ═══════ SECTION 4: Activity Feed ═══════ */}
+            <div style={{ marginTop: '24px' }}>
+              <button
+                onClick={toggleActivity}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
+                  background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px',
+                  cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, color: '#374151',
+                  width: '100%', justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Activity size={16} style={{ color: '#8b5cf6' }} /> Recent Activity
+                </span>
+                <ChevronDown size={16} style={{ color: '#9ca3af', transform: activityOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+              </button>
+              {activityOpen && (
+                <div style={{ padding: '16px 20px', background: '#fff', border: '1px solid #e5e7eb', borderTop: 'none', borderRadius: '0 0 12px 12px' }}>
+                  {activityItems.length === 0 ? (
+                    <p style={{ fontSize: '0.8125rem', color: '#9ca3af', padding: '12px 0' }}>No outreach activity yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {activityItems.map(c => {
+                        const ev = getActivityEvent(c);
+                        if (!ev) return null;
+                        const isResponse = ev.text.includes('responded');
+                        return (
+                          <div key={c.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '6px 0', borderBottom: '1px solid #f3f4f6' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#9ca3af', minWidth: '60px', paddingTop: '2px', whiteSpace: 'nowrap' }}>
+                              {timeAgo(ev.time)}
+                            </span>
+                            <span style={{ fontSize: '0.8125rem', color: '#374151', lineHeight: 1.4 }}>
+                              {isResponse && <MessageCircle size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px', color: '#2563eb' }} />}
+                              {!isResponse && <Send size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px', color: '#8b5cf6' }} />}
+                              {ev.text}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </main>
 
       {/* ═══════ MODALS ═══════ */}

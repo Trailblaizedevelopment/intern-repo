@@ -706,6 +706,7 @@ export interface AlumniContact {
   year: number | null;
   outreach_status: OutreachStatus;
   is_imessage: boolean | null;
+  phone_type: 'mobile' | 'landline' | 'voip' | 'unknown' | null;
   linq_chat_id: string | null;
   provider_conversation_id: string | null;
   assigned_line: number | null;
