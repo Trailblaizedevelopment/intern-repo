@@ -30,6 +30,7 @@ interface PipelineDeal {
   notes: string | null;
   conference: string | null;
   created_at: string;
+  updated_at?: string | null;
   organization?: {
     id: string;
     name: string;
@@ -546,7 +547,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
 
   // Filters — initialized from URL params
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStage, setFilterStage] = useState<string>(() => searchParams.get('stage') || 'lead');
+  const [filterStage, setFilterStage] = useState<string>(() => searchParams.get('stage') || 'all');
   const [filterConference, setFilterConference] = useState<string>(() => searchParams.get('conf') || '');
   const [filterType, setFilterType] = useState<string>(() => searchParams.get('type') || '');
   const [filterTemp, setFilterTemp] = useState<string>(() => searchParams.get('temp') || '');
@@ -786,8 +787,8 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
       result = result.filter(d => d.assigned_to === currentUser.id);
     }
 
-    // Legacy simple filters (my-deals uses these)
-    if (filterStage !== 'all') result = result.filter(d => d.stage === filterStage);
+    // Legacy simple filters (my-deals stage tabs only — not for all-deals which uses the drawer)
+    if (filterStage !== 'all' && activeTab !== 'all-deals') result = result.filter(d => d.stage === filterStage);
 
     // Advanced filters (all-deals drawer)
     if (activeTab === 'all-deals') {
@@ -976,7 +977,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
         </div>
 
         {showAssigned && deal.assigned_to && (
-          <div className="pl2__deal-assigned">{deal.assigned_to}</div>
+          <div className="pl2__deal-assigned">{assignee?.name || deal.assigned_to}</div>
         )}
       </div>
     );

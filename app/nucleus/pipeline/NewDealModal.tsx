@@ -36,7 +36,7 @@ const CONTACT_ROLES = [
   { value: 'board_member', label: 'Board Member' },
   { value: 'other', label: 'Other' },
 ];
-const TEAM_MEMBERS = ['Owen Ridgeway', 'Adam', 'Ford', 'Knox Perry'];
+// TEAM_MEMBERS replaced by dynamic employees fetch (see BUG-4 fix below)
 
 const DEFAULT_VALUE: Record<OrgCategory, string> = {
   fraternity: '3588',
@@ -53,11 +53,14 @@ const TEMP_STYLE: Record<string, { bg: string; border: string; color: string }> 
   cold: { bg: '#3b82f620', border: '#3b82f6', color: '#3b82f6' },
 };
 
+interface Employee { id: string; name: string; }
+
 /* ─── Component ─── */
 export default function NewDealModal({ onClose, onCreated }: Props) {
   /* Data */
   const [schools, setSchools] = useState<School[]>([]);
   const [nationalOrgs, setNationalOrgs] = useState<NationalOrg[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
 
   /* Form state */
   const [orgCategory, setOrgCategory] = useState<OrgCategory | null>(null);
@@ -96,6 +99,9 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
   useEffect(() => {
     fetch('/api/pipeline/schools').then(r => r.json()).then(setSchools).catch(() => {});
     fetch('/api/pipeline/nationals').then(r => r.json()).then(setNationalOrgs).catch(() => {});
+    fetch('/api/pipeline/employees').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setEmployees(data);
+    }).catch(() => {});
   }, []);
 
   /* Close dropdowns on outside click */
@@ -143,16 +149,24 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
   /* Derived deal type */
   const dealType = orgCategory ? ORG_CATEGORIES.find(c => c.key === orgCategory)!.dealType : 'local';
 
+  /* BUG-2: school is only required for chapter/council deals */
+  const schoolRequired = orgCategory === 'fraternity' || orgCategory === 'sorority' || orgCategory === 'council';
+
   /* Can create? Steps 1–5 */
   const step1Done = !!orgCategory;
-  const step2Done = !!selectedSchool;
+  // step2Done: school selected, OR school is not required for this category
+  const step2Done = !!selectedSchool || !schoolRequired;
   const step3Done = orgName.trim().length > 0 || (orgCategory === 'fraternity' || orgCategory === 'sorority' ? !!nationalOrgId : false);
   const step4Done = true; // stage always has a default
   const step5Done = true; // temperature always has a default
-  const canCreate = step1Done && step2Done && (
+
+  // canCreate: school only required for fraternity/sorority/council
+  const canCreate = !!orgCategory && !!stage && !!temperature && (
     orgCategory === 'fraternity' || orgCategory === 'sorority'
-      ? !!nationalOrgId
-      : orgName.trim().length > 0
+      ? !!nationalOrgId && !!selectedSchool
+      : orgCategory === 'council'
+        ? !!selectedSchool && orgName.trim().length > 0
+        : orgName.trim().length > 0 // national/sports/other: school optional
   );
 
   /* ─── Submit ─── */
@@ -167,33 +181,22 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
 
       // 1. Find or create org
       let orgId: string;
-      const existingRes = await fetch(`/api/pipeline/orgs?school_id=${selectedSchool?.id || ''}`);
-      if (existingRes.ok) {
-        const existingOrgs = await existingRes.json();
-        let found = null;
-        if (orgCategory === 'fraternity' || orgCategory === 'sorority') {
-          found = existingOrgs.find((o: any) => o.national_org_id === nationalOrgId && o.school_id === selectedSchool?.id);
-        } else {
-          found = existingOrgs.find((o: any) => o.name?.toLowerCase() === finalOrgName.toLowerCase() && o.school_id === selectedSchool?.id);
+      // For national/sports/other without school: skip dedup lookup, always create new org
+      // For chapter/council with school: try to find existing org first
+      let found = null;
+      if (selectedSchool) {
+        const existingRes = await fetch(`/api/pipeline/orgs?school_id=${selectedSchool.id}`);
+        if (existingRes.ok) {
+          const existingOrgs = await existingRes.json();
+          if (orgCategory === 'fraternity' || orgCategory === 'sorority') {
+            found = existingOrgs.find((o: any) => o.national_org_id === nationalOrgId && o.school_id === selectedSchool.id);
+          } else {
+            found = existingOrgs.find((o: any) => o.name?.toLowerCase() === finalOrgName.toLowerCase() && o.school_id === selectedSchool.id);
+          }
         }
-        if (found) {
-          orgId = found.id;
-        } else {
-          const createRes = await fetch('/api/pipeline/orgs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: finalOrgName,
-              school_id: selectedSchool?.id || null,
-              national_org_id: nationalOrgId || null,
-              type: orgCategory === 'council' ? 'ifc' : 'chapter',
-              status: 'prospect',
-            }),
-          });
-          if (!createRes.ok) throw new Error('Failed to create organization');
-          const newOrg = await createRes.json();
-          orgId = newOrg.id;
-        }
+      }
+      if (found) {
+        orgId = found.id;
       } else {
         const createRes = await fetch('/api/pipeline/orgs', {
           method: 'POST',
@@ -201,7 +204,7 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
           body: JSON.stringify({
             name: finalOrgName,
             school_id: selectedSchool?.id || null,
-            national_org_id: nationalOrgId || null,
+            national_org_id: (orgCategory === 'fraternity' || orgCategory === 'sorority') ? (nationalOrgId || null) : null,
             type: orgCategory === 'council' ? 'ifc' : 'chapter',
             status: 'prospect',
           }),
@@ -244,6 +247,7 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
           temperature,
           assigned_to: assignedTo || null,
           conference: selectedSchool?.conference || null,
+          // national/sports/other without school: school_id and national_org_id are null (handled in org creation above)
           notes: notes.trim() || null,
           next_followup: nextFollowup || null,
           last_touched: new Date().toISOString(),
@@ -259,8 +263,10 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
     }
   }
 
-  const showStep2 = !!orgCategory;
-  const showStep3 = showStep2 && !!selectedSchool;
+  // BUG-2: national skips the school step; sports/other show it as optional
+  const showStep2 = !!orgCategory && orgCategory !== 'national';
+  // Show org name step as soon as: national (immediately), sports/other (immediately), or school selected for chapter/council
+  const showStep3 = !!orgCategory && (orgCategory === 'national' || orgCategory === 'sports' || orgCategory === 'other' || !!selectedSchool);
   const showStep4 = showStep3 && (orgCategory === 'fraternity' || orgCategory === 'sorority' ? !!nationalOrgId : orgName.trim().length > 0);
   const showOptional = showStep4;
 
@@ -304,12 +310,15 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
             </div>
           </div>
 
-          {/* ── Step 2: School ── */}
+          {/* ── Step 2: School (required for chapter/council, optional for sports/other, hidden for national) ── */}
           {showStep2 && (
             <div className="ndm__section">
               <div className="ndm__step-label">
-                <span className={`ndm__step-num ${step2Done ? 'ndm__step-num--done' : 'ndm__step-num--active'}`}>2</span>
-                <span className="ndm__step-title">School <span className="ndm__required">*</span></span>
+                <span className={`ndm__step-num ${step2Done ? 'ndm__step-num--done' : schoolRequired ? 'ndm__step-num--active' : 'ndm__step-num--optional'}`}>2</span>
+                <span className="ndm__step-title">
+                  School
+                  {schoolRequired ? <span className="ndm__required"> *</span> : <span style={{ color: 'var(--ws-text-secondary,#9ca3af)', fontSize: '0.8em', marginLeft: 4 }}>(optional)</span>}
+                </span>
               </div>
               <div className="ndm__dropdown-wrap" ref={schoolRef}>
                 <button
@@ -368,11 +377,11 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* ── Step 3: Org Name ── */}
+          {/* ── Step 3: Org Name (national shows as step 2, others as step 3) ── */}
           {showStep3 && (
             <div className="ndm__section">
               <div className="ndm__step-label">
-                <span className={`ndm__step-num ${step3Done ? 'ndm__step-num--done' : 'ndm__step-num--active'}`}>3</span>
+                <span className={`ndm__step-num ${step3Done ? 'ndm__step-num--done' : 'ndm__step-num--active'}`}>{orgCategory === 'national' ? '2' : '3'}</span>
                 <span className="ndm__step-title">Organization Name <span className="ndm__required">*</span></span>
               </div>
 
@@ -473,7 +482,7 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
           {showStep4 && (
             <div className="ndm__section">
               <div className="ndm__step-label">
-                <span className="ndm__step-num ndm__step-num--done">4</span>
+                <span className="ndm__step-num ndm__step-num--done">{orgCategory === 'national' ? '3' : '4'}</span>
                 <span className="ndm__step-title">Stage</span>
               </div>
               <div className="ndm__stage-pills">
@@ -503,7 +512,7 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
           {showStep4 && (
             <div className="ndm__section">
               <div className="ndm__step-label">
-                <span className="ndm__step-num ndm__step-num--done">5</span>
+                <span className="ndm__step-num ndm__step-num--done">{orgCategory === 'national' ? '4' : '5'}</span>
                 <span className="ndm__step-title">Temperature</span>
               </div>
               <div className="ndm__temp-row">
@@ -586,13 +595,13 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* ── Step 8: Assigned To ── */}
+          {/* ── Step 8: Assigned To (BUG-4: uses employee UUID) ── */}
           {showOptional && (
             <div className="ndm__section">
               <label className="ndm__label">Assigned To</label>
               <select className="ndm__select" value={assignedTo} onChange={e => setAssignedTo(e.target.value)}>
                 <option value="">Unassigned</option>
-                {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
+                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
           )}
