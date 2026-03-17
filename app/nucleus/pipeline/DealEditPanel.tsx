@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Trash2, Building2, Phone, Mail } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Trash2, Building2, Phone, Mail, Plus, Clock } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 /* ─── Types ─── */
@@ -88,6 +88,69 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ─── Activity Log ───
+  type ActivityType = 'call' | 'text' | 'email' | 'meeting' | 'note';
+  interface Activity { id: string; type: ActivityType; outcome: string | null; created_at: string; created_by: string | null; }
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activitiesError, setActivitiesError] = useState<string | null>(null);
+  const [showLogForm, setShowLogForm] = useState(false);
+  const [logType, setLogType] = useState<ActivityType>('call');
+  const [logOutcome, setLogOutcome] = useState('');
+  const [loggingActivity, setLoggingActivity] = useState(false);
+
+  const loadActivities = useCallback(async () => {
+    if (!deal) return;
+    try {
+      const res = await fetch(`/api/pipeline/deals/${deal.id}/activities`);
+      if (!res.ok) {
+        if (res.status === 500) { setActivitiesError('Activity log coming soon — run migration to enable'); return; }
+        setActivitiesError('Failed to load activity log');
+        return;
+      }
+      const data = await res.json();
+      setActivities(Array.isArray(data) ? data : []);
+    } catch {
+      setActivitiesError('Activity log coming soon — run migration to enable');
+    }
+  }, [deal]);
+
+  useEffect(() => { loadActivities(); }, [loadActivities]);
+
+  async function submitActivity() {
+    if (!deal || !logOutcome.trim()) return;
+    setLoggingActivity(true);
+    try {
+      const res = await fetch(`/api/pipeline/deals/${deal.id}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: logType, outcome: logOutcome.trim() }),
+      });
+      if (res.ok) {
+        setLogOutcome('');
+        setShowLogForm(false);
+        loadActivities();
+      }
+    } catch { /* graceful */ }
+    finally { setLoggingActivity(false); }
+  }
+
+  const ACTIVITY_TYPES: { key: ActivityType; emoji: string; label: string }[] = [
+    { key: 'call',    emoji: '📞', label: 'Call'    },
+    { key: 'text',    emoji: '💬', label: 'Text'    },
+    { key: 'email',   emoji: '📧', label: 'Email'   },
+    { key: 'meeting', emoji: '🤝', label: 'Meeting' },
+    { key: 'note',    emoji: '📝', label: 'Note'    },
+  ];
+
+  function timeAgo(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
 
   const salesReps = employees.filter(e =>
     ['founder', 'cofounder', 'growth_intern', 'sales_intern'].includes(e.role)
@@ -427,6 +490,102 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
               rows={4}
             />
           </div>
+
+          {/* ── Activity Log ── */}
+          {!isNew && (
+            <div className="pl2__edit-section">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <h3 className="pl2__edit-section-title" style={{ margin: 0 }}>Activity Log</h3>
+                <button
+                  onClick={() => setShowLogForm(v => !v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    padding: '5px 10px', borderRadius: 8,
+                    background: '#C9A84C', border: 'none', color: '#fff',
+                    fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  <Plus size={13} /> Log Activity
+                </button>
+              </div>
+
+              {showLogForm && (
+                <div style={{ background: 'var(--ws-bg,#f9fafb)', borderRadius: 10, padding: 12, marginBottom: 10, border: '1px solid var(--ws-border,#e5e7eb)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {ACTIVITY_TYPES.map(at => (
+                      <button
+                        key={at.key}
+                        onClick={() => setLogType(at.key)}
+                        style={{
+                          padding: '5px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 500,
+                          border: `1.5px solid ${logType === at.key ? '#C9A84C' : 'var(--ws-border,#e5e7eb)'}`,
+                          background: logType === at.key ? '#C9A84C18' : 'var(--ws-surface,#fff)',
+                          color: logType === at.key ? '#C9A84C' : 'inherit', cursor: 'pointer',
+                        }}
+                      >
+                        {at.emoji} {at.label}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={logOutcome}
+                    onChange={e => setLogOutcome(e.target.value)}
+                    placeholder="What happened? Add notes…"
+                    rows={2}
+                    style={{
+                      width: '100%', padding: '8px 10px',
+                      border: '1.5px solid var(--ws-border,#e5e7eb)',
+                      borderRadius: 8, fontSize: '0.875rem', resize: 'vertical',
+                      background: 'var(--ws-surface,#fff)', boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => { setShowLogForm(false); setLogOutcome(''); }}
+                      style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ws-border,#e5e7eb)', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
+                    >Cancel</button>
+                    <button
+                      onClick={submitActivity}
+                      disabled={loggingActivity || !logOutcome.trim()}
+                      style={{ padding: '6px 14px', borderRadius: 8, background: '#C9A84C', border: 'none', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', opacity: logOutcome.trim() ? 1 : 0.5 }}
+                    >{loggingActivity ? 'Saving…' : 'Save'}</button>
+                  </div>
+                </div>
+              )}
+
+              {activitiesError ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#9ca3af)', padding: '8px 0' }}>
+                  {activitiesError}
+                </div>
+              ) : activities.length === 0 ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#9ca3af)', padding: '8px 0' }}>
+                  No activity logged yet.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {activities.map(act => {
+                    const typeInfo = ACTIVITY_TYPES.find(t => t.key === act.type);
+                    return (
+                      <div key={act.id} style={{
+                        display: 'flex', gap: 10, alignItems: 'flex-start',
+                        padding: '8px 10px', borderRadius: 8,
+                        background: 'var(--ws-bg,#f9fafb)', border: '1px solid var(--ws-border,#e5e7eb)',
+                      }}>
+                        <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{typeInfo?.emoji || '📝'}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.875rem' }}>{act.outcome || '—'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--ws-text-secondary,#9ca3af)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Clock size={11} /> {timeAgo(act.created_at)}
+                            {act.created_by && <span>· {act.created_by}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {error && <div className="pl2__edit-error">{error}</div>}
         </div>

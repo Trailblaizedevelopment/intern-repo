@@ -1,7 +1,123 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Phone, Mail, ChevronRight, Calendar, Edit2, Check, Trash2, Archive } from 'lucide-react';
+import { X, Phone, Mail, ChevronRight, Calendar, Edit2, Check, Trash2, Archive, Plus, Clock } from 'lucide-react';
+
+/* ─── Activity Log (standalone, used by activity tab) ─── */
+type ActivityType = 'call' | 'text' | 'email' | 'meeting' | 'note';
+interface Activity { id: string; type: ActivityType; outcome: string | null; created_at: string; created_by: string | null; }
+
+const ACTIVITY_TYPES: { key: ActivityType; emoji: string; label: string }[] = [
+  { key: 'call',    emoji: '📞', label: 'Call'    },
+  { key: 'text',    emoji: '💬', label: 'Text'    },
+  { key: 'email',   emoji: '📧', label: 'Email'   },
+  { key: 'meeting', emoji: '🤝', label: 'Meeting' },
+  { key: 'note',    emoji: '📝', label: 'Note'    },
+];
+
+function timeAgoActivity(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function ActivityLog({ dealId }: { dealId: string }) {
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [actError, setActError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [logType, setLogType] = useState<ActivityType>('call');
+  const [logOutcome, setLogOutcome] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/pipeline/deals/${dealId}/activities`);
+      if (!res.ok) { setActError('Activity log coming soon — run migration to enable'); return; }
+      const data = await res.json();
+      setActivities(Array.isArray(data) ? data : []);
+    } catch { setActError('Activity log coming soon — run migration to enable'); }
+  }, [dealId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function submit() {
+    if (!logOutcome.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pipeline/deals/${dealId}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: logType, outcome: logOutcome.trim() }),
+      });
+      if (res.ok) { setLogOutcome(''); setShowForm(false); load(); }
+    } catch { /* graceful */ }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Activity Log</span>
+        <button
+          onClick={() => setShowForm(v => !v)}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, background: '#C9A84C', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+        ><Plus size={12} /> Log Activity</button>
+      </div>
+
+      {showForm && (
+        <div style={{ background: 'var(--ws-bg,#f9fafb)', borderRadius: 10, padding: 12, marginBottom: 12, border: '1px solid var(--ws-border,#e5e7eb)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+            {ACTIVITY_TYPES.map(at => (
+              <button key={at.key} onClick={() => setLogType(at.key)}
+                style={{ padding: '5px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 500, border: `1.5px solid ${logType === at.key ? '#C9A84C' : 'var(--ws-border,#e5e7eb)'}`, background: logType === at.key ? '#C9A84C18' : 'var(--ws-surface,#fff)', color: logType === at.key ? '#C9A84C' : 'inherit', cursor: 'pointer' }}>
+                {at.emoji} {at.label}
+              </button>
+            ))}
+          </div>
+          <textarea value={logOutcome} onChange={e => setLogOutcome(e.target.value)}
+            placeholder="What happened? Add notes…" rows={2}
+            style={{ width: '100%', padding: '8px 10px', border: '1.5px solid var(--ws-border,#e5e7eb)', borderRadius: 8, fontSize: '0.875rem', resize: 'vertical', background: 'var(--ws-surface,#fff)', boxSizing: 'border-box' }}
+          />
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => { setShowForm(false); setLogOutcome(''); }}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ws-border,#e5e7eb)', background: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>Cancel</button>
+            <button onClick={submit} disabled={saving || !logOutcome.trim()}
+              style={{ padding: '6px 14px', borderRadius: 8, background: '#C9A84C', border: 'none', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', opacity: logOutcome.trim() ? 1 : 0.5 }}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {actError ? (
+        <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#9ca3af)' }}>{actError}</div>
+      ) : activities.length === 0 ? (
+        <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#9ca3af)' }}>No activity logged yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {activities.map(act => {
+            const typeInfo = ACTIVITY_TYPES.find(t => t.key === act.type);
+            return (
+              <div key={act.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 8, background: 'var(--ws-bg,#f9fafb)', border: '1px solid var(--ws-border,#e5e7eb)' }}>
+                <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{typeInfo?.emoji || '📝'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.875rem' }}>{act.outcome || '—'}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--ws-text-secondary,#9ca3af)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Clock size={11} /> {timeAgoActivity(act.created_at)}
+                    {act.created_by && <span>· {act.created_by}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 import { Deal, DealStage, STAGE_CONFIG } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/Toast';
@@ -424,13 +540,7 @@ export default function LeadDetailPanel({ deal, onClose, onUpdated, onDelete }: 
           )}
 
           {activeTab === 'activity' && (
-            <div className="ldp-activity">
-              <div className="ldp-activity-placeholder">
-                <Calendar size={32} style={{ color: '#9ca3af' }} />
-                <p>Activity tracking coming soon</p>
-                <span>Stage changes, follow-ups, and call logs will appear here.</span>
-              </div>
-            </div>
+            <ActivityLog dealId={deal.id} />
           )}
         </div>
 
