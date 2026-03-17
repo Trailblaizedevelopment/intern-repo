@@ -73,7 +73,7 @@ export function createMessagingService(provider: MessagingProvider) {
           outreach_status: statusMap[params.touch_number],
         };
         if (result.conversation_id) {
-          update.provider_conversation_id = result.conversation_id;
+          update.linq_chat_id = result.conversation_id;
         }
         if (params.line_phone) {
           const line = SENDING_LINES.find(l => l.phone === params.line_phone);
@@ -174,7 +174,8 @@ export function createMessagingService(provider: MessagingProvider) {
           is_imessage: isImessage,
         };
         if (result.conversation_id) {
-          update.provider_conversation_id = result.conversation_id;
+          // Use linq_chat_id (unified field) — execute route uses this for T3 lookups
+          update.linq_chat_id = result.conversation_id;
         }
 
         await supabase

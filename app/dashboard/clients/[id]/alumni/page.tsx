@@ -507,44 +507,20 @@ export default function AlumniPage() {
 
           {/* Right: Action Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <button
-              onClick={() => setVerifyConfirm(true)}
-              disabled={verifying || stats.unverified === 0}
+            {/* Outreach controls moved to Nucleus — these buttons are intentionally disabled */}
+            <a
+              href="/nucleus/customer-success"
+              title="All outreach is managed from the Linq Outreach tab in Nucleus"
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px',
-                border: '1px solid #fde68a', borderRadius: '8px', background: '#fffbeb',
-                color: '#d97706', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                opacity: (verifying || stats.unverified === 0) ? 0.5 : 1, whiteSpace: 'nowrap',
+                border: '1px solid #e5e7eb', borderRadius: '8px', background: '#f9fafb',
+                color: '#9ca3af', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none',
+                whiteSpace: 'nowrap', cursor: 'default', pointerEvents: 'auto',
               }}
             >
-              {verifying ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={13} />}
-              Verify iMessage ({stats.unverified})
-            </button>
-            <button
-              onClick={() => { setSendSchool(chapter?.school || ''); setSendFraternity(chapter?.fraternity || ''); setSendResult(null); setShowSendModal(true); }}
-              disabled={sending}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px',
-                border: '1px solid #c4b5fd', borderRadius: '8px', background: '#f5f3ff',
-                color: '#7c3aed', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                opacity: sending ? 0.5 : 1, whiteSpace: 'nowrap',
-              }}
-            >
-              <Send size={13} /> Send Next Batch
-            </button>
-            <button
-              onClick={handlePollResponses}
-              disabled={polling}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px',
-                border: '1px solid #bfdbfe', borderRadius: '8px', background: '#eff6ff',
-                color: '#2563eb', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                opacity: polling ? 0.5 : 1, whiteSpace: 'nowrap',
-              }}
-            >
-              {polling ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <MessageCircle size={13} />}
-              Check Responses
-            </button>
+              <Zap size={13} />
+              Outreach → Nucleus
+            </a>
           </div>
         </div>
 
