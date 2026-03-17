@@ -1,15 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   TrendingUp, Search, Filter, Phone, MessageSquare, Clock, Mail,
   ChevronRight, ChevronDown, Building2, Users, Trophy, Globe, X,
-  Calendar, Flame, BarChart3, MapPin, ArrowUpRight, Plus, Edit2, Check, Download
+  Calendar, Flame, BarChart3, MapPin, ArrowUpRight, Plus, Edit2, Check, Download,
+  Edit3, SlidersHorizontal
 } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase, STAGE_CONFIG, DealStage } from '@/lib/supabase';
 import { useToast } from '@/components/Toast';
 import FollowUpPicker from './FollowUpPicker';
 import DealEditPanel from './DealEditPanel';
+import NewDealModal from './NewDealModal';
 
 /* ─── Types ─── */
 interface PipelineDeal {
@@ -32,7 +35,7 @@ interface PipelineDeal {
     name: string;
     type: string;
     school?: { id: string; name: string; conference: string } | null;
-    national_org?: { id: string; name: string; abbreviation: string } | null;
+    national_org?: { id: string; name: string; abbreviation: string; type?: string } | null;
   } | null;
   contact?: { id: string; name: string; email: string | null; phone: string | null; role: string | null } | null;
 }
@@ -135,6 +138,391 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function getOrgIcon(deal: PipelineDeal): string {
+  if (deal.deal_type === 'council') return '⚖️';
+  if (deal.deal_type === 'national') return '🌐';
+  const natType = deal.organization?.national_org?.type;
+  if (natType === 'sorority') return '🏠';
+  if (natType === 'fraternity') return '🏛';
+  const name = (deal.organization?.name || '').toLowerCase();
+  const sororityNames = ['alpha chi omega', 'alpha delta pi', 'alpha epsilon phi', 'alpha gamma delta', 'alpha omicron pi', 'alpha phi', 'alpha sigma alpha', 'alpha sigma tau', 'alpha xi delta', 'chi omega', 'delta delta delta', 'delta gamma', 'delta phi epsilon', 'delta zeta', 'gamma phi beta', 'kappa alpha theta', 'kappa delta', 'kappa kappa gamma', 'phi mu', 'phi sigma sigma', 'pi beta phi', 'sigma delta tau', 'sigma kappa', 'sigma sigma sigma', 'theta phi alpha', 'zeta tau alpha'];
+  if (sororityNames.some(s => name.includes(s))) return '🏠';
+  return '🏛';
+}
+
+const TEMP_BORDER: Record<string, string> = {
+  hot: '#ef4444',
+  warm: '#f59e0b',
+  cold: '#3b82f6',
+};
+
+function followupStyle(dateStr: string | null): React.CSSProperties {
+  if (!dateStr) return { color: 'var(--ws-text-secondary, #9ca3af)' };
+  const now = new Date();
+  const due = new Date(dateStr);
+  const diffMs = due.getTime() - now.getTime();
+  const diffHours = diffMs / 3600000;
+  if (diffMs < 0) return { color: '#ef4444', fontWeight: 600 };
+  if (diffHours <= 48) return { color: '#f59e0b', fontWeight: 600 };
+  return { color: 'var(--ws-text-secondary, #9ca3af)' };
+}
+
+/* ─── Quick Edit Sheet ─── */
+interface QuickEditSheetProps {
+  deal: PipelineDeal;
+  onClose: () => void;
+  onPatch: (id: string, updates: Record<string, unknown>) => Promise<boolean>;
+}
+
+function QuickEditSheet({ deal, onClose, onPatch }: QuickEditSheetProps) {
+  const STAGES: DealStage[] = ['lead', 'demo_booked', 'first_demo', 'second_call', 'contract_sent', 'closed_won'];
+  const [stage, setStage] = React.useState<DealStage>(deal.stage);
+  const [temperature, setTemperature] = React.useState<'hot' | 'warm' | 'cold'>(deal.temperature);
+  const [value, setValue] = React.useState(deal.value?.toString() || '');
+  const [nextFollowup, setNextFollowup] = React.useState(deal.next_followup || '');
+  const [notes, setNotes] = React.useState(deal.notes || '');
+  const [saving, setSaving] = React.useState(false);
+
+  async function handleClose() {
+    setSaving(true);
+    await onPatch(deal.id, {
+      stage,
+      temperature,
+      value: parseInt(value) || 0,
+      next_followup: nextFollowup || null,
+      notes: notes.trim() || null,
+      last_touched: new Date().toISOString(),
+    });
+    setSaving(false);
+    onClose();
+  }
+
+  const TEMP_STYLE_QE: Record<string, { bg: string; border: string; color: string }> = {
+    hot:  { bg: '#ef444420', border: '#ef4444', color: '#ef4444' },
+    warm: { bg: '#f59e0b20', border: '#f59e0b', color: '#f59e0b' },
+    cold: { bg: '#3b82f620', border: '#3b82f6', color: '#3b82f6' },
+  };
+
+  return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 9998 }} onClick={handleClose} />
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: 'var(--ws-surface,#fff)',
+        borderRadius: '20px 20px 0 0',
+        zIndex: 9999,
+        padding: '0 0 env(safe-area-inset-bottom)',
+        boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
+        maxHeight: '80dvh',
+        overflow: 'auto',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '1rem' }}>Quick Edit</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#6b7280)' }}>{deal.organization?.name}</div>
+          </div>
+          <button
+            onClick={handleClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--ws-text-secondary,#6b7280)' }}
+            disabled={saving}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Stage */}
+          <div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>Stage</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {STAGES.map(s => {
+                const cfg = STAGE_CONFIG[s];
+                return (
+                  <button key={s}
+                    onClick={() => setStage(s)}
+                    style={{
+                      padding: '6px 12px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 500,
+                      border: `1.5px solid ${stage === s ? cfg.color : 'var(--ws-border,#e5e7eb)'}`,
+                      background: stage === s ? cfg.color + '22' : 'var(--ws-surface,#fff)',
+                      color: stage === s ? cfg.color : 'inherit', cursor: 'pointer',
+                    }}>
+                    {cfg.emoji} {cfg.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Temperature */}
+          <div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>Temperature</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['hot', 'warm', 'cold'] as const).map(t => {
+                const ts = TEMP_STYLE_QE[t];
+                return (
+                  <button key={t}
+                    onClick={() => setTemperature(t)}
+                    style={{
+                      flex: 1, padding: '10px 8px', borderRadius: 10, fontSize: '0.875rem', fontWeight: 500,
+                      border: `2px solid ${temperature === t ? ts.border : 'var(--ws-border,#e5e7eb)'}`,
+                      background: temperature === t ? ts.bg : 'var(--ws-surface,#fff)',
+                      color: temperature === t ? ts.color : 'inherit', cursor: 'pointer',
+                    }}>
+                    {t === 'hot' ? '🔴 Hot' : t === 'warm' ? '🟡 Warm' : '🔵 Cold'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Value + Follow-Up row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Value ($)</label>
+              <input
+                type="number"
+                value={value}
+                onChange={e => setValue(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--ws-border,#e5e7eb)', borderRadius: 8, fontSize: '0.875rem', background: 'var(--ws-surface,#fff)' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Next Follow-Up</label>
+              <input
+                type="date"
+                value={nextFollowup}
+                onChange={e => setNextFollowup(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--ws-border,#e5e7eb)', borderRadius: 8, fontSize: '0.875rem', background: 'var(--ws-surface,#fff)' }}
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+              style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--ws-border,#e5e7eb)', borderRadius: 8, fontSize: '0.875rem', background: 'var(--ws-surface,#fff)', fontFamily: 'inherit', resize: 'vertical' }}
+            />
+          </div>
+
+          <button
+            onClick={handleClose}
+            disabled={saving}
+            style={{ padding: '12px', borderRadius: 10, background: '#C9A84C', border: 'none', color: '#fff', fontWeight: 600, fontSize: '0.9375rem', cursor: 'pointer', opacity: saving ? 0.7 : 1 }}
+          >
+            {saving ? 'Saving…' : 'Save & Close'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ─── Filter Drawer ─── */
+interface FilterDrawerProps {
+  conferences: string[];
+  employees: Employee[];
+  filterStages: string[];
+  filterConferences: string[];
+  filterTemps: string[];
+  filterOrgTypes: string[];
+  filterAssigned: string;
+  filterOverdueOnly: boolean;
+  onChangeStages: (v: string[]) => void;
+  onChangeConferences: (v: string[]) => void;
+  onChangeTemps: (v: string[]) => void;
+  onChangeOrgTypes: (v: string[]) => void;
+  onChangeAssigned: (v: string) => void;
+  onChangeOverdueOnly: (v: boolean) => void;
+  onClose: () => void;
+}
+
+function FilterDrawer({
+  conferences, employees,
+  filterStages, filterConferences, filterTemps, filterOrgTypes, filterAssigned, filterOverdueOnly,
+  onChangeStages, onChangeConferences, onChangeTemps, onChangeOrgTypes, onChangeAssigned, onChangeOverdueOnly,
+  onClose,
+}: FilterDrawerProps) {
+  function toggleArr(arr: string[], val: string, setter: (v: string[]) => void) {
+    setter(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
+  }
+
+  const STAGE_ENTRIES = Object.entries(STAGE_CONFIG) as [DealStage, typeof STAGE_CONFIG[DealStage]][];
+  const ORG_TYPES = [
+    { key: 'fraternity', label: '🏛 Fraternity' },
+    { key: 'sorority', label: '🏠 Sorority' },
+    { key: 'council', label: '⚖️ Council' },
+    { key: 'national', label: '🌐 National' },
+    { key: 'sports', label: '⚽ Sports' },
+    { key: 'other', label: '🎓 Other' },
+  ];
+
+  return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 9998 }} onClick={onClose} />
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(360px, 100vw)',
+        background: 'var(--ws-surface,#fff)',
+        zIndex: 9999,
+        boxShadow: '-8px 0 40px rgba(0,0,0,0.18)',
+        display: 'flex', flexDirection: 'column',
+        overflowY: 'auto',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 20px 12px', borderBottom: '1px solid var(--ws-border,#e5e7eb)', flexShrink: 0 }}>
+          <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 700 }}>Filters</h3>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={() => { onChangeStages([]); onChangeConferences([]); onChangeTemps([]); onChangeOrgTypes([]); onChangeAssigned(''); onChangeOverdueOnly(false); }}
+              style={{ fontSize: '0.8125rem', padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ws-border,#e5e7eb)', background: 'none', cursor: 'pointer', color: 'var(--ws-text-secondary,#6b7280)' }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6 }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: '16px 20px', flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Stage */}
+          <div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ws-text-secondary,#6b7280)' }}>Stage</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {STAGE_ENTRIES.map(([k, v]) => (
+                <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '0.875rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={filterStages.includes(k)}
+                    onChange={() => toggleArr(filterStages, k, onChangeStages)}
+                    style={{ accentColor: '#C9A84C', width: 16, height: 16 }}
+                  />
+                  <span>{v.emoji} {v.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Org Type */}
+          <div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ws-text-secondary,#6b7280)' }}>Org Type</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {ORG_TYPES.map(ot => (
+                <button
+                  key={ot.key}
+                  onClick={() => toggleArr(filterOrgTypes, ot.key, onChangeOrgTypes)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 500,
+                    border: `1.5px solid ${filterOrgTypes.includes(ot.key) ? '#C9A84C' : 'var(--ws-border,#e5e7eb)'}`,
+                    background: filterOrgTypes.includes(ot.key) ? '#C9A84C18' : 'var(--ws-surface,#fff)',
+                    color: filterOrgTypes.includes(ot.key) ? '#C9A84C' : 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {ot.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Conference */}
+          {conferences.length > 0 && (
+            <div>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ws-text-secondary,#6b7280)' }}>Conference</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {conferences.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => toggleArr(filterConferences, c, onChangeConferences)}
+                    style={{
+                      padding: '6px 12px', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 500,
+                      border: `1.5px solid ${filterConferences.includes(c) ? '#C9A84C' : 'var(--ws-border,#e5e7eb)'}`,
+                      background: filterConferences.includes(c) ? '#C9A84C18' : 'var(--ws-surface,#fff)',
+                      color: filterConferences.includes(c) ? '#C9A84C' : 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Temperature */}
+          <div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ws-text-secondary,#6b7280)' }}>Temperature</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {([
+                { key: 'hot', label: '🔴 Hot', color: '#ef4444' },
+                { key: 'warm', label: '🟡 Warm', color: '#f59e0b' },
+                { key: 'cold', label: '🔵 Cold', color: '#3b82f6' },
+              ] as const).map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => toggleArr(filterTemps, t.key, onChangeTemps)}
+                  style={{
+                    flex: 1, padding: '8px 6px', borderRadius: 10, fontSize: '0.8125rem', fontWeight: 500,
+                    border: `1.5px solid ${filterTemps.includes(t.key) ? t.color : 'var(--ws-border,#e5e7eb)'}`,
+                    background: filterTemps.includes(t.key) ? t.color + '18' : 'var(--ws-surface,#fff)',
+                    color: filterTemps.includes(t.key) ? t.color : 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Assigned To */}
+          <div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ws-text-secondary,#6b7280)' }}>Assigned To</div>
+            <select
+              value={filterAssigned}
+              onChange={e => onChangeAssigned(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--ws-border,#e5e7eb)', borderRadius: 8, fontSize: '0.875rem', background: 'var(--ws-surface,#fff)' }}
+            >
+              <option value="">All Reps</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </div>
+
+          {/* Overdue Only */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={filterOverdueOnly}
+                onChange={e => onChangeOverdueOnly(e.target.checked)}
+                style={{ accentColor: '#C9A84C', width: 16, height: 16 }}
+              />
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>Overdue Only</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--ws-text-secondary,#6b7280)' }}>Show only deals with past follow-up dates</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--ws-border,#e5e7eb)', flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            style={{ width: '100%', padding: '12px', borderRadius: 10, background: '#C9A84C', border: 'none', color: '#fff', fontWeight: 600, fontSize: '0.9375rem', cursor: 'pointer' }}
+          >
+            Apply Filters
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ─── Main Component ─── */
 interface PipelineV2Props {
   /** Pre-select and lock to a specific tab (used by intern workspace pages) */
@@ -145,6 +533,8 @@ interface PipelineV2Props {
 
 export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false }: PipelineV2Props = {}) {
   const { showToast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [deals, setDeals] = useState<PipelineDeal[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
@@ -154,14 +544,37 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Filters
+  // Filters — initialized from URL params
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStage, setFilterStage] = useState<string>('lead');
-  const [filterConference, setFilterConference] = useState<string>('');
-  const [filterType, setFilterType] = useState<string>('');
-  const [filterTemp, setFilterTemp] = useState<string>('');
-  const [filterAssigned, setFilterAssigned] = useState<string>('');
+  const [filterStage, setFilterStage] = useState<string>(() => searchParams.get('stage') || 'lead');
+  const [filterConference, setFilterConference] = useState<string>(() => searchParams.get('conf') || '');
+  const [filterType, setFilterType] = useState<string>(() => searchParams.get('type') || '');
+  const [filterTemp, setFilterTemp] = useState<string>(() => searchParams.get('temp') || '');
+  const [filterAssigned, setFilterAssigned] = useState<string>(() => searchParams.get('rep') || '');
+  const [filterOverdueOnly, setFilterOverdueOnly] = useState<boolean>(() => searchParams.get('overdue') === '1');
+  const [filterStages, setFilterStages] = useState<string[]>(() => {
+    const s = searchParams.get('stages');
+    return s ? s.split(',') : [];
+  });
+  const [filterOrgTypes, setFilterOrgTypes] = useState<string[]>(() => {
+    const s = searchParams.get('orgtypes');
+    return s ? s.split(',') : [];
+  });
+  const [filterConferences, setFilterConferences] = useState<string[]>(() => {
+    const s = searchParams.get('confs');
+    return s ? s.split(',') : [];
+  });
+  const [filterTemps, setFilterTemps] = useState<string[]>(() => {
+    const s = searchParams.get('temps');
+    return s ? s.split(',') : [];
+  });
   const [showFilters, setShowFilters] = useState(false);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+
+  // Quick action popovers
+  const [checkPopoverDeal, setCheckPopoverDeal] = useState<string | null>(null);
+  const [quickEditDeal, setQuickEditDeal] = useState<PipelineDeal | null>(null);
+  const checkPopoverRef = useRef<HTMLDivElement>(null);
 
   // Detail views
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
@@ -199,6 +612,12 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     closePanel();
     loadDeals();
     showToast('Deal deleted', 'success');
+  }
+  function handleNewDealCreated() {
+    closePanel();
+    loadDeals();
+    loadSchools();
+    showToast('Deal created!', 'success');
   }
 
   /* ─── Data Loading ─── */
@@ -299,6 +718,51 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     }
   };
 
+  const clearFollowup = async (dealId: string) => {
+    const res = await fetch(`/api/pipeline/deals/${dealId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ next_followup: null }),
+    });
+    if (res.ok) {
+      showToast('Follow-up cleared', 'success');
+      setCheckPopoverDeal(null);
+      loadDeals();
+    }
+  };
+
+  const patchDeal = async (dealId: string, updates: Record<string, unknown>) => {
+    const res = await fetch(`/api/pipeline/deals/${dealId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) loadDeals();
+    return res.ok;
+  };
+
+  // Sync filters to URL (for all-deals tab)
+  function pushFiltersToURL(overrides: Record<string, string> = {}) {
+    const params = new URLSearchParams(searchParams.toString());
+    const map: Record<string, string> = {
+      stage: filterStage,
+      conf: filterConference,
+      type: filterType,
+      temp: filterTemp,
+      rep: filterAssigned,
+      overdue: filterOverdueOnly ? '1' : '',
+      stages: filterStages.join(','),
+      orgtypes: filterOrgTypes.join(','),
+      confs: filterConferences.join(','),
+      temps: filterTemps.join(','),
+      ...overrides,
+    };
+    Object.entries(map).forEach(([k, v]) => {
+      if (v) params.set(k, v); else params.delete(k);
+    });
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }
+
   const saveContact = async (contactId: string) => {
     const res = await fetch(`/api/pipeline/contacts/${contactId}`, {
       method: 'PATCH',
@@ -322,11 +786,32 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
       result = result.filter(d => d.assigned_to === currentUser.id);
     }
 
+    // Legacy simple filters (my-deals uses these)
     if (filterStage !== 'all') result = result.filter(d => d.stage === filterStage);
-    if (filterConference) result = result.filter(d => d.conference === filterConference || d.organization?.school?.conference === filterConference);
+
+    // Advanced filters (all-deals drawer)
+    if (activeTab === 'all-deals') {
+      if (filterStages.length > 0) result = result.filter(d => filterStages.includes(d.stage));
+      if (filterConferences.length > 0) result = result.filter(d =>
+        filterConferences.includes(d.conference || '') ||
+        filterConferences.includes(d.organization?.school?.conference || '')
+      );
+      if (filterTemps.length > 0) result = result.filter(d => filterTemps.includes(d.temperature));
+      if (filterOrgTypes.length > 0) {
+        result = result.filter(d => {
+          const icon = getOrgIcon(d);
+          const iconToType: Record<string, string> = { '🏛': 'fraternity', '🏠': 'sorority', '⚖️': 'council', '🌐': 'national', '⚽': 'sports', '🎓': 'other' };
+          return filterOrgTypes.includes(iconToType[icon] || d.deal_type);
+        });
+      }
+      if (filterAssigned) result = result.filter(d => d.assigned_to === filterAssigned);
+      if (filterOverdueOnly) result = result.filter(d => followupUrgency(d.next_followup) === 'overdue');
+    }
+
+    // Legacy conference/type/temp for simple dropdowns
+    if (filterConference && activeTab !== 'all-deals') result = result.filter(d => d.conference === filterConference || d.organization?.school?.conference === filterConference);
     if (filterType) result = result.filter(d => d.deal_type === filterType);
-    if (filterTemp) result = result.filter(d => d.temperature === filterTemp);
-    if (filterAssigned) result = result.filter(d => d.assigned_to === filterAssigned);
+    if (filterTemp && activeTab !== 'all-deals') result = result.filter(d => d.temperature === filterTemp);
 
     if (searchQuery && (activeTab === 'my-deals' || activeTab === 'all-deals')) {
       const q = searchQuery.toLowerCase();
@@ -341,7 +826,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
 
     result.sort(urgencySort);
     return result;
-  }, [deals, activeTab, currentUser, filterStage, filterConference, filterType, filterTemp, filterAssigned, searchQuery]);
+  }, [deals, activeTab, currentUser, filterStage, filterConference, filterType, filterTemp, filterAssigned, filterStages, filterConferences, filterTemps, filterOrgTypes, filterOverdueOnly, searchQuery]);
 
   const stats = useMemo(() => {
     const active = filteredDeals.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
@@ -367,12 +852,22 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     const days = daysAgo(deal.last_touched);
     const stageConf = STAGE_CONFIG[deal.stage];
     const assignee = showAssigned ? employees.find(e => e.id === deal.assigned_to) : null;
+    const orgIcon = getOrgIcon(deal);
+    const fupStyle = followupStyle(deal.next_followup);
+    const isOverdueFup = deal.next_followup && new Date(deal.next_followup) < new Date();
+    const isCheckOpen = checkPopoverDeal === deal.id;
+
+    const dealTypeLabelMap: Record<string, string> = { local: 'Local', council: 'Council', national: 'National' };
 
     return (
-      <div className={`pl2__deal-card pl2__deal-card--${urgency}`} onClick={() => openDeal(deal)} style={{ cursor: 'pointer' }}>
+      <div
+        className={`pl2__deal-card pl2__deal-card--${urgency}`}
+        onClick={() => { setCheckPopoverDeal(null); openDeal(deal); }}
+        style={{ cursor: 'pointer', borderLeft: `3px solid ${TEMP_BORDER[deal.temperature] || '#e5e7eb'}` }}
+      >
         <div className="pl2__deal-header">
           <div className="pl2__deal-org">
-            <span className="pl2__temp-dot" style={{ background: TEMP_COLORS[deal.temperature] }} />
+            <span style={{ fontSize: '1rem', lineHeight: 1 }}>{orgIcon}</span>
             <span className="pl2__deal-name">{deal.organization?.name || 'Unknown'}</span>
           </div>
           <span className="pl2__stage-pill" style={{ background: stageConf?.color + '22', color: stageConf?.color }}>
@@ -390,17 +885,29 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
               )}
             </span>
           )}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: 6, background: 'var(--ws-border,#e5e7eb)', color: 'var(--ws-text-secondary,#6b7280)', fontWeight: 500 }}>
+              {dealTypeLabelMap[deal.deal_type] || deal.deal_type}
+            </span>
+            {deal.deal_type === 'council' && (!deal.value || deal.value === 0) && (
+              <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: 6, background: '#fef3c7', color: '#d97706', fontWeight: 600 }}>
+                ⚠️ Value missing
+              </span>
+            )}
+          </span>
           {deal.contact && <span className="pl2__deal-contact"><Users size={12} /> {deal.contact.name}</span>}
           {deal.value > 0 && <span className="pl2__deal-value">{formatCurrency(deal.value)}</span>}
         </div>
 
         <div className="pl2__deal-footer">
           <div className="pl2__deal-dates">
-            {deal.next_followup && (
-              <span className={`pl2__followup pl2__followup--${urgency}`}>
-                <Calendar size={12} /> {formatDate(deal.next_followup)}
+            {deal.next_followup ? (
+              <span className={`pl2__followup pl2__followup--${urgency}`} style={fupStyle}>
+                <Calendar size={12} />
+                {isOverdueFup && '⚠️ '}
+                {formatDate(deal.next_followup)}
               </span>
-            )}
+            ) : null}
             {days !== null && (
               <span className="pl2__last-touch">
                 <Clock size={12} /> {days === 0 ? 'Today' : `${days}d ago`}
@@ -419,22 +926,57 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
                 <MessageSquare size={14} />
               </a>
             )}
-            <button className="pl2__action-btn" onClick={() => logCall(deal.id)} title="Log call">
-              <Check size={14} />
-            </button>
-            <button className="pl2__action-btn" onClick={() => setFollowupDeal(deal.id)} title="Snooze follow-up">
+            {/* ✓ button with popover */}
+            <div style={{ position: 'relative' }}>
+              <button
+                className={`pl2__action-btn ${isCheckOpen ? 'pl2__action-btn--active' : ''}`}
+                onClick={() => setCheckPopoverDeal(isCheckOpen ? null : deal.id)}
+                title="Actions"
+              >
+                <Check size={14} />
+              </button>
+              {isCheckOpen && (
+                <div
+                  ref={checkPopoverRef}
+                  style={{
+                    position: 'absolute', bottom: '100%', right: 0,
+                    background: 'var(--ws-surface,#fff)',
+                    border: '1px solid var(--ws-border,#e5e7eb)',
+                    borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                    zIndex: 100, minWidth: 190, overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '0.8125rem', cursor: 'pointer' }}
+                    onClick={() => { clearFollowup(deal.id); setCheckPopoverDeal(null); }}
+                  >
+                    ✅ Mark follow-up done
+                  </button>
+                  <button
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '0.8125rem', cursor: 'pointer', borderTop: '1px solid var(--ws-border,#e5e7eb)' }}
+                    onClick={() => { advanceStage(deal); setCheckPopoverDeal(null); }}
+                  >
+                    ➡️ Advance stage
+                  </button>
+                </div>
+              )}
+            </div>
+            <button className="pl2__action-btn" onClick={() => setFollowupDeal(deal.id)} title="Set follow-up">
               <Clock size={14} />
             </button>
-            {deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
-              <button className="pl2__action-btn pl2__action-btn--advance" onClick={() => advanceStage(deal)} title="Advance stage">
-                <ArrowUpRight size={14} />
-              </button>
-            )}
+            {/* ✏️ Quick Edit */}
+            <button
+              className="pl2__action-btn"
+              onClick={() => setQuickEditDeal(deal)}
+              title="Quick edit"
+            >
+              <Edit3 size={14} />
+            </button>
           </div>
         </div>
 
-        {showAssigned && assignee && (
-          <div className="pl2__deal-assigned">{assignee.name}</div>
+        {showAssigned && deal.assigned_to && (
+          <div className="pl2__deal-assigned">{deal.assigned_to}</div>
         )}
       </div>
     );
@@ -679,8 +1221,13 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
             {searchQuery && <button className="pl2__clear-btn" onClick={() => setSearchQuery('')}><X size={14} /></button>}
           </div>
           {activeTab === 'all-deals' && (
-            <button className="pl2__filter-toggle" onClick={() => setShowFilters(!showFilters)}>
-              <Filter size={16} /> Filters
+            <button className="pl2__filter-toggle" onClick={() => setFilterDrawerOpen(true)}>
+              <SlidersHorizontal size={16} /> Filters
+              {(filterStages.length + filterConferences.length + filterTemps.length + filterOrgTypes.length + (filterOverdueOnly ? 1 : 0) + (filterAssigned ? 1 : 0)) > 0 && (
+                <span style={{ marginLeft: 4, background: '#C9A84C', color: '#fff', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700 }}>
+                  {filterStages.length + filterConferences.length + filterTemps.length + filterOrgTypes.length + (filterOverdueOnly ? 1 : 0) + (filterAssigned ? 1 : 0)}
+                </span>
+              )}
             </button>
           )}
           {(activeTab === 'my-deals' || activeTab === 'all-deals') && (
@@ -777,37 +1324,47 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
         </div>
       )}
 
-      {/* Expanded filters for All Deals */}
-      {showFilters && activeTab === 'all-deals' && (
-        <div className="pl2__filters">
-          <select value={filterStage} onChange={e => setFilterStage(e.target.value)}>
-            <option value="all">All Stages</option>
-            {Object.entries(STAGE_CONFIG).map(([k, v]) => (
-              <option key={k} value={k}>{v.emoji} {v.label}</option>
-            ))}
-          </select>
-          <select value={filterConference} onChange={e => setFilterConference(e.target.value)}>
-            <option value="">All Conferences</option>
-            {conferences.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={filterType} onChange={e => setFilterType(e.target.value)}>
-            <option value="">All Types</option>
-            <option value="local">Local</option>
-            <option value="council">Council</option>
-            <option value="national">National</option>
-          </select>
-          <select value={filterTemp} onChange={e => setFilterTemp(e.target.value)}>
-            <option value="">All Temps</option>
-            <option value="hot">🔴 Hot</option>
-            <option value="warm">🟡 Warm</option>
-            <option value="cold">🔵 Cold</option>
-          </select>
-          <select value={filterAssigned} onChange={e => setFilterAssigned(e.target.value)}>
-            <option value="">All Reps</option>
-            {employees.filter(e => ['growth_intern', 'sales_intern', 'founder', 'cofounder'].includes(e.role)).map(e => (
-              <option key={e.id} value={e.id}>{e.name}</option>
-            ))}
-          </select>
+      {/* Active filter chips for All Deals */}
+      {activeTab === 'all-deals' && (filterStages.length + filterConferences.length + filterTemps.length + filterOrgTypes.length + (filterOverdueOnly ? 1 : 0) + (filterAssigned ? 1 : 0)) > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 16px 8px' }}>
+          {filterStages.map(s => (
+            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '3px 8px', borderRadius: 20, background: '#C9A84C22', color: '#C9A84C', fontWeight: 500 }}>
+              {STAGE_CONFIG[s as DealStage]?.emoji} {STAGE_CONFIG[s as DealStage]?.label}
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }} onClick={() => setFilterStages(prev => prev.filter(x => x !== s))}>×</button>
+            </span>
+          ))}
+          {filterConferences.map(c => (
+            <span key={c} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '3px 8px', borderRadius: 20, background: '#C9A84C22', color: '#C9A84C', fontWeight: 500 }}>
+              {c}<button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }} onClick={() => setFilterConferences(prev => prev.filter(x => x !== c))}>×</button>
+            </span>
+          ))}
+          {filterTemps.map(t => (
+            <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '3px 8px', borderRadius: 20, background: '#C9A84C22', color: '#C9A84C', fontWeight: 500 }}>
+              {t === 'hot' ? '🔴' : t === 'warm' ? '🟡' : '🔵'} {t}
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }} onClick={() => setFilterTemps(prev => prev.filter(x => x !== t))}>×</button>
+            </span>
+          ))}
+          {filterOrgTypes.map(ot => (
+            <span key={ot} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '3px 8px', borderRadius: 20, background: '#C9A84C22', color: '#C9A84C', fontWeight: 500 }}>
+              {ot}<button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }} onClick={() => setFilterOrgTypes(prev => prev.filter(x => x !== ot))}>×</button>
+            </span>
+          ))}
+          {filterOverdueOnly && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '3px 8px', borderRadius: 20, background: '#ef444422', color: '#ef4444', fontWeight: 500 }}>
+              Overdue only<button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }} onClick={() => setFilterOverdueOnly(false)}>×</button>
+            </span>
+          )}
+          {filterAssigned && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '3px 8px', borderRadius: 20, background: '#C9A84C22', color: '#C9A84C', fontWeight: 500 }}>
+              Rep: {filterAssigned}<button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }} onClick={() => setFilterAssigned('')}>×</button>
+            </span>
+          )}
+          <button
+            style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: 20, background: 'none', border: '1px solid var(--ws-border,#e5e7eb)', color: 'var(--ws-text-secondary,#6b7280)', cursor: 'pointer' }}
+            onClick={() => { setFilterStages([]); setFilterConferences([]); setFilterTemps([]); setFilterOrgTypes([]); setFilterOverdueOnly(false); setFilterAssigned(''); }}
+          >
+            Clear all
+          </button>
         </div>
       )}
 
@@ -970,16 +1527,54 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
         {activeTab === 'leaderboard' && <Leaderboard />}
       </div>
 
-      {/* Deal Edit / Create Panel */}
-      {panelOpen && (
+      {/* New Deal Modal */}
+      {panelOpen && isNewDeal && (
+        <NewDealModal
+          onClose={closePanel}
+          onCreated={handleNewDealCreated}
+        />
+      )}
+
+      {/* Deal Edit Panel (existing deals only) */}
+      {panelOpen && !isNewDeal && editingDeal && (
         <DealEditPanel
-          deal={isNewDeal ? null : editingDeal}
+          deal={editingDeal}
           employees={employees}
           schools={schools}
           nationals={nationals}
           onClose={closePanel}
           onSaved={handlePanelSaved}
           onDeleted={handlePanelDeleted}
+        />
+      )}
+
+      {/* Quick Edit Sheet */}
+      {quickEditDeal && (
+        <QuickEditSheet
+          deal={quickEditDeal}
+          onClose={() => { setQuickEditDeal(null); loadDeals(); }}
+          onPatch={patchDeal}
+        />
+      )}
+
+      {/* Filter Drawer */}
+      {filterDrawerOpen && (
+        <FilterDrawer
+          conferences={conferences}
+          employees={employees.filter(e => ['growth_intern', 'sales_intern', 'founder', 'cofounder'].includes(e.role))}
+          filterStages={filterStages}
+          filterConferences={filterConferences}
+          filterTemps={filterTemps}
+          filterOrgTypes={filterOrgTypes}
+          filterAssigned={filterAssigned}
+          filterOverdueOnly={filterOverdueOnly}
+          onChangeStages={setFilterStages}
+          onChangeConferences={setFilterConferences}
+          onChangeTemps={setFilterTemps}
+          onChangeOrgTypes={setFilterOrgTypes}
+          onChangeAssigned={setFilterAssigned}
+          onChangeOverdueOnly={setFilterOverdueOnly}
+          onClose={() => setFilterDrawerOpen(false)}
         />
       )}
 
