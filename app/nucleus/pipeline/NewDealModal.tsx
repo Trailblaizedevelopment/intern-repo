@@ -186,7 +186,7 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
               name: finalOrgName,
               school_id: selectedSchool?.id || null,
               national_org_id: nationalOrgId || null,
-              type: orgCategory === 'council' ? 'ifc' : orgCategory === 'national' ? 'national' : 'chapter',
+              type: orgCategory === 'council' ? 'ifc' : 'chapter',
               status: 'prospect',
             }),
           });
@@ -202,7 +202,7 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
             name: finalOrgName,
             school_id: selectedSchool?.id || null,
             national_org_id: nationalOrgId || null,
-            type: orgCategory === 'council' ? 'ifc' : orgCategory === 'national' ? 'national' : 'chapter',
+            type: orgCategory === 'council' ? 'ifc' : 'chapter',
             status: 'prospect',
           }),
         });
