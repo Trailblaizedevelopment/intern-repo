@@ -322,6 +322,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     // between each send. NO inter-line sleep — that caused serverless timeouts.
     // Phone-level dedup: a phone number can only receive ONE message per execution.
     const sentPhones = new Set<string>();
+    const processedIds = new Set<string>(); // belt-and-suspenders: contact ID dedup
     const maxContacts = activeLineNumbers.length > 0
       ? Math.max(...activeLineNumbers.map(n => (byLine[n] || []).length))
       : 0;
@@ -340,11 +341,17 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           results.skipped_sms++;
           continue;
         }
-        // 2. Phone dedup: never contact the same number twice in one job
+        // 2. Contact ID dedup: prevent double-claiming (T1 then T2 in same batch)
+        if (processedIds.has(contact.id)) {
+          results.skipped_already_sent++;
+          continue;
+        }
+        // 3. Phone dedup: never contact the same number twice in one job
         if (!contact.phone_primary || sentPhones.has(contact.phone_primary)) {
           if (contact.phone_primary) results.skipped_already_sent++;
           continue;
         }
+        processedIds.add(contact.id);
         sentPhones.add(contact.phone_primary);
         // ── End hard guards ──────────────────────────────────────────────────
 
