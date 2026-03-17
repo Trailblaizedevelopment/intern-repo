@@ -21,6 +21,8 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
   touch1_sent:      { bg: '#f3f4f6', text: '#6b7280', label: 'T1 Sent' },
   touch2_sent:      { bg: '#fef9c3', text: '#854d0e', label: 'T2 Sent' },
   touch3_sent:      { bg: '#fee2e2', text: '#991b1b', label: 'T3 Sent' },
+  no_response:      { bg: '#f3f4f6', text: '#6b7280', label: 'No Response' },
+  signed_up:        { bg: '#d1fae5', text: '#065f46', label: 'Signed Up' },
 };
 
 const LINQ_LINE_PHONES = new Set(['+16462408056', '+16462668785', '+16462442696']);
@@ -46,6 +48,8 @@ type ConvContact = {
   flagged: boolean;
   flagged_reason: string | null;
   handled_at: string | null;
+  touch_stage: string;
+  is_urgent: boolean;
 };
 
 type LinqMessage = {
@@ -81,8 +85,21 @@ export default function ConversationsTab({ showToast }: Props) {
   const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [handledIds, setHandledIds] = useState<Set<string>>(new Set());
+  const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
+  const [selectedForBulk, setSelectedForBulk] = useState<Set<string>>(new Set());
+  const [bulkActioning, setBulkActioning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const syncedRef = useRef(false);
   const LIMIT = 50;
+
+  // Auto-sync on mount (non-blocking)
+  useEffect(() => {
+    if (!syncedRef.current) {
+      syncedRef.current = true;
+      fetch('/api/outreach/conversations/sync', { method: 'POST', headers: { Authorization: AUTH } })
+        .then(r => r.json()).then(json => { if ((json.detected || 0) > 0) load(); }).catch(() => {});
+    }
+  }, []); // eslint-disable-line
 
   // Debounce search
   useEffect(() => {
@@ -110,7 +127,15 @@ export default function ConversationsTab({ showToast }: Props) {
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      setContacts(json.data || []);
+
+      // Urgency sort: urgent first
+      const sorted = [...(json.data || [])].sort((a: ConvContact, b: ConvContact) => {
+        if (a.is_urgent && !b.is_urgent) return -1;
+        if (!a.is_urgent && b.is_urgent) return 1;
+        return 0;
+      });
+
+      setContacts(sorted);
       setTotal(json.total || 0);
     } catch (e) {
       showToast(`Failed to load conversations: ${e instanceof Error ? e.message : e}`, 'error');
@@ -177,7 +202,6 @@ export default function ConversationsTab({ showToast }: Props) {
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Failed');
       showToast('Pitch sent — contact moved to Pitched', 'success');
-      // Update locally
       setContacts(prev => prev.map(c =>
         c.id === contact.id ? { ...c, outreach_status: 'pitched' } : c
       ));
@@ -187,6 +211,62 @@ export default function ConversationsTab({ showToast }: Props) {
       showToast(`Failed: ${e instanceof Error ? e.message : e}`, 'error');
     } finally {
       setPitching(null);
+    }
+  }
+
+  // ── Follow-Up ──────────────────────────────────────────────────────────────
+  async function handleFollowUp(contact: ConvContact) {
+    const msg = `Hey ${contact.first_name || contact.contact_name} — just wanted to check if you got a chance to look at the alumni network for ${contact.chapter_name}. Happy to answer any questions.`;
+    setPitching(contact.id);
+    try {
+      const res = await fetch('/api/outreach/conversations/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: AUTH },
+        body: JSON.stringify({ contact_id: contact.id, message: msg }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          showToast('⚠️ Duplicate blocked — same message sent in the last 60 min.', 'error');
+          return;
+        }
+        throw new Error(json.error || 'Failed');
+      }
+      showToast('Follow-up sent', 'success');
+      // Reload messages
+      if (selected?.linq_chat_id) {
+        const msgRes = await fetch(`/api/linq/messages?chat_id=${encodeURIComponent(selected.linq_chat_id)}&limit=100`);
+        const msgJson = await msgRes.json();
+        const sorted = (msgJson.data || []).sort(
+          (a: LinqMessage, b: LinqMessage) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        setMessages(sorted);
+      }
+    } catch (e) {
+      showToast(`Failed: ${e instanceof Error ? e.message : e}`, 'error');
+    } finally {
+      setPitching(null);
+    }
+  }
+
+  // ── Mark Unresponsive ──────────────────────────────────────────────────────
+  async function handleMarkUnresponsive(contact: ConvContact) {
+    try {
+      const res = await fetch('/api/outreach/conversations/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: AUTH },
+        body: JSON.stringify({ action: 'next_touch', contact_ids: [contact.id] }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setContacts(prev => prev.map(c =>
+        c.id === contact.id ? { ...c, outreach_status: 'no_response' } : c
+      ));
+      if (selected?.id === contact.id)
+        setSelected(s => s ? { ...s, outreach_status: 'no_response' } : s);
+      showToast('Marked as no response', 'success');
+    } catch (e) {
+      showToast(`Failed: ${e instanceof Error ? e.message : e}`, 'error');
     }
   }
 
@@ -248,6 +328,10 @@ export default function ConversationsTab({ showToast }: Props) {
         body: JSON.stringify({ contact_id: selected.id, message: replyText.trim() }),
       });
       const json = await res.json();
+      if (res.status === 409) {
+        showToast('⚠️ Duplicate blocked — same message sent in the last 60 min.', 'error');
+        return; // Do NOT clear replyText
+      }
       if (!res.ok || json.error) throw new Error(json.error || 'Failed');
       setReplyText('');
       // Reload messages
@@ -263,6 +347,37 @@ export default function ConversationsTab({ showToast }: Props) {
     } finally {
       setSendingReply(false);
     }
+  }
+
+  // ── Bulk actions ───────────────────────────────────────────────────────────
+  async function handleBulkAction(action: 'next_touch' | 'handled' | 'flag') {
+    if (selectedForBulk.size === 0) return;
+    setBulkActioning(true);
+    try {
+      const res = await fetch('/api/outreach/conversations/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: AUTH },
+        body: JSON.stringify({ action, contact_ids: [...selectedForBulk] }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Failed');
+      showToast(`Done — ${json.updated} contact${json.updated !== 1 ? 's' : ''} updated`, 'success');
+      setSelectedForBulk(new Set());
+      load();
+    } catch (e) {
+      showToast(`Bulk action failed: ${e instanceof Error ? e.message : e}`, 'error');
+    } finally {
+      setBulkActioning(false);
+    }
+  }
+
+  // ── Stage-aware action button ──────────────────────────────────────────────
+  function getActionButton(c: ConvContact): { label: string; bg: string; color: string; border: string; onClick: () => void } | null {
+    if (c.outreach_status === 'signed_up') return { label: '✓ Converted', bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', onClick: () => {} };
+    if (c.outreach_status === 'touch1_confirmed' && !c.touch2_sent_at) return { label: 'Send Pitch', bg: '#eef2ff', color: '#4f46e5', border: '#a5b4fc', onClick: () => handleSendPitch(c) };
+    if (c.outreach_status === 'pitched' || (c.outreach_status === 'touch1_confirmed' && !!c.touch2_sent_at)) return { label: 'Send Follow-Up', bg: '#ecfeff', color: '#0891b2', border: '#a5f3fc', onClick: () => handleFollowUp(c) };
+    if (['touch2_sent', 'touch3_sent', 'no_response'].includes(c.outreach_status)) return { label: 'Mark Unresponsive', bg: '#f9fafb', color: '#6b7280', border: '#e5e7eb', onClick: () => handleMarkUnresponsive(c) };
+    return null;
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -284,100 +399,144 @@ export default function ConversationsTab({ showToast }: Props) {
   }
 
   const displayed = contacts.filter(c => !handledIds.has(c.id));
-  const activeCount = tab === 'active' ? total : null;
-  const unansweredCount = tab === 'unanswered' ? total : null;
+  const totalPages = Math.ceil(total / LIMIT);
 
   // ── Conversation row ───────────────────────────────────────────────────────
   function ConvRow({ c }: { c: ConvContact }) {
     const isSelected = selected?.id === c.id;
     const lineClr = c.assigned_line ? LINE_COLORS[c.assigned_line] : null;
     const statusClr = STATUS_COLORS[c.outreach_status];
-    const isRecent = c.last_response_at
-      ? daysSince(c.last_response_at) < 1
-      : false;
+    const isUnread = c.last_response_at != null && !viewedIds.has(c.id);
+    const isBulkSelected = selectedForBulk.has(c.id);
+
+    // Border: urgent overrides unread
+    const borderColor = c.is_urgent
+      ? '#f59e0b'
+      : isUnread
+        ? '#2563eb'
+        : isSelected
+          ? '#2563eb'
+          : c.flagged
+            ? '#f59e0b'
+            : 'transparent';
 
     return (
       <div
-        onClick={() => setSelected(c)}
-        style={{
-          padding: '10px 14px',
-          cursor: 'pointer',
-          borderBottom: '1px solid #f0f0f0',
-          borderLeft: isSelected ? '3px solid #2563eb'
-            : c.flagged ? '3px solid #f59e0b'
-            : '3px solid transparent',
-          background: isSelected ? '#eff6ff'
-            : c.flagged ? '#fffbeb'
-            : '#fafafa',
-          transition: 'background 0.1s',
-        }}
+        style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid #f0f0f0' }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-          {/* Avatar */}
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-            background: c.flagged ? '#fef3c7' : lineClr ? lineClr.bg : '#e9eaf0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '0.78rem', fontWeight: 700,
-            color: c.flagged ? '#d97706' : lineClr ? lineClr.text : '#64748b',
-          }}>
-            {c.contact_name !== 'Unknown'
-              ? c.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-              : <User size={14} />}
+        {/* Bulk checkbox (unanswered tab only) */}
+        {tab === 'unanswered' && (
+          <div
+            style={{ display: 'flex', alignItems: 'center', padding: '0 10px', background: isBulkSelected ? '#eff6ff' : 'transparent', flexShrink: 0, cursor: 'pointer' }}
+            onClick={e => {
+              e.stopPropagation();
+              setSelectedForBulk(prev => {
+                const next = new Set(prev);
+                if (next.has(c.id)) next.delete(c.id);
+                else next.add(c.id);
+                return next;
+              });
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={isBulkSelected}
+              onChange={() => {}}
+              style={{ cursor: 'pointer', accentColor: '#2563eb' }}
+            />
           </div>
+        )}
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Row 1: name + time */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-              <span style={{
-                fontWeight: isRecent ? 700 : 600, fontSize: '0.8375rem', color: '#111827',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-              }}>
-                {c.contact_name}
-                {c.grad_year && (
-                  <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 4, fontSize: '0.75rem' }}>
-                    &apos;{String(c.grad_year).slice(-2)}
+        <div
+          onClick={() => {
+            setSelected(c);
+            setViewedIds(prev => new Set([...prev, c.id]));
+          }}
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            cursor: 'pointer',
+            borderLeft: `3px solid ${borderColor}`,
+            background: isSelected ? '#eff6ff'
+              : c.is_urgent ? '#fffbeb'
+              : c.flagged ? '#fffbeb'
+              : '#fafafa',
+            transition: 'background 0.1s',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+            {/* Avatar */}
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: c.is_urgent ? '#fef3c7' : c.flagged ? '#fef3c7' : lineClr ? lineClr.bg : '#e9eaf0',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.78rem', fontWeight: 700,
+              color: c.is_urgent ? '#d97706' : c.flagged ? '#d97706' : lineClr ? lineClr.text : '#64748b',
+            }}>
+              {c.contact_name !== 'Unknown'
+                ? c.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                : <User size={14} />}
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Row 1: name + time */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                <span style={{
+                  fontWeight: isUnread || c.is_urgent ? 700 : 600,
+                  fontSize: '0.8375rem', color: '#111827',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                }}>
+                  {c.contact_name}
+                  {c.grad_year && (
+                    <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 4, fontSize: '0.75rem' }}>
+                      &apos;{String(c.grad_year).slice(-2)}
+                    </span>
+                  )}
+                </span>
+                <span style={{ fontSize: '0.7rem', color: c.is_urgent ? '#dc2626' : '#9ca3af', fontWeight: c.is_urgent ? 700 : 400, flexShrink: 0 }}>
+                  {tab === 'active' && c.last_response_at ? formatTime(c.last_response_at) : c.touch1_sent_at ? formatTime(c.touch1_sent_at) : ''}
+                </span>
+              </div>
+
+              {/* Row 2: chapter + badges */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                <span style={{ fontSize: '0.73rem', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                  {c.chapter_name}
+                </span>
+                {/* Touch stage badge */}
+                <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 10, flexShrink: 0 }}>
+                  {c.touch_stage}
+                </span>
+                {statusClr && (
+                  <span style={{ background: statusClr.bg, color: statusClr.text, fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10, flexShrink: 0 }}>
+                    {statusClr.label}
                   </span>
                 )}
-              </span>
-              <span style={{ fontSize: '0.7rem', color: isRecent ? '#dc2626' : '#9ca3af', fontWeight: isRecent ? 700 : 400, flexShrink: 0 }}>
-                {tab === 'active' && c.last_response_at ? formatTime(c.last_response_at) : c.touch1_sent_at ? formatTime(c.touch1_sent_at) : ''}
-              </span>
-            </div>
-
-            {/* Row 2: chapter + badges */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
-              <span style={{ fontSize: '0.73rem', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                {c.chapter_name}
-              </span>
-              {statusClr && (
-                <span style={{ background: statusClr.bg, color: statusClr.text, fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10, flexShrink: 0 }}>
-                  {statusClr.label}
-                </span>
-              )}
-              {lineClr && c.line_label && (
-                <span style={{ background: lineClr.bg, color: lineClr.text, fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10, flexShrink: 0 }}>
-                  {c.line_label}
-                </span>
-              )}
-              {c.flagged && <Flag size={10} style={{ color: '#d97706', flexShrink: 0 }} />}
-            </div>
-
-            {/* Row 3: last message preview */}
-            {tab === 'active' && c.last_response_text && (
-              <div style={{ marginTop: 2, fontSize: '0.73rem', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {c.last_response_text.slice(0, 65)}{c.last_response_text.length > 65 ? '…' : ''}
+                {lineClr && c.line_label && (
+                  <span style={{ background: lineClr.bg, color: lineClr.text, fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10, flexShrink: 0 }}>
+                    {c.line_label}
+                  </span>
+                )}
+                {c.is_urgent && <AlertTriangle size={10} style={{ color: '#f59e0b', flexShrink: 0 }} />}
+                {c.flagged && <Flag size={10} style={{ color: '#d97706', flexShrink: 0 }} />}
               </div>
-            )}
 
-            {/* Row 3 unanswered: time since T1 */}
-            {tab === 'unanswered' && c.touch1_sent_at && (
-              <div style={{ marginTop: 2, fontSize: '0.73rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 3 }}>
-                <Clock size={10} />
-                {daysSince(c.touch1_sent_at)}d since T1
-                {c.touch2_sent_at && <span style={{ marginLeft: 4 }}>· {daysSince(c.touch2_sent_at)}d since T2</span>}
-              </div>
-            )}
+              {/* Row 3: Active — reply preview snippet */}
+              {tab === 'active' && c.last_response_text && (
+                <div style={{ marginTop: 2, fontSize: '0.73rem', color: '#9ca3af', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.last_response_text.slice(0, 65)}{c.last_response_text.length > 65 ? '…' : ''}
+                </div>
+              )}
+
+              {/* Row 3 unanswered: time since T1 */}
+              {tab === 'unanswered' && c.touch1_sent_at && (
+                <div style={{ marginTop: 2, fontSize: '0.73rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Clock size={10} />
+                  {daysSince(c.touch1_sent_at)}d since T1
+                  {c.touch2_sent_at && <span style={{ marginLeft: 4 }}>· {daysSince(c.touch2_sent_at)}d since T2</span>}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -417,6 +576,8 @@ export default function ConversationsTab({ showToast }: Props) {
       );
     }
 
+    const actionBtn = getActionButton(selected);
+
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Contact header */}
@@ -433,6 +594,14 @@ export default function ConversationsTab({ showToast }: Props) {
                   {STATUS_COLORS[selected.outreach_status].label}
                 </span>
               )}
+              <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
+                {selected.touch_stage}
+              </span>
+              {selected.is_urgent && (
+                <span style={{ background: '#fef3c7', color: '#d97706', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
+                  48h+ urgent
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 3, paddingLeft: 24, fontSize: '0.73rem', color: '#6b7280' }}>
               <span>{selected.chapter_name}</span>
@@ -443,14 +612,15 @@ export default function ConversationsTab({ showToast }: Props) {
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {selected.outreach_status === 'touch1_confirmed' && (
+            {/* Stage-aware action button */}
+            {actionBtn && (
               <button
-                onClick={() => handleSendPitch(selected)}
+                onClick={actionBtn.onClick}
                 disabled={pitching === selected.id}
-                style={{ padding: '5px 11px', borderRadius: 7, border: '1px solid #a5b4fc', background: '#eef2ff', color: '#4f46e5', cursor: 'pointer', fontSize: '0.73rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                style={{ padding: '5px 11px', borderRadius: 7, border: `1px solid ${actionBtn.border}`, background: actionBtn.bg, color: actionBtn.color, cursor: 'pointer', fontSize: '0.73rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
               >
-                {pitching === selected.id ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={11} />}
-                Send Pitch
+                {pitching === selected.id ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={11} />}
+                {actionBtn.label}
               </button>
             )}
             <button
@@ -493,21 +663,22 @@ export default function ConversationsTab({ showToast }: Props) {
           )}
         </div>
 
-        {/* Reply bar */}
+        {/* Reply bar — always visible */}
         <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <textarea
               value={replyText}
               onChange={e => setReplyText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendReply(); }}
-              placeholder="Type a reply… (⌘+Enter to send)"
+              placeholder={selected.linq_chat_id ? 'Type a reply… (⌘+Enter to send)' : 'No Linq chat ID — cannot reply'}
+              disabled={!selected.linq_chat_id}
               rows={2}
-              style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.8375rem', resize: 'none', outline: 'none', fontFamily: 'inherit', background: '#fff' }}
+              style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.8375rem', resize: 'none', outline: 'none', fontFamily: 'inherit', background: selected.linq_chat_id ? '#fff' : '#f9fafb', color: selected.linq_chat_id ? '#111827' : '#9ca3af' }}
             />
             <button
               onClick={handleSendReply}
               disabled={!replyText.trim() || sendingReply || !selected.linq_chat_id}
-              style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: replyText.trim() ? '#2563eb' : '#e5e7eb', color: replyText.trim() ? '#fff' : '#9ca3af', cursor: replyText.trim() ? 'pointer' : 'default', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, height: 58 }}
+              style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: replyText.trim() && selected.linq_chat_id ? '#2563eb' : '#e5e7eb', color: replyText.trim() && selected.linq_chat_id ? '#fff' : '#9ca3af', cursor: replyText.trim() && selected.linq_chat_id ? 'pointer' : 'default', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, height: 58 }}
             >
               {sendingReply ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={14} />}
             </button>
@@ -516,8 +687,6 @@ export default function ConversationsTab({ showToast }: Props) {
       </div>
     );
   }
-
-  const totalPages = Math.ceil(total / LIMIT);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 640 }}>
@@ -533,7 +702,7 @@ export default function ConversationsTab({ showToast }: Props) {
           ]).map(t => (
             <button
               key={t.id}
-              onClick={() => { setTab(t.id); setSelected(null); }}
+              onClick={() => { setTab(t.id); setSelected(null); setSelectedForBulk(new Set()); }}
               style={{
                 padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
                 fontWeight: tab === t.id ? 700 : 500, fontSize: '0.8rem',
@@ -590,7 +759,7 @@ export default function ConversationsTab({ showToast }: Props) {
         </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          {/* Sync button — detect new responses from Linq */}
+          {/* Sync button */}
           {tab === 'unanswered' && (
             <button
               onClick={handleSync}
@@ -608,11 +777,50 @@ export default function ConversationsTab({ showToast }: Props) {
         </div>
       </div>
 
+      {/* ── Bulk action bar (No Reply tab) ── */}
+      {tab === 'unanswered' && selectedForBulk.size > 0 && (
+        <div style={{ padding: '8px 18px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1d4ed8' }}>
+            {selectedForBulk.size} selected
+          </span>
+          <button
+            onClick={() => setSelectedForBulk(new Set())}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 0, display: 'flex', alignItems: 'center' }}
+          >
+            <X size={14} />
+          </button>
+          <div style={{ width: 1, height: 16, background: '#93c5fd', marginLeft: 4 }} />
+          <button
+            onClick={() => handleBulkAction('next_touch')}
+            disabled={bulkActioning}
+            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #93c5fd', background: '#dbeafe', color: '#1d4ed8', cursor: 'pointer', fontSize: '0.73rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            {bulkActioning ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={11} />}
+            Push to Next Touch
+          </button>
+          <button
+            onClick={() => handleBulkAction('handled')}
+            disabled={bulkActioning}
+            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#16a34a', cursor: 'pointer', fontSize: '0.73rem', fontWeight: 600 }}
+          >
+            Mark Handled
+          </button>
+          <button
+            onClick={() => handleBulkAction('flag')}
+            disabled={bulkActioning}
+            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #fcd34d', background: '#fef3c7', color: '#b45309', cursor: 'pointer', fontSize: '0.73rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            <Flag size={11} />
+            Flag Selected
+          </button>
+        </div>
+      )}
+
       {/* ── Two-panel body ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
         {/* Left: list panel */}
-        <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: 340, flexShrink: 0, borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', gap: 8, fontSize: '0.8rem' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading…

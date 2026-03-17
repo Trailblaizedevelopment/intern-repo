@@ -110,7 +110,10 @@ export default function CustomerSuccessModule() {
   const [memberForm, setMemberForm] = useState({
     name: '', grad_year: '', major: '', career_interest: '',
     status: 'looking' as MemberStatus, notes: '',
+    member_type: 'active' as 'active' | 'alumni',
+    job_role: '', company: '', is_hiring: false,
   });
+  const [addMemberType, setAddMemberType] = useState<'active' | 'alumni'>('active');
   const [editingMember, setEditingMember] = useState<ChapterMember | null>(null);
   const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
 
@@ -384,13 +387,17 @@ export default function CustomerSuccessModule() {
           career_interest: memberForm.career_interest || null,
           status: memberForm.status,
           notes: memberForm.notes || null,
+          member_type: memberForm.member_type,
+          job_role: memberForm.job_role || null,
+          company: memberForm.company || null,
+          is_hiring: memberForm.is_hiring,
         }),
       });
       const json = await r.json();
       if (json.error) return showToast(json.error, 'error');
       showToast('Member added', 'success');
       setShowAddMember(null);
-      setMemberForm({ name: '', grad_year: '', major: '', career_interest: '', status: 'looking', notes: '' });
+      setMemberForm({ name: '', grad_year: '', major: '', career_interest: '', status: 'looking', notes: '', member_type: 'active', job_role: '', company: '', is_hiring: false });
       fetchMembers(chapterId);
     } catch { showToast('Failed to add member', 'error'); }
   }
@@ -1035,11 +1042,11 @@ export default function CustomerSuccessModule() {
                               <div>
                                 <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>
                                   <GraduationCap size={15} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }} />
-                                  Active Members — Career Tracking
+                                  Member &amp; Alumni Tracking
                                 </h4>
-                                <p className="cs-section-sub">Track members actively using their network to find opportunities through Trailblaize.</p>
+                                <p className="cs-section-sub">Track active members and alumni for career connections, hiring, and network opportunities.</p>
                               </div>
-                              <button className="cs-log-btn" onClick={() => { setShowAddMember(chapter.id); setEditingMember(null); setMemberForm({ name: '', grad_year: '', major: '', career_interest: '', status: 'looking', notes: '' }); }}>
+                              <button className="cs-log-btn" onClick={() => { setShowAddMember(chapter.id); setEditingMember(null); setAddMemberType('active'); setMemberForm({ name: '', grad_year: '', major: '', career_interest: '', status: 'looking', notes: '', member_type: 'active', job_role: '', company: '', is_hiring: false }); }}>
                                 <Plus size={13} /> Add Member
                               </button>
                             </div>

@@ -10,11 +10,19 @@ const LINE_LABELS: Record<number, string> = { 1: 'Owen', 2: 'Adam', 3: 'Ford' };
  *
  * DB-first conversation list. No Linq API calls — purely reads alumni_contacts.
  * Two modes:
- *   mode=active    → outreach_status IN (touch1_confirmed, pitched)
- *   mode=unanswered → outreach_status IN (touch1_sent, touch2_sent, touch3_sent)
+ *   mode=active      → last_response_at IS NOT NULL
+ *   mode=unanswered  → last_response_at IS NULL AND touch1_sent_at IS NOT NULL
  *
  * Supports: search, chapter_id, line (1|2|3), page (1-indexed), limit (default 50)
  */
+
+function getTouchStage(c: { touch3_sent_at: string | null; touch2_sent_at: string | null; touch1_sent_at: string | null }): string {
+  if (c.touch3_sent_at) return 'T3';
+  if (c.touch2_sent_at) return 'T2';
+  if (c.touch1_sent_at) return 'T1';
+  return 'T0';
+}
+
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -33,11 +41,6 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
   const limit = Math.min(100, parseInt(searchParams.get('limit') || '50'));
   const offset = (page - 1) * limit;
-
-  // ── Status filters ─────────────────────────────────────────────────────────
-  const activeStatuses = ['touch1_confirmed', 'pitched'];
-  const unansweredStatuses = ['touch1_sent', 'touch2_sent', 'touch3_sent'];
-  const statuses = mode === 'active' ? activeStatuses : unansweredStatuses;
 
   // ── Build query ────────────────────────────────────────────────────────────
   let query = supabase
@@ -60,8 +63,14 @@ export async function GET(req: NextRequest) {
       flagged,
       flagged_reason,
       handled_at
-    `, { count: 'exact' })
-    .in('outreach_status', statuses);
+    `, { count: 'exact' });
+
+  // ── Status filters ─────────────────────────────────────────────────────────
+  if (mode === 'active') {
+    query = query.not('last_response_at', 'is', null);
+  } else {
+    query = query.is('last_response_at', null).not('touch1_sent_at', 'is', null);
+  }
 
   if (chapterId) query = query.eq('chapter_id', chapterId);
   if (lineFilter) query = query.eq('assigned_line', lineFilter);
@@ -96,6 +105,9 @@ export async function GET(req: NextRequest) {
     for (const ch of chapters || []) chapterMap.set(ch.id, ch.chapter_name);
   }
 
+  const now = Date.now();
+  const fortyEightHoursMs = 48 * 60 * 60 * 1000;
+
   // ── Apply search filter (post-join, in-memory for now) ─────────────────────
   let results = contacts.map(c => ({
     id: c.id,
@@ -118,6 +130,10 @@ export async function GET(req: NextRequest) {
     flagged: c.flagged || false,
     flagged_reason: c.flagged_reason,
     handled_at: c.handled_at,
+    touch_stage: getTouchStage(c),
+    is_urgent: c.last_response_at
+      ? (now - new Date(c.last_response_at).getTime()) > fortyEightHoursMs
+      : false,
   }));
 
   if (search) {

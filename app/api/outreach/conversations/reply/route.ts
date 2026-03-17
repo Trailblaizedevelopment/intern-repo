@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { sendMessage } from '@/lib/linq';
+import { sendMessage, getMessages } from '@/lib/linq';
 
 const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+
+const LINQ_LINE_PHONES = new Set(['+16462408056', '+16462668785', '+16462442696']);
 
 /**
  * POST /api/outreach/conversations/reply
@@ -40,6 +42,18 @@ export async function POST(req: NextRequest) {
 
   if (!contact.linq_chat_id) {
     return NextResponse.json({ error: 'No Linq chat ID on this contact' }, { status: 400 });
+  }
+
+  // ── Duplicate send protection ──────────────────────────────────────────────
+  const sixtyMinAgo = Date.now() - 60 * 60 * 1000;
+  const recentMsgs = await getMessages(contact.linq_chat_id!, 10);
+  const isDuplicate = recentMsgs.some(m =>
+    LINQ_LINE_PHONES.has(m.from) &&
+    new Date(m.created_at).getTime() > sixtyMinAgo &&
+    m.parts.filter(p => p.type === 'text').map(p => p.value).join(' ').trim() === message.trim()
+  );
+  if (isDuplicate) {
+    return NextResponse.json({ error: 'DUPLICATE_BLOCKED' }, { status: 409 });
   }
 
   try {

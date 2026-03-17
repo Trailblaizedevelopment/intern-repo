@@ -861,4 +861,8 @@ export interface ChapterMember {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  member_type?: 'active' | 'alumni';
+  job_role: string | null;
+  company: string | null;
+  is_hiring: boolean;
 }

@@ -9,12 +9,12 @@ const LINQ_LINE_PHONES = new Set(['+16462408056', '+16462668785', '+16462442696'
 /**
  * POST /api/outreach/conversations/sync
  *
- * Scans all contacts with outreach_status=touch1_sent + linq_chat_id.
+ * Scans ALL contacts with linq_chat_id IS NOT NULL.
  * Fetches their Linq message thread. If any inbound message is found
- * (from ≠ our line phones), marks contact as touch1_confirmed and
- * writes last_response_at + response_text.
+ * (from ≠ our line phones), writes last_response_at + response_text.
+ * Does NOT change outreach_status.
  *
- * Runs on-demand (triggered by "Sync" button) — not an auto-cron.
+ * Runs on-demand (triggered by "Sync" button or auto-mount) — not an auto-cron.
  * NEVER auto-replies. Just detects and records.
  */
 export async function POST(req: NextRequest) {
@@ -27,14 +27,12 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
-  // Fetch contacts pending response detection
-  // Includes touch1_sent contacts with a linq_chat_id
+  // Fetch ALL contacts with a linq_chat_id
   const { data: contacts, error } = await supabase
     .from('alumni_contacts')
     .select('id, outreach_status, linq_chat_id, assigned_line, touch1_sent_at')
-    .eq('outreach_status', 'touch1_sent')
     .not('linq_chat_id', 'is', null)
-    .limit(500); // safety cap — at 28 right now, grows to ~2000 over time
+    .limit(500); // safety cap
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!contacts?.length) return NextResponse.json({ detected: 0, scanned: 0 });
@@ -43,44 +41,45 @@ export async function POST(req: NextRequest) {
   const updates: { id: string; response_text: string; last_response_at: string }[] = [];
   const errors: string[] = [];
 
-  for (const contact of contacts) {
-    try {
-      const msgs = await getMessages(contact.linq_chat_id!, 50);
+  // Process in parallel batches of 5
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
+    const batch = contacts.slice(i, i + BATCH_SIZE);
+    await Promise.all(batch.map(async (contact) => {
+      try {
+        const msgs = await getMessages(contact.linq_chat_id!, 50);
 
-      // Find first inbound message (from ≠ our lines)
-      const inbound = msgs
-        .filter(m => !LINQ_LINE_PHONES.has(m.from))
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        // Find most recent inbound message (from ≠ our lines)
+        const inbound = msgs
+          .filter(m => !LINQ_LINE_PHONES.has(m.from))
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      if (inbound.length > 0) {
-        const firstReply = inbound[0];
-        const text = firstReply.parts
-          .filter(p => p.type === 'text')
-          .map(p => p.value)
-          .join(' ')
-          .trim();
+        if (inbound.length > 0) {
+          const latestReply = inbound[0];
+          const text = latestReply.parts
+            .filter(p => p.type === 'text')
+            .map(p => p.value)
+            .join(' ')
+            .trim();
 
-        updates.push({
-          id: contact.id,
-          response_text: text || '(media/no text)',
-          last_response_at: firstReply.created_at,
-        });
-        detected++;
+          updates.push({
+            id: contact.id,
+            response_text: text || '(media/no text)',
+            last_response_at: latestReply.created_at,
+          });
+          detected++;
+        }
+      } catch (e) {
+        errors.push(`${contact.id}: ${e}`);
       }
-
-      // Small delay to avoid hammering Linq API
-      await new Promise(r => setTimeout(r, 150));
-    } catch (e) {
-      errors.push(`${contact.id}: ${e}`);
-    }
+    }));
   }
 
-  // Batch update detected contacts
+  // Batch update detected contacts — only last_response_at and response_text
   for (const update of updates) {
     await supabase
       .from('alumni_contacts')
       .update({
-        outreach_status: 'touch1_confirmed',
         last_response_at: update.last_response_at,
         response_text: update.response_text,
       })
