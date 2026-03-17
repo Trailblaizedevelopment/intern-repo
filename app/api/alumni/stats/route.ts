@@ -130,6 +130,23 @@ export async function GET(request: NextRequest) {
       .eq('chapter_id', chapterId)
       .not('touch1_sent_at', 'is', null);
 
+    // Phone type breakdown (for Data Quality Card)
+    const [
+      { count: mobileCount },
+      { count: voipCount },
+      { count: landlineCount },
+      { count: unknownPhoneCount },
+      { count: enrichedCount },
+      { count: signedUpDqCount },
+    ] = await Promise.all([
+      supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', chapterId).eq('phone_type', 'mobile'),
+      supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', chapterId).eq('phone_type', 'voip'),
+      supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', chapterId).eq('phone_type', 'landline'),
+      supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', chapterId).or('phone_type.is.null,phone_type.eq.unknown'),
+      supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', chapterId).not('phone_type', 'is', null).not('phone_type', 'eq', 'unknown'),
+      supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', chapterId).or('platform_user_id.not.is.null,signed_up_at.not.is.null,outreach_status.eq.signed_up'),
+    ]);
+
     const { count: touch2SentCount } = await supabase
       .from('alumni_contacts')
       .select('*', { count: 'exact', head: true })
@@ -238,6 +255,13 @@ export async function GET(request: NextRequest) {
         signed_up: signedUpCount ?? 0,
         imessage_eligible: imessageCount ?? 0,
         sms_only: smsCount ?? 0,
+        // Phone type breakdown (Data Quality Card)
+        mobile: mobileCount ?? 0,
+        voip: voipCount ?? 0,
+        landline: landlineCount ?? 0,
+        unknown: unknownPhoneCount ?? 0,
+        enriched: enrichedCount ?? 0,
+        signed_up_dq: signedUpDqCount ?? 0,
         touch1_sent: touch1SentCount ?? 0,
         touch2_sent: touch2SentCount ?? 0,
         touch3_sent: touch3SentCount ?? 0,

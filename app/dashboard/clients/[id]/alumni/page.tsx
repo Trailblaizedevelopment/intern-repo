@@ -30,6 +30,22 @@ interface AlumniStats {
   imessage: number; sms: number; unverified: number; responded: number; signed_up: number;
   touch1_ready: number; touch2_due: number; touch3_due: number; responses_to_check: number;
   line_today: LineTodayStat[];
+  // Phone type breakdown (Data Quality Card)
+  mobile?: number; voip?: number; landline?: number; unknown?: number;
+  enriched?: number; signed_up_dq?: number; touch1_sent?: number;
+  imessage_eligible?: number;
+}
+
+interface ChapterStats {
+  total: number;
+  mobile: number;
+  voip: number;
+  landline: number;
+  unknown: number;
+  imessage_eligible: number;
+  signed_up: number;
+  enriched: number;
+  contacted: number;
 }
 interface ImportResult { imported: number; skipped: number; duplicates: number; dual_phone_count: number; queue_assigned: number; errors: { row: number; message: string }[]; }
 
@@ -154,30 +170,28 @@ function LineCapacityBar({ line }: { line: LineTodayStat }) {
 }
 
 // ── Data Quality Card ──
-function DataQualityCard({ contacts, total }: { contacts: AlumniContact[]; total: number }) {
+function DataQualityCard({ chapterStats, total }: { chapterStats: ChapterStats | null; total: number }) {
   const [collapsed, setCollapsed] = useState(false);
 
+  const statsTotal = chapterStats?.total ?? total;
+  const isLoading = chapterStats === null;
+
   const phoneCounts = {
-    mobile: contacts.filter(c => c.phone_type === 'mobile').length,
-    voip: contacts.filter(c => c.phone_type === 'voip').length,
-    landline: contacts.filter(c => c.phone_type === 'landline').length,
-    unknown: contacts.filter(c => !c.phone_type || c.phone_type === 'unknown').length,
+    mobile: chapterStats?.mobile ?? 0,
+    voip: chapterStats?.voip ?? 0,
+    landline: chapterStats?.landline ?? 0,
+    unknown: chapterStats?.unknown ?? 0,
   };
-  const iMessageEligible = contacts.filter(c =>
-    c.phone_primary && c.is_imessage !== false &&
-    (!c.phone_type || c.phone_type === 'mobile')
-  ).length;
+  const iMessageEligible = chapterStats?.imessage_eligible ?? 0;
+  const signedUp = chapterStats?.signed_up ?? 0;
+  const enriched = chapterStats?.enriched ?? 0;
+  const contacted = chapterStats?.contacted ?? 0;
 
-  const signedUp = contacts.filter(c =>
-    c.platform_user_id || c.signed_up_at || c.outreach_status === 'signed_up'
-  ).length;
-  const conversionRate = total > 0 ? ((signedUp / total) * 100).toFixed(1) : '0.0';
+  const conversionRate = statsTotal > 0 ? ((signedUp / statsTotal) * 100).toFixed(1) : '0.0';
+  const iMsgPct = statsTotal > 0 ? (iMessageEligible / statsTotal) * 100 : 0;
+  const signedUpPct = statsTotal > 0 ? (signedUp / statsTotal) * 100 : 0;
 
-  const enriched = contacts.filter(c => c.phone_type && c.phone_type !== 'unknown').length;
-  const contacted = contacts.filter(c => c.touch1_sent_at || c.touch2_sent_at || c.touch3_sent_at).length;
-
-  const iMsgPct = total > 0 ? (iMessageEligible / total) * 100 : 0;
-  const signedUpPct = total > 0 ? (signedUp / total) * 100 : 0;
+  const fmt = (n: number) => isLoading ? '—' : String(n);
 
   return (
     <div style={{
@@ -196,7 +210,7 @@ function DataQualityCard({ contacts, total }: { contacts: AlumniContact[]; total
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>
           <span style={{ fontSize: '1rem' }}>📊</span> Data Quality
           <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#9ca3af' }}>
-            — {total} total contacts loaded
+            — {isLoading ? '…' : statsTotal} total contacts
           </span>
         </span>
         <ChevronDown size={15} style={{ color: '#9ca3af', transform: collapsed ? 'none' : 'rotate(180deg)', transition: 'transform 0.15s ease' }} />
@@ -211,20 +225,20 @@ function DataQualityCard({ contacts, total }: { contacts: AlumniContact[]; total
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8125rem', fontWeight: 600, background: '#dcfce7', color: '#15803d' }}>
-                📱 Mobile: {phoneCounts.mobile}
+                📱 Mobile: {fmt(phoneCounts.mobile)}
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8125rem', fontWeight: 600, background: '#fef3c7', color: '#b45309' }}>
-                📞 VoIP: {phoneCounts.voip}
+                📞 VoIP: {fmt(phoneCounts.voip)}
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8125rem', fontWeight: 600, background: '#fee2e2', color: '#b91c1c' }}>
-                🏠 Landline: {phoneCounts.landline}
+                🏠 Landline: {fmt(phoneCounts.landline)}
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8125rem', fontWeight: 600, background: '#f3f4f6', color: '#6b7280' }}>
-                ❓ Unknown: {phoneCounts.unknown}
+                ❓ Unknown: {fmt(phoneCounts.unknown)}
               </span>
               {/* iMessage Eligible with progress */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '9999px', background: '#dbeafe', border: '1px solid #bfdbfe' }}>
-                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1d4ed8' }}>✉️ iMessage Eligible: {iMessageEligible}</span>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1d4ed8' }}>✉️ iMessage Eligible: {fmt(iMessageEligible)}</span>
                 <div style={{ width: '60px', height: '4px', background: '#bfdbfe', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${iMsgPct}%`, background: '#3b82f6', borderRadius: '2px', transition: 'width 0.3s ease' }} />
                 </div>
@@ -242,9 +256,9 @@ function DataQualityCard({ contacts, total }: { contacts: AlumniContact[]; total
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '0.875rem', color: '#374151' }}>
-                <span style={{ fontWeight: 700, color: '#16a34a' }}>{signedUp}</span>
+                <span style={{ fontWeight: 700, color: '#16a34a' }}>{fmt(signedUp)}</span>
                 <span style={{ color: '#6b7280' }}> signed up on Trailblaize</span>
-                <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}> ({conversionRate}%)</span>
+                <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}> ({isLoading ? '—' : conversionRate}%)</span>
               </span>
               <div style={{ flex: 1, maxWidth: '200px', height: '6px', background: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${signedUpPct}%`, background: '#16a34a', borderRadius: '3px', transition: 'width 0.3s ease' }} />
@@ -260,7 +274,7 @@ function DataQualityCard({ contacts, total }: { contacts: AlumniContact[]; total
               Telnyx Enrichment
             </div>
             <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-              <span style={{ fontWeight: 600, color: '#374151' }}>{enriched}</span> of <span style={{ fontWeight: 600, color: '#374151' }}>{contacted}</span> contacted have enriched phone data from Telnyx
+              <span style={{ fontWeight: 600, color: '#374151' }}>{fmt(enriched)}</span> of <span style={{ fontWeight: 600, color: '#374151' }}>{fmt(contacted)}</span> contacted have enriched phone data from Telnyx
             </span>
           </div>
         </div>
@@ -391,6 +405,7 @@ export default function AlumniPage() {
   const [contacts, setContacts] = useState<AlumniContact[]>([]);
   const emptyStats: AlumniStats = { total: 0, have_phone: 0, have_email: 0, contacted: 0, imessage: 0, sms: 0, unverified: 0, responded: 0, signed_up: 0, touch1_ready: 0, touch2_due: 0, touch3_due: 0, responses_to_check: 0, line_today: [] };
   const [stats, setStats] = useState<AlumniStats>(emptyStats);
+  const [chapterStats, setChapterStats] = useState<ChapterStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -468,7 +483,21 @@ export default function AlumniPage() {
     try {
       const res = await fetch(`/api/alumni/stats?chapter_id=${chapterId}`);
       const json = await res.json();
-      if (json.data) setStats(json.data);
+      if (json.data) {
+        setStats(json.data);
+        // Populate Data Quality Card stats from the same response
+        setChapterStats({
+          total: json.data.total ?? 0,
+          mobile: json.data.mobile ?? 0,
+          voip: json.data.voip ?? 0,
+          landline: json.data.landline ?? 0,
+          unknown: json.data.unknown ?? 0,
+          imessage_eligible: json.data.imessage_eligible ?? 0,
+          signed_up: json.data.signed_up_dq ?? json.data.signed_up ?? 0,
+          enriched: json.data.enriched ?? 0,
+          contacted: json.data.touch1_sent ?? 0,
+        });
+      }
     } catch (err) { console.error('Failed to fetch stats:', err); }
   }, [chapterId]);
 
@@ -856,7 +885,7 @@ export default function AlumniPage() {
         {activeTab === 'alumni' && (
           <>
             {/* ── Data Quality Card (above search bar) ── */}
-            <DataQualityCard contacts={contacts} total={total} />
+            <DataQualityCard chapterStats={chapterStats} total={total} />
 
             {/* ═══════ SECTION 3: Filters + Table + Conversation ═══════ */}
             <div style={{ display: 'flex', gap: '0', minHeight: selectedContact ? '600px' : 'auto' }}>
