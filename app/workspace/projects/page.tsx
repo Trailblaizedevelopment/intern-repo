@@ -396,6 +396,111 @@ function StickyNoteCard({ project, colorIndex, onClick }: {
 // CREATE PROJECT MODAL
 // ═══════════════════════════════════════════
 
+/* ── Ticket Detail Modal ───────────────────────────────────────────────────── */
+function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onClose: () => void }) {
+  const [ticket, setTicket] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/tickets/${ticketId}`)
+      .then(r => r.json())
+      .then(json => {
+        if (json.error) throw new Error(json.error.message || String(json.error));
+        setTicket(json.data || json);
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [ticketId]);
+
+  const t = ticket as Record<string, unknown> | null;
+  const assignee = t?.assignee as { name: string } | null;
+  const creator = t?.creator as { name: string } | null;
+  const status = (t?.status as string) || '';
+  const priority = (t?.priority as string) || '';
+  const statusColor = STATUS_PILL[status] || '#6b7280';
+  const priorityColor = PRIORITY_COLORS[priority] || '#D1D5DB';
+
+  return (
+    <ModalOverlay className="tkt__overlay" onClose={onClose}>
+      <div className="tkt__modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 680, width: '95vw', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div className="tkt__modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          {loading ? (
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Loader2 size={16} className="tkt__spinner" /> Loading ticket…</h2>
+          ) : error ? (
+            <h2 style={{ color: '#dc2626' }}>Failed to load ticket</h2>
+          ) : (
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
+              <span style={{ color: '#9ca3af', fontWeight: 400, marginRight: 6 }}>#{t?.number as number}</span>
+              {t?.title as string}
+            </h2>
+          )}
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4, display: 'flex', flexShrink: 0 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {!loading && !error && t && (
+          <div className="tkt__modal-body" style={{ paddingTop: 8 }}>
+            {/* Status + Priority row */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+              <span className="tkt__status-pill" style={{ color: statusColor, background: `${statusColor}18`, fontWeight: 600, fontSize: '0.78rem', padding: '3px 10px', borderRadius: 20 }}>
+                {status.replace(/_/g, ' ')}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', color: '#374151', background: '#f3f4f6', padding: '3px 10px', borderRadius: 20 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: priorityColor, display: 'inline-block' }} />
+                {priority}
+              </span>
+              {Boolean(t?.type) && (
+                <span style={{ fontSize: '0.78rem', color: '#6b7280', background: '#f3f4f6', padding: '3px 10px', borderRadius: 20 }}>
+                  {String(t!.type)}
+                </span>
+              )}
+              {Boolean(t?.project) && (
+                <span style={{ fontSize: '0.78rem', color: '#6b7280', background: '#f3f4f6', padding: '3px 10px', borderRadius: 20 }}>
+                  {String(t!.project)}
+                </span>
+              )}
+            </div>
+
+            {/* Meta grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginBottom: 16, fontSize: '0.8rem' }}>
+              {assignee && (
+                <div><span style={{ color: '#9ca3af' }}>Assignee</span><br /><strong>{assignee.name}</strong></div>
+              )}
+              {creator && (
+                <div><span style={{ color: '#9ca3af' }}>Created by</span><br /><strong>{creator.name}</strong></div>
+              )}
+              {Boolean(t?.due_date) && (
+                <div><span style={{ color: '#9ca3af' }}>Due</span><br /><strong>{new Date(String(t!.due_date) + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong></div>
+              )}
+              {Boolean(t?.created_at) && (
+                <div><span style={{ color: '#9ca3af' }}>Created</span><br /><strong>{new Date(String(t!.created_at)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>
+              )}
+            </div>
+
+            {/* Description */}
+            {t?.description ? (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Description</div>
+                <div style={{ fontSize: '0.875rem', lineHeight: 1.6, color: '#111827', background: '#f9fafb', padding: '10px 14px', borderRadius: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  <RichTextDisplay content={t.description as string} />
+                </div>
+              </div>
+            ) : (
+              <p style={{ color: '#9ca3af', fontSize: '0.8rem', fontStyle: 'italic' }}>No description added.</p>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <div className="tkt__modal-body" style={{ color: '#dc2626', fontSize: '0.875rem' }}>{error}</div>
+        )}
+      </div>
+    </ModalOverlay>
+  );
+}
+
 function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }: {
   currentEmployeeId: string | null;
   employees: Employee[];
@@ -495,6 +600,7 @@ function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRe
   onRefresh: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<'tickets' | 'screenshots' | 'docs' | 'milestones'>('tickets');
+  const [viewingTicketId, setViewingTicketId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState(false);
   const [editName, setEditName] = useState(project.name);
   const [editDesc, setEditDesc] = useState(project.description || '');
@@ -876,7 +982,7 @@ function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRe
             ) : (
               <div className="sn__ticket-list">
                 {tickets.map(t => (
-                  <div key={t.id} className="sn__ticket-row">
+                  <div key={t.id} className="sn__ticket-row" onClick={() => setViewingTicketId(t.id)} style={{ cursor: 'pointer' }}>
                     <span className="sn__ticket-priority" style={{ background: PRIORITY_COLORS[t.priority] || '#D1D5DB' }} />
                     <span className="sn__ticket-num">#{t.number}</span>
                     <span className="sn__ticket-title">{t.title}</span>
@@ -1072,6 +1178,11 @@ function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRe
           </button>
         </div>
       </div>
+
+      {/* Ticket Detail Modal */}
+      {viewingTicketId && (
+        <TicketDetailModal ticketId={viewingTicketId} onClose={() => setViewingTicketId(null)} />
+      )}
     </div>
   );
 }
