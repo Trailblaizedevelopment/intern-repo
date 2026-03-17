@@ -68,7 +68,7 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
   const google = useGoogleIntegration(currentEmployee?.id);
 
   const [myDeals, setMyDeals] = useState<Deal[]>([]);
-  const [allDeals, setAllDeals] = useState<Deal[]>([]);
+  const [allDeals, setAllDeals] = useState<{ id: string; stage: string; value: number; assigned_to: string | null; organization?: { name: string } | null; contact?: { name: string } | null }[]>([]);
   const [chapters, setChapters] = useState<{ status: string; payment_amount: number | null; payment_type: string | null }[]>([]);
   const [metricsOpen, setMetricsOpen] = useState(false);
 
@@ -90,12 +90,13 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
         if (d) setMyDeals(d as Deal[]);
       }
 
-      // Founders + Engineers: fetch all deals + chapter count for company metrics
+      // Founders + Engineers: fetch all pipeline_deals + chapter count for company metrics
       if (isFounder || isEngineer) {
-        const { data: d } = await supabase
-          .from('deals')
-          .select('id, stage, value');
-        if (d) setAllDeals(d as unknown as Deal[]);
+        const res = await fetch('/api/pipeline/deals');
+        if (res.ok) {
+          const d = await res.json();
+          setAllDeals(d);
+        }
 
         const { data: chapterData } = await supabase
           .from('chapters')
@@ -137,9 +138,9 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
   const myARR = useMemo(() => myClosedWon.reduce((s, d) => s + (d.value || 0), 0), [myClosedWon]);
 
 
-  // --- Company-wide metrics (deals-based for ARR) ---
+  // --- Company-wide metrics (pipeline_deals-based for ARR) ---
   const totalARR = useMemo(() =>
-    allDeals.filter(d => d.stage === 'closed_won').reduce((s, d) => s + ((d as Deal).value || 0), 0),
+    allDeals.filter(d => d.stage === 'closed_won').reduce((s, d) => s + (d.value || 0), 0),
     [allDeals]
   );
   const activeChapters = useMemo(() => chapters.filter(c => c.status === 'active').length, [chapters]);
