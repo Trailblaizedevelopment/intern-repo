@@ -11,7 +11,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  */
 
 const DEFAULT_LINES = [
-  { line_number: 1, label: 'Owen',  line_phone: '+16462408056', daily_limit: 45 },
+  { line_number: 1, label: 'Owen',  line_phone: '+16462101111', daily_limit: 45 },
   { line_number: 2, label: 'Adam',  line_phone: '+16462668785', daily_limit: 45 },
   { line_number: 3, label: 'Ford',  line_phone: '+16462442696', daily_limit: 45 },
 ];
@@ -33,14 +33,16 @@ export async function GET() {
     });
   }
 
-  // Merge DB rows with defaults (in case new line added later)
-  const dbMap = new Map((data || []).map(r => [r.line_phone, r]));
-  const merged = DEFAULT_LINES.map(def => {
-    const row = dbMap.get(def.line_phone);
-    return row ? { ...def, ...row } : { ...def, is_paused: false, pause_reason: null };
-  });
+  // If DB has rows, return them directly (source of truth)
+  // Fall back to DEFAULT_LINES only if DB is empty
+  if (data && data.length > 0) {
+    return NextResponse.json({ data, error: null });
+  }
 
-  return NextResponse.json({ data: merged, error: null });
+  return NextResponse.json({
+    data: DEFAULT_LINES.map(l => ({ ...l, is_paused: false, pause_reason: null })),
+    error: null,
+  });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -54,20 +56,23 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ data: null, error: 'line_phone and is_paused are required' }, { status: 400 });
   }
 
-  const line = DEFAULT_LINES.find(l => l.line_phone === line_phone);
-  if (!line) return NextResponse.json({ data: null, error: 'Unknown line' }, { status: 404 });
+  // Look up the line from DB (not hardcoded — supports any line)
+  const { data: existingLine } = await supabase
+    .from('linq_line_config')
+    .select('*')
+    .eq('line_phone', line_phone)
+    .single();
+
+  if (!existingLine) return NextResponse.json({ data: null, error: 'Unknown line' }, { status: 404 });
 
   const { data, error } = await supabase
     .from('linq_line_config')
-    .upsert({
-      line_phone,
-      line_number: line.line_number,
-      label: line.label,
-      daily_limit: line.daily_limit,
+    .update({
       is_paused,
       pause_reason: is_paused ? (pause_reason?.trim() || null) : null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'line_phone' })
+    })
+    .eq('line_phone', line_phone)
     .select()
     .single();
 
