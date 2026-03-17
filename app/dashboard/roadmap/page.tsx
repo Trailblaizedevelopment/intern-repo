@@ -264,7 +264,7 @@ function RoadmapPageInner() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg">
+      <div className="flex flex-wrap items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg sticky top-0 z-20 border-b">
         {/* Sprint button group */}
         <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
           {(['all', 'sprint1', 'sprint2'] as const).map(s => {

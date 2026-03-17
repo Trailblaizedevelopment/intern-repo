@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import type { RoadmapTicket, Employee } from './types';
 import {
-  ganttDays, daysBetween, formatDate, parseDate, sprintBand, bandBg,
-  priorityColor, priorityDot, GANTT_START, DAY_WIDTH, SPRINT1_END, SPRINT2_END, clamp,
+  ganttDays, daysBetween, formatDate, parseDate, sprintBand,
+  priorityDot, projectColor, GANTT_START, DAY_WIDTH, SPRINT1_END, SPRINT2_END, clamp,
 } from './utils';
 
 const ROW_HEIGHT = 36;
@@ -122,8 +122,6 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
     return s.includes('sprint 2') || s.includes('sprint2') || /\bsprint.{0,3}2\b/.test(s);
   });
 
-  const empMap = Object.fromEntries(employees.map(e => [e.id, e.name]));
-
   if (tickets.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
@@ -147,19 +145,21 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
           onScroll={syncScroll}
           style={{ maxHeight: 'calc(100vh - 260px)' }}
         >
-          {rows.map((row, i) => {
+          {rows.map((row) => {
             if (row.type === 'header') {
+              const color = projectColor(row.project);
               return (
                 <div
                   key={`h-${row.project}`}
-                  style={{ height: ROW_HEIGHT }}
-                  className="flex items-center gap-1.5 px-2 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100"
+                  style={{ height: ROW_HEIGHT, borderLeft: `4px solid ${color}` }}
+                  className="flex items-center gap-1.5 px-2 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors duration-100"
                   onClick={() => setCollapsed(c => ({ ...c, [row.project]: !c[row.project] }))}
                 >
-                  {collapsed[row.project]
-                    ? <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
-                    : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />
-                  }
+                  <ChevronDown
+                    size={14}
+                    className="text-gray-400 flex-shrink-0 transition-transform duration-200"
+                    style={{ transform: collapsed[row.project] ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+                  />
                   <span className="text-xs font-semibold text-gray-700 truncate">{row.project}</span>
                   <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{projectGroups[row.project]?.length}</span>
                 </div>
@@ -169,12 +169,12 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
             return (
               <div
                 key={`t-${t.id}`}
-                style={{ height: ROW_HEIGHT }}
-                className="flex items-center gap-2 px-3 border-b border-gray-100 cursor-pointer hover:bg-blue-50 transition-colors"
+                style={{ height: ROW_HEIGHT, paddingLeft: 16 }}
+                className="flex items-center gap-2 pr-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors duration-100"
                 onClick={() => onTicketClick(t)}
               >
                 <span className={`flex-shrink-0 w-2 h-2 rounded-full ${priorityDot(t.priority)}`} />
-                <span className="text-xs text-gray-700 truncate">{t.title}</span>
+                <span className="text-xs font-medium text-gray-700 truncate">{t.title}</span>
               </div>
             );
           })}
@@ -191,29 +191,31 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
             {/* Sprint 1: days 0-4 (Mar 17-21) = 5 days */}
             <div
               style={{ width: 5 * DAY_WIDTH }}
-              className="bg-blue-50 border-b border-r border-blue-200 flex items-center justify-center"
+              className="bg-blue-50 border-b border-r border-blue-200 flex items-center justify-center gap-1.5"
             >
-              <span className="text-xs font-semibold text-blue-700">Sprint 1 (Mar 17–21)</span>
+              <span className="bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded">Sprint 1</span>
+              <span className="text-[10px] text-blue-500 hidden sm:inline">Mar 17–21</span>
             </div>
             {/* Sprint 2: days 5-14 (Mar 22-31) = 10 days */}
             <div
               style={{ width: 10 * DAY_WIDTH }}
-              className="bg-purple-50 border-b border-r border-purple-200 flex items-center justify-center"
+              className="bg-purple-50 border-b border-r border-purple-200 flex items-center justify-center gap-1.5"
             >
-              <span className="text-xs font-semibold text-purple-700">Sprint 2 (Mar 22–31)</span>
+              <span className="bg-purple-600 text-white text-xs font-semibold px-2 py-0.5 rounded">Sprint 2</span>
+              <span className="text-[10px] text-purple-500 hidden sm:inline">Mar 22–31</span>
             </div>
             {/* Post: days 15-21 (Apr 1-7) = 7 days */}
             <div
               style={{ width: 7 * DAY_WIDTH }}
-              className="bg-white border-b border-gray-200 flex items-center justify-center"
+              className="bg-white border-b border-gray-200 flex items-center justify-center gap-1"
             >
-              <span className="text-xs text-gray-400">Post-Sprint (Apr 1–7)</span>
+              <span className="bg-gray-400 text-white text-xs font-semibold px-2 py-0.5 rounded">Post-Sprint</span>
             </div>
           </div>
 
           {/* Day headers */}
           <div style={{ height: 36, display: 'flex', position: 'sticky', top: 20, zIndex: 10, background: 'white', borderBottom: '1px solid #e5e7eb' }}>
-            {days.map((day, idx) => {
+            {days.map((day) => {
               const band = sprintBand(day);
               const bg = band === 'sprint1' ? 'bg-blue-50' : band === 'sprint2' ? 'bg-purple-50' : 'bg-white';
               const dayNum = parseInt(day.slice(8, 10), 10);
@@ -224,7 +226,7 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
                   style={{ width: DAY_WIDTH, flexShrink: 0, position: 'relative' }}
                   className={`flex items-center justify-center border-r border-gray-100 ${bg}`}
                 >
-                  <span className={`text-xs font-medium ${isToday ? 'text-red-600 font-bold' : 'text-gray-500'}`}>{dayNum}</span>
+                  <span className={`text-[11px] font-mono ${isToday ? 'text-red-600 font-bold' : 'text-gray-400'}`}>{dayNum}</span>
                   {isToday && (
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 bg-red-400" style={{ height: 4 }} />
                   )}
@@ -244,7 +246,12 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
             <div style={{ position: 'absolute', inset: 0, display: 'flex', pointerEvents: 'none' }}>
               {days.map((day) => {
                 const band = sprintBand(day);
-                const bg = band === 'sprint1' ? '#eff6ff' : band === 'sprint2' ? '#f5f3ff' : '#ffffff';
+                // sprint1: bg-blue-50/60, sprint2: bg-purple-50/40, post: white
+                const bg = band === 'sprint1'
+                  ? 'rgba(239,246,255,0.6)'
+                  : band === 'sprint2'
+                    ? 'rgba(245,243,255,0.4)'
+                    : '#ffffff';
                 return (
                   <div
                     key={day}
@@ -262,8 +269,8 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
                   left: todayIdx * DAY_WIDTH + DAY_WIDTH / 2,
                   top: 0,
                   bottom: 0,
-                  width: 2,
-                  background: 'rgba(239,68,68,0.6)',
+                  width: 1,
+                  background: 'rgba(248,113,113,0.8)',
                   pointerEvents: 'none',
                   zIndex: 5,
                   height: totalHeight + 8,
@@ -274,7 +281,8 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
             {/* Milestone: Sprint 1 End (Mar 21 = day 4) */}
             <MilestoneMark
               dayIdx={4}
-              color="bg-blue-600"
+              colorClass="bg-red-500"
+              borderColorClass="border-red-400"
               totalHeight={totalHeight}
               label="Sprint 1 End"
               onClick={(x, y) => setMilestone(ms => ms?.sprint === 1 ? null : { sprint: 1, x, y })}
@@ -283,7 +291,8 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
             {/* Milestone: Sprint 2 End (Mar 31 = day 14) */}
             <MilestoneMark
               dayIdx={14}
-              color="bg-purple-600"
+              colorClass="bg-purple-600"
+              borderColorClass="border-purple-500"
               totalHeight={totalHeight}
               label="Sprint 2 End"
               onClick={(x, y) => setMilestone(ms => ms?.sprint === 2 ? null : { sprint: 2, x, y })}
@@ -308,12 +317,13 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
               const barLeft = Math.max(0, startIdx) * DAY_WIDTH;
               const barWidth = Math.max(DAY_WIDTH * 0.5, (endIdx - Math.max(0, startIdx) + 1) * DAY_WIDTH - 4);
               const isDragging = drag?.ticketId === t.id;
+              const barColor = projectColor(t.project ?? '');
 
               return (
                 <div
                   key={`tr-${t.id}`}
                   style={{ position: 'absolute', top, left: 0, right: 0, height: ROW_HEIGHT }}
-                  className="border-b border-gray-100"
+                  className="border-b border-gray-100 transition-colors duration-100 hover:bg-gray-50/60"
                 >
                   {/* Bar */}
                   <div
@@ -323,14 +333,15 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
                       top: (ROW_HEIGHT - 20) / 2,
                       width: barWidth,
                       height: 20,
-                      borderRadius: 4,
+                      borderRadius: 2,
                       cursor: isDragging ? 'grabbing' : 'grab',
                       zIndex: 6,
                       boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : undefined,
-                      opacity: isDragging ? 0.85 : 1,
-                      transition: isDragging ? 'none' : 'box-shadow 0.1s',
+                      opacity: isDragging ? 0.85 : 0.9,
+                      transition: isDragging ? 'none' : 'opacity 0.1s, box-shadow 0.1s',
+                      backgroundColor: barColor,
                     }}
-                    className={`${priorityColor(t.priority)} flex items-center px-1.5 overflow-hidden`}
+                    className="flex items-center overflow-hidden"
                     onMouseDown={e => handleBarMouseDown(e, t)}
                     onClick={e => {
                       if (!isDragging && Math.abs(e.movementX) < 2) {
@@ -338,8 +349,18 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
                       }
                     }}
                   >
-                    <span className="text-white text-xs truncate leading-none font-medium">
+                    {/* Priority dot on left edge */}
+                    <span
+                      className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ml-1 ${priorityDot(t.priority)}`}
+                      style={{ opacity: 1, border: '1px solid rgba(255,255,255,0.5)' }}
+                    />
+                    {/* Ticket number */}
+                    <span className="text-[10px] font-mono text-white/70 ml-1 flex-shrink-0 leading-none">
                       #{t.number}
+                    </span>
+                    {/* Ticket title */}
+                    <span className="text-[11px] font-medium text-white ml-1 truncate leading-none">
+                      {t.title}
                     </span>
                   </div>
                 </div>
@@ -382,13 +403,15 @@ export function GanttView({ tickets, employees, onTicketClick, onReschedule }: G
 
 function MilestoneMark({
   dayIdx,
-  color,
+  colorClass,
+  borderColorClass,
   totalHeight,
   label,
   onClick,
 }: {
   dayIdx: number;
-  color: string;
+  colorClass: string;
+  borderColorClass: string;
   totalHeight: number;
   label: string;
   onClick: (x: number, y: number) => void;
@@ -409,21 +432,21 @@ function MilestoneMark({
           zIndex: 4,
           opacity: 0.4,
         }}
-        className={color.replace('bg-', 'border-')}
+        className={borderColorClass}
       />
-      {/* Diamond */}
+      {/* Diamond w-3 h-3 rotate-45 shadow-sm */}
       <div
         style={{
           position: 'absolute',
-          left: cx - 8,
+          left: cx - 6,
           top: 4,
-          width: 14,
-          height: 14,
+          width: 12,
+          height: 12,
           transform: 'rotate(45deg)',
           cursor: 'pointer',
           zIndex: 8,
         }}
-        className={`${color} rounded-sm hover:opacity-80 transition-opacity`}
+        className={`${colorClass} shadow-sm hover:opacity-80 transition-opacity`}
         title={label}
         onClick={e => onClick(e.clientX, e.clientY)}
       />

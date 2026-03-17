@@ -60,7 +60,26 @@ export function buildTicket(raw: Omit<RoadmapTicket, 'barStart' | 'barEnd'>): Ro
   return { ...raw, barStart, barEnd };
 }
 
-/** Priority color (Tailwind bg class) */
+// ── Project color palette (deterministic) ──────────────────────────────────
+const PROJECT_COLORS = [
+  '#6366f1', // indigo
+  '#10b981', // emerald
+  '#8b5cf6', // violet
+  '#f43f5e', // rose
+  '#f59e0b', // amber
+  '#06b6d4', // cyan
+  '#0ea5e9', // sky
+  '#ec4899', // pink
+];
+
+/** Stable color for a project name — same name → same color every render */
+export function projectColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
+  return PROJECT_COLORS[hash % PROJECT_COLORS.length];
+}
+
+/** Priority color (Tailwind bg class) — kept for backward compat */
 export function priorityColor(priority: string | null): string {
   switch (priority) {
     case 'critical': return 'bg-red-500';
@@ -71,7 +90,7 @@ export function priorityColor(priority: string | null): string {
   }
 }
 
-/** Priority dot color */
+/** Priority dot color (Tailwind bg class) */
 export function priorityDot(priority: string | null): string {
   switch (priority) {
     case 'critical': return 'bg-red-500';
@@ -82,16 +101,18 @@ export function priorityDot(priority: string | null): string {
   }
 }
 
-/** Status pill styling */
+/** Status pill — Tailwind classes per spec */
 export function statusPill(status: string | null): string {
   switch (status) {
-    case 'open':        return 'bg-blue-100 text-blue-800';
-    case 'in_progress': return 'bg-purple-100 text-purple-800';
-    case 'in_review':   return 'bg-yellow-100 text-yellow-800';
+    case 'backlog':     return 'bg-gray-100 text-gray-500';
+    case 'open':        return 'bg-blue-100 text-blue-700';
+    case 'in_progress': return 'bg-amber-100 text-amber-700';
+    case 'in_review':   return 'bg-purple-100 text-purple-700';
     case 'done':
-    case 'resolved':    return 'bg-green-100 text-green-800';
-    case 'backlog':     return 'bg-gray-100 text-gray-600';
-    default:            return 'bg-gray-100 text-gray-600';
+    case 'resolved':    return 'bg-emerald-100 text-emerald-700';
+    case 'canceled':    return 'bg-red-100 text-red-500 line-through';
+    case 'todo':        return 'bg-sky-100 text-sky-700';
+    default:            return 'bg-gray-100 text-gray-500';
   }
 }
 
@@ -126,4 +147,13 @@ export function sprintLabel(sprint: string | null): string {
   if (s.includes('sprint 1') || s.includes('sprint1') || /\bsprint.{0,3}1\b/.test(s)) return 'Sprint 1';
   if (s.includes('sprint 2') || s.includes('sprint2') || /\bsprint.{0,3}2\b/.test(s)) return 'Sprint 2';
   return sprint;
+}
+
+/** Compact sprint badge label: S1, S2, or null */
+export function sprintBadgeLabel(sprint: string | null): 'S1' | 'S2' | null {
+  if (!sprint) return null;
+  const s = sprint.toLowerCase();
+  if (s.includes('sprint 1') || s.includes('sprint1') || /\bsprint.{0,3}1\b/.test(s)) return 'S1';
+  if (s.includes('sprint 2') || s.includes('sprint2') || /\bsprint.{0,3}2\b/.test(s)) return 'S2';
+  return null;
 }
