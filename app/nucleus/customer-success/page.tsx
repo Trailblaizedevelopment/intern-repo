@@ -21,6 +21,7 @@ import ModalOverlay from '@/components/ModalOverlay';
 import LinqOutreachTab from './LinqOutreachTab';
 import EmailTemplatesTab from './EmailTemplatesTab';
 import EmailOutreachTab from './EmailOutreachTab';
+import ConversationsTab from './ConversationsTab';
 
 interface Toast {
   id: string;
@@ -47,7 +48,7 @@ const TAB_CONFIG: { id: ChapterTab; label: string; icon: React.ReactNode }[] = [
 
 export default function CustomerSuccessModule() {
   /* ─── Module-level view ─── */
-  const [moduleView, setModuleView] = useState<'chapters' | 'outreach' | 'templates' | 'email'>('chapters');
+  const [moduleView, setModuleView] = useState<'chapters' | 'outreach' | 'conversations' | 'templates' | 'email'>('chapters');
 
   /* ─── Core state ─── */
   const [chapters, setChapters] = useState<ChapterWithOnboarding[]>([]);
@@ -590,6 +591,7 @@ export default function CustomerSuccessModule() {
           {([
             { id: 'chapters', label: 'Chapters', icon: <HeartHandshake size={14} /> },
             { id: 'outreach', label: 'Linq Outreach', icon: <Send size={14} /> },
+            { id: 'conversations', label: 'Conversations', icon: <MessageSquare size={14} /> },
             { id: 'templates', label: 'Email Templates', icon: <Mail size={14} /> },
             { id: 'email', label: 'Email Outreach', icon: <Send size={14} /> },
           ] as const).map(view => (
@@ -617,6 +619,8 @@ export default function CustomerSuccessModule() {
 
         {moduleView === 'outreach' ? (
           <LinqOutreachTab showToast={showToast} />
+        ) : moduleView === 'conversations' ? (
+          <ConversationsTab showToast={showToast} />
         ) : moduleView === 'templates' ? (
           <EmailTemplatesTab showToast={showToast} />
         ) : moduleView === 'email' ? (
