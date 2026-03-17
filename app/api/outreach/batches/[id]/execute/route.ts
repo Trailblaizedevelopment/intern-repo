@@ -190,12 +190,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     };
 
     // Step 1: count not_contacted per chapter (lightweight — only chapter_id)
+    // Note: linq_chat_id may be pre-allocated at compile time (not null), so we don't filter it here.
     const { data: countRows } = await supabase
       .from('alumni_contacts')
       .select('chapter_id')
       .eq('outreach_status', 'not_contacted')
       .is('touch1_sent_at', null)
-      .is('linq_chat_id', null)
       .not('is_imessage', 'is', false)
       .not('flagged', 'is', true)
       .not('phone_primary', 'is', null);
@@ -214,13 +214,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     for (const chId of prioritizedChapterIds) {
       if (t1ContactsOrdered.length >= totalT1Cap) break;
       const remaining = totalT1Cap - t1ContactsOrdered.length;
+      // Include contacts pre-allocated at compile time (linq_chat_id may be set)
       const { data: chContacts } = await supabase
         .from('alumni_contacts')
         .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id')
         .eq('chapter_id', chId)
         .eq('outreach_status', 'not_contacted')
         .is('touch1_sent_at', null)
-        .is('linq_chat_id', null)
         .not('is_imessage', 'is', false)
         .not('flagged', 'is', true)
         .not('phone_primary', 'is', null)
@@ -314,6 +314,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       chatId: string;
       message: string;
       originalStatus: string;
+      skipServiceCheck: boolean; // true if pre-allocated at compile time (already iMessage-verified)
     };
     const pendingChats: PendingChat[] = [];
 
@@ -410,13 +411,28 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
                                           buildT3BMessage(contact.first_name, chapter.fraternity_name);
 
         try {
-          const chat = await createChat(fromPhone, contact.phone_primary, message);
-          pendingChats.push({ contact, chatId: chat.id, message, originalStatus: status });
+          // Check if this contact was pre-allocated at compile time.
+          // If so, we already know it's iMessage — skip Phase B service detection.
+          const preAllocatedChatId = contact.linq_chat_id ?? null;
 
-          // Store chat ID immediately — protects against Phase B timeout
-          await supabase.from('alumni_contacts')
-            .update({ linq_chat_id: chat.id })
-            .eq('id', contact.id);
+          const chat = await createChat(fromPhone, contact.phone_primary, message);
+
+          if (preAllocatedChatId) {
+            // Pre-verified iMessage at compile time — no need for Phase B getChat check.
+            // Update chat id in case Linq returned a different chat id this time.
+            await supabase.from('alumni_contacts')
+              .update({ linq_chat_id: chat.id, is_imessage: true })
+              .eq('id', contact.id);
+            // Don't add to pendingChats — skip Phase B entirely for this contact
+          } else {
+            // Not pre-allocated — add to Phase B queue for SMS/iMessage detection
+            pendingChats.push({ contact, chatId: chat.id, message, originalStatus: status, skipServiceCheck: false });
+
+            // Store chat ID immediately — protects against Phase B timeout
+            await supabase.from('alumni_contacts')
+              .update({ linq_chat_id: chat.id })
+              .eq('id', contact.id);
+          }
 
           results.sent++;
           if (status === 'not_contacted') results.t1_sent++;
@@ -440,7 +456,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       // Shared wait — Linq resolves service within ~5s for most numbers
       await sleep(10000);
 
-      for (const { contact, chatId, originalStatus } of pendingChats) {
+      for (const { contact, chatId, originalStatus, skipServiceCheck } of pendingChats) {
+        // Pre-allocated at compile time = already iMessage-verified; skip the getChat round-trip
+        if (skipServiceCheck) {
+          await supabase.from('alumni_contacts').update({ is_imessage: true }).eq('id', contact.id);
+          continue;
+        }
         try {
           const resolvedChat = await getChat(chatId);
           const service = getRecipientService(resolvedChat);

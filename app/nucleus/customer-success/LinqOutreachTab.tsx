@@ -183,6 +183,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
 
   // ── Compile ──
   const [compiling, setCompiling] = useState(false);
+  const [allocationStats, setAllocationStats] = useState<{ allocated: number; sms_rejected: number; failed: number } | null>(null);
 
   // ── Actions ──
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -278,6 +279,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
         showToast('A batch is already awaiting approval.', 'info');
         await fetchBatches();
       } else {
+        if (json.allocation) setAllocationStats(json.allocation);
         showToast(`✅ Compiled ${json.batch?.total_contacts || 0} contacts for today.`, 'success');
         await fetchBatches();
       }
@@ -702,6 +704,25 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* iMessage allocation stats (shown when compile just ran) */}
+        {allocationStats && batch.status === 'pending_approval' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, marginTop: 8 }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#166534' }}>
+              📱 {allocationStats.allocated} iMessage chats allocated
+            </span>
+            {allocationStats.sms_rejected > 0 && (
+              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                · {allocationStats.sms_rejected} SMS filtered out
+              </span>
+            )}
+            {allocationStats.failed > 0 && (
+              <span style={{ fontSize: '0.75rem', color: '#dc2626' }}>
+                · {allocationStats.failed} failed (will retry at send)
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -1250,7 +1271,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                     {compiling ? (
                       <>
                         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                        Tony is compiling…
+                        Compiling batch and allocating iMessage chats…
                       </>
                     ) : (
                       <>

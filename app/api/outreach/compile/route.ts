@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { createChat, getRecipientService } from '@/lib/linq';
 
 /**
  * POST /api/outreach/compile
  * On-demand outreach batch compiler. Mirrors cron logic but runs immediately
  * and returns full detail for the UI to display before approval.
  *
+ * Also pre-allocates iMessage chats for all T1 contacts (Phase B) so that:
+ *   (1) SMS contacts are filtered out at compile time
+ *   (2) execute can skip Phase B and jump straight to sending
+ *
  * Returns:
  *   { existing: true, batch: {...} }   — batch already exists for today
- *   { existing: false, batch: {...} }  — newly compiled batch
+ *   { existing: false, batch: {...}, allocation: {...} }  — newly compiled batch
  *   { total: 0, message: string }      — nothing to send
  */
 
@@ -104,7 +109,7 @@ export async function POST() {
     // Exclude known landline/voip entirely — they'll never be iMessage
     const { data: t1Raw } = await supabase
       .from('alumni_contacts')
-      .select('id, chapter_id, year')
+      .select('id, chapter_id, year, phone_primary, linq_chat_id')
       .eq('outreach_status', 'not_contacted')
       .not('is_imessage', 'is', false)
       .not('phone_primary', 'is', null)
@@ -112,7 +117,7 @@ export async function POST() {
       .gte('year', 1970)
       .limit(t1Total);
 
-    const t1Contacts: { id: string; chapter_id: string; year?: number | null }[] = t1Raw || [];
+    const t1Contacts: { id: string; chapter_id: string; year?: number | null; phone_primary?: string | null; linq_chat_id?: string | null }[] = t1Raw || [];
 
     // ── 5. T2 nudge eligible (NON-RESPONDERS ONLY) ───────────────────────────
     // T2 = automated nudge for contacts who got T1 but never replied.
@@ -162,17 +167,69 @@ export async function POST() {
       t3Contacts = t3Raw || [];
     }
 
-    const totalContacts = t1Contacts.length + t2Contacts.length + t3Contacts.length;
+    // ── 6B. Phase B: Pre-allocate iMessage chats for T1 contacts ─────────────
+    const allocatedChats: { contactId: string; chatId: string; lineNumber: number }[] = [];
+    const smsRejected: string[] = [];
+    const allocationFailed: string[] = [];
+
+    // Only allocate for contacts that don't already have a linq_chat_id
+    const needsAllocation = t1Contacts.filter(c => !c.linq_chat_id && c.phone_primary);
+
+    // Round-robin assign lines (same as execute)
+    let lineIdx = 0;
+    const lineCycler = () => {
+      const l = activeLines[lineIdx % activeLines.length];
+      lineIdx++;
+      return l;
+    };
+
+    // Process in parallel batches of 5
+    const allocationBatches: typeof needsAllocation[] = [];
+    for (let i = 0; i < needsAllocation.length; i += 5) {
+      allocationBatches.push(needsAllocation.slice(i, i + 5));
+    }
+
+    for (const batch of allocationBatches) {
+      await Promise.all(batch.map(async contact => {
+        const line = lineCycler();
+        try {
+          const chat = await createChat(line.line_phone, contact.phone_primary!);
+          const service = getRecipientService(chat);
+          if (service === 'SMS') {
+            // Mark as not iMessage — exclude from batch
+            smsRejected.push(contact.id);
+            await supabase.from('alumni_contacts').update({ is_imessage: false }).eq('id', contact.id);
+          } else {
+            // iMessage — store chat ID and assigned line
+            allocatedChats.push({ contactId: contact.id, chatId: chat.id, lineNumber: line.line_number });
+            await supabase.from('alumni_contacts').update({
+              linq_chat_id: chat.id,
+              assigned_line: line.line_number,
+            }).eq('id', contact.id);
+          }
+        } catch {
+          allocationFailed.push(contact.id);
+        }
+      }));
+    }
+
+    // Remove SMS and failed contacts from T1 list
+    // Contacts that already had linq_chat_id (pre-existing) are kept
+    const rejectedSet = new Set([...smsRejected, ...allocationFailed]);
+    const t1Final = t1Contacts.filter(c => !rejectedSet.has(c.id) || c.linq_chat_id);
+
+    // Final contact counts
+    const finalTotal = t1Final.length + t2Contacts.length + t3Contacts.length;
 
     // ── 10. Empty check ───────────────────────────────────────────────────────
-    if (totalContacts === 0) {
+    if (finalTotal === 0) {
       return NextResponse.json({ total: 0, message: 'No eligible contacts found.' });
     }
 
     // ── 7. Fetch chapter names ─────────────────────────────────────────────────
     const allChapterIds = [
       ...new Set([
-        ...t1Contacts.map(c => c.chapter_id),
+        ...t1Final.map(c => c.chapter_id),
         ...t2Contacts.map(c => c.chapter_id),
         ...t3Contacts.map(c => c.chapter_id),
       ]),
@@ -191,7 +248,7 @@ export async function POST() {
     // ── 8. Build breakdowns ───────────────────────────────────────────────────
     const t1ByChapter: Record<string, number> = {};
     const t1ByYear: Record<string, number> = {};
-    for (const c of t1Contacts) {
+    for (const c of t1Final) {
       const chName = chapterMap.get(c.chapter_id) || c.chapter_id;
       t1ByChapter[chName] = (t1ByChapter[chName] || 0) + 1;
       const decade = getDecadeBucket(c.year);
@@ -211,7 +268,7 @@ export async function POST() {
     }
 
     const touchBreakdown = {
-      t1: { total: t1Contacts.length, by_chapter: t1ByChapter, by_year: t1ByYear },
+      t1: { total: t1Final.length, by_chapter: t1ByChapter, by_year: t1ByYear },
       t2: { total: t2Contacts.length, by_chapter: t2ByChapter },
       t3: { total: t3Contacts.length, by_chapter: t3ByChapter },
     };
@@ -245,13 +302,16 @@ export async function POST() {
       .insert({
         scheduled_date: today,
         status: 'pending_approval',
-        total_contacts: totalContacts,
+        total_contacts: finalTotal,
         touch_breakdown: touchBreakdown,
         lines: linesSummary,
         notes: JSON.stringify({
           created_by: 'manual-compile',
+          allocated_chats: allocatedChats.length,
+          sms_rejected: smsRejected.length,
+          allocation_failed: allocationFailed.length,
           contact_ids: {
-            t1: t1Contacts.map(c => c.id),
+            t1: t1Final.map(c => c.id),
             t2: t2Contacts.map(c => c.id),
             t3: t3Contacts.map(c => c.id),
           },
@@ -266,7 +326,15 @@ export async function POST() {
     }
 
     // ── 12. Return ────────────────────────────────────────────────────────────
-    return NextResponse.json({ existing: false, batch: newBatch });
+    return NextResponse.json({
+      existing: false,
+      batch: newBatch,
+      allocation: {
+        allocated: allocatedChats.length,
+        sms_rejected: smsRejected.length,
+        failed: allocationFailed.length,
+      },
+    });
 
   } catch (err) {
     console.error('[POST /api/outreach/compile]', err);

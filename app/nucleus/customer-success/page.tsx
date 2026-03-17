@@ -116,6 +116,7 @@ export default function CustomerSuccessModule() {
   const [addMemberType, setAddMemberType] = useState<'active' | 'alumni'>('active');
   const [editingMember, setEditingMember] = useState<ChapterMember | null>(null);
   const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
+  const [memberMigrationPending, setMemberMigrationPending] = useState(false);
 
   /* ─── Check-in form ─── */
   const [checkInForm, setCheckInForm] = useState({
@@ -395,7 +396,12 @@ export default function CustomerSuccessModule() {
       });
       const json = await r.json();
       if (json.error) return showToast(json.error, 'error');
-      showToast('Member added', 'success');
+      if (json.migration_pending) {
+        setMemberMigrationPending(true);
+        showToast('Member added (run migration to enable alumni fields)', 'success');
+      } else {
+        showToast('Member added', 'success');
+      }
       setShowAddMember(null);
       setMemberForm({ name: '', grad_year: '', major: '', career_interest: '', status: 'looking', notes: '', member_type: 'active', job_role: '', company: '', is_hiring: false });
       fetchMembers(chapterId);
@@ -410,6 +416,7 @@ export default function CustomerSuccessModule() {
       });
       const json = await r.json();
       if (json.error) return showToast(json.error, 'error');
+      if (json.migration_pending) setMemberMigrationPending(true);
       const chapters_updated = Object.entries(members).find(([, list]) => list.some(m => m.id === memberId))?.[0];
       if (chapters_updated) fetchMembers(chapters_updated);
       setEditingMember(null);
@@ -1038,6 +1045,14 @@ export default function CustomerSuccessModule() {
                         {/* ── Headhunting tab ── */}
                         {activeTab === 'headhunting' && (
                           <div className="cs-tab-body">
+                            {memberMigrationPending && (
+                              <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: '0.8rem', color: '#92400e' }}>
+                                ⚠️ Alumni fields (Job Role, Company, Hiring) require a DB migration.{' '}
+                                <a href="https://supabase.com/dashboard/project/uoemlefauspgmmpeoilq/sql" target="_blank" rel="noreferrer" style={{ color: '#b45309', textDecoration: 'underline' }}>
+                                  Run migration →
+                                </a>
+                              </div>
+                            )}
                             <div className="cs-section-header">
                               <div>
                                 <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>
