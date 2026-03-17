@@ -1058,54 +1058,137 @@ export default function CustomerSuccessModule() {
                                 No members tracked yet.<br />
                                 <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>Add members who are looking for jobs or internships through their Trailblaize network.</span>
                               </div>
-                            ) : (
-                              <div className="cs-members-list">
-                                {members[chapter.id].map(m => (
-                                  editingMember?.id === m.id ? (
-                                    <div key={m.id} className="cs-member-edit-row">
-                                      <input className="cs-member-input" placeholder="Name" value={memberForm.name} onChange={e => setMemberForm(p => ({ ...p, name: e.target.value }))} />
-                                      <input className="cs-member-input cs-member-input--sm" placeholder="Grad Year" value={memberForm.grad_year} onChange={e => setMemberForm(p => ({ ...p, grad_year: e.target.value }))} />
-                                      <input className="cs-member-input" placeholder="Major" value={memberForm.major} onChange={e => setMemberForm(p => ({ ...p, major: e.target.value }))} />
-                                      <input className="cs-member-input" placeholder="Career Interest" value={memberForm.career_interest} onChange={e => setMemberForm(p => ({ ...p, career_interest: e.target.value }))} />
-                                      <select className="cs-member-select" value={memberForm.status} onChange={e => setMemberForm(p => ({ ...p, status: e.target.value as MemberStatus }))}>
-                                        {(Object.keys(MEMBER_STATUS_CONFIG) as MemberStatus[]).map(s => (
-                                          <option key={s} value={s}>{MEMBER_STATUS_CONFIG[s].label}</option>
-                                        ))}
-                                      </select>
-                                      <input className="cs-member-input" placeholder="Notes" value={memberForm.notes} onChange={e => setMemberForm(p => ({ ...p, notes: e.target.value }))} />
-                                      <div className="cs-member-row-actions">
-                                        <button className="cs-log-btn" onClick={() => updateMember(m.id, { name: memberForm.name, grad_year: memberForm.grad_year ? parseInt(memberForm.grad_year) : null, major: memberForm.major || null, career_interest: memberForm.career_interest || null, status: memberForm.status, notes: memberForm.notes || null })}>Save</button>
-                                        <button className="module-table-action" onClick={() => setEditingMember(null)}><X size={13} /></button>
+                            ) : (() => {
+                              const sortedMembers = [...(members[chapter.id] || [])].sort((a, b) => {
+                                if (a.is_hiring && !b.is_hiring) return -1;
+                                if (!a.is_hiring && b.is_hiring) return 1;
+                                if ((a.member_type || 'active') === 'alumni' && (b.member_type || 'active') !== 'alumni') return -1;
+                                if ((a.member_type || 'active') !== 'alumni' && (b.member_type || 'active') === 'alumni') return 1;
+                                return 0;
+                              });
+                              return (
+                                <div className="cs-members-list">
+                                  {sortedMembers.map(m => (
+                                    editingMember?.id === m.id ? (
+                                      <div key={m.id} className="cs-member-edit-row">
+                                        <input className="cs-member-input" placeholder="Name" value={memberForm.name} onChange={e => setMemberForm(p => ({ ...p, name: e.target.value }))} />
+                                        <input className="cs-member-input cs-member-input--sm" placeholder="Grad Year" value={memberForm.grad_year} onChange={e => setMemberForm(p => ({ ...p, grad_year: e.target.value }))} />
+                                        {(m.member_type || 'active') === 'active' ? (
+                                          <input className="cs-member-input" placeholder="Major" value={memberForm.major} onChange={e => setMemberForm(p => ({ ...p, major: e.target.value }))} />
+                                        ) : (
+                                          <>
+                                            <input className="cs-member-input" placeholder="Job Role" value={memberForm.job_role} onChange={e => setMemberForm(p => ({ ...p, job_role: e.target.value }))} />
+                                            <input className="cs-member-input" placeholder="Company" value={memberForm.company} onChange={e => setMemberForm(p => ({ ...p, company: e.target.value }))} />
+                                            <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                              <input type="checkbox" checked={memberForm.is_hiring} onChange={e => setMemberForm(p => ({ ...p, is_hiring: e.target.checked }))} />
+                                              Hiring?
+                                            </label>
+                                          </>
+                                        )}
+                                        <input className="cs-member-input" placeholder="Career Interest" value={memberForm.career_interest} onChange={e => setMemberForm(p => ({ ...p, career_interest: e.target.value }))} />
+                                        <select className="cs-member-select" value={memberForm.status} onChange={e => setMemberForm(p => ({ ...p, status: e.target.value as MemberStatus }))}>
+                                          {(Object.keys(MEMBER_STATUS_CONFIG) as MemberStatus[]).map(s => (
+                                            <option key={s} value={s}>{MEMBER_STATUS_CONFIG[s].label}</option>
+                                          ))}
+                                        </select>
+                                        <input className="cs-member-input" placeholder="Notes" value={memberForm.notes} onChange={e => setMemberForm(p => ({ ...p, notes: e.target.value }))} />
+                                        <div className="cs-member-row-actions">
+                                          <button className="cs-log-btn" onClick={() => updateMember(m.id, {
+                                            name: memberForm.name,
+                                            grad_year: memberForm.grad_year ? parseInt(memberForm.grad_year) : null,
+                                            major: (m.member_type || 'active') === 'active' ? (memberForm.major || null) : null,
+                                            job_role: (m.member_type || 'active') === 'alumni' ? (memberForm.job_role || null) : null,
+                                            company: (m.member_type || 'active') === 'alumni' ? (memberForm.company || null) : null,
+                                            is_hiring: (m.member_type || 'active') === 'alumni' ? memberForm.is_hiring : false,
+                                            career_interest: memberForm.career_interest || null,
+                                            status: memberForm.status,
+                                            notes: memberForm.notes || null,
+                                          })}>Save</button>
+                                          <button className="module-table-action" onClick={() => setEditingMember(null)}><X size={13} /></button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <div key={m.id} className="cs-member-row">
-                                      <div className="cs-member-name">{m.name}</div>
-                                      {m.grad_year && <div className="cs-member-meta">'{String(m.grad_year).slice(2)}</div>}
-                                      {m.major && <div className="cs-member-meta cs-member-meta--muted">{m.major}</div>}
-                                      {m.career_interest && <div className="cs-member-interest">{m.career_interest}</div>}
-                                      <span className="cs-member-status" style={{ background: MEMBER_STATUS_CONFIG[m.status].bg, color: MEMBER_STATUS_CONFIG[m.status].color }}>
-                                        {MEMBER_STATUS_CONFIG[m.status].label}
-                                      </span>
-                                      {m.notes && <div className="cs-member-notes">{m.notes}</div>}
-                                      <div className="cs-member-row-actions">
-                                        <button className="module-table-action" onClick={() => { setEditingMember(m); setMemberForm({ name: m.name, grad_year: m.grad_year ? String(m.grad_year) : '', major: m.major || '', career_interest: m.career_interest || '', status: m.status, notes: m.notes || '' }); }}>
-                                          <Edit2 size={13} />
-                                        </button>
-                                        <button className="module-table-action delete" disabled={deletingMemberId === m.id} onClick={() => deleteMember(m.id, chapter.id)}>
-                                          <Trash2 size={13} />
-                                        </button>
+                                    ) : (
+                                      <div key={m.id} className="cs-member-row">
+                                        <div className="cs-member-name">
+                                          {m.name}
+                                          <span style={{
+                                            fontSize: '0.7rem', fontWeight: 600, padding: '1px 7px', borderRadius: 12,
+                                            background: (m.member_type || 'active') === 'alumni' ? '#ede9fe' : '#dbeafe',
+                                            color: (m.member_type || 'active') === 'alumni' ? '#6d28d9' : '#1d4ed8',
+                                            marginLeft: 4,
+                                          }}>
+                                            {(m.member_type || 'active') === 'alumni' ? 'Alumni' : 'Active'}
+                                          </span>
+                                        </div>
+                                        {m.grad_year && <div className="cs-member-meta">&apos;{String(m.grad_year).slice(2)}</div>}
+                                        {(m.member_type || 'active') === 'alumni' ? (
+                                          <>
+                                            {m.job_role && <div className="cs-member-meta">{m.job_role}</div>}
+                                            {m.company && <div className="cs-member-meta cs-member-meta--muted">{m.company}</div>}
+                                            {m.is_hiring && (
+                                              <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '1px 8px', borderRadius: 12, background: '#dcfce7', color: '#16a34a' }}>
+                                                Hiring ✓
+                                              </span>
+                                            )}
+                                          </>
+                                        ) : (
+                                          m.major && <div className="cs-member-meta cs-member-meta--muted">{m.major}</div>
+                                        )}
+                                        {m.career_interest && <div className="cs-member-interest">{m.career_interest}</div>}
+                                        <span className="cs-member-status" style={{ background: MEMBER_STATUS_CONFIG[m.status].bg, color: MEMBER_STATUS_CONFIG[m.status].color }}>
+                                          {MEMBER_STATUS_CONFIG[m.status].label}
+                                        </span>
+                                        {m.notes && <div className="cs-member-notes">{m.notes}</div>}
+                                        <div className="cs-member-row-actions">
+                                          <button className="module-table-action" onClick={() => {
+                                            setEditingMember(m);
+                                            setMemberForm({
+                                              name: m.name,
+                                              grad_year: m.grad_year ? String(m.grad_year) : '',
+                                              major: m.major || '',
+                                              career_interest: m.career_interest || '',
+                                              status: m.status,
+                                              notes: m.notes || '',
+                                              member_type: m.member_type || 'active',
+                                              job_role: m.job_role || '',
+                                              company: m.company || '',
+                                              is_hiring: m.is_hiring || false,
+                                            });
+                                          }}>
+                                            <Edit2 size={13} />
+                                          </button>
+                                          <button className="module-table-action delete" disabled={deletingMemberId === m.id} onClick={() => deleteMember(m.id, chapter.id)}>
+                                            <Trash2 size={13} />
+                                          </button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  )
-                                ))}
-                              </div>
-                            )}
+                                    )
+                                  ))}
+                                </div>
+                              );
+                            })()}
 
                             {/* Add member form (inline) */}
                             {showAddMember === chapter.id && (
                               <div className="cs-member-add-form">
                                 <div className="cs-member-form-title"><Plus size={13} /> New Member</div>
+                                {/* Member Type Toggle */}
+                                <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                                  {(['active', 'alumni'] as const).map(type => (
+                                    <button
+                                      key={type}
+                                      onClick={() => { setAddMemberType(type); setMemberForm(p => ({ ...p, member_type: type })); }}
+                                      style={{
+                                        padding: '5px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+                                        border: addMemberType === type ? '2px solid #4f46e5' : '1px solid #e5e7eb',
+                                        background: addMemberType === type ? '#eef2ff' : '#fff',
+                                        color: addMemberType === type ? '#4f46e5' : '#6b7280',
+                                      }}
+                                    >
+                                      {type === 'active' ? 'Active Member' : 'Alumni'}
+                                    </button>
+                                  ))}
+                                </div>
                                 <div className="cs-member-form-grid">
                                   <div className="module-form-group">
                                     <label>Name *</label>
@@ -1115,13 +1198,30 @@ export default function CustomerSuccessModule() {
                                     <label>Grad Year</label>
                                     <input type="number" value={memberForm.grad_year} onChange={e => setMemberForm(p => ({ ...p, grad_year: e.target.value }))} placeholder="2025" />
                                   </div>
+                                  {addMemberType === 'active' ? (
+                                    <div className="module-form-group">
+                                      <label>Major</label>
+                                      <input type="text" value={memberForm.major} onChange={e => setMemberForm(p => ({ ...p, major: e.target.value }))} placeholder="Finance" />
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="module-form-group">
+                                        <label>Job Role</label>
+                                        <input type="text" value={memberForm.job_role} onChange={e => setMemberForm(p => ({ ...p, job_role: e.target.value }))} placeholder="VP at Goldman Sachs" />
+                                      </div>
+                                      <div className="module-form-group">
+                                        <label>Company</label>
+                                        <input type="text" value={memberForm.company} onChange={e => setMemberForm(p => ({ ...p, company: e.target.value }))} placeholder="Goldman Sachs" />
+                                      </div>
+                                      <div className="module-form-group" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <label style={{ marginBottom: 0 }}>Hiring?</label>
+                                        <input type="checkbox" checked={memberForm.is_hiring} onChange={e => setMemberForm(p => ({ ...p, is_hiring: e.target.checked }))} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                                      </div>
+                                    </>
+                                  )}
                                   <div className="module-form-group">
-                                    <label>Major</label>
-                                    <input type="text" value={memberForm.major} onChange={e => setMemberForm(p => ({ ...p, major: e.target.value }))} placeholder="Finance" />
-                                  </div>
-                                  <div className="module-form-group">
-                                    <label>Career Interest</label>
-                                    <input type="text" value={memberForm.career_interest} onChange={e => setMemberForm(p => ({ ...p, career_interest: e.target.value }))} placeholder="Investment Banking, PE, Tech…" />
+                                    <label>{addMemberType === 'alumni' ? 'Open To' : 'Career Interest'}</label>
+                                    <input type="text" value={memberForm.career_interest} onChange={e => setMemberForm(p => ({ ...p, career_interest: e.target.value }))} placeholder={addMemberType === 'alumni' ? 'Mentoring, hiring, investing…' : 'Investment Banking, PE, Tech…'} />
                                   </div>
                                   <div className="module-form-group">
                                     <label>Status</label>
@@ -1138,7 +1238,7 @@ export default function CustomerSuccessModule() {
                                 </div>
                                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                                   <button className="module-primary-btn" onClick={() => addMember(chapter.id)}>Add Member</button>
-                                  <button className="module-cancel-btn" onClick={() => setShowAddMember(null)}>Cancel</button>
+                                  <button className="module-cancel-btn" onClick={() => { setShowAddMember(null); setAddMemberType('active'); }}>Cancel</button>
                                 </div>
                               </div>
                             )}
