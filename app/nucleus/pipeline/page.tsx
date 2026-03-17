@@ -850,7 +850,8 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   /* ─── Deal Card ─── */
   const DealCard = ({ deal, showAssigned = false }: { deal: PipelineDeal; showAssigned?: boolean }) => {
     const urgency = followupUrgency(deal.next_followup);
-    const days = daysAgo(deal.last_touched);
+    // BUG-5: prefer updated_at, fallback to last_touched, then created_at
+    const days = daysAgo(deal.updated_at || deal.last_touched || deal.created_at);
     const stageConf = STAGE_CONFIG[deal.stage];
     const assignee = showAssigned ? employees.find(e => e.id === deal.assigned_to) : null;
     const orgIcon = getOrgIcon(deal);

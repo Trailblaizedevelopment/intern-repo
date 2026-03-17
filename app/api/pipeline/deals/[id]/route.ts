@@ -29,7 +29,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = await req.json();
 
-  const { data, error } = await admin.from('pipeline_deals').update(body).eq('id', id).select().single();
+  // BUG-5: always stamp updated_at on every PATCH
+  const payload = { ...body, updated_at: new Date().toISOString() };
+
+  const { data, error } = await admin.from('pipeline_deals').update(payload).eq('id', id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
