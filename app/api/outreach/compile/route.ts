@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { createChat, getRecipientService } from '@/lib/linq';
 
+export const maxDuration = 300;
+
 /**
  * POST /api/outreach/compile
  * On-demand outreach batch compiler. Mirrors cron logic but runs immediately
@@ -213,10 +215,10 @@ export async function POST() {
       }));
     }
 
-    // Remove SMS and failed contacts from T1 list
-    // Contacts that already had linq_chat_id (pre-existing) are kept
-    const rejectedSet = new Set([...smsRejected, ...allocationFailed]);
-    const t1Final = t1Contacts.filter(c => !rejectedSet.has(c.id) || c.linq_chat_id);
+    // Only CONFIRMED SMS contacts get excluded from the batch.
+    // Failed allocations stay in — they'll retry Phase B at execute time.
+    const smsSet = new Set(smsRejected);
+    const t1Final = t1Contacts.filter(c => !smsSet.has(c.id));
 
     // Final contact counts
     const finalTotal = t1Final.length + t2Contacts.length + t3Contacts.length;
