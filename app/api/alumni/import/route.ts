@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { autoAssignQueue } from '@/lib/outreach';
+import { batchLookupPhoneTypes } from '@/lib/telnyx';
 
 const HEADER_ALIASES: Record<string, string[]> = {
   first_name: ['first name', 'fname', 'first', 'firstname', 'given name', 'givenname'],
@@ -235,6 +236,43 @@ export async function POST(request: NextRequest) {
       } catch (assignErr) {
         console.error('Auto-assign after import failed:', assignErr);
       }
+    }
+
+    // ── Telnyx carrier lookup (fire-and-forget, runs after response) ──────────
+    // Classifies phone numbers as mobile/landline/voip so non-mobile contacts
+    // are permanently excluded from iMessage outreach before they ever hit a batch.
+    if (imported > 0 && process.env.TELNYX_API_KEY) {
+      const phones = toInsert
+        .filter(c => c.phone_primary)
+        .map(c => c.phone_primary as string);
+
+      // Non-blocking — don't await, let it run in background
+      (async () => {
+        try {
+          const supabaseAdmin = (await import('@/lib/supabase-admin')).getSupabaseAdmin();
+          if (!supabaseAdmin) return;
+
+          const typeMap = await batchLookupPhoneTypes(phones, 120); // 120ms between lookups
+
+          // Batch update phone_type for each classified number
+          const updates = [...typeMap.entries()].map(([phone, phoneType]) => ({
+            phone,
+            phoneType,
+          }));
+
+          for (const { phone, phoneType } of updates) {
+            await supabaseAdmin
+              .from('alumni_contacts')
+              .update({ phone_type: phoneType })
+              .eq('chapter_id', chapterId)
+              .eq('phone_primary', phone);
+          }
+
+          console.log(`[import] Telnyx lookup complete: ${updates.length} phones classified`);
+        } catch (e) {
+          console.error('[import] Telnyx lookup failed:', e);
+        }
+      })();
     }
 
     return NextResponse.json({

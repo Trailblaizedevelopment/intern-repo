@@ -759,6 +759,7 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
     const [flagReason, setFlagReason] = React.useState('');
     const [flagging, setFlagging] = React.useState(false);
     const [handlingId, setHandlingId] = React.useState<string | null>(null);
+    const [pitchingId, setPitchingId] = React.useState<string | null>(null);
     const [handledIds, setHandledIds] = React.useState<Set<string>>(new Set());
     const [handledAtMissing, setHandledAtMissing] = React.useState(false);
     const [inboxError, setInboxError] = React.useState<string | null>(null);
@@ -876,6 +877,27 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
         showToast(`Failed to send: ${e instanceof Error ? e.message : e}`, 'error');
       } finally {
         setSendingReply(false);
+      }
+    }
+
+    async function handleSendPitch(conv: InboxConversation) {
+      if (!conv.contact_id) return;
+      setPitchingId(conv.contact_id);
+      try {
+        const res = await fetch('/api/outreach/conversations/send-pitch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h' },
+          body: JSON.stringify({ contact_id: conv.contact_id }),
+        });
+        const json = await res.json();
+        if (!res.ok || json.error) throw new Error(json.error || 'Send failed');
+        showToast('Pitch sent — contact marked as pitched', 'success');
+        // Refresh inbox to reflect status change
+        fetchInbox();
+      } catch (e) {
+        showToast(`Failed to send pitch: ${e instanceof Error ? e.message : e}`, 'error');
+      } finally {
+        setPitchingId(null);
       }
     }
 
@@ -1135,6 +1157,18 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {/* Send Pitch — only for confirmed contacts */}
+                    {selected.outreach_status === 'touch1_confirmed' && (
+                      <button
+                        onClick={() => handleSendPitch(selected)}
+                        disabled={pitchingId === selected.contact_id}
+                        title="Send T1.2 — pitch with sign-up link on the same Linq line"
+                        style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid #a5b4fc', background: '#eef2ff', color: '#4f46e5', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        {pitchingId === selected.contact_id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={12} />}
+                        Send Pitch
+                      </button>
+                    )}
                     {/* Flag/Unflag */}
                     <button
                       onClick={() => selected.flagged ? handleFlag(true) : setShowFlagModal(true)}

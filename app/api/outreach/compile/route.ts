@@ -100,29 +100,35 @@ export async function POST() {
     const cutoff4days = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString();
 
     // ── 4. T1 eligible ────────────────────────────────────────────────────────
+    // T1 pool: prefer confirmed-mobile contacts first, then unclassified (phone_type IS NULL)
+    // Exclude known landline/voip entirely — they'll never be iMessage
     const { data: t1Raw } = await supabase
       .from('alumni_contacts')
-      .select('id, chapter_id, year')
+      .select('id, chapter_id, year, phone_type')
       .eq('outreach_status', 'not_contacted')
       .not('is_imessage', 'is', false)
       .not('phone_primary', 'is', null)
+      .not('phone_type', 'in', '("landline","voip")')
       .gte('year', 1970)
       .limit(t1Total);
 
     const t1Contacts: { id: string; chapter_id: string; year?: number | null }[] = t1Raw || [];
 
-    // ── 5. T2 eligible (two queries, deduplicate) ─────────────────────────────
-    // Part A: touch1_confirmed OR (touch1_sent AND sent >= 2 days ago)
+    // ── 5. T2 nudge eligible (NON-RESPONDERS ONLY) ───────────────────────────
+    // T2 = automated nudge for contacts who got T1 but never replied.
+    // touch1_confirmed contacts are handled manually via "Send Pitch" in the inbox.
+    // pitched contacts skip T2/T3 entirely (they're in a real conversation).
     const { data: t2aRaw } = await supabase
       .from('alumni_contacts')
       .select('id, chapter_id')
-      .or(`outreach_status.eq.touch1_confirmed,and(outreach_status.eq.touch1_sent,touch1_sent_at.lte.${cutoff2days})`)
+      .eq('outreach_status', 'touch1_sent')
+      .lte('touch1_sent_at', cutoff2days)
       .is('touch2_sent_at', null)
       .not('is_imessage', 'is', false)
       .not('phone_primary', 'is', null)
       .limit(t2t3Total);
 
-    // Part B: no_response AND touch1 >= 2 days ago
+    // Part B: explicitly no_response AND touch1 >= 2 days ago
     const { data: t2bRaw } = await supabase
       .from('alumni_contacts')
       .select('id, chapter_id')
