@@ -35,6 +35,18 @@ interface ConfettiParticle {
   color: string; rotation: number; scale: number;
 }
 
+interface MemberConnection {
+  id: string;
+  chapter_id: string;
+  member_a_id: string;
+  member_b_id: string;
+  status: 'intro_made' | 'in_conversation' | 'hired' | 'no_fit';
+  notes: string | null;
+  created_at: string;
+  member_a: { id: string; name: string; member_type: string | null } | null;
+  member_b: { id: string; name: string; member_type: string | null } | null;
+}
+
 type ChapterTab = 'overview' | 'alumni' | 'platform' | 'headhunting' | 'links' | 'payment';
 
 const TAB_CONFIG: { id: ChapterTab; label: string; icon: React.ReactNode }[] = [
@@ -117,6 +129,14 @@ export default function CustomerSuccessModule() {
   const [editingMember, setEditingMember] = useState<ChapterMember | null>(null);
   const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
   const [memberMigrationPending, setMemberMigrationPending] = useState(false);
+
+  /* ─── Member connections (headhunting) ─── */
+  const [connections, setConnections] = useState<Record<string, MemberConnection[]>>({});
+  const [showAddConnection, setShowAddConnection] = useState<string | null>(null);
+  const [connectionForm, setConnectionForm] = useState<{ member_b_id: string; status: string; notes: string }>({
+    member_b_id: '', status: 'intro_made', notes: '',
+  });
+  const [savingConnection, setSavingConnection] = useState(false);
 
   /* ─── Check-in form ─── */
   const [checkInForm, setCheckInForm] = useState({
@@ -222,6 +242,16 @@ export default function CustomerSuccessModule() {
     } finally {
       setLoadingMembers(p => ({ ...p, [chapterId]: false }));
     }
+  }
+
+  async function fetchConnections(chapterId: string) {
+    try {
+      const res = await fetch(`/api/headhunting/connections?chapter_id=${chapterId}`, {
+        headers: { Authorization: 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h' },
+      });
+      const json = await res.json();
+      if (json.data) setConnections(p => ({ ...p, [chapterId]: json.data }));
+    } catch { /* silent */ }
   }
 
   async function fetchPlatformMembers(chapterId: string) {
@@ -431,6 +461,49 @@ export default function CustomerSuccessModule() {
     } finally { setDeletingMemberId(null); }
   }
 
+  async function addConnection(chapterId: string, memberAId: string) {
+    if (!connectionForm.member_b_id) return showToast('Select a member to connect', 'error');
+    setSavingConnection(true);
+    try {
+      const res = await fetch('/api/headhunting/connections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h',
+        },
+        body: JSON.stringify({
+          chapter_id: chapterId,
+          member_a_id: memberAId,
+          member_b_id: connectionForm.member_b_id,
+          status: connectionForm.status,
+          notes: connectionForm.notes || null,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) return showToast(json.error, 'error');
+      showToast('Connection logged', 'success');
+      setShowAddConnection(null);
+      setConnectionForm({ member_b_id: '', status: 'intro_made', notes: '' });
+      fetchConnections(chapterId);
+    } catch { showToast('Failed to log connection', 'error'); }
+    finally { setSavingConnection(false); }
+  }
+
+  async function deleteConnection(connectionId: string, chapterId: string) {
+    try {
+      const res = await fetch(`/api/headhunting/connections/${connectionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h' },
+      });
+      const json = await res.json();
+      if (json.error) return showToast(json.error, 'error');
+      setConnections(p => ({
+        ...p,
+        [chapterId]: (p[chapterId] || []).filter(c => c.id !== connectionId),
+      }));
+    } catch { showToast('Failed to remove connection', 'error'); }
+  }
+
   async function saveBookingLink() {
     setSavingSettings(true);
     try {
@@ -488,7 +561,10 @@ export default function CustomerSuccessModule() {
 
   function handleTabChange(tab: ChapterTab, chapterId: string) {
     setActiveTab(tab);
-    if (tab === 'headhunting' && !members[chapterId]) fetchMembers(chapterId);
+    if (tab === 'headhunting') {
+      if (!members[chapterId]) fetchMembers(chapterId);
+      if (!connections[chapterId]) fetchConnections(chapterId);
+    }
     if (tab === 'platform' && !platformMembers[chapterId]) fetchPlatformMembers(chapterId);
   }
 
@@ -1154,6 +1230,118 @@ export default function CustomerSuccessModule() {
                                           {MEMBER_STATUS_CONFIG[m.status].label}
                                         </span>
                                         {m.notes && <div className="cs-member-notes">{m.notes}</div>}
+
+                                        {/* ── Connections sub-section ── */}
+                                        {(() => {
+                                          const memberConns = (connections[chapter.id] || []).filter(
+                                            c => c.member_a_id === m.id || c.member_b_id === m.id
+                                          );
+                                          const statusBadge = (s: string) => {
+                                            const cfg: Record<string, { bg: string; color: string; label: string }> = {
+                                              intro_made:     { bg: '#dbeafe', color: '#1d4ed8', label: 'Intro Made' },
+                                              in_conversation:{ bg: '#fef3c7', color: '#b45309', label: 'In Conversation' },
+                                              hired:          { bg: '#dcfce7', color: '#16a34a', label: 'Hired 🎉' },
+                                              no_fit:         { bg: '#f3f4f6', color: '#6b7280', label: 'No Fit' },
+                                            };
+                                            const c = cfg[s] || cfg.intro_made;
+                                            return <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: c.bg, color: c.color }}>{c.label}</span>;
+                                          };
+                                          const typeBadge = (type: string | null) => (
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10, background: type === 'alumni' ? '#ede9fe' : '#dbeafe', color: type === 'alumni' ? '#6d28d9' : '#1d4ed8' }}>
+                                              {type === 'alumni' ? 'Alumni' : 'Active'}
+                                            </span>
+                                          );
+                                          return (
+                                            <div style={{ width: '100%', marginTop: 8, paddingLeft: 12, borderLeft: '2px solid #f3f4f6' }}>
+                                              {memberConns.length > 0 && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
+                                                  {memberConns.map(conn => {
+                                                    const other = conn.member_a_id === m.id ? conn.member_b : conn.member_a;
+                                                    return (
+                                                      <div key={conn.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: '0.78rem', color: '#374151' }}>
+                                                        <span style={{ fontWeight: 600 }}>{other?.name || 'Unknown'}</span>
+                                                        {typeBadge(other?.member_type || null)}
+                                                        {statusBadge(conn.status)}
+                                                        {conn.notes && <span style={{ color: '#6b7280', fontSize: '0.72rem' }}>— {conn.notes}</span>}
+                                                        <button
+                                                          onClick={() => deleteConnection(conn.id, chapter.id)}
+                                                          style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+                                                          title="Remove connection"
+                                                        >
+                                                          <X size={11} />
+                                                        </button>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
+
+                                              {showAddConnection === m.id ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb', marginTop: 2 }}>
+                                                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', marginBottom: 2 }}>Log Connection</div>
+                                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                    <select
+                                                      value={connectionForm.member_b_id}
+                                                      onChange={e => setConnectionForm(p => ({ ...p, member_b_id: e.target.value }))}
+                                                      style={{ fontSize: '0.78rem', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', flex: '1 1 140px', minWidth: 0 }}
+                                                    >
+                                                      <option value="">Select member…</option>
+                                                      {(members[chapter.id] || [])
+                                                        .filter(other => other.id !== m.id)
+                                                        .map(other => (
+                                                          <option key={other.id} value={other.id}>
+                                                            {other.name} ({(other.member_type || 'active') === 'alumni' ? 'Alumni' : 'Active'})
+                                                          </option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                      value={connectionForm.status}
+                                                      onChange={e => setConnectionForm(p => ({ ...p, status: e.target.value }))}
+                                                      style={{ fontSize: '0.78rem', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', flex: '0 1 130px' }}
+                                                    >
+                                                      <option value="intro_made">Intro Made</option>
+                                                      <option value="in_conversation">In Conversation</option>
+                                                      <option value="hired">Hired</option>
+                                                      <option value="no_fit">No Fit</option>
+                                                    </select>
+                                                  </div>
+                                                  <input
+                                                    type="text"
+                                                    placeholder="Notes (optional)"
+                                                    value={connectionForm.notes}
+                                                    onChange={e => setConnectionForm(p => ({ ...p, notes: e.target.value }))}
+                                                    style={{ fontSize: '0.78rem', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, background: '#fff' }}
+                                                  />
+                                                  <div style={{ display: 'flex', gap: 6 }}>
+                                                    <button
+                                                      className="cs-log-btn"
+                                                      disabled={savingConnection}
+                                                      onClick={() => addConnection(chapter.id, m.id)}
+                                                      style={{ fontSize: '0.75rem', padding: '4px 12px' }}
+                                                    >
+                                                      {savingConnection ? 'Saving…' : 'Save'}
+                                                    </button>
+                                                    <button
+                                                      className="module-cancel-btn"
+                                                      onClick={() => { setShowAddConnection(null); setConnectionForm({ member_b_id: '', status: 'intro_made', notes: '' }); }}
+                                                      style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                                                    >
+                                                      Cancel
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <button
+                                                  onClick={() => { setShowAddConnection(m.id); setConnectionForm({ member_b_id: '', status: 'intro_made', notes: '' }); }}
+                                                  style={{ fontSize: '0.72rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}
+                                                >
+                                                  <Plus size={11} /> Add Connection
+                                                </button>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
+
                                         <div className="cs-member-row-actions">
                                           <button className="module-table-action" onClick={() => {
                                             setEditingMember(m);
