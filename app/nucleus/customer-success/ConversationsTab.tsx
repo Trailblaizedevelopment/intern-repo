@@ -664,7 +664,7 @@ export default function ConversationsTab({ showToast }: Props) {
         </div>
 
         {/* Reply bar — always visible */}
-        <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0 }}>
+        <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0, position: 'sticky', bottom: 0, zIndex: 10 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <textarea
               value={replyText}

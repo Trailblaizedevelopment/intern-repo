@@ -113,7 +113,7 @@ export async function sendMessage(chatId: string, message: string): Promise<Linq
       'Authorization': `Bearer ${getToken()}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ parts: [{ type: 'text', value: message }] }),
+    body: JSON.stringify({ message: { parts: [{ type: 'text', value: message }] } }),
   });
   if (!res.ok) {
     const text = await res.text();
