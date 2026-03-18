@@ -162,9 +162,18 @@ export default function ConversationsTab({ showToast }: Props) {
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [selectedForBulk, setSelectedForBulk] = useState<Set<string>>(new Set());
   const [bulkActioning, setBulkActioning] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const syncedRef = useRef(false);
   const LIMIT = 50;
+
+  // Mobile viewport detection
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Auto-sync on mount (non-blocking)
   useEffect(() => {
@@ -744,7 +753,7 @@ export default function ConversationsTab({ showToast }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: 'calc(100vh - 220px)', minHeight: 520, maxHeight: '90vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: isMobile ? 'calc(100vh - 160px)' : 'calc(100vh - 220px)', minHeight: 520, maxHeight: '90vh' }}>
 
       {/* ── Top bar ── */}
       <div style={{ padding: '12px 18px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: '#fff', flexShrink: 0 }}>
@@ -875,7 +884,7 @@ export default function ConversationsTab({ showToast }: Props) {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
         {/* Left: list panel */}
-        <div style={{ width: 340, flexShrink: 0, borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: isMobile ? '100%' : 340, flexShrink: 0, borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fafafa', display: isMobile && selected ? 'none' : 'flex', flexDirection: 'column' }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', gap: 8, fontSize: '0.8rem' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
@@ -911,7 +920,9 @@ export default function ConversationsTab({ showToast }: Props) {
         </div>
 
         {/* Right: thread panel */}
-        {ThreadPanel()}
+        <div style={{ display: isMobile && !selected ? 'none' : 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+          {ThreadPanel()}
+        </div>
       </div>
 
       {/* ── Flag modal ── */}
