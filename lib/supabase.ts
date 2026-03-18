@@ -742,7 +742,7 @@ export interface AlumniImportSummary {
 // ============================================
 
 export const SENDING_LINES = [
-  { number: 1, label: 'Owen', daily_limit: 50, phone: '+16462408056' },
+  { number: 1, label: 'Owen', daily_limit: 45, phone: '+16462101111' },
   { number: 2, label: 'Adam', daily_limit: 50, phone: '+16462668785' },
   { number: 3, label: 'Ford', daily_limit: 50, phone: '+16462442696' },
 ] as const;

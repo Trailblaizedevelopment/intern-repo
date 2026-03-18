@@ -106,14 +106,19 @@ export async function getChat(chatId: string): Promise<LinqChat> {
   return res.json();
 }
 
-export async function sendMessage(chatId: string, message: string): Promise<LinqMessage> {
+export async function sendMessage(chatId: string, message: string, fromPhone?: string): Promise<LinqMessage> {
+  const body: Record<string, unknown> = {
+    message: { parts: [{ type: 'text', value: message }] },
+  };
+  if (fromPhone) body.from = fromPhone;
+
   const res = await fetch(`${LINQ_BASE}/chats/${chatId}/messages`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getToken()}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message: { parts: [{ type: 'text', value: message }] } }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text();

@@ -14,7 +14,7 @@ export interface LinqLineConfig {
 }
 
 const DEFAULT_LINES: LinqLineConfig[] = [
-  { line_number: 1, label: 'Owen', line_phone: '+16462408056', daily_limit: 45, is_paused: false, pause_reason: null },
+  { line_number: 1, label: 'Owen', line_phone: '+16462101111', daily_limit: 45, is_paused: false, pause_reason: null },
   { line_number: 2, label: 'Adam', line_phone: '+16462668785', daily_limit: 45, is_paused: false, pause_reason: null },
   { line_number: 3, label: 'Ford', line_phone: '+16462442696', daily_limit: 45, is_paused: false, pause_reason: null },
 ];
