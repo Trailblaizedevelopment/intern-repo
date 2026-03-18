@@ -874,7 +874,9 @@ export default function ConversationsTab({ showToast }: Props) {
             </div>
           ) : (
             <>
-              {displayed.map(c => <ConvRow key={c.id} c={c} />)}
+              {displayed.map(c => (
+                <React.Fragment key={c.id}>{ConvRow({ c })}</React.Fragment>
+              ))}
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -889,7 +891,7 @@ export default function ConversationsTab({ showToast }: Props) {
         </div>
 
         {/* Right: thread panel */}
-        <ThreadPanel />
+        {ThreadPanel()}
       </div>
 
       {/* ── Flag modal ── */}
