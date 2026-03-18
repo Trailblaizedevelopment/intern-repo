@@ -18,6 +18,9 @@ export interface RoadmapTicket {
   barEnd: string;   // YYYY-MM-DD
 }
 
+/** Raw ticket as returned from the DB (no computed fields) */
+export type RawTicket = Omit<RoadmapTicket, 'barStart' | 'barEnd'>;
+
 export interface RoadmapProject {
   id: string;
   name: string;

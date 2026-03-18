@@ -4,6 +4,7 @@ import type { RoadmapTicket } from './types';
 export const GANTT_START = '2026-03-17';
 export const GANTT_END = '2026-04-07';
 export const SPRINT1_END = '2026-03-21';
+export const SPRINT2_START = '2026-03-22';
 export const SPRINT2_END = '2026-03-31';
 export const DAY_WIDTH = 40; // px per day
 
@@ -41,10 +42,10 @@ export function computeBarEnd(ticket: {
   if (ticket.due_date) return ticket.due_date.slice(0, 10);
   if (ticket.sprint) {
     const s = ticket.sprint.toLowerCase();
-    if (s.includes('sprint 1') || s.includes('sprint1') || s.includes('mar 17') || /\bsprint.{0,3}1\b/.test(s)) {
+    if (s.includes('sprint 1') || s.includes('sprint1') || /\bsprint.{0,3}1\b/.test(s)) {
       return SPRINT1_END;
     }
-    if (s.includes('sprint 2') || s.includes('sprint2') || s.includes('mar 22') || /\bsprint.{0,3}2\b/.test(s)) {
+    if (s.includes('sprint 2') || s.includes('sprint2') || /\bsprint.{0,3}2\b/.test(s)) {
       return SPRINT2_END;
     }
   }
@@ -55,8 +56,23 @@ export function computeBarEnd(ticket: {
 /** Build full RoadmapTicket from raw DB row */
 export function buildTicket(raw: Omit<RoadmapTicket, 'barStart' | 'barEnd'>): RoadmapTicket {
   const barEnd = clamp(computeBarEnd(raw));
-  const rawStart = raw.created_at.slice(0, 10);
-  const barStart = clamp(rawStart < barEnd ? rawStart : barEnd);
+
+  // Bar start = sprint band start (not created_at) — so bars don't all cluster at creation date
+  let rawBarStart: string;
+  if (raw.sprint) {
+    const s = raw.sprint.toLowerCase();
+    if (s.includes('sprint 1') || s.includes('sprint1') || /\bsprint.{0,3}1\b/.test(s)) {
+      rawBarStart = GANTT_START; // Sprint 1 starts 2026-03-17
+    } else if (s.includes('sprint 2') || s.includes('sprint2') || /\bsprint.{0,3}2\b/.test(s)) {
+      rawBarStart = SPRINT2_START; // Sprint 2 starts 2026-03-22
+    } else {
+      rawBarStart = formatDate(new Date());
+    }
+  } else {
+    rawBarStart = formatDate(new Date());
+  }
+
+  const barStart = clamp(rawBarStart <= barEnd ? rawBarStart : barEnd);
   return { ...raw, barStart, barEnd };
 }
 
@@ -77,17 +93,6 @@ export function projectColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
   return PROJECT_COLORS[hash % PROJECT_COLORS.length];
-}
-
-/** Priority color (Tailwind bg class) — kept for backward compat */
-export function priorityColor(priority: string | null): string {
-  switch (priority) {
-    case 'critical': return 'bg-red-500';
-    case 'high':     return 'bg-orange-500';
-    case 'medium':   return 'bg-yellow-400';
-    case 'low':      return 'bg-gray-400';
-    default:         return 'bg-gray-300';
-  }
 }
 
 /** Priority dot color (Tailwind bg class) */
@@ -133,14 +138,6 @@ export function sprintBand(day: string): 'sprint1' | 'sprint2' | 'post' {
   return 'post';
 }
 
-export function bandBg(band: 'sprint1' | 'sprint2' | 'post'): string {
-  switch (band) {
-    case 'sprint1': return 'bg-blue-50';
-    case 'sprint2': return 'bg-purple-50';
-    default: return 'bg-white';
-  }
-}
-
 export function sprintLabel(sprint: string | null): string {
   if (!sprint) return '—';
   const s = sprint.toLowerCase();
@@ -157,3 +154,12 @@ export function sprintBadgeLabel(sprint: string | null): 'S1' | 'S2' | null {
   if (s.includes('sprint 2') || s.includes('sprint2') || /\bsprint.{0,3}2\b/.test(s)) return 'S2';
   return null;
 }
+
+/** Next status in progression */
+export const STATUS_NEXT: Record<string, string> = {
+  backlog: 'open',
+  open: 'in_progress',
+  todo: 'in_progress',
+  in_progress: 'in_review',
+  in_review: 'done',
+};

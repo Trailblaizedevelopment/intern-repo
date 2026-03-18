@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { RoadmapTicket, Employee } from './types';
 import {
   ganttDays, daysBetween, formatDate, parseDate, sprintBand,
@@ -10,13 +10,6 @@ import {
 
 const ROW_HEIGHT = 36;
 const LEFT_WIDTH = 240;
-const HEADER_H = 56; // Sprint band (20px) + day row (36px)
-
-interface MilestoneTooltipState {
-  sprint: 1 | 2;
-  x: number;
-  y: number;
-}
 
 interface GanttViewProps {
   tickets: RoadmapTicket[];
@@ -27,429 +20,400 @@ interface GanttViewProps {
 
 interface DragState {
   ticketId: string;
-  startMouseX: number;
+  startX: number;
   originalEnd: string;
   currentEnd: string;
 }
 
-export function GanttView({ tickets, employees, onTicketClick, onReschedule }: GanttViewProps) {
+interface MilestonePopover {
+  sprint: 1 | 2;
+  x: number;
+  y: number;
+}
+
+// Column background per band
+function dayBg(day: string): string {
+  const band = sprintBand(day);
+  if (band === 'sprint1') return 'rgba(239,246,255,0.7)';
+  if (band === 'sprint2') return 'rgba(245,243,255,0.5)';
+  return '#ffffff';
+}
+
+// Vertical line inside a row (today / milestones)
+function RowLine({ x, color, zIndex = 5 }: { x: number; color: string; zIndex?: number }) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: x,
+        top: 0,
+        bottom: 0,
+        width: 1,
+        background: color,
+        pointerEvents: 'none',
+        zIndex,
+      }}
+    />
+  );
+}
+
+export function GanttView({ tickets, employees: _employees, onTicketClick, onReschedule }: GanttViewProps) {
   const days = ganttDays();
   const totalWidth = days.length * DAY_WIDTH;
   const today = formatDate(new Date());
+  const todayIdx = daysBetween(GANTT_START, today);
+  const sprint1EndIdx = daysBetween(GANTT_START, SPRINT1_END); // 4
+  const sprint2EndIdx = daysBetween(GANTT_START, SPRINT2_END); // 14
 
-  // Collapse state per project name
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const [milestone, setMilestone] = useState<MilestoneTooltipState | null>(null);
-  const rightRef = useRef<HTMLDivElement>(null);
-  const leftRef = useRef<HTMLDivElement>(null);
-
-  // Sync scroll between left and right columns
-  const syncScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const src = e.currentTarget;
-    const other = src === rightRef.current ? leftRef.current : rightRef.current;
-    if (other) other.scrollTop = src.scrollTop;
-  }, []);
+  const [dragEnd, setDragEnd] = useState<Record<string, string>>({});
+  const [milestonePopover, setMilestonePopover] = useState<MilestonePopover | null>(null);
+  const dragRef = useRef<DragState | null>(null);
 
   // Group tickets by project
   const projectGroups = tickets.reduce<Record<string, RoadmapTicket[]>>((acc, t) => {
     const key = t.project ?? 'No Project';
-    (acc[key] = acc[key] || []).push(t);
+    (acc[key] = acc[key] ?? []).push(t);
     return acc;
   }, {});
   const projectNames = Object.keys(projectGroups).sort();
 
-  // Build flat list of visible rows for positioning
   type RowItem = { type: 'header'; project: string } | { type: 'ticket'; ticket: RoadmapTicket };
   const rows: RowItem[] = [];
   for (const proj of projectNames) {
     rows.push({ type: 'header', project: proj });
     if (!collapsed[proj]) {
-      for (const t of projectGroups[proj]) {
-        rows.push({ type: 'ticket', ticket: t });
-      }
+      for (const t of projectGroups[proj]) rows.push({ type: 'ticket', ticket: t });
     }
   }
 
-  const totalHeight = rows.length * ROW_HEIGHT;
+  const getBarEnd = (id: string, fallback: string) => dragEnd[id] ?? fallback;
 
-  // Today column index
-  const todayIdx = daysBetween(GANTT_START, today);
-
-  // Drag handlers
-  const handleBarMouseDown = useCallback((e: React.MouseEvent, ticket: RoadmapTicket) => {
-    e.stopPropagation();
-    const currentEnd = drag?.ticketId === ticket.id ? drag.currentEnd : ticket.barEnd;
-    setDrag({ ticketId: ticket.id, startMouseX: e.clientX, originalEnd: currentEnd, currentEnd });
-  }, [drag]);
-
-  useEffect(() => {
-    if (!drag) return;
-    const onMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - drag.startMouseX;
-      const deltaDays = Math.round(deltaX / DAY_WIDTH);
-      const origMs = parseDate(drag.originalEnd).getTime();
-      const newMs = origMs + deltaDays * 86400000;
-      const newEnd = clamp(formatDate(new Date(newMs)));
-      setDrag(d => d ? { ...d, currentEnd: newEnd } : null);
-    };
-    const onUp = () => {
-      if (drag) {
-        if (drag.currentEnd !== drag.originalEnd) {
-          onReschedule(drag.ticketId, drag.currentEnd);
-        }
-        setDrag(null);
-      }
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-  }, [drag, onReschedule]);
-
-  const getTicketEnd = (ticket: RoadmapTicket) =>
-    drag?.ticketId === ticket.id ? drag.currentEnd : ticket.barEnd;
-
-  // Sprint 1/2 ticket lists for milestone tooltips
-  const sprint1Tickets = tickets.filter(t => {
-    const s = (t.sprint ?? '').toLowerCase();
-    return s.includes('sprint 1') || s.includes('sprint1') || /\bsprint.{0,3}1\b/.test(s);
-  });
-  const sprint2Tickets = tickets.filter(t => {
-    const s = (t.sprint ?? '').toLowerCase();
-    return s.includes('sprint 2') || s.includes('sprint2') || /\bsprint.{0,3}2\b/.test(s);
-  });
-
-  if (tickets.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
-        No tickets match the current filters.
-      </div>
-    );
-  }
+  // Sprint ticket lists for the milestone popover
+  const sprintTickets = (sprintNum: 1 | 2) =>
+    tickets.filter(t => {
+      const s = (t.sprint ?? '').toLowerCase();
+      const n = sprintNum.toString();
+      return (
+        s.includes(`sprint ${n}`) ||
+        s.includes(`sprint${n}`) ||
+        new RegExp(`\\bsprint.{0,3}${n}\\b`).test(s)
+      );
+    });
 
   return (
-    <div className="flex border border-gray-200 rounded-lg overflow-hidden bg-white select-none">
-      {/* Left: project groups + ticket names */}
-      <div style={{ width: LEFT_WIDTH, minWidth: LEFT_WIDTH }} className="flex flex-col border-r border-gray-200 bg-white">
-        {/* Header spacer */}
-        <div style={{ height: HEADER_H }} className="border-b border-gray-200 flex items-end px-3 pb-1.5">
+    <div
+      className="relative select-none overflow-auto bg-white"
+      style={{ maxHeight: 'calc(100vh - 240px)' }}
+    >
+      {/* ── STICKY HEADER ────────────────────────────────────────────────── */}
+      <div
+        className="sticky top-0 z-20 flex"
+        style={{ minWidth: LEFT_WIDTH + totalWidth }}
+      >
+        {/* Corner cell — sticky left AND top */}
+        <div
+          className="sticky left-0 z-30 bg-white border-r border-b border-gray-200 flex items-end px-3 pb-1.5 flex-shrink-0"
+          style={{ width: LEFT_WIDTH }}
+        >
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Ticket</span>
         </div>
-        {/* Rows */}
-        <div
-          ref={leftRef}
-          className="overflow-y-auto overflow-x-hidden flex-1"
-          onScroll={syncScroll}
-          style={{ maxHeight: 'calc(100vh - 260px)' }}
-        >
-          {rows.map((row) => {
-            if (row.type === 'header') {
-              const color = projectColor(row.project);
-              return (
-                <div
-                  key={`h-${row.project}`}
-                  style={{ height: ROW_HEIGHT, borderLeft: `4px solid ${color}` }}
-                  className="flex items-center gap-1.5 px-2 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors duration-100"
-                  onClick={() => setCollapsed(c => ({ ...c, [row.project]: !c[row.project] }))}
-                >
-                  <ChevronDown
-                    size={14}
-                    className="text-gray-400 flex-shrink-0 transition-transform duration-200"
-                    style={{ transform: collapsed[row.project] ? 'rotate(-90deg)' : 'rotate(0deg)' }}
-                  />
-                  <span className="text-xs font-semibold text-gray-700 truncate">{row.project}</span>
-                  <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{projectGroups[row.project]?.length}</span>
-                </div>
-              );
-            }
-            const t = row.ticket;
-            return (
-              <div
-                key={`t-${t.id}`}
-                style={{ height: ROW_HEIGHT, paddingLeft: 16 }}
-                className="flex items-center gap-2 pr-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors duration-100"
-                onClick={() => onTicketClick(t)}
-              >
-                <span className={`flex-shrink-0 w-2 h-2 rounded-full ${priorityDot(t.priority)}`} />
-                <span className="text-xs font-medium text-gray-700 truncate">{t.title}</span>
-              </div>
-            );
-          })}
-          {/* Bottom padding row */}
-          <div style={{ height: 8 }} />
-        </div>
-      </div>
 
-      {/* Right: timeline */}
-      <div className="flex-1 overflow-x-auto">
-        <div style={{ width: totalWidth, position: 'relative' }}>
-          {/* Sprint band header */}
-          <div style={{ height: 20, display: 'flex', position: 'sticky', top: 0, zIndex: 10 }}>
-            {/* Sprint 1: days 0-4 (Mar 17-21) = 5 days */}
+        {/* Sprint bands + day numbers */}
+        <div className="flex-shrink-0" style={{ width: totalWidth }}>
+          {/* Sprint band row */}
+          <div className="flex" style={{ height: 20 }}>
             <div
+              className="bg-blue-50 border-b border-r border-blue-200 flex items-center justify-center gap-1.5 flex-shrink-0"
               style={{ width: 5 * DAY_WIDTH }}
-              className="bg-blue-50 border-b border-r border-blue-200 flex items-center justify-center gap-1.5"
             >
               <span className="bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded">Sprint 1</span>
               <span className="text-[10px] text-blue-500 hidden sm:inline">Mar 17–21</span>
             </div>
-            {/* Sprint 2: days 5-14 (Mar 22-31) = 10 days */}
             <div
+              className="bg-purple-50 border-b border-r border-purple-200 flex items-center justify-center gap-1.5 flex-shrink-0"
               style={{ width: 10 * DAY_WIDTH }}
-              className="bg-purple-50 border-b border-r border-purple-200 flex items-center justify-center gap-1.5"
             >
               <span className="bg-purple-600 text-white text-xs font-semibold px-2 py-0.5 rounded">Sprint 2</span>
               <span className="text-[10px] text-purple-500 hidden sm:inline">Mar 22–31</span>
             </div>
-            {/* Post: days 15-21 (Apr 1-7) = 7 days */}
             <div
+              className="bg-white border-b border-gray-200 flex items-center justify-center flex-shrink-0"
               style={{ width: 7 * DAY_WIDTH }}
-              className="bg-white border-b border-gray-200 flex items-center justify-center gap-1"
             >
               <span className="bg-gray-400 text-white text-xs font-semibold px-2 py-0.5 rounded">Post-Sprint</span>
             </div>
           </div>
 
-          {/* Day headers */}
-          <div style={{ height: 36, display: 'flex', position: 'sticky', top: 20, zIndex: 10, background: 'white', borderBottom: '1px solid #e5e7eb' }}>
+          {/* Day number row — milestone diamonds live here */}
+          <div className="flex bg-white border-b border-gray-200" style={{ height: 36 }}>
             {days.map((day) => {
               const band = sprintBand(day);
-              const bg = band === 'sprint1' ? 'bg-blue-50' : band === 'sprint2' ? 'bg-purple-50' : 'bg-white';
-              const dayNum = parseInt(day.slice(8, 10), 10);
+              const bg =
+                band === 'sprint1' ? 'bg-blue-50'
+                  : band === 'sprint2' ? 'bg-purple-50'
+                    : 'bg-white';
               const isToday = day === today;
+              const isSprint1End = day === SPRINT1_END;
+              const isSprint2End = day === SPRINT2_END;
               return (
                 <div
                   key={day}
-                  style={{ width: DAY_WIDTH, flexShrink: 0, position: 'relative' }}
-                  className={`flex items-center justify-center border-r border-gray-100 ${bg}`}
+                  style={{ width: DAY_WIDTH, flexShrink: 0 }}
+                  className={`flex items-center justify-center border-r border-gray-100 ${bg} relative`}
                 >
-                  <span className={`text-[11px] font-mono ${isToday ? 'text-red-600 font-bold' : 'text-gray-400'}`}>{dayNum}</span>
-                  {isToday && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 bg-red-400" style={{ height: 4 }} />
+                  <span className={`text-[11px] font-mono ${isToday ? 'text-red-600 font-bold' : 'text-gray-400'}`}>
+                    {parseInt(day.slice(8, 10), 10)}
+                  </span>
+
+                  {/* Sprint 1 End milestone diamond */}
+                  {isSprint1End && (
+                    <div
+                      className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rotate-45 shadow-sm cursor-pointer hover:opacity-80 transition-opacity z-10"
+                      title="Sprint 1 End — Mar 21"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setMilestonePopover(mp => mp?.sprint === 1 ? null : { sprint: 1, x: e.clientX, y: e.clientY });
+                      }}
+                    />
+                  )}
+
+                  {/* Sprint 2 End milestone diamond */}
+                  {isSprint2End && (
+                    <div
+                      className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-purple-600 rotate-45 shadow-sm cursor-pointer hover:opacity-80 transition-opacity z-10"
+                      title="Sprint 2 End — Mar 31"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setMilestonePopover(mp => mp?.sprint === 2 ? null : { sprint: 2, x: e.clientX, y: e.clientY });
+                      }}
+                    />
                   )}
                 </div>
               );
             })}
           </div>
-
-          {/* Gantt body */}
-          <div
-            ref={rightRef}
-            className="overflow-y-auto overflow-x-hidden"
-            onScroll={syncScroll}
-            style={{ maxHeight: 'calc(100vh - 260px)', position: 'relative' }}
-          >
-            {/* Background grid + sprint bands */}
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', pointerEvents: 'none' }}>
-              {days.map((day) => {
-                const band = sprintBand(day);
-                // sprint1: bg-blue-50/60, sprint2: bg-purple-50/40, post: white
-                const bg = band === 'sprint1'
-                  ? 'rgba(239,246,255,0.6)'
-                  : band === 'sprint2'
-                    ? 'rgba(245,243,255,0.4)'
-                    : '#ffffff';
-                return (
-                  <div
-                    key={day}
-                    style={{ width: DAY_WIDTH, flexShrink: 0, background: bg, borderRight: '1px solid #f3f4f6', height: totalHeight + 8 }}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Today vertical line */}
-            {todayIdx >= 0 && todayIdx < days.length && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: todayIdx * DAY_WIDTH + DAY_WIDTH / 2,
-                  top: 0,
-                  bottom: 0,
-                  width: 1,
-                  background: 'rgba(248,113,113,0.8)',
-                  pointerEvents: 'none',
-                  zIndex: 5,
-                  height: totalHeight + 8,
-                }}
-              />
-            )}
-
-            {/* Milestone: Sprint 1 End (Mar 21 = day 4) */}
-            <MilestoneMark
-              dayIdx={4}
-              colorClass="bg-red-500"
-              borderColorClass="border-red-400"
-              totalHeight={totalHeight}
-              label="Sprint 1 End"
-              onClick={(x, y) => setMilestone(ms => ms?.sprint === 1 ? null : { sprint: 1, x, y })}
-            />
-
-            {/* Milestone: Sprint 2 End (Mar 31 = day 14) */}
-            <MilestoneMark
-              dayIdx={14}
-              colorClass="bg-purple-600"
-              borderColorClass="border-purple-500"
-              totalHeight={totalHeight}
-              label="Sprint 2 End"
-              onClick={(x, y) => setMilestone(ms => ms?.sprint === 2 ? null : { sprint: 2, x, y })}
-            />
-
-            {/* Rows */}
-            {rows.map((row, i) => {
-              const top = i * ROW_HEIGHT;
-              if (row.type === 'header') {
-                return (
-                  <div
-                    key={`hr-${row.project}`}
-                    style={{ position: 'absolute', top, left: 0, right: 0, height: ROW_HEIGHT }}
-                    className="border-b border-gray-200 bg-gray-50/80"
-                  />
-                );
-              }
-              const t = row.ticket;
-              const barEnd = getTicketEnd(t);
-              const startIdx = daysBetween(GANTT_START, t.barStart);
-              const endIdx = daysBetween(GANTT_START, barEnd);
-              const barLeft = Math.max(0, startIdx) * DAY_WIDTH;
-              const barWidth = Math.max(DAY_WIDTH * 0.5, (endIdx - Math.max(0, startIdx) + 1) * DAY_WIDTH - 4);
-              const isDragging = drag?.ticketId === t.id;
-              const barColor = projectColor(t.project ?? '');
-
-              return (
-                <div
-                  key={`tr-${t.id}`}
-                  style={{ position: 'absolute', top, left: 0, right: 0, height: ROW_HEIGHT }}
-                  className="border-b border-gray-100 transition-colors duration-100 hover:bg-gray-50/60"
-                >
-                  {/* Bar */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: barLeft + 2,
-                      top: (ROW_HEIGHT - 20) / 2,
-                      width: barWidth,
-                      height: 20,
-                      borderRadius: 2,
-                      cursor: isDragging ? 'grabbing' : 'grab',
-                      zIndex: 6,
-                      boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : undefined,
-                      opacity: isDragging ? 0.85 : 0.9,
-                      transition: isDragging ? 'none' : 'opacity 0.1s, box-shadow 0.1s',
-                      backgroundColor: barColor,
-                    }}
-                    className="flex items-center overflow-hidden"
-                    onMouseDown={e => handleBarMouseDown(e, t)}
-                    onClick={e => {
-                      if (!isDragging && Math.abs(e.movementX) < 2) {
-                        onTicketClick(t);
-                      }
-                    }}
-                  >
-                    {/* Priority dot on left edge */}
-                    <span
-                      className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ml-1 ${priorityDot(t.priority)}`}
-                      style={{ opacity: 1, border: '1px solid rgba(255,255,255,0.5)' }}
-                    />
-                    {/* Ticket number */}
-                    <span className="text-[10px] font-mono text-white/70 ml-1 flex-shrink-0 leading-none">
-                      #{t.number}
-                    </span>
-                    {/* Ticket title */}
-                    <span className="text-[11px] font-medium text-white ml-1 truncate leading-none">
-                      {t.title}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-            {/* Bottom padding */}
-            <div style={{ height: totalHeight + 8 }} />
-          </div>
         </div>
       </div>
 
-      {/* Milestone tooltip */}
-      {milestone && (
+      {/* ── BODY ROWS ────────────────────────────────────────────────────── */}
+      <div style={{ minWidth: LEFT_WIDTH + totalWidth }}>
+        {rows.map((row) => {
+          if (row.type === 'header') {
+            const color = projectColor(row.project);
+            return (
+              <div key={`h-${row.project}`} className="flex" style={{ height: ROW_HEIGHT }}>
+                {/* Left label — sticky */}
+                <div
+                  className="sticky left-0 z-10 bg-gray-50 border-r border-b border-gray-200 flex items-center gap-1.5 px-2 cursor-pointer hover:bg-gray-100 transition-colors flex-shrink-0"
+                  style={{ width: LEFT_WIDTH, borderLeft: `3px solid ${color}` }}
+                  onClick={() => setCollapsed(c => ({ ...c, [row.project]: !c[row.project] }))}
+                >
+                  {collapsed[row.project]
+                    ? <ChevronRight size={13} className="text-gray-400 flex-shrink-0" />
+                    : <ChevronDown size={13} className="text-gray-400 flex-shrink-0" />
+                  }
+                  <span className="text-xs font-semibold text-gray-700 truncate">{row.project}</span>
+                  <span className="ml-auto text-xs text-gray-400 flex-shrink-0">
+                    {projectGroups[row.project]?.length}
+                  </span>
+                </div>
+
+                {/* Gantt area for header row */}
+                <div
+                  className="relative border-b border-gray-200 bg-gray-50/80 flex-shrink-0"
+                  style={{ width: totalWidth }}
+                >
+                  {/* Column backgrounds */}
+                  <div className="absolute inset-0 flex pointer-events-none">
+                    {days.map(day => (
+                      <div
+                        key={day}
+                        style={{ width: DAY_WIDTH, flexShrink: 0, background: dayBg(day), borderRight: '1px solid #f3f4f6' }}
+                      />
+                    ))}
+                  </div>
+                  {/* Today line */}
+                  {todayIdx >= 0 && todayIdx < days.length && (
+                    <RowLine x={todayIdx * DAY_WIDTH + DAY_WIDTH / 2} color="rgba(248,113,113,0.6)" />
+                  )}
+                  {/* Milestone lines */}
+                  <RowLine x={sprint1EndIdx * DAY_WIDTH + DAY_WIDTH / 2} color="rgba(239,68,68,0.25)" zIndex={4} />
+                  <RowLine x={sprint2EndIdx * DAY_WIDTH + DAY_WIDTH / 2} color="rgba(147,51,234,0.25)" zIndex={4} />
+                </div>
+              </div>
+            );
+          }
+
+          // Ticket row
+          const t = row.ticket;
+          const barEnd = getBarEnd(t.id, t.barEnd);
+          const startIdx = daysBetween(GANTT_START, t.barStart);
+          const endIdx = daysBetween(GANTT_START, barEnd);
+          const barLeft = Math.max(0, startIdx) * DAY_WIDTH + 2;
+          const barWidth = Math.max(DAY_WIDTH, (endIdx - Math.max(0, startIdx) + 1) * DAY_WIDTH - 4);
+          const isDragging = !!dragEnd[t.id];
+          const barColor = projectColor(t.project ?? '');
+
+          return (
+            <div key={`t-${t.id}`} className="flex group" style={{ height: ROW_HEIGHT }}>
+              {/* Left label — sticky */}
+              <div
+                className="sticky left-0 z-10 bg-white border-r border-b border-gray-100 flex items-center gap-2 px-4 cursor-pointer group-hover:bg-gray-50 transition-colors flex-shrink-0"
+                style={{ width: LEFT_WIDTH }}
+                onClick={() => onTicketClick(t)}
+              >
+                <span className={`flex-shrink-0 w-2 h-2 rounded-full ${priorityDot(t.priority)}`} />
+                <span className="text-[11px] font-mono text-gray-400 flex-shrink-0">#{t.number}</span>
+                <span className="text-xs font-medium text-gray-700 truncate">{t.title}</span>
+              </div>
+
+              {/* Gantt cell */}
+              <div
+                className="relative border-b border-gray-100 group-hover:bg-gray-50/30 transition-colors flex-shrink-0"
+                style={{ width: totalWidth }}
+              >
+                {/* Column backgrounds */}
+                <div className="absolute inset-0 flex pointer-events-none">
+                  {days.map(day => (
+                    <div
+                      key={day}
+                      style={{ width: DAY_WIDTH, flexShrink: 0, background: dayBg(day), borderRight: '1px solid #f3f4f6' }}
+                    />
+                  ))}
+                </div>
+
+                {/* Today line */}
+                {todayIdx >= 0 && todayIdx < days.length && (
+                  <RowLine x={todayIdx * DAY_WIDTH + DAY_WIDTH / 2} color="rgba(248,113,113,0.6)" />
+                )}
+                {/* Milestone lines */}
+                <RowLine x={sprint1EndIdx * DAY_WIDTH + DAY_WIDTH / 2} color="rgba(239,68,68,0.2)" zIndex={4} />
+                <RowLine x={sprint2EndIdx * DAY_WIDTH + DAY_WIDTH / 2} color="rgba(147,51,234,0.2)" zIndex={4} />
+
+                {/* Gantt bar */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: barLeft,
+                    top: (ROW_HEIGHT - 22) / 2,
+                    width: barWidth,
+                    height: 22,
+                    backgroundColor: barColor,
+                    borderRadius: 4,
+                    opacity: isDragging ? 0.85 : 0.88,
+                    boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.18)' : '0 1px 3px rgba(0,0,0,0.12)',
+                    zIndex: 6,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    transition: isDragging ? 'none' : 'opacity 0.1s, box-shadow 0.1s',
+                  }}
+                  onClick={e => { e.stopPropagation(); onTicketClick(t); }}
+                >
+                  <span className="text-[10px] font-mono text-white/70 ml-1.5 flex-shrink-0">#{t.number}</span>
+                  <span className="text-[11px] font-medium text-white ml-1 truncate flex-1">{t.title}</span>
+
+                  {/* Right-edge drag handle */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 10,
+                      cursor: 'ew-resize',
+                      zIndex: 7,
+                      flexShrink: 0,
+                    }}
+                    className="hover:bg-black/10 rounded-r transition-colors"
+                    onPointerDown={e => {
+                      e.stopPropagation();
+                      // Capture so pointer events keep arriving even outside the element
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      dragRef.current = {
+                        ticketId: t.id,
+                        startX: e.clientX,
+                        originalEnd: barEnd,
+                        currentEnd: barEnd,
+                      };
+                    }}
+                    onPointerMove={e => {
+                      if (!dragRef.current || dragRef.current.ticketId !== t.id) return;
+                      const deltaX = e.clientX - dragRef.current.startX;
+                      const deltaDays = Math.round(deltaX / DAY_WIDTH);
+                      const newMs = parseDate(dragRef.current.originalEnd).getTime() + deltaDays * 86400000;
+                      const newEnd = clamp(formatDate(new Date(newMs)));
+                      if (newEnd !== dragRef.current.currentEnd) {
+                        dragRef.current.currentEnd = newEnd;
+                        setDragEnd(prev => ({ ...prev, [t.id]: newEnd }));
+                      }
+                    }}
+                    onPointerUp={e => {
+                      e.stopPropagation();
+                      if (!dragRef.current || dragRef.current.ticketId !== t.id) return;
+                      const { currentEnd, originalEnd, ticketId } = dragRef.current;
+                      dragRef.current = null;
+                      if (currentEnd !== originalEnd) {
+                        onReschedule(ticketId, currentEnd);
+                      }
+                      setDragEnd(prev => {
+                        const next = { ...prev };
+                        delete next[ticketId];
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {/* Bottom padding */}
+        <div style={{ height: 8 }} />
+      </div>
+
+      {/* ── MILESTONE POPOVER ────────────────────────────────────────────── */}
+      {milestonePopover && (
         <div
           className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-3 w-64"
-          style={{ left: Math.min(milestone.x, window.innerWidth - 270), top: milestone.y + 8 }}
+          style={{
+            left: Math.min(milestonePopover.x + 8, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 272),
+            top: milestonePopover.y + 8,
+          }}
         >
-          <p className="text-xs font-semibold text-gray-700 mb-2">
-            {milestone.sprint === 1 ? 'Sprint 1 (Mar 17–21)' : 'Sprint 2 (Mar 22–31)'} — {milestone.sprint === 1 ? sprint1Tickets.length : sprint2Tickets.length} tickets
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-800">
+              {milestonePopover.sprint === 1
+                ? '🔴 Sprint 1 End — Mar 21'
+                : '🟣 Sprint 2 End — Mar 31'}
+            </p>
+            <button
+              className="text-gray-400 hover:text-gray-600 text-sm leading-none"
+              onClick={() => setMilestonePopover(null)}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-500 mb-2">
+            {sprintTickets(milestonePopover.sprint).length} tickets in sprint
           </p>
           <ul className="space-y-1 max-h-48 overflow-y-auto">
-            {(milestone.sprint === 1 ? sprint1Tickets : sprint2Tickets).map(t => (
-              <li key={t.id} className="flex items-center gap-1.5 text-xs text-gray-600">
+            {sprintTickets(milestonePopover.sprint).slice(0, 20).map(t => (
+              <li
+                key={t.id}
+                className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 cursor-pointer py-0.5"
+                onClick={() => { setMilestonePopover(null); onTicketClick(t); }}
+              >
                 <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${priorityDot(t.priority)}`} />
                 <span className="truncate">#{t.number} {t.title}</span>
               </li>
             ))}
           </ul>
-          <button
-            className="mt-2 text-xs text-gray-400 hover:text-gray-600"
-            onClick={() => setMilestone(null)}
-          >
-            Close
-          </button>
         </div>
       )}
     </div>
-  );
-}
-
-function MilestoneMark({
-  dayIdx,
-  colorClass,
-  borderColorClass,
-  totalHeight,
-  label,
-  onClick,
-}: {
-  dayIdx: number;
-  colorClass: string;
-  borderColorClass: string;
-  totalHeight: number;
-  label: string;
-  onClick: (x: number, y: number) => void;
-}) {
-  const cx = dayIdx * DAY_WIDTH + DAY_WIDTH / 2;
-  return (
-    <>
-      {/* Vertical dashed line */}
-      <div
-        style={{
-          position: 'absolute',
-          left: cx,
-          top: 0,
-          width: 1,
-          height: totalHeight + 8,
-          borderLeft: '2px dashed',
-          pointerEvents: 'none',
-          zIndex: 4,
-          opacity: 0.4,
-        }}
-        className={borderColorClass}
-      />
-      {/* Diamond w-3 h-3 rotate-45 shadow-sm */}
-      <div
-        style={{
-          position: 'absolute',
-          left: cx - 6,
-          top: 4,
-          width: 12,
-          height: 12,
-          transform: 'rotate(45deg)',
-          cursor: 'pointer',
-          zIndex: 8,
-        }}
-        className={`${colorClass} shadow-sm hover:opacity-80 transition-opacity`}
-        title={label}
-        onClick={e => onClick(e.clientX, e.clientY)}
-      />
-    </>
   );
 }
