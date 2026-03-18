@@ -668,12 +668,7 @@ export default function ConversationsTab({ showToast }: Props) {
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <textarea
               value={replyText}
-              onChange={e => {
-                setReplyText(e.target.value);
-                // Auto-resize
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-              }}
+              onChange={e => setReplyText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendReply(); }}
               placeholder={selected.linq_chat_id ? 'Type a reply… (⌘↵ to send)' : 'No Linq chat ID — cannot reply'}
               disabled={!selected.linq_chat_id}
