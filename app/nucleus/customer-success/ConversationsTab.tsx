@@ -579,7 +579,7 @@ export default function ConversationsTab({ showToast }: Props) {
     const actionBtn = getActionButton(selected);
 
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
         {/* Contact header */}
         <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexShrink: 0 }}>
           <div>
@@ -642,7 +642,7 @@ export default function ConversationsTab({ showToast }: Props) {
         </div>
 
         {/* Message thread */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', background: '#fff' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', background: '#fff', minHeight: 0 }}>
           {!selected.linq_chat_id ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 8, color: '#9ca3af' }}>
               <AlertTriangle size={24} style={{ opacity: 0.3 }} />
@@ -663,33 +663,73 @@ export default function ConversationsTab({ showToast }: Props) {
           )}
         </div>
 
-        {/* Reply bar — always visible */}
-        <div style={{ padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0, position: 'sticky', bottom: 0, zIndex: 10 }}>
+        {/* Reply bar — always visible, pinned to bottom of flex column */}
+        <div style={{ padding: '12px 14px', borderTop: '2px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <textarea
               value={replyText}
-              onChange={e => setReplyText(e.target.value)}
+              onChange={e => {
+                setReplyText(e.target.value);
+                // Auto-resize
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendReply(); }}
-              placeholder={selected.linq_chat_id ? 'Type a reply… (⌘+Enter to send)' : 'No Linq chat ID — cannot reply'}
+              placeholder={selected.linq_chat_id ? 'Type a reply… (⌘↵ to send)' : 'No Linq chat ID — cannot reply'}
               disabled={!selected.linq_chat_id}
               rows={2}
-              style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.8375rem', resize: 'none', outline: 'none', fontFamily: 'inherit', background: selected.linq_chat_id ? '#fff' : '#f9fafb', color: selected.linq_chat_id ? '#111827' : '#9ca3af' }}
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                borderRadius: 10,
+                border: '1.5px solid #d1d5db',
+                fontSize: '0.875rem',
+                lineHeight: '1.5',
+                resize: 'none',
+                outline: 'none',
+                fontFamily: 'inherit',
+                background: selected.linq_chat_id ? '#fff' : '#f9fafb',
+                color: selected.linq_chat_id ? '#111827' : '#9ca3af',
+                minHeight: 44,
+                maxHeight: 120,
+                transition: 'border-color 0.15s',
+              }}
+              onFocus={e => { e.target.style.borderColor = '#2563eb'; }}
+              onBlur={e => { e.target.style.borderColor = '#d1d5db'; }}
             />
             <button
               onClick={handleSendReply}
               disabled={!replyText.trim() || sendingReply || !selected.linq_chat_id}
-              style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: replyText.trim() && selected.linq_chat_id ? '#2563eb' : '#e5e7eb', color: replyText.trim() && selected.linq_chat_id ? '#fff' : '#9ca3af', cursor: replyText.trim() && selected.linq_chat_id ? 'pointer' : 'default', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, height: 58 }}
+              style={{
+                padding: '0 18px',
+                borderRadius: 10,
+                border: 'none',
+                background: replyText.trim() && selected.linq_chat_id ? '#2563eb' : '#e5e7eb',
+                color: replyText.trim() && selected.linq_chat_id ? '#fff' : '#9ca3af',
+                cursor: replyText.trim() && selected.linq_chat_id ? 'pointer' : 'default',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                flexShrink: 0,
+                height: 44,
+                transition: 'background 0.15s',
+              }}
             >
-              {sendingReply ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={14} />}
+              {sendingReply ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <><Send size={15} /> Send</>}
             </button>
           </div>
+          <p style={{ margin: '5px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
+            {selected.linq_chat_id ? '⌘+Enter to send · replies go through Linq' : '⚠️ No Linq chat ID on this contact'}
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', minHeight: 640 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: 'calc(100vh - 220px)', minHeight: 520, maxHeight: '90vh' }}>
 
       {/* ── Top bar ── */}
       <div style={{ padding: '12px 18px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: '#fff', flexShrink: 0 }}>
