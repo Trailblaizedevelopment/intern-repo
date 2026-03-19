@@ -25,7 +25,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
   signed_up:        { bg: '#d1fae5', text: '#065f46', label: 'Signed Up' },
 };
 
-const LINQ_LINE_PHONES = new Set(['+16462408056', '+16462668785', '+16462442696']);
+const LINQ_LINE_PHONES = new Set(['+16462408056', '+16462668785', '+16462442696', '+16462101111']);
 
 type ConvContact = {
   id: string;
@@ -64,6 +64,80 @@ interface Props {
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
+// ── ReplyBox — module-level component so typing never re-renders parent ────
+interface ReplyBoxProps {
+  onSend: (text: string) => Promise<void>;
+  hasLinqChatId: boolean;
+  sendingReply: boolean;
+  resetKey: number;
+}
+
+function ReplyBox({ onSend, hasLinqChatId, sendingReply, resetKey }: ReplyBoxProps) {
+  const [replyText, setReplyText] = useState('');
+
+  useEffect(() => {
+    if (resetKey > 0) setReplyText('');
+  }, [resetKey]);
+
+  return (
+    <div style={{ padding: '12px 14px', borderTop: '2px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <textarea
+          value={replyText}
+          onChange={e => setReplyText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onSend(replyText); }}
+          placeholder={hasLinqChatId ? 'Type a reply… (⌘↵ to send)' : 'No Linq chat ID — cannot reply'}
+          disabled={!hasLinqChatId}
+          rows={2}
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            borderRadius: 10,
+            border: '1.5px solid #d1d5db',
+            fontSize: '0.875rem',
+            lineHeight: '1.5',
+            resize: 'none',
+            outline: 'none',
+            fontFamily: 'inherit',
+            background: hasLinqChatId ? '#fff' : '#f9fafb',
+            color: hasLinqChatId ? '#111827' : '#9ca3af',
+            minHeight: 44,
+            maxHeight: 120,
+            transition: 'border-color 0.15s',
+          }}
+          onFocus={e => { e.target.style.borderColor = '#2563eb'; }}
+          onBlur={e => { e.target.style.borderColor = '#d1d5db'; }}
+        />
+        <button
+          onClick={() => onSend(replyText)}
+          disabled={!replyText.trim() || sendingReply || !hasLinqChatId}
+          style={{
+            padding: '0 18px',
+            borderRadius: 10,
+            border: 'none',
+            background: replyText.trim() && hasLinqChatId ? '#2563eb' : '#e5e7eb',
+            color: replyText.trim() && hasLinqChatId ? '#fff' : '#9ca3af',
+            cursor: replyText.trim() && hasLinqChatId ? 'pointer' : 'default',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flexShrink: 0,
+            height: 44,
+            transition: 'background 0.15s',
+          }}
+        >
+          {sendingReply ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <><Send size={15} /> Send</>}
+        </button>
+      </div>
+      <p style={{ margin: '5px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
+        {hasLinqChatId ? '⌘+Enter to send · replies go through Linq' : '⚠️ No Linq chat ID on this contact'}
+      </p>
+    </div>
+  );
+}
+
 export default function ConversationsTab({ showToast }: Props) {
   const [tab, setTab] = useState<'active' | 'unanswered'>('active');
   const [contacts, setContacts] = useState<ConvContact[]>([]);
@@ -82,15 +156,24 @@ export default function ConversationsTab({ showToast }: Props) {
   const [flagging, setFlagging] = useState(false);
   const [showFlagModal, setShowFlagModal] = useState(false);
   const [flagReason, setFlagReason] = useState('');
-  const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   const [handledIds, setHandledIds] = useState<Set<string>>(new Set());
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [selectedForBulk, setSelectedForBulk] = useState<Set<string>>(new Set());
   const [bulkActioning, setBulkActioning] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const syncedRef = useRef(false);
   const LIMIT = 50;
+
+  // Mobile viewport detection
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Auto-sync on mount (non-blocking)
   useEffect(() => {
@@ -318,22 +401,22 @@ export default function ConversationsTab({ showToast }: Props) {
   }
 
   // ── Send Reply ─────────────────────────────────────────────────────────────
-  async function handleSendReply() {
-    if (!selected?.linq_chat_id || !replyText.trim()) return;
+  async function handleSendReply(text: string) {
+    if (!selected?.linq_chat_id || !text.trim()) return;
     setSendingReply(true);
     try {
       const res = await fetch('/api/outreach/conversations/reply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: AUTH },
-        body: JSON.stringify({ contact_id: selected.id, message: replyText.trim() }),
+        body: JSON.stringify({ contact_id: selected.id, message: text.trim() }),
       });
       const json = await res.json();
       if (res.status === 409) {
         showToast('⚠️ Duplicate blocked — same message sent in the last 60 min.', 'error');
-        return; // Do NOT clear replyText
+        return; // Do NOT clear reply box
       }
       if (!res.ok || json.error) throw new Error(json.error || 'Failed');
-      setReplyText('');
+      setResetKey(k => k + 1); // Signal ReplyBox to clear its text
       // Reload messages
       const msgRes = await fetch(`/api/linq/messages?chat_id=${encodeURIComponent(selected.linq_chat_id)}&limit=100`);
       const msgJson = await msgRes.json();
@@ -663,68 +746,14 @@ export default function ConversationsTab({ showToast }: Props) {
           )}
         </div>
 
-        {/* Reply bar — always visible, pinned to bottom of flex column */}
-        <div style={{ padding: '12px 14px', borderTop: '2px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-            <textarea
-              value={replyText}
-              onChange={e => setReplyText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendReply(); }}
-              placeholder={selected.linq_chat_id ? 'Type a reply… (⌘↵ to send)' : 'No Linq chat ID — cannot reply'}
-              disabled={!selected.linq_chat_id}
-              rows={2}
-              style={{
-                flex: 1,
-                padding: '10px 14px',
-                borderRadius: 10,
-                border: '1.5px solid #d1d5db',
-                fontSize: '0.875rem',
-                lineHeight: '1.5',
-                resize: 'none',
-                outline: 'none',
-                fontFamily: 'inherit',
-                background: selected.linq_chat_id ? '#fff' : '#f9fafb',
-                color: selected.linq_chat_id ? '#111827' : '#9ca3af',
-                minHeight: 44,
-                maxHeight: 120,
-                transition: 'border-color 0.15s',
-              }}
-              onFocus={e => { e.target.style.borderColor = '#2563eb'; }}
-              onBlur={e => { e.target.style.borderColor = '#d1d5db'; }}
-            />
-            <button
-              onClick={handleSendReply}
-              disabled={!replyText.trim() || sendingReply || !selected.linq_chat_id}
-              style={{
-                padding: '0 18px',
-                borderRadius: 10,
-                border: 'none',
-                background: replyText.trim() && selected.linq_chat_id ? '#2563eb' : '#e5e7eb',
-                color: replyText.trim() && selected.linq_chat_id ? '#fff' : '#9ca3af',
-                cursor: replyText.trim() && selected.linq_chat_id ? 'pointer' : 'default',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                flexShrink: 0,
-                height: 44,
-                transition: 'background 0.15s',
-              }}
-            >
-              {sendingReply ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <><Send size={15} /> Send</>}
-            </button>
-          </div>
-          <p style={{ margin: '5px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
-            {selected.linq_chat_id ? '⌘+Enter to send · replies go through Linq' : '⚠️ No Linq chat ID on this contact'}
-          </p>
-        </div>
+        {/* Reply bar — rendered via module-level ReplyBox so typing never re-renders parent */}
+        {ReplyBox({ onSend: handleSendReply, hasLinqChatId: !!selected.linq_chat_id, sendingReply, resetKey })}
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: 'calc(100vh - 220px)', minHeight: 520, maxHeight: '90vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: isMobile ? 'calc(100vh - 160px)' : 'calc(100vh - 220px)', minHeight: 520, maxHeight: '90vh' }}>
 
       {/* ── Top bar ── */}
       <div style={{ padding: '12px 18px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: '#fff', flexShrink: 0 }}>
@@ -855,7 +884,7 @@ export default function ConversationsTab({ showToast }: Props) {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
         {/* Left: list panel */}
-        <div style={{ width: 340, flexShrink: 0, borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: isMobile ? '100%' : 340, flexShrink: 0, borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fafafa', display: isMobile && selected ? 'none' : 'flex', flexDirection: 'column' }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', gap: 8, fontSize: '0.8rem' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
@@ -874,7 +903,9 @@ export default function ConversationsTab({ showToast }: Props) {
             </div>
           ) : (
             <>
-              {displayed.map(c => <ConvRow key={c.id} c={c} />)}
+              {displayed.map(c => (
+                <React.Fragment key={c.id}>{ConvRow({ c })}</React.Fragment>
+              ))}
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -889,7 +920,9 @@ export default function ConversationsTab({ showToast }: Props) {
         </div>
 
         {/* Right: thread panel */}
-        <ThreadPanel />
+        <div style={{ display: isMobile && !selected ? 'none' : 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+          {ThreadPanel()}
+        </div>
       </div>
 
       {/* ── Flag modal ── */}
