@@ -1,13 +1,17 @@
 /**
  * GET /api/conversations
- * List linq_conversations with filtering, search, and pagination.
+ * List linq_conversations with filtering and pagination.
  *
  * Query params:
- *   status  — active | handled | flagged | all (default: active)
- *   line    — phone number or "all" (default: all)
- *   search  — name/phone/chapter text search
- *   page    — 1-indexed (default: 1)
- *   limit   — per page (default: 50)
+ *   mode        — chapters_summary (returns chapter breakdown) | (default: list)
+ *   status      — active | flagged | unresponsive | handled | all (default: active)
+ *   chapter_id  — filter by chapter UUID
+ *   search      — name/phone/chapter text search
+ *   page        — 1-indexed (default: 1)
+ *   limit       — per page (default: 50)
+ *
+ * chapters_summary response:
+ *   { chapters: [{ chapter_id, chapter_name, count }] } sorted by count DESC
  *
  * All requests require: Authorization: Bearer <internal_token>
  */
@@ -33,14 +37,47 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
+  const mode = searchParams.get('mode') || '';
   const status = searchParams.get('status') || 'active';
-  const line = searchParams.get('line') || 'all';
+  const chapterId = (searchParams.get('chapter_id') || '').trim();
   const search = (searchParams.get('search') || '').trim();
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
   const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') || '50')));
   const offset = (page - 1) * limit;
 
   try {
+    // ── chapters_summary mode ──────────────────────────────────────────────
+    if (mode === 'chapters_summary') {
+      let q = supabase
+        .from('linq_conversations')
+        .select('chapter_id, chapter_name');
+
+      if (status !== 'all') {
+        q = q.eq('status', status);
+      }
+
+      const { data, error } = await q;
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // Group by chapter_id in JS
+      const map = new Map<string, { chapter_id: string | null; chapter_name: string | null; count: number }>();
+      for (const row of (data || [])) {
+        const key = row.chapter_id ?? '__none__';
+        const existing = map.get(key);
+        if (!existing) {
+          map.set(key, { chapter_id: row.chapter_id, chapter_name: row.chapter_name, count: 1 });
+        } else {
+          existing.count++;
+        }
+      }
+
+      const chapters = [...map.values()].sort((a, b) => b.count - a.count);
+      return NextResponse.json({ chapters });
+    }
+
+    // ── Normal list mode ───────────────────────────────────────────────────
     let query = supabase
       .from('linq_conversations')
       .select('*', { count: 'exact' });
@@ -50,12 +87,12 @@ export async function GET(req: NextRequest) {
       query = query.eq('status', status);
     }
 
-    // Line filter
-    if (line && line !== 'all') {
-      query = query.eq('line_phone', line);
+    // Chapter filter
+    if (chapterId) {
+      query = query.eq('chapter_id', chapterId);
     }
 
-    // Search filter (ilike on contact_name, contact_phone, chapter_name)
+    // Search filter
     if (search) {
       query = query.or(
         `contact_name.ilike.%${search}%,contact_phone.ilike.%${search}%,chapter_name.ilike.%${search}%`

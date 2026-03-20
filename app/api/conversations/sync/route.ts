@@ -1,7 +1,13 @@
 /**
  * POST /api/conversations/sync
  * Light sync: pull latest from Linq across all lines, upsert new chats,
- * update last_message fields, set has_unread_reply and is_urgent flags.
+ * update last_message fields, set has_unread_reply, and auto-classify status.
+ *
+ * Classification rules (applied per conversation, based on inbound messages):
+ *   - unresponsive: no inbound messages at all
+ *   - active: most recent inbound is affirmative
+ *   - flagged: most recent inbound is NOT affirmative
+ *   - handled: NEVER auto-set (preserved from manual action)
  *
  * Requires: Authorization: Bearer <internal_token>
  */
@@ -17,7 +23,35 @@ function checkAuth(req: NextRequest): boolean {
   return (req.headers.get('Authorization') || '') === `Bearer ${INTERNAL_TOKEN}`;
 }
 
-const URGENT_THRESHOLD_MS = 48 * 60 * 60 * 1000; // 48 hours
+// ── Affirmative detection ───────────────────────────────────────────────────
+const AFFIRMATIVE = new Set([
+  'yes', 'yep', 'yeah', 'yea', 'sure', 'correct',
+  "that's me", 'thats me', 'absolutely', 'definitely',
+  'yup', 'uh huh', 'mhm', 'for sure', 'sounds right',
+  'right', "that's right", 'thats right',
+]);
+
+function isAffirmative(text: string): boolean {
+  return AFFIRMATIVE.has(text.toLowerCase().trim());
+}
+
+type AutoStatus = 'active' | 'flagged' | 'unresponsive';
+
+function classifyStatus(msgs: { is_from_me: boolean; parts: { type: string; value: string }[] }[]): AutoStatus {
+  // Find inbound messages (messages not sent by us)
+  const inbound = msgs.filter(m => !m.is_from_me);
+
+  if (inbound.length === 0) {
+    return 'unresponsive';
+  }
+
+  // msgs are newest-first, so find the first inbound (= most recent inbound)
+  const mostRecent = inbound[0];
+  const text = mostRecent.parts
+    ?.find((p: { type: string; value: string }) => p.type === 'text')?.value ?? '';
+
+  return isAffirmative(text) ? 'active' : 'flagged';
+}
 
 export async function POST(req: NextRequest) {
   if (!checkAuth(req)) {
@@ -49,23 +83,25 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // For each chat, fetch last message to determine direction
-    const updates: Record<string, unknown>[] = [];
+    // For each chat, fetch messages to determine status and last_message fields
+    const upserts: Record<string, unknown>[] = [];
+    // Map linq_chat_id → computed auto-status
+    const statusMap: Record<string, AutoStatus> = {};
 
     await Promise.allSettled(
       allChats.map(async ({ chat, line }) => {
         try {
-          const msgs = await getMessages(chat.id, 1);
+          // Fetch up to 20 messages to find recent inbound and classify
+          const msgs = await getMessages(chat.id, 20);
           const lastMsg = msgs[0] ?? null;
 
           const isInbound = lastMsg ? !lastMsg.is_from_me : false;
           const lastMsgAt = lastMsg?.created_at ?? chat.updated_at;
-          const isOld = lastMsgAt
-            ? Date.now() - new Date(lastMsgAt).getTime() > URGENT_THRESHOLD_MS
-            : false;
-          const isUrgent = isInbound && isOld;
+          const autoStatus = classifyStatus(msgs);
 
-          updates.push({
+          statusMap[chat.id] = autoStatus;
+
+          upserts.push({
             linq_chat_id: chat.id,
             line_phone: line.phone,
             line_label: line.label,
@@ -77,7 +113,6 @@ export async function POST(req: NextRequest) {
               ? (lastMsg.is_from_me ? 'outbound' : 'inbound')
               : null,
             has_unread_reply: isInbound,
-            is_urgent: isUrgent,
             updated_at: new Date().toISOString(),
           });
           processed++;
@@ -87,15 +122,44 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // Batch upsert (only fields we know — don't overwrite status/flagged_reason)
+    // ── Batch upsert base fields (no status — preserve existing) ───────────
     const BATCH = 50;
-    for (let i = 0; i < updates.length; i += BATCH) {
-      const batch = updates.slice(i, i + BATCH);
+    for (let i = 0; i < upserts.length; i += BATCH) {
+      const batch = upserts.slice(i, i + BATCH);
       const { error } = await supabase
         .from('linq_conversations')
         .upsert(batch, { onConflict: 'linq_chat_id', ignoreDuplicates: false });
       if (error) {
-        errors.push(`Sync upsert batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
+        errors.push(`Upsert batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
+      }
+    }
+
+    // ── Batch status updates — grouped by new status, never touch 'handled' ─
+    const byStatus: Record<AutoStatus, string[]> = {
+      active: [],
+      flagged: [],
+      unresponsive: [],
+    };
+    for (const [chatId, newStatus] of Object.entries(statusMap)) {
+      byStatus[newStatus].push(chatId);
+    }
+
+    const now = new Date().toISOString();
+    for (const [newStatus, chatIds] of Object.entries(byStatus) as [AutoStatus, string[]][]) {
+      if (chatIds.length === 0) continue;
+
+      // Process in batches to avoid URL length limits on .in()
+      for (let i = 0; i < chatIds.length; i += BATCH) {
+        const batchIds = chatIds.slice(i, i + BATCH);
+        const { error } = await supabase
+          .from('linq_conversations')
+          .update({ status: newStatus, updated_at: now })
+          .in('linq_chat_id', batchIds)
+          .neq('status', 'handled'); // never overwrite manually handled
+
+        if (error) {
+          errors.push(`Status update (${newStatus}) batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
+        }
       }
     }
 
