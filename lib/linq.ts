@@ -32,8 +32,15 @@ export interface LinqMessage {
   id: string;
   chat_id: string;
   from: string;
+  is_from_me: boolean;
   parts: { type: string; value: string }[];
   created_at: string;
+  updated_at?: string;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  sent_at?: string | null;
+  is_delivered?: boolean;
+  is_read?: boolean;
 }
 
 export async function createChat(fromPhone: string, toPhone: string, message?: string): Promise<LinqChat> {
