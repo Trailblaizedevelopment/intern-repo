@@ -382,43 +382,53 @@ function ChapterListPanel({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Header: tabs + sync */}
+      {/* Tab bar — matches top-level module nav style */}
       <div style={{
-        padding: '12px 14px', borderBottom: '1px solid #e5e7eb',
-        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        borderBottom: '1px solid #e5e7eb',
         background: '#fff', flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', gap: 5, flex: 1, flexWrap: 'wrap' }}>
-          {TABS.map(t => (
-            <button
-              key={t}
-              onClick={() => onTabChange(t)}
-              style={{
-                padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                fontWeight: tab === t ? 700 : 500, fontSize: '0.78rem',
-                background: tab === t ? TAB_META[t].color : '#f3f4f6',
-                color: tab === t ? '#fff' : '#6b7280',
-                transition: 'all 0.15s',
-              }}
-            >
-              {TAB_META[t].label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', paddingRight: 12 }}>
+          {/* Primary tab navigation */}
+          <div style={{ display: 'flex', flex: 1, overflowX: 'auto' }}>
+            {TABS.map(t => (
+              <button
+                key={t}
+                onClick={() => onTabChange(t)}
+                style={{
+                  padding: '11px 16px',
+                  border: 'none',
+                  borderBottom: tab === t ? `2px solid ${TAB_META[t].color}` : '2px solid transparent',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: tab === t ? 600 : 400,
+                  fontSize: '0.8125rem',
+                  color: tab === t ? TAB_META[t].color : '#6b7280',
+                  whiteSpace: 'nowrap',
+                  transition: 'color 0.15s, border-color 0.15s',
+                  marginBottom: -1,
+                }}
+              >
+                {TAB_META[t].label}
+              </button>
+            ))}
+          </div>
+          {/* Sync button — right-aligned, compact */}
+          <button
+            onClick={onSync}
+            disabled={syncing}
+            style={{
+              padding: '5px 10px', borderRadius: 7, border: '1px solid #e5e7eb',
+              background: '#fff', color: '#374151', cursor: syncing ? 'default' : 'pointer',
+              fontSize: '0.73rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5,
+              flexShrink: 0,
+            }}
+          >
+            {syncing
+              ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+              : <RefreshCw size={12} />}
+            Sync
+          </button>
         </div>
-        <button
-          onClick={onSync}
-          disabled={syncing}
-          style={{
-            padding: '5px 12px', borderRadius: 7, border: '1px solid #e5e7eb',
-            background: '#fff', color: '#374151', cursor: syncing ? 'default' : 'pointer',
-            fontSize: '0.73rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5,
-            flexShrink: 0,
-          }}
-        >
-          {syncing
-            ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-            : <RefreshCw size={12} />}
-          Sync
-        </button>
       </div>
 
       {/* Chapter list */}
@@ -1100,7 +1110,7 @@ export default function ConversationsTab({ showToast }: Props) {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
         {/* Left panel: 340px */}
         <div style={{
-          width: 340, flexShrink: 0, borderRight: '1px solid #e5e7eb',
+          width: '40%', flexShrink: 0, borderRight: '1px solid #e5e7eb',
           overflow: 'hidden', display: 'flex', flexDirection: 'column',
         }}>
           {selectedChapter ? convListPanel : chapterListPanel}
