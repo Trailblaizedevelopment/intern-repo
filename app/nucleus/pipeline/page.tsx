@@ -992,30 +992,26 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   };
 
   /* ─── School Card ─── */
-  const SchoolCard = ({ school }: { school: School }) => {
+  const SchoolCard = ({ school, activeDeals }: { school: School; activeDeals: number }) => {
     const orgs = school.organizations || [];
-    const totalDeals = orgs.reduce((s, o) => s + (o.pipeline_deals?.length || 0), 0);
-    const totalValue = orgs.reduce((s, o) => s + (o.pipeline_deals?.reduce((v, d) => v + (d.value || 0), 0) || 0), 0);
     const activeCustomers = orgs.filter(o => o.status === 'active_customer').length;
     const hasIfc = orgs.some(o => o.type === 'ifc');
     const hasPhc = orgs.some(o => o.type === 'phc');
-    const penetration = school.total_greek_orgs ? Math.round((activeCustomers / school.total_greek_orgs) * 100) : 0;
 
     return (
       <button className="pl2__school-card" onClick={() => setSelectedSchool(school)} style={{
-        borderLeftColor: penetration > 50 ? 'var(--color-accent-success)' : penetration > 0 ? 'var(--color-accent-warm)' : 'var(--ws-border)',
+        borderLeftColor: activeCustomers > 0 ? 'var(--color-accent-success)' : activeDeals > 0 ? 'var(--color-accent-warm)' : 'var(--ws-border)',
       }}>
         <div className="pl2__school-header">
           <h3 className="pl2__school-name">{school.name}</h3>
           {school.conference && <span className="pl2__conf-badge">{school.conference}</span>}
         </div>
         <div className="pl2__school-stats">
-          <span>{activeCustomers}/{school.total_greek_orgs || '?'} chapters</span>
+          {activeCustomers > 0 && <span>{activeCustomers} active chapter{activeCustomers !== 1 ? 's' : ''}</span>}
           {(hasIfc || hasPhc) && <span className="pl2__council-badge">{hasIfc && 'IFC'}{hasIfc && hasPhc && ' · '}{hasPhc && 'PHC'}</span>}
         </div>
         <div className="pl2__school-footer">
-          <span>{totalDeals} deals</span>
-          {totalValue > 0 && <span className="pl2__deal-value">{formatCurrency(totalValue)}</span>}
+          <span>{activeDeals} active deal{activeDeals !== 1 ? 's' : ''}</span>
         </div>
       </button>
     );
@@ -1024,6 +1020,16 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   /* ─── School Detail ─── */
   const SchoolDetail = ({ school }: { school: School }) => {
     const orgs = school.organizations || [];
+    // Only show orgs that have at least one active deal (not closed_lost or hold_off)
+    const activeOrgs = orgs
+      .map(org => ({
+        ...org,
+        activeDeals: ((org as any).pipeline_deals || []).filter(
+          (d: any) => d.stage !== 'closed_lost' && d.stage !== 'hold_off'
+        ),
+      }))
+      .filter(org => org.activeDeals.length > 0);
+
     return (
       <div className="pl2__detail-panel">
         <div className="pl2__detail-header">
@@ -1032,14 +1038,14 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
           {school.conference && <span className="pl2__conf-badge pl2__conf-badge--lg">{school.conference}</span>}
         </div>
         <div className="pl2__detail-grid">
-          {orgs.map(org => (
+          {activeOrgs.map(org => (
             <div key={org.id} className="pl2__org-card">
               <div className="pl2__org-header">
                 <h4>{org.name}</h4>
                 <span className={`pl2__status-dot pl2__status-dot--${org.status}`} />
               </div>
               <span className="pl2__org-type">{org.type}</span>
-              {(org as any).pipeline_deals?.map((d: any) => (
+              {org.activeDeals.map((d: any) => (
                 <div key={d.id} className="pl2__mini-deal">
                   <span className="pl2__stage-pill pl2__stage-pill--sm" style={{ background: STAGE_CONFIG[d.stage as DealStage]?.color + '22', color: STAGE_CONFIG[d.stage as DealStage]?.color }}>
                     {STAGE_CONFIG[d.stage as DealStage]?.label}
@@ -1049,7 +1055,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
               ))}
             </div>
           ))}
-          {orgs.length === 0 && <p className="pl2__empty">No organizations at this school yet.</p>}
+          {activeOrgs.length === 0 && <p className="pl2__empty">No active deals at this school.</p>}
         </div>
       </div>
     );
@@ -1468,9 +1474,20 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
             </div>
             <div className="pl2__schools-grid">
               {schools
-                .filter(s => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                .map(school => (
-                  <SchoolCard key={school.id} school={school} />
+                .map(s => ({
+                  school: s,
+                  activeDeals: (s.organizations || []).reduce((sum, o) =>
+                    sum + ((o as any).pipeline_deals || []).filter(
+                      (d: any) => d.stage !== 'closed_lost' && d.stage !== 'hold_off'
+                    ).length, 0),
+                }))
+                .filter(({ school, activeDeals }) =>
+                  activeDeals > 0 &&
+                  (!searchQuery || school.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                )
+                .sort((a, b) => b.activeDeals - a.activeDeals)
+                .map(({ school, activeDeals }) => (
+                  <SchoolCard key={school.id} school={school} activeDeals={activeDeals} />
                 ))}
             </div>
           </>
