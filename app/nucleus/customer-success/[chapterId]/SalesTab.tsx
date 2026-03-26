@@ -138,8 +138,8 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
   return (
     <div style={{ maxWidth: 700 }}>
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 6 }}>Post-Close Cycle Tracker</h2>
-        <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+        <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.25rem', marginBottom: 6, color: '#1B2A4A' }}>Post-Close Cycle Tracker</h2>
+        <p style={{ color: '#5C5449', fontSize: '0.875rem' }}>
           Track the three critical milestones after a chapter signs up.
         </p>
       </div>
@@ -173,32 +173,32 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
               )}
             <div
               style={{
-                background: '#fff',
-                border: `2px solid ${isChecked ? '#10b981' : '#e5e7eb'}`,
-                borderLeft: `4px solid ${isChecked ? '#10b981' : '#d1d5db'}`,
-                borderRadius: 12,
+                background: isChecked ? 'rgba(234,240,232,0.5)' : '#fff',
+                border: `1px solid ${isChecked ? '#4A7060' : '#D9D4CC'}`,
+                borderLeft: `3px solid ${isChecked ? '#C4874A' : '#D9D4CC'}`,
+                borderRadius: 2,
                 padding: '18px 20px',
-                transition: 'border-color 0.2s, box-shadow 0.2s',
-                boxShadow: isChecked ? '0 2px 12px rgba(16,185,129,0.1)' : '0 1px 4px rgba(0,0,0,0.04)',
-                opacity: isChecked ? 0.75 : 1,
+                transition: 'border-color 0.15s ease-out',
+                boxShadow: isChecked ? '0 1px 6px rgba(196,135,74,0.1)' : '0 1px 3px rgba(27,42,74,0.04)',
+                opacity: isChecked ? 0.8 : 1,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                 {/* Step number + checkbox */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: isChecked ? '#10b981' : '#f3f4f6',
-                    border: `2px solid ${isChecked ? '#10b981' : '#d1d5db'}`,
+                    width: 32, height: 32, borderRadius: 2,
+                    background: isChecked ? '#C4874A' : '#F7F5F1',
+                    border: `2px solid ${isChecked ? '#C4874A' : '#1B2A4A'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1rem',
+                    fontSize: '0.85rem',
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.15s ease-out',
                     flexShrink: 0,
                   }}
                     onClick={() => updateEdit(step.key, 'checked', !isChecked)}
                   >
-                    {isChecked ? <Check size={18} color="#fff" /> : <span style={{ opacity: 0.4 }}>{originalIdx + 1}</span>}
+                    {isChecked ? <Check size={16} color="#fff" strokeWidth={3} /> : <span style={{ opacity: 0.6, color: '#1B2A4A', fontWeight: 600 }}>{originalIdx + 1}</span>}
                   </div>
                   {idx < sortedSteps.length - 1 && (
                     <div style={{ width: 2, height: 20, background: '#e5e7eb', margin: '0 auto' }} />
@@ -208,16 +208,16 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
                 {/* Content */}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                    <span style={{ fontSize: '1.1rem' }}>{step.icon}</span>
+                    <span style={{ fontSize: '1rem' }}>{step.icon}</span>
                     <span style={{
-                      fontSize: '0.95rem', fontWeight: 700,
-                      textDecoration: isChecked ? 'none' : 'none',
-                      color: isChecked ? '#065f46' : '#111827',
+                      fontFamily: "'Instrument Serif', Georgia, serif",
+                      fontSize: '1rem', fontWeight: 400,
+                      color: isChecked ? '#2A4229' : '#1B2A4A',
                     }}>
                       {step.label}
                     </span>
                     {isChecked && (
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#d1fae5', color: '#065f46' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 2, background: '#EAF0E8', color: '#2A4229' }}>
                         ✓ Complete
                       </span>
                     )}
@@ -225,34 +225,34 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
 
                   <div style={{ display: 'grid', gridTemplateColumns: step.fields.amountKey ? '1fr 1fr 1fr' : '1fr 2fr', gap: 10, marginBottom: 10 }}>
                     <div className="module-form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '0.75rem' }}>Date</label>
+                      <label style={{ fontSize: '0.75rem', color: '#5C5449' }}>Date</label>
                       <input
                         type="date"
                         value={edit.date}
                         onChange={e => updateEdit(step.key, 'date', e.target.value)}
-                        style={{ fontSize: '0.8rem', padding: '5px 8px' }}
+                        style={{ fontSize: '0.8rem', padding: '5px 8px', border: '1px solid #D9D4CC', borderRadius: 2 }}
                       />
                     </div>
                     {step.fields.amountKey && (
                       <div className="module-form-group" style={{ margin: 0 }}>
-                        <label style={{ fontSize: '0.75rem' }}>Amount ($)</label>
+                        <label style={{ fontSize: '0.75rem', color: '#5C5449' }}>Amount ($)</label>
                         <input
                           type="number"
                           value={edit.amount ?? ''}
                           onChange={e => updateEdit(step.key, 'amount', e.target.value)}
                           placeholder="299"
-                          style={{ fontSize: '0.8rem', padding: '5px 8px' }}
+                          style={{ fontSize: '0.8rem', padding: '5px 8px', border: '1px solid #D9D4CC', borderRadius: 2 }}
                         />
                       </div>
                     )}
                     <div className="module-form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '0.75rem' }}>Notes</label>
+                      <label style={{ fontSize: '0.75rem', color: '#5C5449' }}>Notes</label>
                       <input
                         type="text"
                         value={edit.notes}
                         onChange={e => updateEdit(step.key, 'notes', e.target.value)}
                         placeholder="Any notes…"
-                        style={{ fontSize: '0.8rem', padding: '5px 8px' }}
+                        style={{ fontSize: '0.8rem', padding: '5px 8px', border: '1px solid #D9D4CC', borderRadius: 2 }}
                       />
                     </div>
                   </div>
@@ -261,9 +261,10 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
                     onClick={() => saveStep(step.key, step)}
                     disabled={isSaving}
                     style={{
-                      padding: '5px 14px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600,
-                      background: isChecked ? '#10b981' : '#ec4899', color: '#fff',
+                      padding: '5px 14px', borderRadius: 2, fontSize: '0.8rem', fontWeight: 600,
+                      background: '#1B2A4A', color: '#F7F5F1',
                       border: 'none', cursor: 'pointer', opacity: isSaving ? 0.7 : 1,
+                      transition: 'background 0.15s ease-out',
                     }}
                   >
                     {isSaving ? 'Saving…' : 'Save'}

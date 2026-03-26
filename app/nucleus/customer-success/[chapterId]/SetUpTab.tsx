@@ -25,7 +25,7 @@ interface ConfettiParticle {
 }
 
 function generateConfetti(): ConfettiParticle[] {
-  const colors = ['#14b8a6', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#3b82f6'];
+  const colors = ['#C4874A', '#A8703C', '#4A7060', '#1B2A4A', '#5C7A5A', '#8A6A3A'];
   return Array.from({ length: 50 }, (_, i) => ({
     id: i, x: Math.random() * 100, y: Math.random() * 100,
     color: colors[Math.floor(Math.random() * colors.length)],
@@ -61,10 +61,9 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
   }, [chapter.id, showToast, onUpdate]);
 
   function getProgressGradient(pct: number): string {
-    if (pct < 25) return 'linear-gradient(90deg,#f97316,#fb923c)';
-    if (pct < 50) return 'linear-gradient(90deg,#f59e0b,#fbbf24)';
-    if (pct < 75) return 'linear-gradient(90deg,#10b981,#34d399)';
-    return 'linear-gradient(90deg,#14b8a6,#2dd4bf)';
+    if (pct < 50) return '#C4874A';
+    if (pct < 100) return '#A8703C';
+    return '#2A4229';
   }
 
   async function toggleStep(stepKey: string, categoryKey: string) {
@@ -135,8 +134,8 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
   return (
     <div style={{ maxWidth: 720 }}>
       {/* Opt-out toggles */}
-      <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#374151' }}>
+      <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '12px 16px', marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#5C5449' }}>
           <input
             type="checkbox"
             checked={!emailOutreachEnabled}
@@ -145,11 +144,11 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
               setEmailOutreachEnabled(!skipping);
               saveOptOut('email_outreach_enabled', !skipping);
             }}
-            style={{ width: 15, height: 15, cursor: 'pointer' }}
+            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B2A4A' }}
           />
           Skip email outreach for this chapter
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#374151' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#5C5449' }}>
           <input
             type="checkbox"
             checked={!conversationsEnabled}
@@ -158,24 +157,24 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
               setConversationsEnabled(!skipping);
               saveOptOut('conversations_enabled', !skipping);
             }}
-            style={{ width: 15, height: 15, cursor: 'pointer' }}
+            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B2A4A' }}
           />
           Skip Linq conversations for this chapter
         </label>
       </div>
 
       {/* Overall progress */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '16px 20px', marginBottom: 24 }}>
+      <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 20px', marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Overall Setup Progress</span>
-          <span style={{ fontWeight: 700, color: overallPct >= 100 ? '#10b981' : '#6b7280' }}>{doneSteps}/{totalSteps} ({overallPct}%)</span>
+          <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A' }}>Overall Setup Progress</span>
+          <span style={{ fontWeight: 600, color: overallPct >= 100 ? '#2A4229' : '#5C5449', fontSize: '0.875rem' }}>{doneSteps}/{totalSteps} ({overallPct}%)</span>
         </div>
-        <div style={{ height: 8, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+        <div style={{ height: 6, background: '#F0EDEA', borderRadius: 2, overflow: 'hidden' }}>
           <div style={{
-            height: '100%', borderRadius: 99,
+            height: '100%', borderRadius: 2,
             width: `${overallPct}%`,
             background: getProgressGradient(overallPct),
-            transition: 'width 0.4s ease',
+            transition: 'width 0.15s ease-out',
           }} />
         </div>
       </div>
@@ -192,9 +191,9 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
           const isOptedOut = (category === 'email' && !emailOutreachEnabled) || (category === 'linq' && !conversationsEnabled);
           if (isOptedOut) {
             return (
-              <div key={category} style={{ background: '#f9fafb', border: '1px dashed #d1d5db', borderRadius: 12, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#9ca3af' }}>{CATEGORY_LABELS[category] || category}</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: '#e5e7eb', color: '#6b7280' }}>Opted out</span>
+              <div key={category} style={{ background: '#F7F5F1', border: '1px dashed #D9D4CC', borderRadius: 2, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '0.95rem', color: '#9ca3af' }}>{CATEGORY_LABELS[category] || category}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: 2, background: '#E8E4DF', color: '#5C5449' }}>Opted out</span>
               </div>
             );
           }
@@ -204,11 +203,11 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
               key={category}
               style={{
                 background: '#fff',
-                border: `1px solid ${isCelebrating ? '#10b981' : '#e5e7eb'}`,
-                borderRadius: 12,
+                border: `1px solid ${isCelebrating ? '#4A7060' : '#D9D4CC'}`,
+                borderRadius: 2,
                 padding: '16px 20px',
-                transition: 'border-color 0.3s',
-                boxShadow: isCelebrating ? '0 0 0 3px rgba(16,185,129,0.15)' : 'none',
+                transition: 'border-color 0.15s ease-out',
+                boxShadow: isCelebrating ? '0 0 0 3px rgba(74,112,96,0.12)' : 'none',
                 position: 'relative',
                 overflow: 'hidden',
               }}
@@ -219,7 +218,7 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
                     <div key={p.id} style={{
                       position: 'absolute',
                       left: `${p.x}%`, top: `${p.y}%`,
-                      width: 6, height: 6, borderRadius: 2,
+                      width: 5, height: 5, borderRadius: 1,
                       backgroundColor: p.color,
                       transform: `rotate(${p.rotation}deg) scale(${p.scale})`,
                       animation: 'confetti-fall 0.8s ease-out forwards',
@@ -229,27 +228,27 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '0.95rem', color: '#1B2A4A' }}>
                   {CATEGORY_LABELS[category] || category}
                   {isCelebrating && <span style={{ marginLeft: 8, fontSize: '0.9rem' }}>🎉</span>}
                 </span>
                 <span style={{
-                  fontSize: '0.75rem', fontWeight: 700,
-                  color: catPct === 100 ? '#065f46' : '#6b7280',
-                  background: catPct === 100 ? '#d1fae5' : '#f3f4f6',
-                  padding: '2px 8px', borderRadius: 99,
+                  fontSize: '0.75rem', fontWeight: 600,
+                  color: catPct === 100 ? '#2A4229' : '#5C5449',
+                  background: catPct === 100 ? '#EAF0E8' : '#F0EDEA',
+                  padding: '2px 8px', borderRadius: 2,
                 }}>
                   {catDone}/{steps.length}
                 </span>
               </div>
 
               {/* Category progress bar */}
-              <div style={{ height: 4, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden', marginBottom: 14 }}>
+              <div style={{ height: 4, background: '#F0EDEA', borderRadius: 2, overflow: 'hidden', marginBottom: 14 }}>
                 <div style={{
-                  height: '100%', borderRadius: 99,
+                  height: '100%', borderRadius: 2,
                   width: `${catPct}%`,
                   background: getProgressGradient(catPct),
-                  transition: 'width 0.3s ease',
+                  transition: 'width 0.15s ease-out',
                 }} />
               </div>
 
@@ -262,9 +261,9 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
                       key={step.key}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 10,
-                        cursor: 'pointer', padding: '5px 6px', borderRadius: 6,
-                        background: checked ? 'rgba(16,185,129,0.06)' : 'transparent',
-                        transition: 'background 0.15s',
+                        cursor: 'pointer', padding: '5px 6px', borderRadius: 2,
+                        background: checked ? 'rgba(196,135,74,0.06)' : 'transparent',
+                        transition: 'background 0.15s ease-out',
                       }}
                     >
                       <input
@@ -274,20 +273,20 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
                         style={{ display: 'none' }}
                       />
                       <div style={{
-                        width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                        border: `2px solid ${checked ? '#10b981' : '#d1d5db'}`,
-                        background: checked ? '#10b981' : '#fff',
+                        width: 18, height: 18, borderRadius: 2, flexShrink: 0,
+                        border: `2px solid ${checked ? '#C4874A' : '#1B2A4A'}`,
+                        background: checked ? '#C4874A' : '#fff',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.2s',
+                        transition: 'all 0.15s ease-out',
                       }}>
-                        {checked && <Check size={12} color="#fff" strokeWidth={3} />}
+                        {checked && <Check size={11} color="#fff" strokeWidth={3} />}
                       </div>
                       <span style={{
                         fontSize: '0.85rem',
-                        color: checked ? '#374151' : '#4b5563',
+                        color: checked ? '#5C5449' : '#1B2A4A',
                         textDecoration: checked ? 'line-through' : 'none',
-                        opacity: checked ? 0.7 : 1,
-                        transition: 'all 0.2s',
+                        opacity: checked ? 0.65 : 1,
+                        transition: 'all 0.15s ease-out',
                       }}>
                         {step.label}
                       </span>
@@ -325,10 +324,10 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
             <p style={{ color: '#6b7280', marginBottom: 8 }}>
               <strong style={{ color: '#111827' }}>{chapter.chapter_name}</strong> has completed all setup steps!
             </p>
-            <p style={{ color: '#10b981', fontWeight: 600, fontSize: '0.9rem', marginBottom: 24 }}>Status automatically updated to Active.</p>
+            <p style={{ color: '#4A7060', fontWeight: 600, fontSize: '0.9rem', marginBottom: 24 }}>Status automatically updated to Active.</p>
             <button
               onClick={() => setShowCompletionModal(false)}
-              style={{ padding: '10px 28px', borderRadius: 10, background: '#10b981', color: '#fff', border: 'none', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer' }}
+              style={{ padding: '10px 28px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}
             >
               Awesome! 🎊
             </button>

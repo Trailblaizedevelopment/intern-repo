@@ -20,17 +20,18 @@ import { ArrowLeft, LayoutDashboard, CreditCard, Edit2, Trash2, Link as LinkIcon
 // STICKY NOTE COLORS (from Projects pattern)
 // ═══════════════════════════════════════════
 
+// Warm, muted palette — intentional and editorial, not neon
 const NOTE_COLORS = [
-  { bg: '#FEF3C7', border: '#F59E0B', text: '#92400E', accent: '#D97706' },  // amber
-  { bg: '#DBEAFE', border: '#3B82F6', text: '#1E3A5F', accent: '#2563EB' },  // blue
-  { bg: '#D1FAE5', border: '#10B981', text: '#065F46', accent: '#059669' },  // emerald
-  { bg: '#FCE7F3', border: '#EC4899', text: '#831843', accent: '#DB2777' },  // pink
-  { bg: '#EDE9FE', border: '#8B5CF6', text: '#4C1D95', accent: '#7C3AED' },  // violet
-  { bg: '#FEE2E2', border: '#EF4444', text: '#7F1D1D', accent: '#DC2626' },  // red
-  { bg: '#E0F2FE', border: '#0EA5E9', text: '#0C4A6E', accent: '#0284C7' },  // sky
-  { bg: '#F3E8FF', border: '#A855F7', text: '#581C87', accent: '#9333EA' },  // purple
-  { bg: '#CCFBF1', border: '#14B8A6', text: '#134E4A', accent: '#0D9488' },  // teal
-  { bg: '#FFF7ED', border: '#F97316', text: '#7C2D12', accent: '#EA580C' },  // orange
+  { bg: '#FDF0E0', border: '#C4874A', text: '#5C3A1E', accent: '#C4874A' },  // warm amber
+  { bg: '#EAF0E8', border: '#5C7A5A', text: '#2A4229', accent: '#4A6B47' },  // warm sage
+  { bg: '#E8EDF5', border: '#4A6B8A', text: '#1B2A4A', accent: '#3A5A7A' },  // warm slate blue
+  { bg: '#F5EFE0', border: '#9C7B4A', text: '#4A3519', accent: '#8A6A3A' },  // warm sand
+  { bg: '#EDF0E8', border: '#6B7A52', text: '#2E3A22', accent: '#5A6A43' },  // warm olive
+  { bg: '#F0E8E0', border: '#8A6050', text: '#3A2418', accent: '#7A5040' },  // warm clay
+  { bg: '#E6EDF2', border: '#4A6878', text: '#1A3040', accent: '#3A5868' },  // warm steel
+  { bg: '#F2EDE8', border: '#7A6850', text: '#3A2E20', accent: '#6A5840' },  // warm umber
+  { bg: '#E8F0EC', border: '#4A7060', text: '#1E3830', accent: '#3A6050' },  // warm teal-green
+  { bg: '#F5EAE0', border: '#B07040', text: '#503018', accent: '#A06030' },  // deep amber
 ];
 
 function getNoteColor(index: number) {
@@ -243,11 +244,11 @@ export default function CustomerSuccessPage() {
             <Link href="/workspace" className="module-back"><LayoutDashboard size={20} /> Workspace</Link>
           </div>
           <div className="module-title-row">
-            <div className="module-icon" style={{ backgroundColor: '#ec489915', color: '#ec4899' }}>
+            <div className="module-icon" style={{ backgroundColor: 'rgba(196,135,74,0.12)', color: '#C4874A' }}>
               <HeartHandshake size={24} />
             </div>
             <div>
-              <h1>Customer Success</h1>
+              <h1 style={{ fontFamily: "'Instrument Serif', 'Playfair Display', Georgia, serif", fontWeight: 400, color: '#1B2A4A' }}>Customer Success</h1>
               <p>Chapter onboarding, alumni outreach, headhunting, and success tracking.</p>
             </div>
           </div>
@@ -463,16 +464,16 @@ function ChapterNoteCard({
   const isOverdue = daysUntilCheckIn !== null && daysUntilCheckIn < 0;
 
   const statusColors: Record<string, { bg: string; color: string }> = {
-    onboarding: { bg: '#fef3c7', color: '#92400e' },
-    active:     { bg: '#d1fae5', color: '#065f46' },
-    at_risk:    { bg: '#fee2e2', color: '#991b1b' },
-    churned:    { bg: '#f3f4f6', color: '#374151' },
+    onboarding: { bg: '#F5EFE0', color: '#6B4A1E' },
+    active:     { bg: '#EAF0E8', color: '#2A4229' },
+    at_risk:    { bg: '#F5E8E0', color: '#6B2A1E' },
+    churned:    { bg: '#F0EDEA', color: '#5C5449' },
   };
 
   const healthColors: Record<string, { bg: string; color: string }> = {
-    good:     { bg: '#d1fae5', color: '#065f46' },
-    warning:  { bg: '#fef3c7', color: '#92400e' },
-    critical: { bg: '#fee2e2', color: '#991b1b' },
+    good:     { bg: '#EAF0E8', color: '#2A4229' },
+    warning:  { bg: '#F5EFE0', color: '#6B4A1E' },
+    critical: { bg: '#F5E8E0', color: '#6B2A1E' },
   };
 
   const statusLabels: Record<string, string> = {
@@ -505,14 +506,14 @@ function ChapterNoteCard({
           {chapter.health === 'good' ? '✓ Good' : chapter.health === 'warning' ? '⚠ Warning' : '🔴 Critical'}
         </span>
         {isOverdue && (
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: '#fee2e2', color: '#991b1b' }}>
+          <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 2, background: '#F5E8E0', color: '#6B2A1E' }}>
             ⏰ Check-in overdue
           </span>
         )}
       </div>
 
       {/* Chapter name */}
-      <h3 className="sn__note-title" style={{ fontSize: '1.05rem', marginBottom: 4 }}>{chapter.chapter_name}</h3>
+      <h3 className="sn__note-title" style={{ fontSize: '1.05rem', marginBottom: 4, fontFamily: "'Instrument Serif', 'Playfair Display', Georgia, serif", fontWeight: 400 }}>{chapter.chapter_name}</h3>
 
       {/* Subtitle */}
       <p style={{ fontSize: '0.8rem', opacity: 0.75, marginBottom: 10, lineHeight: 1.4 }}>
@@ -533,12 +534,12 @@ function ChapterNoteCard({
           <span>Setup Progress</span>
           <span>{setupPct}%</span>
         </div>
-        <div style={{ height: 5, background: 'rgba(0,0,0,0.1)', borderRadius: 99, overflow: 'hidden' }}>
+        <div style={{ height: 4, background: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' }}>
           <div style={{
-            height: '100%', borderRadius: 99,
+            height: '100%', borderRadius: 2,
             width: `${setupPct}%`,
-            background: setupPct >= 75 ? '#10b981' : setupPct >= 50 ? '#f59e0b' : '#f97316',
-            transition: 'width 0.3s ease',
+            background: '#C4874A',
+            transition: 'width 0.15s ease-out',
           }} />
         </div>
       </div>

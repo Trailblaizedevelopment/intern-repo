@@ -139,10 +139,10 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
 
       {/* Import Alumni List */}
       <section>
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 12 }}>
-          📤 Import Alumni List
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
+          Import Alumni List
         </h3>
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: '16px 18px' }}>
+        <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <div className="module-form-group" style={{ margin: 0, flex: 1 }}>
               <input
@@ -187,21 +187,21 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
 
       {/* Import Stats */}
       <section>
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 12 }}>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
           Import Stats
         </h3>
         {stats ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
             {[
-              { label: 'Total Alumni', value: stats.total, icon: <Users size={18} />, color: '#374151', bg: '#f9fafb' },
-              { label: 'Have Email', value: stats.have_email ?? '—', icon: <Mail size={18} />, color: '#2563eb', bg: '#dbeafe' },
-              { label: 'Have Phone', value: stats.have_phone, icon: <Phone size={18} />, color: '#8b5cf6', bg: '#ede9fe' },
-              { label: 'Mobile (iMsg)', value: stats.imessage, icon: <Smartphone size={18} />, color: '#059669', bg: '#d1fae5' },
+              { label: 'Total Alumni', value: stats.total, icon: <Users size={18} />, color: '#1B2A4A', bg: '#F7F5F1' },
+              { label: 'Have Email', value: stats.have_email ?? '—', icon: <Mail size={18} />, color: '#3A5A7A', bg: '#E8EDF5' },
+              { label: 'Have Phone', value: stats.have_phone, icon: <Phone size={18} />, color: '#5C5449', bg: '#F0EDEA' },
+              { label: 'Mobile (iMsg)', value: stats.imessage, icon: <Smartphone size={18} />, color: '#2A4229', bg: '#EAF0E8' },
             ].map(s => (
-              <div key={s.label} style={{ background: s.bg, borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
+              <div key={s.label} style={{ background: s.bg, borderRadius: 2, padding: '14px 16px', textAlign: 'center', border: '1px solid #D9D4CC' }}>
                 <div style={{ color: s.color, marginBottom: 6, display: 'flex', justifyContent: 'center' }}>{s.icon}</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 2 }}>{s.label}</div>
+                <div style={{ fontSize: '1.4rem', fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '0.75rem', color: '#5C5449', marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -212,32 +212,32 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
 
       {/* Linq Pipeline */}
       <section>
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 12 }}>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
           Linq Pipeline
         </h3>
         {stats ? (
           <div>
-            {/* Funnel */}
+            {/* Funnel — navy → amber progression */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               {[
-                { label: 'Contacted', value: stats.contacted, color: '#7c3aed', bg: '#ede9fe' },
-                { label: '→', value: null, color: '#9ca3af', bg: 'transparent' },
-                { label: 'Responded', value: stats.responded, color: '#2563eb', bg: '#dbeafe' },
-                { label: '→', value: null, color: '#9ca3af', bg: 'transparent' },
-                { label: 'Signed Up', value: stats.signed_up, color: '#059669', bg: '#d1fae5' },
+                { label: 'Contacted', value: stats.contacted, color: '#1B2A4A', bg: '#E8EDF5' },
+                { label: '→', value: null, color: '#D9D4CC', bg: 'transparent' },
+                { label: 'Responded', value: stats.responded, color: '#3A5A7A', bg: '#EDF0F5' },
+                { label: '→', value: null, color: '#D9D4CC', bg: 'transparent' },
+                { label: 'Signed Up', value: stats.signed_up, color: '#C4874A', bg: '#FDF0E0' },
               ].map((item, i) => (
                 item.value === null ? (
-                  <span key={i} style={{ fontSize: '1.2rem', color: '#9ca3af' }}>→</span>
+                  <span key={i} style={{ fontSize: '1.2rem', color: '#D9D4CC' }}>→</span>
                 ) : (
-                  <div key={item.label} style={{ background: item.bg, borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 100 }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: item.color }}>{item.value}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{item.label}</div>
+                  <div key={item.label} style={{ background: item.bg, borderRadius: 2, padding: '10px 18px', textAlign: 'center', minWidth: 100, border: '1px solid #D9D4CC' }}>
+                    <div style={{ fontSize: '1.4rem', fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, color: item.color }}>{item.value}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#5C5449' }}>{item.label}</div>
                   </div>
                 )
               ))}
-              <div style={{ marginLeft: 12, background: '#f9fafb', borderRadius: 10, padding: '10px 18px' }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#374151' }}>{responseRate}%</div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Response Rate</div>
+              <div style={{ marginLeft: 12, background: '#F7F5F1', borderRadius: 2, padding: '10px 18px', border: '1px solid #D9D4CC' }}>
+                <div style={{ fontSize: '1.4rem', fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, color: '#1B2A4A' }}>{responseRate}%</div>
+                <div style={{ fontSize: '0.75rem', color: '#5C5449' }}>Response Rate</div>
               </div>
             </div>
 
@@ -245,17 +245,17 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
             {(stats.touch1_ready > 0 || stats.touch2_due > 0 || stats.touch3_due > 0) && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                 {stats.touch1_ready > 0 && (
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 99, background: '#ede9fe', color: '#7c3aed' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 2, background: '#FDF0E0', color: '#6B4A1E' }}>
                     {stats.touch1_ready} ready for Touch 1
                   </span>
                 )}
                 {stats.touch2_due > 0 && (
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 99, background: '#fef3c7', color: '#d97706' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 2, background: '#F5EFE0', color: '#8A5A20' }}>
                     {stats.touch2_due} due Touch 2
                   </span>
                 )}
                 {stats.touch3_due > 0 && (
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 99, background: '#dbeafe', color: '#2563eb' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 2, background: '#E8EDF5', color: '#1B2A4A' }}>
                     {stats.touch3_due} due Touch 3
                   </span>
                 )}
@@ -277,10 +277,10 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
 
       {/* Signup Links */}
       <section>
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 12 }}>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
           Signup Links
         </h3>
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: '16px 18px' }}>
+        <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 18px' }}>
           <div className="cs-links-grid" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>Alumni Join Link</label>
@@ -290,7 +290,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
                   value={alumniJoinLink}
                   onChange={e => setAlumniJoinLink(e.target.value)}
                   placeholder="https://trailblaize.net/join/..."
-                  style={{ flex: 1, padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: '0.85rem' }}
+                  style={{ flex: 1, padding: '7px 10px', border: '1px solid #D9D4CC', borderRadius: 2, fontSize: '0.85rem' }}
                 />
                 <button
                   className="cs-copy-link-btn"
@@ -311,7 +311,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
                   value={activesJoinLink}
                   onChange={e => setActivesJoinLink(e.target.value)}
                   placeholder="https://trailblaize.net/join/..."
-                  style={{ flex: 1, padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: '0.85rem' }}
+                  style={{ flex: 1, padding: '7px 10px', border: '1px solid #D9D4CC', borderRadius: 2, fontSize: '0.85rem' }}
                 />
                 <button
                   className="cs-copy-link-btn"
@@ -338,7 +338,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
 
       {/* Email Status */}
       <section>
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 12 }}>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
           Email Status
         </h3>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 10, background: emailSequenceLive ? '#d1fae5' : '#f3f4f6' }}>

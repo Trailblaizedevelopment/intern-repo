@@ -212,10 +212,10 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
       {/* ─── 1. Check-ins ─── */}
       <section>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: '#1B2A4A' }}>
           📅 Check-ins
         </h3>
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '18px 20px' }}>
+        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '18px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>Frequency:</label>
@@ -231,7 +231,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
             </div>
             <button
               onClick={() => setShowCheckInModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: '#ec4899', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}
             >
               <Plus size={13} /> Log Check-in
             </button>
@@ -263,7 +263,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <h5 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Recent</h5>
               {checkIns.slice(0, 3).map(ci => (
-                <div key={ci.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', background: '#f9fafb', borderRadius: 8 }}>
+                <div key={ci.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', background: '#F7F5F1', borderRadius: 2, border: '1px solid #E8E4DF' }}>
                   <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', flexShrink: 0 }}>
                     {new Date(ci.check_in_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
@@ -284,15 +284,15 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
       {/* ─── 2. Headhunting / Matchmaking ─── */}
       <section>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: '#1B2A4A' }}>
           <Briefcase size={16} /> Headhunting / Matchmaking
         </h3>
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '18px 20px' }}>
+        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '18px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Track actives and alumni for career connections</span>
             <button
               onClick={() => { setShowAddMember(true); setEditingMember(null); setAddMemberType('active'); setMemberForm({ name: '', grad_year: '', major: '', career_interest: '', status: 'looking', notes: '', member_type: 'active', job_role: '', company: '', is_hiring: false }); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: '#ec4899', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}
             >
               <Plus size={13} /> Add Member
             </button>
@@ -343,7 +343,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                   <div key={m.id} className="cs-member-row">
                     <div className="cs-member-name">
                       {m.name}
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 7px', borderRadius: 12, background: (m.member_type || 'active') === 'alumni' ? '#ede9fe' : '#dbeafe', color: (m.member_type || 'active') === 'alumni' ? '#6d28d9' : '#1d4ed8', marginLeft: 4 }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 7px', borderRadius: 2, background: (m.member_type || 'active') === 'alumni' ? '#F5EFE0' : '#E8EDF5', color: (m.member_type || 'active') === 'alumni' ? '#6B4A1E' : '#1B2A4A', marginLeft: 4 }}>
                         {(m.member_type || 'active') === 'alumni' ? 'Alumni' : 'Active'}
                       </span>
                     </div>
@@ -352,7 +352,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                       <>
                         {m.job_role && <div className="cs-member-meta">{m.job_role}</div>}
                         {m.company && <div className="cs-member-meta cs-member-meta--muted">{m.company}</div>}
-                        {m.is_hiring && <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '1px 8px', borderRadius: 12, background: '#dcfce7', color: '#16a34a' }}>Hiring ✓</span>}
+                        {m.is_hiring && <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 8px', borderRadius: 2, background: '#EAF0E8', color: '#2A4229' }}>Hiring ✓</span>}
                       </>
                     ) : (
                       m.major && <div className="cs-member-meta cs-member-meta--muted">{m.major}</div>
@@ -402,7 +402,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                 <div className="module-form-group" style={{ gridColumn: '1 / -1' }}><label>Notes</label><input value={memberForm.notes} onChange={e => setMemberForm(p => ({ ...p, notes: e.target.value }))} /></div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button onClick={addMember} style={{ padding: '6px 16px', borderRadius: 8, background: '#ec4899', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>Add Member</button>
+                <button onClick={addMember} style={{ padding: '6px 16px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}>Add Member</button>
                 <button onClick={() => setShowAddMember(false)} style={{ padding: '6px 16px', borderRadius: 8, background: '#f3f4f6', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>Cancel</button>
               </div>
             </div>

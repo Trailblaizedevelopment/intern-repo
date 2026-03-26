@@ -193,16 +193,16 @@ export default function ChapterDashboardPage() {
   };
 
   const statusColors: Record<string, { bg: string; color: string }> = {
-    onboarding: { bg: '#fef3c7', color: '#92400e' },
-    active:     { bg: '#d1fae5', color: '#065f46' },
-    at_risk:    { bg: '#fee2e2', color: '#991b1b' },
-    churned:    { bg: '#f3f4f6', color: '#374151' },
+    onboarding: { bg: '#F5EFE0', color: '#6B4A1E' },
+    active:     { bg: '#EAF0E8', color: '#2A4229' },
+    at_risk:    { bg: '#F5E8E0', color: '#6B2A1E' },
+    churned:    { bg: '#F0EDEA', color: '#5C5449' },
   };
 
   const healthColors: Record<string, { bg: string; color: string }> = {
-    good:     { bg: '#d1fae5', color: '#065f46' },
-    warning:  { bg: '#fef3c7', color: '#92400e' },
-    critical: { bg: '#fee2e2', color: '#991b1b' },
+    good:     { bg: '#EAF0E8', color: '#2A4229' },
+    warning:  { bg: '#F5EFE0', color: '#6B4A1E' },
+    critical: { bg: '#F5E8E0', color: '#6B2A1E' },
   };
 
   const sc = statusColors[chapter.status] || statusColors.onboarding;
@@ -228,19 +228,19 @@ export default function ChapterDashboardPage() {
             <button
               className="module-back"
               onClick={() => router.push('/nucleus/customer-success')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: '#6b7280', fontSize: '0.875rem' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: '#5C5449', fontSize: '0.875rem', transition: 'color 0.15s ease-out' }}
             >
               <ArrowLeft size={18} /> Customer Success
             </button>
           </div>
           <div className="module-title-row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div className="module-icon" style={{ backgroundColor: '#ec489915', color: '#ec4899' }}>
+              <div className="module-icon" style={{ backgroundColor: 'rgba(196,135,74,0.12)', color: '#C4874A' }}>
                 <HeartHandshake size={22} />
               </div>
               <div>
-                <h1 style={{ fontSize: '1.4rem', lineHeight: 1.2 }}>{chapter.chapter_name}</h1>
-                <p style={{ color: '#6b7280', marginTop: 2 }}>
+                <h1 style={{ fontSize: '1.5rem', lineHeight: 1.2, fontFamily: "'Instrument Serif', 'Playfair Display', Georgia, serif", fontWeight: 400, color: '#1B2A4A' }}>{chapter.chapter_name}</h1>
+                <p style={{ color: '#5C5449', marginTop: 2 }}>
                   {chapter.fraternity}{chapter.fraternity && chapter.school ? ' · ' : ''}{chapter.school}
                 </p>
               </div>
@@ -254,19 +254,19 @@ export default function ChapterDashboardPage() {
               </span>
               <button
                 onClick={viewSubmission}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, border: '1px solid #D9D4CC', background: '#F7F5F1', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500, color: '#5C5449', transition: 'border-color 0.15s ease-out' }}
               >
                 <Eye size={13} /> View Submission
               </button>
               <button
                 onClick={() => setShowEditModal(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, border: '1px solid #D9D4CC', background: '#F7F5F1', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500, color: '#5C5449', transition: 'border-color 0.15s ease-out' }}
               >
                 <Edit2 size={13} /> Edit
               </button>
               <button
                 onClick={generateOnboardingLink}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#ec4899', color: '#fff', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, border: 'none', background: '#1B2A4A', color: '#F7F5F1', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}
               >
                 <Copy size={13} /> Onboarding Link
               </button>
@@ -277,23 +277,24 @@ export default function ChapterDashboardPage() {
 
       <main className="module-main">
         {/* Tab Bar */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '2px solid #f3f4f6', paddingBottom: 0 }}>
+        <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid #D9D4CC', paddingBottom: 0, overflowX: 'auto' }}>
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '10px 20px',
+                padding: '10px 18px',
                 border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid #ec4899' : '2px solid transparent',
+                borderBottom: activeTab === tab.id ? '2px solid #1B2A4A' : '2px solid transparent',
                 background: 'none',
                 cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: activeTab === tab.id ? 700 : 400,
-                color: activeTab === tab.id ? '#ec4899' : '#6b7280',
-                marginBottom: -2,
-                transition: 'all 0.15s',
+                fontSize: '0.875rem',
+                fontWeight: activeTab === tab.id ? 600 : 400,
+                color: activeTab === tab.id ? '#1B2A4A' : '#5C5449',
+                marginBottom: -1,
+                transition: 'color 0.15s ease-out, border-color 0.15s ease-out',
                 whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
               {tab.label}
