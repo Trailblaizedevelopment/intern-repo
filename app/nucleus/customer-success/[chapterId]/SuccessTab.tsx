@@ -377,11 +377,11 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
           {/* Add member form */}
           {showAddMember && (
-            <div style={{ marginTop: 16, background: '#f9fafb', borderRadius: 10, padding: '16px' }}>
+            <div style={{ marginTop: 16, background: '#F7F5F1', borderRadius: 2, padding: '16px', border: '1px solid #D9D4CC' }}>
               <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
                 {(['active', 'alumni'] as const).map(type => (
                   <button key={type} onClick={() => { setAddMemberType(type); setMemberForm(p => ({ ...p, member_type: type })); }}
-                    style={{ padding: '4px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: addMemberType === type ? '2px solid #4f46e5' : '1px solid #e5e7eb', background: addMemberType === type ? '#eef2ff' : '#fff', color: addMemberType === type ? '#4f46e5' : '#6b7280' }}>
+                    style={{ padding: '4px 14px', borderRadius: 2, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: addMemberType === type ? '2px solid #1B2A4A' : '1px solid #D9D4CC', background: addMemberType === type ? '#E8EDF5' : '#fff', color: addMemberType === type ? '#1B2A4A' : '#5C5449', transition: 'all 0.15s ease-out' }}>
                     {type === 'active' ? 'Active Member' : 'Alumni'}
                   </button>
                 ))}
@@ -417,7 +417,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
               <div className="module-form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.75rem' }}>Date</label><input type="date" value={matchForm.date} onChange={e => setMatchForm(p => ({ ...p, date: e.target.value }))} style={{ fontSize: '0.8rem', padding: '5px 8px' }} /></div>
             </div>
             <div className="module-form-group" style={{ margin: '0 0 10px' }}><label style={{ fontSize: '0.75rem' }}>Outcome Notes</label><input value={matchForm.notes} onChange={e => setMatchForm(p => ({ ...p, notes: e.target.value }))} placeholder="How did the intro go?" style={{ fontSize: '0.8rem', padding: '5px 8px' }} /></div>
-            <button onClick={addMatch} style={{ padding: '5px 14px', borderRadius: 8, background: '#4f46e5', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>Log Match</button>
+            <button onClick={addMatch} style={{ padding: '5px 14px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}>Log Match</button>
 
             {matches.length > 0 && (
               <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -439,8 +439,8 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
       {/* ─── 3. Exec Meeting Notes ─── */}
       <section>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12 }}>📝 Exec Meeting Notes</h3>
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '16px 20px' }}>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 12, color: '#1B2A4A' }}>📝 Exec Meeting Notes</h3>
+        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 20px' }}>
           <textarea
             value={execNotes}
             onChange={e => setExecNotes(e.target.value)}
@@ -461,8 +461,8 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
       {/* ─── 4. Bonus Notes ─── */}
       <section>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12 }}>🎁 Bonus Notes <span style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: 400 }}>(care packages, extras)</span></h3>
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '16px 20px' }}>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 12, color: '#1B2A4A' }}>🎁 Bonus Notes <span style={{ fontSize: '0.8rem', color: '#5C5449', fontWeight: 400, fontFamily: 'inherit' }}>(care packages, extras)</span></h3>
+        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 20px' }}>
           <textarea
             value={bonusNotes}
             onChange={e => setBonusNotes(e.target.value)}

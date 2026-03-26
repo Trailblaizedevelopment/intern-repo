@@ -1582,20 +1582,20 @@ input:focus {
   align-items: center;
   gap: 0.5rem;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  color: #6b7280;
+  border: 1px solid var(--color-border, #D9D4CC);
+  color: var(--color-text-secondary, #5C5449);
   padding: 0.75rem 1rem;
-  border-radius: 10px;
+  border-radius: 2px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease-out;
   font-family: inherit;
 }
 
 .module-filter-btn:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--color-bg, #F7F5F1);
+  border-color: var(--color-navy, #1B2A4A);
 }
 
 .module-primary-btn {

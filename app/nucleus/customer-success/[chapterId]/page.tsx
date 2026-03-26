@@ -418,7 +418,7 @@ export default function ChapterDashboardPage() {
                     </div>
                     {submission.chapter.alumni_list_url && (
                       <div style={{ marginTop: 10 }}>
-                        <a href={submission.chapter.alumni_list_url} target="_blank" rel="noopener noreferrer" style={{ color: '#ec4899', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>
+                        <a href={submission.chapter.alumni_list_url} target="_blank" rel="noopener noreferrer" style={{ color: '#C4874A', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>
                           📎 Download Alumni List
                         </a>
                       </div>

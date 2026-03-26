@@ -265,7 +265,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
             {/* Link to full alumni list */}
             <Link
               href={`/dashboard/clients/${chapter.id}/alumni`}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#ec4899', fontWeight: 600, textDecoration: 'none' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#C4874A', fontWeight: 600, textDecoration: 'none' }}
             >
               View Full Alumni List <ExternalLink size={13} />
             </Link>
