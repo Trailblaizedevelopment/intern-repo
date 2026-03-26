@@ -470,11 +470,12 @@ interface ConvListPanelProps {
   onBack: () => void;
   onConvClick: (conv: LinqConversation) => void;
   onPageChange: (p: number) => void;
+  hideBackButton?: boolean;
 }
 
 function ConvListPanel({
   chapterName, tab, convs, total, page, loading, selectedConvId,
-  onBack, onConvClick, onPageChange,
+  onBack, onConvClick, onPageChange, hideBackButton,
 }: ConvListPanelProps) {
   const totalPages = Math.ceil(total / LIMIT);
 
@@ -485,12 +486,14 @@ function ConvListPanel({
         padding: '10px 14px', borderBottom: '1px solid #e5e7eb', background: '#fff',
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
       }}>
-        <button
-          onClick={onBack}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 0, display: 'flex' }}
-        >
-          <ArrowLeft size={18} />
-        </button>
+        {!hideBackButton && (
+          <button
+            onClick={onBack}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 0, display: 'flex' }}
+          >
+            <ArrowLeft size={18} />
+          </button>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {chapterName ?? '(No Chapter)'}
@@ -734,9 +737,11 @@ function EmptyRight() {
 
 interface Props {
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  initialChapterId?: string | null;
+  initialChapterName?: string | null;
 }
 
-export default function ConversationsTab({ showToast }: Props) {
+export default function ConversationsTab({ showToast, initialChapterId, initialChapterName }: Props) {
   // Navigation state
   const [tab, setTab] = useState<Tab>('active');
   const [selectedChapter, setSelectedChapter] = useState<{ id: string | null; name: string | null } | null>(null);
@@ -774,6 +779,15 @@ export default function ConversationsTab({ showToast }: Props) {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // If initialChapterId is provided, skip chapter selection and load that chapter's convs directly
+  useEffect(() => {
+    if (initialChapterId) {
+      setSelectedChapter({ id: initialChapterId, name: initialChapterName ?? null });
+      loadConvs(initialChapterId, tab, 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialChapterId]);
 
   // ── Data fetchers ────────────────────────────────────────────────────────
 
@@ -1057,6 +1071,7 @@ export default function ConversationsTab({ showToast }: Props) {
       onBack={handleBackToChapters}
       onConvClick={setSelectedConv}
       onPageChange={p => setPage(p)}
+      hideBackButton={!!initialChapterId}
     />
   ) : null;
 

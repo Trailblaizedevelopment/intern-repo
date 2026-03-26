@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   HeartHandshake, Plus, Search, X, AlertTriangle, Clock,
-  Send, Mail, Settings, Loader2,
+  Settings, Loader2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -14,8 +14,6 @@ import {
 } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import ConfirmModal from '@/components/ConfirmModal';
-import LinqOutreachTab from './LinqOutreachTab';
-import EmailTemplatesTab from './EmailTemplatesTab';
 import { ArrowLeft, LayoutDashboard, CreditCard, Edit2, Trash2, Link as LinkIcon } from 'lucide-react';
 
 // ═══════════════════════════════════════════
@@ -55,7 +53,6 @@ interface Toast {
 
 export default function CustomerSuccessPage() {
   const router = useRouter();
-  const [moduleView, setModuleView] = useState<'chapters' | 'outreach' | 'templates'>('chapters');
 
   const [chapters, setChapters] = useState<ChapterWithOnboarding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -258,40 +255,7 @@ export default function CustomerSuccessPage() {
       </header>
 
       <main className="module-main">
-        {/* Module-level navigation */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #f3f4f6', paddingBottom: 0 }}>
-          {([
-            { id: 'chapters', label: 'Chapters', icon: <HeartHandshake size={14} /> },
-            { id: 'outreach', label: 'Linq Outreach', icon: <Send size={14} /> },
-            { id: 'templates', label: 'Email Templates', icon: <Mail size={14} /> },
-          ] as const).map(view => (
-            <button
-              key={view.id}
-              onClick={() => setModuleView(view.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '8px 16px',
-                border: 'none',
-                borderBottom: moduleView === view.id ? '2px solid #ec4899' : '2px solid transparent',
-                background: 'none',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: moduleView === view.id ? 600 : 400,
-                color: moduleView === view.id ? '#ec4899' : '#6b7280',
-                marginBottom: -2,
-                transition: 'all 0.15s',
-              }}
-            >
-              {view.icon} {view.label}
-            </button>
-          ))}
-        </div>
-
-        {moduleView === 'outreach' ? (
-          <LinqOutreachTab showToast={showToast} />
-        ) : moduleView === 'templates' ? (
-          <EmailTemplatesTab showToast={showToast} />
-        ) : loading ? (
+        {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
             {[1,2,3,4].map(i => (
               <div key={i} style={{ height: 160, background: '#f3f4f6', borderRadius: 16, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i*0.1}s` }} />

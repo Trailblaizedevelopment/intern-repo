@@ -18,6 +18,8 @@ import AlumniOutreachTab from './AlumniOutreachTab';
 import SuccessTab from './SuccessTab';
 import ConversationsTab from '../ConversationsTab';
 import EmailOutreachTab from '../EmailOutreachTab';
+import LinqOutreachTab from '../LinqOutreachTab';
+import EmailTemplatesTab from '../EmailTemplatesTab';
 
 const EXECUTIVE_POSITION_LABELS: Record<string, string> = {
   president: 'President', vp: 'Vice President', treasurer: 'Treasurer',
@@ -36,7 +38,7 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
-type DashTab = 'setup' | 'alumni' | 'conversations' | 'email' | 'success' | 'sales';
+type DashTab = 'setup' | 'alumni' | 'conversations' | 'email' | 'linqoutreach' | 'emailtemplates' | 'success' | 'sales';
 
 interface SubmissionData {
   chapter: {
@@ -211,6 +213,8 @@ export default function ChapterDashboardPage() {
     { id: 'alumni', label: '👥 Alumni Outreach' },
     { id: 'conversations', label: '💬 Linq Conversations' },
     { id: 'email', label: '📧 Email Outreach' },
+    { id: 'linqoutreach', label: '📤 Linq Outreach' },
+    { id: 'emailtemplates', label: '📨 Email Templates' },
     { id: 'success', label: '✅ Success' },
     { id: 'sales', label: '💰 Sales' },
   ];
@@ -305,11 +309,17 @@ export default function ChapterDashboardPage() {
           <AlumniOutreachTab chapter={chapter} showToast={showToast} onUpdate={fetchChapter} />
         )}
         {activeTab === 'conversations' && (
-          <ConversationsTab showToast={showToast} />
+          <ConversationsTab
+            showToast={showToast}
+            initialChapterId={chapter.id}
+            initialChapterName={chapter.chapter_name}
+          />
         )}
         {activeTab === 'email' && (
           <EmailOutreachTab showToast={showToast} />
         )}
+        {activeTab === 'linqoutreach' && <LinqOutreachTab showToast={showToast} />}
+        {activeTab === 'emailtemplates' && <EmailTemplatesTab showToast={showToast} />}
         {activeTab === 'success' && (
           <SuccessTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
         )}
