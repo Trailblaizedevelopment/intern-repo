@@ -275,29 +275,57 @@ export interface Chapter {
   alumni_join_link: string | null;
   actives_join_link: string | null;
 
+  // Sales tracking (added by CS rebuild)
+  contract_signed?: boolean;
+  contract_signed_date?: string;
+  contract_signed_notes?: string;
+  payment_received?: boolean;
+  payment_received_date?: string;
+  payment_amount_received?: number;
+  payment_received_notes?: string;
+  onboarding_form_submitted?: boolean;
+  onboarding_form_submitted_date?: string;
+  onboarding_form_notes?: string;
+
+  // Success notes
+  exec_notes?: string;
+  bonus_notes?: string;
+
   created_at: string;
   updated_at: string;
 }
 
 // Onboarding step definition for UI
 export const ONBOARDING_STEPS = [
-  { key: 'chapter_created', label: 'Chapter Created', category: 'setup' },
-  { key: 'exec_account', label: 'Exec Account', category: 'setup' },
-  { key: 'scheduled_first_call', label: 'Scheduled First Call', category: 'setup' },
-  { key: 'exec_demo', label: 'Exec Demo', category: 'setup' },
-  { key: 'alumni_list', label: 'Alumni List', category: 'alumni' },
-  { key: 'alumni_emails_sent', label: 'Alumni Emails Sent', category: 'alumni' },
-  { key: 'member_onboarding', label: 'Member Onboarding', category: 'members' },
-  { key: 'budget_set', label: 'Budget Set', category: 'members' },
-  { key: 'qr_code', label: 'QR Code', category: 'members' },
-  { key: 'simple_function_guide', label: 'Simple Function Guide', category: 'training' },
-  { key: 'events_scheduled', label: 'Events Scheduled', category: 'engagement' },
-  { key: 'test_announcements', label: 'Test Announcements', category: 'engagement' },
-  { key: 'message_board_started', label: 'Message Board Started', category: 'engagement' },
-  { key: 'invitations_created', label: 'Invitations Created', category: 'social' },
-  { key: 'facebook_group', label: 'Facebook Group', category: 'social' },
-  { key: 'linkedin_group', label: 'LinkedIn Group', category: 'social' },
-  { key: 'instagram_post', label: 'Instagram Post', category: 'social' },
+  // Setup
+  { key: 'setup_groupchat_created',    label: 'Groupchat created with admin',        category: 'setup' },
+  { key: 'setup_chapter_on_space',     label: 'Chapter created on Space',            category: 'setup' },
+  { key: 'setup_chapter_on_platform',  label: 'Chapter created on Trailblaize',      category: 'setup' },
+  { key: 'setup_submission_form_sent', label: 'Submission form sent',                category: 'setup' },
+  { key: 'setup_submission_received',  label: 'Submission form received',            category: 'setup' },
+  // Alumni Activation
+  { key: 'activate_ig_collab',         label: 'Collab IG post done',                 category: 'activation' },
+  { key: 'activate_facebook_flyer',    label: 'Facebook group flyer sent',           category: 'activation' },
+  { key: 'activate_linkedin_post',     label: 'LinkedIn group post done',            category: 'activation' },
+  { key: 'activate_groupme_blast',     label: 'GroupMe blast sent',                  category: 'activation' },
+  { key: 'activate_newsletter',        label: 'Newsletter sent',                     category: 'activation' },
+  // Data Import
+  { key: 'data_list_uploaded',         label: 'Alumni list uploaded',                category: 'data' },
+  { key: 'data_counts_verified',       label: 'Phone/email counts verified',         category: 'data' },
+  { key: 'data_imessage_filtered',     label: 'iMessage pre-filter run',             category: 'data' },
+  // Linq Outreach
+  { key: 'linq_touch1_sent',           label: 'Touch 1 sent',                        category: 'linq' },
+  { key: 'linq_touch2_sent',           label: 'Touch 2 sent',                        category: 'linq' },
+  { key: 'linq_touch3_sent',           label: 'Touch 3 sent',                        category: 'linq' },
+  { key: 'linq_100_signups',           label: '100+ alumni signed up 🎯',            category: 'linq' },
+  // Email Outreach
+  { key: 'email_sequence_live',        label: 'SendGrid sequence live',              category: 'email' },
+  { key: 'email_blast_sent',           label: 'Email blast sent',                    category: 'email' },
+  // Success Activation
+  { key: 'success_first_checkin',      label: 'First exec check-in done',            category: 'success_setup' },
+  { key: 'success_actives_list',       label: 'Actives job/internship list collected', category: 'success_setup' },
+  { key: 'success_first_match',        label: 'First matchmaking run',               category: 'success_setup' },
+  { key: 'success_video_sent',         label: 'Chapter video asset sent',            category: 'success_setup' },
 ] as const;
 
 export interface EnterpriseContract {
@@ -561,6 +589,30 @@ export interface ChapterWithOnboarding extends Chapter {
   instagram_photo_url?: string;
   alumni_list_url?: string;
   scheduled_demo_time?: string;
+  // New ONBOARDING_STEPS keys (all optional booleans)
+  setup_groupchat_created?: boolean;
+  setup_chapter_on_space?: boolean;
+  setup_chapter_on_platform?: boolean;
+  setup_submission_form_sent?: boolean;
+  setup_submission_received?: boolean;
+  activate_ig_collab?: boolean;
+  activate_facebook_flyer?: boolean;
+  activate_linkedin_post?: boolean;
+  activate_groupme_blast?: boolean;
+  activate_newsletter?: boolean;
+  data_list_uploaded?: boolean;
+  data_counts_verified?: boolean;
+  data_imessage_filtered?: boolean;
+  linq_touch1_sent?: boolean;
+  linq_touch2_sent?: boolean;
+  linq_touch3_sent?: boolean;
+  linq_100_signups?: boolean;
+  email_sequence_live?: boolean;
+  email_blast_sent?: boolean;
+  success_first_checkin?: boolean;
+  success_actives_list?: boolean;
+  success_first_match?: boolean;
+  success_video_sent?: boolean;
 }
 
 // List of common US universities for autocomplete

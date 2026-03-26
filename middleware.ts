@@ -30,13 +30,14 @@ export function middleware(req: NextRequest) {
     // If no key is configured, allow through (dev mode / not set up yet)
     if (!apiKey) return NextResponse.next();
 
-    // Allow same-origin browser requests — browsers always send Origin header
-    // for same-site fetches. This app uses localStorage for auth (not cookies).
+    // Allow same-origin/same-site browser requests — browsers send Sec-Fetch-Site
+    // for fetches. This app uses localStorage for auth (not cookies).
     const origin  = req.headers.get('origin')  || '';
     const referer = req.headers.get('referer') || '';
     const host    = req.headers.get('host')    || '';
+    const sfSite  = req.headers.get('sec-fetch-site') ?? '';
     const isBrowser = origin.includes(host) || referer.includes(host) ||
-      req.headers.get('sec-fetch-site') === 'same-origin';
+      sfSite === 'same-origin' || sfSite === 'same-site';
     if (isBrowser) return NextResponse.next();
 
     // Check for API key in Authorization header or x-api-key header

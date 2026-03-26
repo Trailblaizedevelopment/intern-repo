@@ -111,7 +111,36 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ data: data || [], total: count ?? 0 });
+    // ── Enrich contact_name from alumni_contacts ───────────────────────────
+    const rows = data || [];
+    const nullNameIds = rows
+      .filter(r => !r.contact_name && r.linq_chat_id)
+      .map(r => r.linq_chat_id as string);
+
+    if (nullNameIds.length > 0) {
+      const { data: contacts } = await supabase
+        .from('alumni_contacts')
+        .select('linq_chat_id, first_name, last_name')
+        .in('linq_chat_id', nullNameIds);
+
+      if (contacts && contacts.length > 0) {
+        const nameMap = new Map<string, string>();
+        for (const c of contacts) {
+          if (c.linq_chat_id) {
+            const name = [c.first_name, c.last_name].filter(Boolean).join(' ').trim();
+            if (name) nameMap.set(c.linq_chat_id, name);
+          }
+        }
+        for (const row of rows) {
+          if (!row.contact_name && row.linq_chat_id) {
+            const resolved = nameMap.get(row.linq_chat_id);
+            if (resolved) row.contact_name = resolved;
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({ data: rows, total: count ?? 0 });
   } catch (err) {
     console.error('[conversations GET]', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });

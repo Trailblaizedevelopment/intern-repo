@@ -101,10 +101,13 @@ export async function POST(req: NextRequest) {
 
           statusMap[chat.id] = autoStatus;
 
+          const contactPhone = chat.handles.find(h => !h.is_me)?.handle ?? null;
+
           upserts.push({
             linq_chat_id: chat.id,
             line_phone: line.phone,
             line_label: line.label,
+            contact_phone: contactPhone,
             last_message_at: lastMsgAt,
             last_message_text: lastMsg
               ? (lastMsg.parts?.find((p: { type: string; value: string }) => p.type === 'text')?.value ?? null)
@@ -122,8 +125,92 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // ── Batch upsert base fields (no status — preserve existing) ───────────
+    // ── Enrich upserts with chapter_id + chapter_name ─────────────────────
+    // Collect unique contact phones from all chats being upserted
+    const contactPhones = [
+      ...new Set(
+        allChats
+          .map(({ chat }) => {
+            const h = chat.handles.find(h => !h.is_me);
+            return h?.handle ?? null;
+          })
+          .filter((p): p is string => Boolean(p))
+      ),
+    ];
+
+    const phoneToChapterId = new Map<string, string>();
+    const chapterNameMap = new Map<string, string>();
     const BATCH = 50;
+
+    if (contactPhones.length > 0) {
+      // Batch query alumni_contacts for chapter_id
+      for (let i = 0; i < contactPhones.length; i += BATCH) {
+        const batch = contactPhones.slice(i, i + BATCH);
+        const { data: contacts } = await supabase
+          .from('alumni_contacts')
+          .select('phone_primary, chapter_id')
+          .in('phone_primary', batch);
+        for (const c of contacts ?? []) {
+          if (c.phone_primary && c.chapter_id) {
+            phoneToChapterId.set(c.phone_primary, c.chapter_id);
+          }
+        }
+      }
+
+      // Batch query chapters for chapter_name
+      const allChapterIds = [...new Set(phoneToChapterId.values())];
+      for (let i = 0; i < allChapterIds.length; i += BATCH) {
+        const batch = allChapterIds.slice(i, i + BATCH);
+        const { data: chapters } = await supabase
+          .from('chapters')
+          .select('id, chapter_name')
+          .in('id', batch);
+        for (const ch of chapters ?? []) {
+          if (ch.id && ch.chapter_name) chapterNameMap.set(ch.id, ch.chapter_name);
+        }
+      }
+
+      // Add chapter fields to each upsert record
+      for (const upsert of upserts) {
+        const phone = upsert.contact_phone as string | undefined;
+        if (!phone) continue;
+        const chapterId = phoneToChapterId.get(phone);
+        if (chapterId) {
+          upsert.chapter_id = chapterId;
+          upsert.chapter_name = chapterNameMap.get(chapterId) ?? null;
+        }
+      }
+    }
+
+    // ── Enrich upserts with contact_name from alumni_contacts ─────────────
+    const upsertChatIds = [
+      ...new Set(upserts.map(u => u.linq_chat_id as string).filter(Boolean)),
+    ];
+
+    if (upsertChatIds.length > 0) {
+      const chatIdNameMap = new Map<string, string>();
+      for (let i = 0; i < upsertChatIds.length; i += BATCH) {
+        const batch = upsertChatIds.slice(i, i + BATCH);
+        const { data: nameContacts } = await supabase
+          .from('alumni_contacts')
+          .select('linq_chat_id, first_name, last_name')
+          .in('linq_chat_id', batch);
+        for (const c of nameContacts ?? []) {
+          if (c.linq_chat_id) {
+            const name = [c.first_name, c.last_name].filter(Boolean).join(' ').trim();
+            if (name) chatIdNameMap.set(c.linq_chat_id, name);
+          }
+        }
+      }
+      for (const upsert of upserts) {
+        const chatId = upsert.linq_chat_id as string | undefined;
+        if (chatId && chatIdNameMap.has(chatId)) {
+          upsert.contact_name = chatIdNameMap.get(chatId);
+        }
+      }
+    }
+
+    // ── Batch upsert base fields (no status — preserve existing) ───────────
     for (let i = 0; i < upserts.length; i += BATCH) {
       const batch = upserts.slice(i, i + BATCH);
       const { error } = await supabase
