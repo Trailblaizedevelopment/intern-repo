@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   HeartHandshake, Plus, Search, X, AlertTriangle, Clock,
-  Send, MessageSquare, Mail, Settings, Loader2,
+  Send, Mail, Settings, Loader2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -16,8 +16,6 @@ import ModalOverlay from '@/components/ModalOverlay';
 import ConfirmModal from '@/components/ConfirmModal';
 import LinqOutreachTab from './LinqOutreachTab';
 import EmailTemplatesTab from './EmailTemplatesTab';
-import EmailOutreachTab from './EmailOutreachTab';
-import ConversationsTab from './ConversationsTab';
 import { ArrowLeft, LayoutDashboard, CreditCard, Edit2, Trash2, Link as LinkIcon } from 'lucide-react';
 
 // ═══════════════════════════════════════════
@@ -57,7 +55,7 @@ interface Toast {
 
 export default function CustomerSuccessPage() {
   const router = useRouter();
-  const [moduleView, setModuleView] = useState<'chapters' | 'outreach' | 'conversations' | 'templates' | 'email'>('chapters');
+  const [moduleView, setModuleView] = useState<'chapters' | 'outreach' | 'templates'>('chapters');
 
   const [chapters, setChapters] = useState<ChapterWithOnboarding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,9 +263,7 @@ export default function CustomerSuccessPage() {
           {([
             { id: 'chapters', label: 'Chapters', icon: <HeartHandshake size={14} /> },
             { id: 'outreach', label: 'Linq Outreach', icon: <Send size={14} /> },
-            { id: 'conversations', label: 'Conversations', icon: <MessageSquare size={14} /> },
             { id: 'templates', label: 'Email Templates', icon: <Mail size={14} /> },
-            { id: 'email', label: 'Email Outreach', icon: <Send size={14} /> },
           ] as const).map(view => (
             <button
               key={view.id}
@@ -293,12 +289,8 @@ export default function CustomerSuccessPage() {
 
         {moduleView === 'outreach' ? (
           <LinqOutreachTab showToast={showToast} />
-        ) : moduleView === 'conversations' ? (
-          <ConversationsTab showToast={showToast} />
         ) : moduleView === 'templates' ? (
           <EmailTemplatesTab showToast={showToast} />
-        ) : moduleView === 'email' ? (
-          <EmailOutreachTab showToast={showToast} />
         ) : loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
             {[1,2,3,4].map(i => (

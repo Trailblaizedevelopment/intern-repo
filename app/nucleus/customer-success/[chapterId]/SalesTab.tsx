@@ -130,6 +130,11 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
 
   const outOfOrder = (paymentDone && !contractDone) || (formDone && !paymentDone);
 
+  // Split steps into incomplete and completed
+  const incompleteSteps = SALES_STEPS.filter(step => !edits[step.key].checked);
+  const completedSteps = SALES_STEPS.filter(step => edits[step.key].checked);
+  const sortedSteps = [...incompleteSteps, ...completedSteps];
+
   return (
     <div style={{ maxWidth: 700 }}>
       <div style={{ marginBottom: 24 }}>
@@ -146,16 +151,27 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
         </div>
       )}
 
-      {/* Timeline stepper */}
+      {/* Timeline stepper — incomplete first, completed sink to bottom */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {SALES_STEPS.map((step, idx) => {
+        {sortedSteps.map((step, idx) => {
           const edit = edits[step.key];
           const isChecked = edit.checked;
           const isSaving = saving === step.key;
+          // Original step index for numbering
+          const originalIdx = SALES_STEPS.findIndex(s => s.key === step.key);
+          // Show "Completed" divider before first completed step
+          const showCompletedDivider = isChecked && (idx === 0 || !edits[sortedSteps[idx - 1].key].checked);
 
           return (
+            <React.Fragment key={step.key}>
+              {showCompletedDivider && completedSteps.length > 0 && incompleteSteps.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0' }}>
+                  <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>Completed</span>
+                  <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+                </div>
+              )}
             <div
-              key={step.key}
               style={{
                 background: '#fff',
                 border: `2px solid ${isChecked ? '#10b981' : '#e5e7eb'}`,
@@ -164,6 +180,7 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
                 padding: '18px 20px',
                 transition: 'border-color 0.2s, box-shadow 0.2s',
                 boxShadow: isChecked ? '0 2px 12px rgba(16,185,129,0.1)' : '0 1px 4px rgba(0,0,0,0.04)',
+                opacity: isChecked ? 0.75 : 1,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
@@ -181,9 +198,9 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
                   }}
                     onClick={() => updateEdit(step.key, 'checked', !isChecked)}
                   >
-                    {isChecked ? <Check size={18} color="#fff" /> : <span style={{ opacity: 0.4 }}>{idx + 1}</span>}
+                    {isChecked ? <Check size={18} color="#fff" /> : <span style={{ opacity: 0.4 }}>{originalIdx + 1}</span>}
                   </div>
-                  {idx < SALES_STEPS.length - 1 && (
+                  {idx < sortedSteps.length - 1 && (
                     <div style={{ width: 2, height: 20, background: '#e5e7eb', margin: '0 auto' }} />
                   )}
                 </div>
@@ -254,6 +271,7 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
                 </div>
               </div>
             </div>
+            </React.Fragment>
           );
         })}
       </div>

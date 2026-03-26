@@ -275,6 +275,10 @@ export interface Chapter {
   alumni_join_link: string | null;
   actives_join_link: string | null;
 
+  // Opt-out toggles
+  email_outreach_enabled?: boolean;
+  conversations_enabled?: boolean;
+
   // Sales tracking (added by CS rebuild)
   contract_signed?: boolean;
   contract_signed_date?: string;

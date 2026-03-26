@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, HeartHandshake, Edit2, Copy, X, Loader2,
-  CreditCard,
+  CreditCard, Eye,
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import {
@@ -16,6 +16,19 @@ import SalesTab from './SalesTab';
 import SetUpTab from './SetUpTab';
 import AlumniOutreachTab from './AlumniOutreachTab';
 import SuccessTab from './SuccessTab';
+import ConversationsTab from '../ConversationsTab';
+import EmailOutreachTab from '../EmailOutreachTab';
+
+const EXECUTIVE_POSITION_LABELS: Record<string, string> = {
+  president: 'President', vp: 'Vice President', treasurer: 'Treasurer',
+  secretary: 'Secretary', alumni_chair: 'Alumni Chair', risk_chair: 'Risk Chair',
+  recruitment_chair: 'Recruitment Chair', social_chair: 'Social Chair', other: 'Other',
+};
+const OUTREACH_CHANNEL_LABELS: Record<string, string> = {
+  facebook_group: 'Facebook Group', linkedin_group: 'LinkedIn Group',
+  groupme: 'GroupMe', slack: 'Slack', discord: 'Discord',
+  email_newsletter: 'Email Newsletter', website: 'Website', other: 'Other',
+};
 
 interface Toast {
   id: string;
@@ -23,7 +36,21 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
-type DashTab = 'sales' | 'setup' | 'alumni' | 'success';
+type DashTab = 'setup' | 'alumni' | 'conversations' | 'email' | 'success' | 'sales';
+
+interface SubmissionData {
+  chapter: {
+    id: string;
+    chapter_name: string;
+    school: string;
+    fraternity: string;
+    estimated_alumni?: number;
+    alumni_list_url?: string;
+  };
+  executives: { full_name: string; position: string; email: string }[];
+  outreach_channels: { channel_type: string; facebook_member_count?: number; email_subscriber_count?: number; linkedin_member_count?: number; description?: string }[];
+  submitted_at: string | null;
+}
 
 export default function ChapterDashboardPage() {
   const router = useRouter();
@@ -32,9 +59,14 @@ export default function ChapterDashboardPage() {
 
   const [chapter, setChapter] = useState<ChapterWithOnboarding | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<DashTab>('sales');
+  const [activeTab, setActiveTab] = useState<DashTab>('setup');
   const [showEditModal, setShowEditModal] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Submission viewer
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [submission, setSubmission] = useState<SubmissionData | null>(null);
+  const [loadingSubmission, setLoadingSubmission] = useState(false);
 
   const [formData, setFormData] = useState({
     chapter_name: '', school: '', fraternity: '', contact_name: '',
@@ -113,6 +145,27 @@ export default function ChapterDashboardPage() {
     } catch { showToast('Failed to generate link', 'error'); }
   }
 
+  async function viewSubmission() {
+    if (!chapter) return;
+    setLoadingSubmission(true);
+    setShowSubmissionModal(true);
+    try {
+      const res = await fetch(`/api/onboarding/submission/${chapter.id}`);
+      const json = await res.json();
+      if (json.error) {
+        showToast(json.error.message || 'Failed to load submission', 'error');
+        setShowSubmissionModal(false);
+      } else {
+        setSubmission(json.data);
+      }
+    } catch {
+      showToast('Failed to load submission', 'error');
+      setShowSubmissionModal(false);
+    } finally {
+      setLoadingSubmission(false);
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', gap: 12 }}>
@@ -154,10 +207,12 @@ export default function ChapterDashboardPage() {
   const hc = healthColors[chapter.health] || healthColors.good;
 
   const TABS: { id: DashTab; label: string }[] = [
-    { id: 'sales', label: '💰 Sales' },
     { id: 'setup', label: '🚀 Set Up' },
     { id: 'alumni', label: '👥 Alumni Outreach' },
+    { id: 'conversations', label: '💬 Linq Conversations' },
+    { id: 'email', label: '📧 Email Outreach' },
     { id: 'success', label: '✅ Success' },
+    { id: 'sales', label: '💰 Sales' },
   ];
 
   return (
@@ -193,6 +248,12 @@ export default function ChapterDashboardPage() {
               <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: hc.bg, color: hc.color }}>
                 {chapter.health === 'good' ? '✓ Good' : chapter.health === 'warning' ? '⚠ Warning' : '🔴 Critical'}
               </span>
+              <button
+                onClick={viewSubmission}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500 }}
+              >
+                <Eye size={13} /> View Submission
+              </button>
               <button
                 onClick={() => setShowEditModal(true)}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500 }}
@@ -237,17 +298,23 @@ export default function ChapterDashboardPage() {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'sales' && (
-          <SalesTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
-        )}
         {activeTab === 'setup' && (
           <SetUpTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
         )}
         {activeTab === 'alumni' && (
-          <AlumniOutreachTab chapter={chapter} showToast={showToast} />
+          <AlumniOutreachTab chapter={chapter} showToast={showToast} onUpdate={fetchChapter} />
+        )}
+        {activeTab === 'conversations' && (
+          <ConversationsTab showToast={showToast} />
+        )}
+        {activeTab === 'email' && (
+          <EmailOutreachTab showToast={showToast} />
         )}
         {activeTab === 'success' && (
           <SuccessTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
+        )}
+        {activeTab === 'sales' && (
+          <SalesTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
         )}
       </main>
 
@@ -308,6 +375,94 @@ export default function ChapterDashboardPage() {
             <div className="module-modal-footer">
               <button className="module-cancel-btn" onClick={() => setShowEditModal(false)}>Cancel</button>
               <button className="module-primary-btn" onClick={updateChapter} disabled={!formData.chapter_name}>Update</button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* Submission Viewer Modal */}
+      {showSubmissionModal && (
+        <ModalOverlay className="module-modal-overlay" onClose={() => { setShowSubmissionModal(false); setSubmission(null); }}>
+          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()}>
+            <div className="module-modal-header">
+              <h2>Onboarding Submission</h2>
+              <button className="module-modal-close" onClick={() => { setShowSubmissionModal(false); setSubmission(null); }}><X size={20} /></button>
+            </div>
+            <div className="module-modal-body">
+              {loadingSubmission ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 0', color: '#6b7280' }}>
+                  <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                  Loading submission…
+                </div>
+              ) : submission ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {/* Chapter info */}
+                  <div style={{ background: '#f9fafb', borderRadius: 10, padding: '14px 18px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 8 }}>{submission.chapter.chapter_name}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: '0.85rem', color: '#374151' }}>
+                      {submission.chapter.school && <div><span style={{ color: '#6b7280' }}>School:</span> {submission.chapter.school}</div>}
+                      {submission.chapter.fraternity && <div><span style={{ color: '#6b7280' }}>Fraternity:</span> {submission.chapter.fraternity}</div>}
+                      {submission.chapter.estimated_alumni && <div><span style={{ color: '#6b7280' }}>Est. Alumni:</span> {submission.chapter.estimated_alumni}</div>}
+                      {submission.submitted_at && <div><span style={{ color: '#6b7280' }}>Submitted:</span> {new Date(submission.submitted_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>}
+                    </div>
+                    {submission.chapter.alumni_list_url && (
+                      <div style={{ marginTop: 10 }}>
+                        <a href={submission.chapter.alumni_list_url} target="_blank" rel="noopener noreferrer" style={{ color: '#ec4899', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>
+                          📎 Download Alumni List
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Exec board */}
+                  {submission.executives.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 10 }}>Executive Board</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {submission.executives.map((exec, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#f9fafb', borderRadius: 8, fontSize: '0.85rem' }}>
+                            <div style={{ fontWeight: 600, flex: 1 }}>{exec.full_name}</div>
+                            <div style={{ color: '#6b7280', fontSize: '0.8rem' }}>{EXECUTIVE_POSITION_LABELS[exec.position] || exec.position}</div>
+                            <div style={{ color: '#2563eb', fontSize: '0.8rem' }}>{exec.email}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Outreach channels */}
+                  {submission.outreach_channels.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 10 }}>Outreach Channels</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {submission.outreach_channels.map((ch, i) => {
+                          const memberCount = ch.facebook_member_count || ch.email_subscriber_count || ch.linkedin_member_count;
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#f9fafb', borderRadius: 8, fontSize: '0.85rem' }}>
+                              <div style={{ fontWeight: 600, flex: 1 }}>{OUTREACH_CHANNEL_LABELS[ch.channel_type] || ch.channel_type}</div>
+                              {memberCount && <div style={{ color: '#6b7280' }}>{memberCount.toLocaleString()} members</div>}
+                              {ch.description && <div style={{ color: '#9ca3af', fontSize: '0.78rem' }}>{ch.description}</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {submission.executives.length === 0 && submission.outreach_channels.length === 0 && (
+                    <p style={{ color: '#9ca3af', fontSize: '0.875rem', textAlign: 'center', padding: '20px 0' }}>
+                      No detailed submission data available yet.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p style={{ color: '#9ca3af', fontSize: '0.875rem', textAlign: 'center', padding: '20px 0' }}>
+                  No submission found for this chapter.
+                </p>
+              )}
+            </div>
+            <div className="module-modal-footer">
+              <button className="module-cancel-btn" onClick={() => { setShowSubmissionModal(false); setSubmission(null); }}>Close</button>
             </div>
           </div>
         </ModalOverlay>

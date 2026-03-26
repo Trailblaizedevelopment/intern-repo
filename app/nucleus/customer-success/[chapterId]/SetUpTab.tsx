@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Check, Sparkles } from 'lucide-react';
 import { supabase, ChapterWithOnboarding, ONBOARDING_STEPS } from '@/lib/supabase';
 
@@ -39,9 +39,26 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [confetti] = useState(() => generateConfetti());
 
+  // Opt-out toggles
+  const [emailOutreachEnabled, setEmailOutreachEnabled] = useState(chapter.email_outreach_enabled !== false);
+  const [conversationsEnabled, setConversationsEnabled] = useState(chapter.conversations_enabled !== false);
+
   useEffect(() => {
     setLocalChapter(chapter);
+    setEmailOutreachEnabled(chapter.email_outreach_enabled !== false);
+    setConversationsEnabled(chapter.conversations_enabled !== false);
   }, [chapter]);
+
+  const saveOptOut = useCallback(async (field: 'email_outreach_enabled' | 'conversations_enabled', value: boolean) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('chapters').update({ [field]: value }).eq('id', chapter.id);
+    if (error) {
+      showToast('Failed to save setting', 'error');
+    } else {
+      showToast('Setting saved', 'success');
+      onUpdate();
+    }
+  }, [chapter.id, showToast, onUpdate]);
 
   function getProgressGradient(pct: number): string {
     if (pct < 25) return 'linear-gradient(90deg,#f97316,#fb923c)';
@@ -117,6 +134,36 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
 
   return (
     <div style={{ maxWidth: 720 }}>
+      {/* Opt-out toggles */}
+      <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#374151' }}>
+          <input
+            type="checkbox"
+            checked={!emailOutreachEnabled}
+            onChange={e => {
+              const skipping = e.target.checked;
+              setEmailOutreachEnabled(!skipping);
+              saveOptOut('email_outreach_enabled', !skipping);
+            }}
+            style={{ width: 15, height: 15, cursor: 'pointer' }}
+          />
+          Skip email outreach for this chapter
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#374151' }}>
+          <input
+            type="checkbox"
+            checked={!conversationsEnabled}
+            onChange={e => {
+              const skipping = e.target.checked;
+              setConversationsEnabled(!skipping);
+              saveOptOut('conversations_enabled', !skipping);
+            }}
+            style={{ width: 15, height: 15, cursor: 'pointer' }}
+          />
+          Skip Linq conversations for this chapter
+        </label>
+      </div>
+
       {/* Overall progress */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '16px 20px', marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -140,6 +187,17 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
           const catDone = steps.filter(s => localChapter[s.key as keyof ChapterWithOnboarding]).length;
           const catPct = Math.round((catDone / steps.length) * 100);
           const isCelebrating = celebratingCategory === category;
+
+          // Opt-out collapse
+          const isOptedOut = (category === 'email' && !emailOutreachEnabled) || (category === 'linq' && !conversationsEnabled);
+          if (isOptedOut) {
+            return (
+              <div key={category} style={{ background: '#f9fafb', border: '1px dashed #d1d5db', borderRadius: 12, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#9ca3af' }}>{CATEGORY_LABELS[category] || category}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: '#e5e7eb', color: '#6b7280' }}>Opted out</span>
+              </div>
+            );
+          }
 
           return (
             <div
