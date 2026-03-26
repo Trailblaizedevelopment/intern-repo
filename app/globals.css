@@ -30879,18 +30879,18 @@ body { background: #FAFAFA; }
 
 .sn__pill {
   padding: 4px 12px;
-  border-radius: 16px;
+  border-radius: 2px;
   font-size: 0.75rem;
   font-weight: 600;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: #F0EDEA;
+  color: #5C5449;
   border: none;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s ease-out;
 }
 
-.sn__pill:hover { background: #e5e7eb; color: #374151; }
-.sn__pill.active { background: #111827; color: white; }
+.sn__pill:hover { background: #E8E4DF; color: #1B2A4A; }
+.sn__pill.active { background: #1B2A4A; color: #F7F5F1; }
 
 .sn__create-btn {
   display: flex;

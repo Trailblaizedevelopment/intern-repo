@@ -385,8 +385,8 @@ export default function CustomerSuccessPage() {
                 <div className="module-form-group"><label>Check-in Frequency</label><select value={formData.check_in_frequency} onChange={e => setFormData({ ...formData, check_in_frequency: e.target.value as CheckInFrequency })}>{Object.entries(CHECK_IN_FREQUENCY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
               </div>
               {/* Payment */}
-              <div style={{ marginTop: 16, marginBottom: 16, padding: 16, background: '#faf5ff', borderRadius: 8, border: '1px solid #e9d5ff' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}><CreditCard size={18} style={{ color: '#8b5cf6' }} /><span style={{ fontWeight: 600, color: '#6b21a8' }}>Payment Tracking</span></div>
+              <div style={{ marginTop: 16, marginBottom: 16, padding: 16, background: '#F7F5F1', borderRadius: 2, border: '1px solid #D9D4CC' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}><CreditCard size={18} style={{ color: '#C4874A' }} /><span style={{ fontWeight: 600, color: '#1B2A4A' }}>Payment Tracking</span></div>
                 <div className="module-form-row">
                   <div className="module-form-group"><label>Payment Day (1–31)</label><input type="number" min="1" max="31" value={formData.payment_day || ''} onChange={e => setFormData({ ...formData, payment_day: e.target.value ? parseInt(e.target.value) : null })} placeholder="15" /></div>
                   <div className="module-form-group"><label>Payment Type</label><select value={formData.payment_type} onChange={e => setFormData({ ...formData, payment_type: e.target.value as Chapter['payment_type'] })}><option value="annual">Annual</option><option value="monthly">Monthly</option><option value="one_time">One-Time</option></select></div>
