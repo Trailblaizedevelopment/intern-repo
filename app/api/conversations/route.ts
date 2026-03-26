@@ -44,15 +44,50 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
   const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') || '50')));
   const offset = (page - 1) * limit;
+  const category = (searchParams.get('category') || '').trim();
 
   try {
+    // ── category_counts mode ───────────────────────────────────────────────
+    if (mode === 'category_counts') {
+      if (!chapterId) {
+        return NextResponse.json({ error: 'chapter_id required for category_counts' }, { status: 400 });
+      }
+
+      type CountRow = { status: string; touch_stage: string | null; outreach_status: string | null; has_unread_reply: boolean };
+
+      const { data: allRows, error: allErr } = await supabase
+        .from('linq_conversations')
+        .select('status, touch_stage, outreach_status, has_unread_reply')
+        .eq('chapter_id', chapterId);
+
+      if (allErr) return NextResponse.json({ error: allErr.message }, { status: 500 });
+
+      const rows: CountRow[] = allRows || [];
+      const counts = {
+        needs_reply:  rows.filter(r => r.has_unread_reply).length,
+        flagged:      rows.filter(r => r.status === 'flagged').length,
+        touch1:       rows.filter(r => r.touch_stage === 'T1' && r.status === 'active').length,
+        touch2:       rows.filter(r => r.touch_stage === 'T2' && r.status === 'active').length,
+        touch3:       rows.filter(r => r.touch_stage === 'T3' && r.status === 'active').length,
+        signed_up:    rows.filter(r => r.outreach_status === 'signed_up').length,
+        confirmed:    rows.filter(r => r.outreach_status === 'touch1_confirmed').length,
+        no_response:  rows.filter(r => r.outreach_status === 'no_response').length,
+        handled:      rows.filter(r => r.status === 'handled').length,
+        all:          rows.length,
+      };
+
+      return NextResponse.json({ counts });
+    }
+
     // ── chapters_summary mode ──────────────────────────────────────────────
     if (mode === 'chapters_summary') {
       let q = supabase
         .from('linq_conversations')
-        .select('chapter_id, chapter_name');
+        .select('chapter_id, chapter_name, has_unread_reply');
 
-      if (status !== 'all') {
+      if (category === 'needs_reply') {
+        q = q.eq('has_unread_reply', true);
+      } else if (status !== 'all') {
         q = q.eq('status', status);
       }
 
@@ -82,9 +117,42 @@ export async function GET(req: NextRequest) {
       .from('linq_conversations')
       .select('*', { count: 'exact' });
 
-    // Status filter
-    if (status !== 'all') {
-      query = query.eq('status', status);
+    // Category filter (takes precedence over status when set)
+    if (category && category !== 'all') {
+      switch (category) {
+        case 'needs_reply':
+          query = query.eq('has_unread_reply', true);
+          break;
+        case 'flagged':
+          query = query.eq('status', 'flagged');
+          break;
+        case 'touch1':
+          query = query.eq('touch_stage', 'T1').eq('status', 'active');
+          break;
+        case 'touch2':
+          query = query.eq('touch_stage', 'T2').eq('status', 'active');
+          break;
+        case 'touch3':
+          query = query.eq('touch_stage', 'T3').eq('status', 'active');
+          break;
+        case 'signed_up':
+          query = query.eq('outreach_status', 'signed_up');
+          break;
+        case 'confirmed':
+          query = query.eq('outreach_status', 'touch1_confirmed');
+          break;
+        case 'no_response':
+          query = query.eq('outreach_status', 'no_response');
+          break;
+        case 'handled':
+          query = query.eq('status', 'handled');
+          break;
+      }
+    } else if (!category || category === 'all') {
+      // Status filter (only when category not set)
+      if (status !== 'all') {
+        query = query.eq('status', status);
+      }
     }
 
     // Chapter filter

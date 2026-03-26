@@ -40,6 +40,21 @@ const TAB_META: Record<Tab, { label: string; color: string }> = {
   handled:      { label: 'Handled',      color: '#16a34a' },
 };
 
+type ConvCategory = 'needs_reply' | 'flagged' | 'touch1' | 'touch2' | 'touch3' | 'signed_up' | 'confirmed' | 'no_response' | 'handled' | 'all';
+
+const CATEGORY_META: { key: ConvCategory; icon: string; label: string }[] = [
+  { key: 'needs_reply',  icon: '🔴', label: 'Needs Reply' },
+  { key: 'flagged',      icon: '🟡', label: 'Flagged' },
+  { key: 'touch1',       icon: '📬', label: 'Touch 1 Pending' },
+  { key: 'touch2',       icon: '📩', label: 'Touch 2 Pending' },
+  { key: 'touch3',       icon: '📫', label: 'Touch 3 Pending' },
+  { key: 'signed_up',    icon: '✅', label: 'Signed Up' },
+  { key: 'confirmed',    icon: '🤝', label: 'Confirmed' },
+  { key: 'no_response',  icon: '📭', label: 'No Response' },
+  { key: 'handled',      icon: '☑️', label: 'Handled' },
+  { key: 'all',          icon: '📋', label: 'All' },
+];
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface ChapterEntry {
@@ -733,6 +748,106 @@ function EmptyRight() {
   );
 }
 
+// CategorySidebar — triage nav for chapter-embedded mode
+interface CategorySidebarProps {
+  chapterName: string | null;
+  selectedCategory: ConvCategory;
+  counts: Record<ConvCategory, number>;
+  onSelect: (cat: ConvCategory) => void;
+}
+
+function CategorySidebar({ chapterName, selectedCategory, counts, onSelect }: CategorySidebarProps) {
+  return (
+    <div style={{
+      width: 200, flexShrink: 0, background: '#1B2A4A',
+      display: 'flex', flexDirection: 'column', overflowY: 'auto',
+      borderRight: '1px solid rgba(255,255,255,0.08)',
+    }}>
+      {/* Chapter header */}
+      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{
+          fontFamily: "'Instrument Serif', serif",
+          fontWeight: 700, fontSize: '0.9rem', color: '#fff',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {chapterName ?? 'Chapter'}
+        </div>
+        <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+          {counts.all} total conversation{counts.all !== 1 ? 's' : ''}
+        </div>
+      </div>
+
+      {/* Category items */}
+      <div style={{ flex: 1, paddingTop: 6, paddingBottom: 8 }}>
+        {CATEGORY_META.map(({ key, icon, label }) => {
+          const isActive = selectedCategory === key;
+          return (
+            <CategoryItem
+              key={key}
+              icon={icon}
+              label={label}
+              count={counts[key]}
+              isActive={isActive}
+              onClick={() => onSelect(key)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface CategoryItemProps {
+  icon: string;
+  label: string;
+  count: number;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+function CategoryItem({ icon, label, count, isActive, onClick }: CategoryItemProps) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '9px 14px 9px 13px',
+        cursor: 'pointer',
+        borderLeft: isActive ? '3px solid #C4874A' : '3px solid transparent',
+        background: isActive
+          ? 'rgba(196,135,74,0.25)'
+          : hovered ? 'rgba(255,255,255,0.08)' : 'transparent',
+        transition: 'background 0.12s',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+        <span style={{ fontSize: '0.8rem', flexShrink: 0 }}>{icon}</span>
+        <span style={{
+          fontSize: '0.775rem',
+          fontWeight: isActive ? 700 : 400,
+          color: '#fff',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {label}
+        </span>
+      </div>
+      {count > 0 && (
+        <span style={{
+          fontSize: '0.68rem', fontWeight: 600,
+          color: '#C4874A',
+          background: 'rgba(196,135,74,0.18)',
+          padding: '1px 6px', borderRadius: 10, flexShrink: 0, marginLeft: 4,
+        }}>
+          {count}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────
 
 interface Props {
@@ -746,6 +861,14 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   const [tab, setTab] = useState<Tab>('active');
   const [selectedChapter, setSelectedChapter] = useState<{ id: string | null; name: string | null } | null>(null);
   const [selectedConv, setSelectedConv] = useState<LinqConversation | null>(null);
+
+  // Category triage (only used when initialChapterId is set)
+  const [selectedCategory, setSelectedCategory] = useState<ConvCategory>('needs_reply');
+  const [categoryCounts, setCategoryCounts] = useState<Record<ConvCategory, number>>({
+    needs_reply: 0, flagged: 0, touch1: 0, touch2: 0, touch3: 0,
+    signed_up: 0, confirmed: 0, no_response: 0, handled: 0, all: 0,
+  });
+  const [categorySearch, setCategorySearch] = useState('');
 
   // Chapter data
   const [chapterEntries, setChapterEntries] = useState<ChapterEntry[]>([]);
@@ -784,7 +907,8 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   useEffect(() => {
     if (initialChapterId) {
       setSelectedChapter({ id: initialChapterId, name: initialChapterName ?? null });
-      loadConvs(initialChapterId, tab, 1);
+      loadConvs(initialChapterId, tab, 1, selectedCategory, categorySearch);
+      fetchCategoryCounts(initialChapterId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialChapterId]);
@@ -836,16 +960,32 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     }
   }, []);
 
-  const loadConvs = useCallback(async (chapterId: string | null, currentTab: Tab, currentPage: number) => {
+  const loadConvs = useCallback(async (
+    chapterId: string | null,
+    currentTab: Tab,
+    currentPage: number,
+    category?: ConvCategory,
+    search?: string,
+  ) => {
     setLoadingConvs(true);
     setError(null);
     try {
       const params = new URLSearchParams({
-        status: currentTab,
         page: String(currentPage),
         limit: String(LIMIT),
       });
       if (chapterId) params.set('chapter_id', chapterId);
+
+      if (category && category !== 'all') {
+        params.set('category', category);
+      } else if (!category) {
+        params.set('status', currentTab);
+      }
+      // category=all → no status or category param → API returns all
+
+      if (search && search.trim()) {
+        params.set('search', search.trim());
+      }
 
       const res = await fetch(`${API}?${params}`, { headers: { Authorization: AUTH } });
       const json = await res.json();
@@ -862,6 +1002,20 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     }
   }, []);
 
+  const fetchCategoryCounts = useCallback(async (chapterId: string) => {
+    try {
+      const res = await fetch(`${API}?mode=category_counts&chapter_id=${chapterId}`, {
+        headers: { Authorization: AUTH },
+      });
+      const json = await res.json();
+      if (res.ok && json.counts) {
+        setCategoryCounts(json.counts as Record<ConvCategory, number>);
+      }
+    } catch {
+      // silently fail — counts are non-critical
+    }
+  }, []);
+
   // On mount: load chapters + background sync
   useEffect(() => {
     loadChapterSummaries();
@@ -872,13 +1026,15 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // On tab change: reload chapter summaries + reload convs if a chapter is selected
+  // On tab change: reload chapter summaries + reload convs if a chapter is selected (global mode only)
   useEffect(() => {
-    loadChapterSummaries();
-    if (selectedChapter !== null) {
-      setPage(1);
-      setSelectedConv(null);
-      loadConvs(selectedChapter.id, tab, 1);
+    if (!initialChapterId) {
+      loadChapterSummaries();
+      if (selectedChapter !== null) {
+        setPage(1);
+        setSelectedConv(null);
+        loadConvs(selectedChapter.id, tab, 1);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
@@ -886,7 +1042,11 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   // On chapter or page change: reload convs
   useEffect(() => {
     if (selectedChapter !== null) {
-      loadConvs(selectedChapter.id, tab, page);
+      if (initialChapterId) {
+        loadConvs(selectedChapter.id, tab, page, selectedCategory, categorySearch);
+      } else {
+        loadConvs(selectedChapter.id, tab, page);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChapter, page]);
@@ -919,6 +1079,25 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     setSelectedConv(null);
   }
 
+  function handleCategoryChange(cat: ConvCategory) {
+    setSelectedCategory(cat);
+    setSelectedConv(null);
+    setPage(1);
+    setCategorySearch('');
+    if (selectedChapter) {
+      loadConvs(selectedChapter.id, tab, 1, cat, '');
+    }
+  }
+
+  function handleCategorySearch(search: string) {
+    setCategorySearch(search);
+    setPage(1);
+    setSelectedConv(null);
+    if (selectedChapter) {
+      loadConvs(selectedChapter.id, tab, 1, selectedCategory, search);
+    }
+  }
+
   function handleChapterClick(entry: ChapterEntry) {
     setSelectedChapter({ id: entry.chapter_id, name: entry.chapter_name });
     setSelectedConv(null);
@@ -947,8 +1126,13 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
         showToast(json.error ?? 'Sync failed', 'error');
       } else {
         showToast(`Synced ${json.data?.processed ?? 0} conversations`, 'success');
-        loadChapterSummaries();
-        if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page);
+        if (initialChapterId) {
+          fetchCategoryCounts(initialChapterId);
+          if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page, selectedCategory, categorySearch);
+        } else {
+          loadChapterSummaries();
+          if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page);
+        }
       }
     } catch (err) {
       showToast(String(err), 'error');
@@ -972,8 +1156,13 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       } else {
         showToast('Marked as handled', 'success');
         setSelectedConv(null);
-        loadChapterSummaries();
-        if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page);
+        if (initialChapterId) {
+          fetchCategoryCounts(initialChapterId);
+          if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page, selectedCategory, categorySearch);
+        } else {
+          loadChapterSummaries();
+          if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page);
+        }
       }
     } catch (err) {
       showToast(String(err), 'error');
@@ -997,8 +1186,13 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       } else {
         showToast('Flagged', 'info');
         setSelectedConv(prev => prev ? { ...prev, status: 'flagged' } : null);
-        loadChapterSummaries();
-        if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page);
+        if (initialChapterId) {
+          fetchCategoryCounts(initialChapterId);
+          if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page, selectedCategory, categorySearch);
+        } else {
+          loadChapterSummaries();
+          if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page);
+        }
       }
     } catch (err) {
       showToast(String(err), 'error');
@@ -1046,7 +1240,157 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     </div>
   ) : null;
 
-  // Shared sub-panel renders
+  // ── Embedded chapter triage workspace (initialChapterId is set) ────────────
+  if (initialChapterId && selectedChapter) {
+    const convListContent = (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        {/* Search bar */}
+        <div style={{ padding: '8px 10px', borderBottom: '1px solid #e5e7eb', flexShrink: 0, background: '#fff' }}>
+          <input
+            type="text"
+            value={categorySearch}
+            onChange={e => handleCategorySearch(e.target.value)}
+            placeholder="Search conversations…"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '7px 12px', borderRadius: 8,
+              border: '1.5px solid #e5e7eb', fontSize: '0.8125rem',
+              outline: 'none', fontFamily: 'inherit', color: '#111827',
+            }}
+          />
+        </div>
+
+        {/* Conv list */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {loadingConvs ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', gap: 8 }}>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontSize: '0.8rem' }}>Loading…</span>
+            </div>
+          ) : convs.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, color: '#9ca3af', gap: 10 }}>
+              <MessageSquare size={28} style={{ opacity: 0.2 }} />
+              <span style={{ fontSize: '0.8rem' }}>No conversations</span>
+            </div>
+          ) : (
+            convs.map(c => (
+              <ConvRow
+                key={c.id}
+                conv={c}
+                isSelected={selectedConv?.id === c.id}
+                onClick={() => setSelectedConv(c)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Pagination */}
+        {Math.ceil(total / LIMIT) > 1 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '10px 0', borderTop: '1px solid #f0f0f0', flexShrink: 0,
+          }}>
+            <button
+              disabled={page === 1}
+              onClick={() => { setPage(p => p - 1); loadConvs(selectedChapter.id, tab, page - 1, selectedCategory, categorySearch); }}
+              style={{
+                padding: '3px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff',
+                cursor: page > 1 ? 'pointer' : 'default',
+                color: page > 1 ? '#374151' : '#d1d5db', fontSize: '0.73rem',
+              }}
+            >← Prev</button>
+            <span style={{ fontSize: '0.73rem', color: '#6b7280' }}>{page} / {Math.ceil(total / LIMIT)}</span>
+            <button
+              disabled={page === Math.ceil(total / LIMIT)}
+              onClick={() => { setPage(p => p + 1); loadConvs(selectedChapter.id, tab, page + 1, selectedCategory, categorySearch); }}
+              style={{
+                padding: '3px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff',
+                cursor: page < Math.ceil(total / LIMIT) ? 'pointer' : 'default',
+                color: page < Math.ceil(total / LIMIT) ? '#374151' : '#d1d5db', fontSize: '0.73rem',
+              }}
+            >Next →</button>
+          </div>
+        )}
+      </div>
+    );
+
+    const threadPanelEmbedded = selectedConv ? (
+      <ThreadPanel
+        conv={selectedConv}
+        messages={messages}
+        loadingMsgs={loadingMsgs}
+        handling={handling}
+        flagging={flagging}
+        isMobile={isMobile}
+        onBack={() => setSelectedConv(null)}
+        onMarkHandled={handleMarkHandled}
+        onFlag={handleFlag}
+        onReplySent={handleReplySent}
+        onReplyError={msg => setError(msg)}
+        messagesEndRef={messagesEndRef as React.RefObject<HTMLDivElement>}
+      />
+    ) : null;
+
+    // Mobile: single panel at a time
+    if (isMobile) {
+      if (selectedConv && threadPanelEmbedded) {
+        return (
+          <div style={containerStyle}>
+            {errorBanner}
+            {threadPanelEmbedded}
+          </div>
+        );
+      }
+      return (
+        <div style={containerStyle}>
+          {errorBanner}
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+            <CategorySidebar
+              chapterName={selectedChapter.name}
+              selectedCategory={selectedCategory}
+              counts={categoryCounts}
+              onSelect={handleCategoryChange}
+            />
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              {convListContent}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Desktop: sidebar + conv list + thread panel
+    return (
+      <div style={containerStyle}>
+        {errorBanner}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          {/* Category sidebar */}
+          <CategorySidebar
+            chapterName={selectedChapter.name}
+            selectedCategory={selectedCategory}
+            counts={categoryCounts}
+            onSelect={handleCategoryChange}
+          />
+
+          {/* Conv list — fixed width */}
+          <div style={{
+            width: 300, flexShrink: 0, borderRight: '1px solid #e5e7eb',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          }}>
+            {convListContent}
+          </div>
+
+          {/* Thread panel */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+            {selectedConv && threadPanelEmbedded ? threadPanelEmbedded : <EmptyRight />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Global mode (no initialChapterId) ──────────────────────────────────────
+
   const chapterListPanel = (
     <ChapterListPanel
       tab={tab}
@@ -1071,7 +1415,7 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       onBack={handleBackToChapters}
       onConvClick={setSelectedConv}
       onPageChange={p => setPage(p)}
-      hideBackButton={!!initialChapterId}
+      hideBackButton={false}
     />
   ) : null;
 
@@ -1123,7 +1467,7 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     <div style={containerStyle}>
       {errorBanner}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-        {/* Left panel: 340px */}
+        {/* Left panel: 40% */}
         <div style={{
           width: '40%', flexShrink: 0, borderRight: '1px solid #e5e7eb',
           overflow: 'hidden', display: 'flex', flexDirection: 'column',
