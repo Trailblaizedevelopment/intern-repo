@@ -19,6 +19,7 @@ import MergedOutreachTab from './MergedOutreachTab';
 import SuccessTab from './SuccessTab';
 import EmailOutreachTab from '../EmailOutreachTab';
 import EmailTemplatesTab from '../EmailTemplatesTab';
+// EmailTemplatesTab is now embedded inside EmailOutreachTab — kept for direct import if needed
 
 const EXECUTIVE_POSITION_LABELS: Record<string, string> = {
   president: 'President', vp: 'Vice President', treasurer: 'Treasurer',
@@ -68,6 +69,11 @@ export default function ChapterDashboardPage() {
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [loadingSubmission, setLoadingSubmission] = useState(false);
+
+  // Delete chapter flow
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     chapter_name: '', school: '', fraternity: '', contact_name: '',
@@ -146,6 +152,28 @@ export default function ChapterDashboardPage() {
     } catch { showToast('Failed to generate link', 'error'); }
   }
 
+  async function deleteChapter() {
+    if (!chapter || deleteConfirmName !== chapter.chapter_name) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'DELETE',
+        headers: { 'x-confirm-delete': 'CONFIRMED' },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast(json.error ?? 'Delete failed', 'error');
+        setDeleting(false);
+        return;
+      }
+      showToast(`"${json.deleted}" has been permanently deleted.`, 'info');
+      router.push('/nucleus/customer-success');
+    } catch {
+      showToast('Delete failed', 'error');
+      setDeleting(false);
+    }
+  }
+
   async function viewSubmission() {
     if (!chapter) return;
     setLoadingSubmission(true);
@@ -212,7 +240,7 @@ export default function ChapterDashboardPage() {
     { id: 'outreach', label: '📤 Outreach' },
     { id: 'alumni', label: '👥 Alumni Data' },
     { id: 'email', label: '📧 Email Outreach' },
-    { id: 'emailtemplates', label: '📨 Email Templates' },
+    // emailtemplates is now merged into the email tab — removed as standalone
     { id: 'success', label: '✅ Success' },
     { id: 'sales', label: '💰 Sales' },
   ];
@@ -315,7 +343,6 @@ export default function ChapterDashboardPage() {
         {activeTab === 'email' && (
           <EmailOutreachTab showToast={showToast} />
         )}
-        {activeTab === 'emailtemplates' && <EmailTemplatesTab showToast={showToast} />}
         {activeTab === 'success' && (
           <SuccessTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
         )}
@@ -377,6 +404,26 @@ export default function ChapterDashboardPage() {
               <div className="module-form-group"><label>Next Action</label><input type="text" value={formData.next_action} onChange={e => setFormData({ ...formData, next_action: e.target.value })} /></div>
               <div className="module-form-group"><label>Alumni Channels</label><input type="text" value={formData.alumni_channels} onChange={e => setFormData({ ...formData, alumni_channels: e.target.value })} /></div>
               <div className="module-form-group"><label>Notes</label><textarea value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} rows={3} /></div>
+
+              {/* ── Danger Zone ── */}
+              <div style={{ marginTop: 28, borderTop: '1px solid #fca5a5', paddingTop: 16 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  Danger Zone
+                </div>
+                <button
+                  onClick={() => { setShowEditModal(false); setDeleteConfirmName(''); setShowDeleteModal(true); }}
+                  style={{
+                    padding: '6px 14px', borderRadius: 2,
+                    background: 'transparent', border: '1px solid #fca5a5',
+                    color: '#dc2626', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500,
+                  }}
+                >
+                  Delete this chapter…
+                </button>
+                <span style={{ marginLeft: 10, fontSize: '0.75rem', color: '#9ca3af' }}>
+                  Permanently removes all data. Cannot be undone.
+                </span>
+              </div>
             </div>
             <div className="module-modal-footer">
               <button className="module-cancel-btn" onClick={() => setShowEditModal(false)}>Cancel</button>
@@ -469,6 +516,87 @@ export default function ChapterDashboardPage() {
             </div>
             <div className="module-modal-footer">
               <button className="module-cancel-btn" onClick={() => { setShowSubmissionModal(false); setSubmission(null); }}>Close</button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* ── Delete Chapter Modal ── */}
+      {showDeleteModal && (
+        <ModalOverlay className="module-modal-overlay" onClose={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}>
+          <div
+            className="module-modal"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: 480, borderTop: '4px solid #dc2626' }}
+          >
+            <div className="module-modal-header" style={{ borderBottom: '1px solid #fee2e2' }}>
+              <h2 style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+                ⚠ Delete Chapter
+              </h2>
+              <button
+                className="module-modal-close"
+                onClick={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="module-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '12px 16px', fontSize: '0.875rem', color: '#991b1b', lineHeight: 1.6 }}>
+                <strong>This action is permanent and cannot be undone.</strong> Deleting this chapter will permanently remove:
+                <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                  <li>All alumni contacts &amp; outreach history</li>
+                  <li>All Linq conversations</li>
+                  <li>All tasks &amp; check-ins</li>
+                  <li>All email campaigns &amp; templates for this chapter</li>
+                  <li>All members, matches, and notes</li>
+                </ul>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                  Type <strong style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 6px', borderRadius: 4 }}>{chapter.chapter_name}</strong> to confirm:
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmName}
+                  onChange={e => setDeleteConfirmName(e.target.value)}
+                  placeholder={chapter.chapter_name}
+                  autoFocus
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '9px 12px', border: '1.5px solid #fca5a5',
+                    borderRadius: 6, fontSize: '0.875rem', outline: 'none',
+                    fontFamily: 'inherit',
+                    borderColor: deleteConfirmName === chapter.chapter_name ? '#dc2626' : '#fca5a5',
+                  }}
+                />
+              </div>
+            </div>
+            <div className="module-modal-footer" style={{ borderTop: '1px solid #fee2e2' }}>
+              <button
+                className="module-cancel-btn"
+                onClick={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteChapter}
+                disabled={deleteConfirmName !== chapter.chapter_name || deleting}
+                style={{
+                  padding: '8px 20px', borderRadius: 2, border: 'none',
+                  background: deleteConfirmName === chapter.chapter_name ? '#dc2626' : '#fca5a5',
+                  color: '#fff', cursor: deleteConfirmName === chapter.chapter_name && !deleting ? 'pointer' : 'not-allowed',
+                  fontSize: '0.875rem', fontWeight: 700,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  transition: 'background 0.15s',
+                }}
+              >
+                {deleting ? (
+                  <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Deleting…</>
+                ) : (
+                  <>🗑 Delete Forever</>
+                )}
+              </button>
             </div>
           </div>
         </ModalOverlay>

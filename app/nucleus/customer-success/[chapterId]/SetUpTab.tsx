@@ -133,34 +133,48 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
 
   return (
     <div style={{ maxWidth: 720 }}>
-      {/* Opt-out toggles */}
-      <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '12px 16px', marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#5C5449' }}>
-          <input
-            type="checkbox"
-            checked={!emailOutreachEnabled}
-            onChange={e => {
-              const skipping = e.target.checked;
-              setEmailOutreachEnabled(!skipping);
-              saveOptOut('email_outreach_enabled', !skipping);
-            }}
-            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B2A4A' }}
-          />
-          Skip email outreach for this chapter
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#5C5449' }}>
-          <input
-            type="checkbox"
-            checked={!conversationsEnabled}
-            onChange={e => {
-              const skipping = e.target.checked;
-              setConversationsEnabled(!skipping);
-              saveOptOut('conversations_enabled', !skipping);
-            }}
-            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B2A4A' }}
-          />
-          Skip Linq conversations for this chapter
-        </label>
+      {/* Step skip toggles — mark entire setup sections as N/A */}
+      <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '12px 16px', marginBottom: 16 }}>
+        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#5C5449', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>
+          Skip Setup Sections (mark as N/A)
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+          <label
+            title="Check this if Email Outreach is not applicable to this chapter — hides those setup steps from the checklist."
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#5C5449' }}
+          >
+            <input
+              type="checkbox"
+              checked={!emailOutreachEnabled}
+              onChange={e => {
+                const skipping = e.target.checked;
+                setEmailOutreachEnabled(!skipping);
+                saveOptOut('email_outreach_enabled', !skipping);
+              }}
+              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B2A4A' }}
+            />
+            Email Outreach steps — not applicable to this chapter
+          </label>
+          <label
+            title="Check this if Linq Outreach is not applicable to this chapter — hides those setup steps from the checklist."
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#5C5449' }}
+          >
+            <input
+              type="checkbox"
+              checked={!conversationsEnabled}
+              onChange={e => {
+                const skipping = e.target.checked;
+                setConversationsEnabled(!skipping);
+                saveOptOut('conversations_enabled', !skipping);
+              }}
+              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B2A4A' }}
+            />
+            Linq Outreach steps — not applicable to this chapter
+          </label>
+        </div>
+        <div style={{ fontSize: '0.73rem', color: '#9ca3af', marginTop: 6 }}>
+          Checking a box marks that entire setup section as N/A and bypasses it in the onboarding flow.
+        </div>
       </div>
 
       {/* Overall progress */}
@@ -193,7 +207,7 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
             return (
               <div key={category} style={{ background: '#F7F5F1', border: '1px dashed #D9D4CC', borderRadius: 2, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '0.95rem', color: '#9ca3af' }}>{CATEGORY_LABELS[category] || category}</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: 2, background: '#E8E4DF', color: '#5C5449' }}>Opted out</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: 2, background: '#E8E4DF', color: '#5C5449' }}>Skipped (N/A)</span>
               </div>
             );
           }

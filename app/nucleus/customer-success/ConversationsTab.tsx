@@ -5,6 +5,7 @@ import {
   MessageSquare, RefreshCw, CheckCheck, Flag,
   Loader2, Send, User, ArrowLeft, ChevronLeft, AlertTriangle,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -374,6 +375,147 @@ function ReplyBox({ convId, linqChatId, onSent, onError }: ReplyBoxProps) {
           Send
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── AlumniContactsList — renders alumni_contacts for status-based categories ──
+
+interface AlumniContactRow {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone_primary: string | null;
+  outreach_status: string;
+  touch1_sent_at: string | null;
+  touch2_sent_at: string | null;
+  touch3_sent_at: string | null;
+  last_response_at: string | null;
+}
+
+const ALUMNI_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
+  touch1_sent:      { label: 'Touch 1 Sent',  color: '#1d4ed8', bg: '#dbeafe' },
+  touch2_sent:      { label: 'Touch 2 Sent',  color: '#854d0e', bg: '#fef9c3' },
+  touch3_sent:      { label: 'Touch 3 Sent',  color: '#991b1b', bg: '#fee2e2' },
+  signed_up:        { label: 'Signed Up ✓',   color: '#065f46', bg: '#d1fae5' },
+  touch1_confirmed: { label: 'Confirmed',      color: '#b45309', bg: '#fef3c7' },
+  declined:         { label: 'Handled',        color: '#374151', bg: '#f3f4f6' },
+};
+
+// Map category key to outreach_status values to query
+function getStatusesForCategory(cat: ConvCategory): string[] | null {
+  switch (cat) {
+    case 'touch1':    return ['touch1_sent'];
+    case 'touch2':    return ['touch2_sent'];
+    case 'touch3':    return ['touch3_sent'];
+    case 'signed_up': return ['signed_up'];
+    case 'confirmed': return ['touch1_confirmed'];
+    case 'handled':   return ['declined'];
+    default:          return null;
+  }
+}
+
+interface AlumniContactsListProps {
+  chapterId: string;
+  category: ConvCategory;
+  search: string;
+}
+
+function AlumniContactsList({ chapterId, category, search }: AlumniContactsListProps) {
+  const [contacts, setContacts] = useState<AlumniContactRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase) { setLoading(false); return; }
+    const statuses = getStatusesForCategory(category);
+    if (!statuses) { setLoading(false); return; }
+
+    setLoading(true);
+    let query = supabase
+      .from('alumni_contacts')
+      .select('id, first_name, last_name, phone_primary, outreach_status, touch1_sent_at, touch2_sent_at, touch3_sent_at, last_response_at')
+      .eq('chapter_id', chapterId)
+      .in('outreach_status', statuses)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    // Apply search filter
+    if (search.trim()) {
+      query = query.or(`first_name.ilike.%${search.trim()}%,last_name.ilike.%${search.trim()}%,phone_primary.ilike.%${search.trim()}%`);
+    }
+
+    query.then(({ data, error }) => {
+      if (!error && data) setContacts(data as AlumniContactRow[]);
+      setLoading(false);
+    });
+  }, [chapterId, category, search]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', gap: 8 }}>
+        <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontSize: '0.8rem' }}>Loading…</span>
+      </div>
+    );
+  }
+
+  if (contacts.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, color: '#9ca3af', gap: 10 }}>
+        <MessageSquare size={28} style={{ opacity: 0.2 }} />
+        <span style={{ fontSize: '0.8rem' }}>No contacts found</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ overflowY: 'auto', flex: 1 }}>
+      {contacts.map((c, i) => {
+        const meta = ALUMNI_STATUS_META[c.outreach_status] || { label: c.outreach_status, color: '#6b7280', bg: '#f3f4f6' };
+        const lastTouch = c.last_response_at || c.touch3_sent_at || c.touch2_sent_at || c.touch1_sent_at;
+        const name = [c.first_name, c.last_name].filter(Boolean).join(' ') || '—';
+        return (
+          <div
+            key={c.id}
+            style={{
+              padding: '10px 14px',
+              borderBottom: '1px solid #f0f0f0',
+              background: '#fafafa',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                background: '#e9eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.78rem', fontWeight: 700, color: '#64748b',
+              }}>
+                <User size={14} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.8375rem', color: '#111827' }}>{name}</span>
+                  {lastTouch && (
+                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', flexShrink: 0 }}>
+                      {new Date(lastTouch).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+                <div style={{ marginTop: 2, fontSize: '0.73rem', color: '#9ca3af', fontFamily: 'monospace' }}>
+                  {c.phone_primary || 'No phone'}
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  <span style={{
+                    background: meta.bg, color: meta.color,
+                    fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 10,
+                  }}>
+                    {meta.label}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1004,13 +1146,44 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
 
   const fetchCategoryCounts = useCallback(async (chapterId: string) => {
     try {
+      // Fetch linq_conversations counts
       const res = await fetch(`${API}?mode=category_counts&chapter_id=${chapterId}`, {
         headers: { Authorization: AUTH },
       });
       const json = await res.json();
-      if (res.ok && json.counts) {
-        setCategoryCounts(json.counts as Record<ConvCategory, number>);
+      const linqCounts: Record<ConvCategory, number> = res.ok && json.counts
+        ? json.counts
+        : { needs_reply: 0, flagged: 0, touch1: 0, touch2: 0, touch3: 0, signed_up: 0, confirmed: 0, no_response: 0, handled: 0, all: 0 };
+
+      // Fetch alumni_contacts counts for status-based categories
+      if (supabase) {
+        const { data: alumniRows } = await supabase
+          .from('alumni_contacts')
+          .select('outreach_status')
+          .eq('chapter_id', chapterId);
+
+        if (alumniRows) {
+          const touch1Count  = alumniRows.filter(r => r.outreach_status === 'touch1_sent').length;
+          const touch2Count  = alumniRows.filter(r => r.outreach_status === 'touch2_sent').length;
+          const touch3Count  = alumniRows.filter(r => r.outreach_status === 'touch3_sent').length;
+          const signedUpCount = alumniRows.filter(r => r.outreach_status === 'signed_up').length;
+          const confirmedCount = alumniRows.filter(r => r.outreach_status === 'touch1_confirmed').length;
+          const handledCount = alumniRows.filter(r => r.outreach_status === 'declined').length;
+
+          setCategoryCounts({
+            ...linqCounts,
+            touch1: touch1Count,
+            touch2: touch2Count,
+            touch3: touch3Count,
+            signed_up: signedUpCount,
+            confirmed: confirmedCount,
+            handled: handledCount || linqCounts.handled,
+          });
+          return;
+        }
       }
+
+      setCategoryCounts(linqCounts);
     } catch {
       // silently fail — counts are non-critical
     }
@@ -1241,6 +1414,10 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   ) : null;
 
   // ── Embedded chapter triage workspace (initialChapterId is set) ────────────
+  // Categories that pull from alumni_contacts instead of linq_conversations
+  const isAlumniCategory = (cat: ConvCategory) =>
+    ['touch1', 'touch2', 'touch3', 'signed_up', 'confirmed', 'handled'].includes(cat);
+
   if (initialChapterId && selectedChapter) {
     const convListContent = (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -1250,7 +1427,7 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
             type="text"
             value={categorySearch}
             onChange={e => handleCategorySearch(e.target.value)}
-            placeholder="Search conversations…"
+            placeholder={isAlumniCategory(selectedCategory) ? 'Search contacts…' : 'Search conversations…'}
             style={{
               width: '100%', boxSizing: 'border-box',
               padding: '7px 12px', borderRadius: 8,
@@ -1260,7 +1437,15 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
           />
         </div>
 
-        {/* Conv list */}
+        {/* Alumni contacts list for status-based categories */}
+        {isAlumniCategory(selectedCategory) ? (
+          <AlumniContactsList
+            chapterId={selectedChapter.id ?? ''}
+            category={selectedCategory}
+            search={categorySearch}
+          />
+        ) : (
+        /* Conv list */
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loadingConvs ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', gap: 8 }}>
@@ -1283,9 +1468,10 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
             ))
           )}
         </div>
+        )}
 
-        {/* Pagination */}
-        {Math.ceil(total / LIMIT) > 1 && (
+        {/* Pagination — only for linq conversation categories */}
+        {!isAlumniCategory(selectedCategory) && Math.ceil(total / LIMIT) > 1 && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             padding: '10px 0', borderTop: '1px solid #f0f0f0', flexShrink: 0,
