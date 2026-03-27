@@ -54,7 +54,7 @@ function PortalLayoutInner({ children }: { children: ReactNode }) {
           <Menu size={20} />
         </button>
         <div className="portal-mobile-logo">
-          <img src="/logo-icon.svg" alt="Trailblaize" />
+          <img src="/logos/logo-icon-white.png" alt="Trailblaize" />
           <span>Portal</span>
         </div>
         <div className="portal-mobile-actions">
@@ -68,7 +68,7 @@ function PortalLayoutInner({ children }: { children: ReactNode }) {
       <aside className={`portal-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="portal-sidebar-header">
           <Link href="/portal" className="portal-logo">
-            <img src="/logo-icon.svg" alt="Trailblaize" className="portal-logo-icon" />
+            <img src="/logos/logo-icon-white.png" alt="Trailblaize" className="portal-logo-icon" />
             {!sidebarCollapsed && <span className="portal-logo-text">Portal</span>}
           </Link>
           <button 

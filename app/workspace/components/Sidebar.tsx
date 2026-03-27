@@ -142,7 +142,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
       <aside className={`ws-sidebar ${collapsed ? 'collapsed' : ''}`}>
         <div className="ws-sidebar-header">
           <Link href="/workspace" className="ws-logo">
-            <img src="/logo-icon.svg" alt="Trailblaize" className="ws-logo-icon" />
+            <img src="/logos/logo-icon-black.png" alt="Trailblaize" className="ws-logo-icon" />
             {!collapsed && <span className="ws-logo-text">Workspace</span>}
           </Link>
           <button 

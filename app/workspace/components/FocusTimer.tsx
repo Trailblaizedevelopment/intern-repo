@@ -27,7 +27,7 @@ export function FocusTimer({ compact = false }: FocusTimerProps) {
         if (Notification.permission === 'granted') {
           new Notification('Focus session complete!', {
             body: 'Great work! Take a short break.',
-            icon: '/logo-icon.svg'
+            icon: '/logos/logo-icon-white.png'
           });
         }
       }

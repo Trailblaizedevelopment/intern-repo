@@ -7302,7 +7302,6 @@ input:focus {
 .portal-logo-icon {
   width: 32px;
   height: 32px;
-  filter: brightness(0) invert(1);
 }
 
 .portal-logo-text {
@@ -11150,8 +11149,11 @@ input:focus {
 .landing-logo-img {
   height: 42px;
   width: auto;
-  filter: brightness(0) invert(1);
   transition: opacity 0.2s;
+}
+
+.landing-logo-img--light {
+  /* No filter — navy wordmark on white background */
 }
 
 .landing-logo:hover .landing-logo-img {

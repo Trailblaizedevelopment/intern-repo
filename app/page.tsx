@@ -328,7 +328,7 @@ export default function HomePage() {
               ← Back
             </button>
             <a href="https://trailblaize.net" className="landing-logo">
-              <img src="/logo.svg" alt="Trailblaize" className="landing-logo-img" />
+              <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" className="landing-logo-img landing-logo-img--light" />
             </a>
             <div style={{ width: '80px' }} />
           </div>
@@ -580,7 +580,7 @@ export default function HomePage() {
       {/* Header */}
       <header className="landing-header">
         <a href="https://trailblaize.net" className="landing-logo">
-          <img src="/logo.svg" alt="Trailblaize" className="landing-logo-img" />
+          <img src="/logos/logo-wordmark-white.png" alt="Trailblaize" className="landing-logo-img" />
         </a>
         <div className="landing-header-links">
           <a href="https://trailblaize.net" className="landing-header-link">About</a>

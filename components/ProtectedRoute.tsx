@@ -34,7 +34,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     return (
       <div className="nucleus-loading-screen">
         <div className="nucleus-loading-content">
-          <img src="/logo-icon.svg" alt="Trailblaize" className="nucleus-loading-logo" />
+          <img src="/logos/logo-icon-white.png" alt="Trailblaize" className="nucleus-loading-logo" />
           <div className="nucleus-loading-spinner" />
           <p>Loading...</p>
         </div>
@@ -53,7 +53,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     return (
       <div className="nucleus-loading-screen">
         <div className="nucleus-loading-content">
-          <img src="/logo-icon.svg" alt="Trailblaize" className="nucleus-loading-logo" />
+          <img src="/logos/logo-icon-white.png" alt="Trailblaize" className="nucleus-loading-logo" />
           <div className="nucleus-loading-spinner" />
           <p>Setting up your workspace...</p>
         </div>
@@ -67,7 +67,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     return (
       <div className="nucleus-loading-screen">
         <div className="nucleus-loading-content">
-          <img src="/logo-icon.svg" alt="Trailblaize" className="nucleus-loading-logo" />
+          <img src="/logos/logo-icon-white.png" alt="Trailblaize" className="nucleus-loading-logo" />
           <div className="nucleus-loading-spinner" />
           <p>Redirecting to your workspace...</p>
         </div>
@@ -81,7 +81,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     return (
       <div className="nucleus-access-denied">
         <div className="nucleus-access-denied-content">
-          <img src="/logo-icon.svg" alt="Trailblaize" className="nucleus-access-denied-logo" />
+          <img src="/logos/logo-icon-black.png" alt="Trailblaize" className="nucleus-access-denied-logo" />
           <h1>Founder Access Required</h1>
           <p className="nucleus-access-denied-message">
             This area is restricted to Founders and Co-Founders.

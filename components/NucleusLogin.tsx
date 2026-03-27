@@ -35,7 +35,7 @@ export default function NucleusLogin() {
         {/* Logo and Header */}
         <div className="nucleus-login-header">
           <div className="nucleus-brand">
-            <img src="/logo-icon.svg" alt="Trailblaize" className="nucleus-login-logo" />
+            <img src="/logos/logo-icon-black.png" alt="Trailblaize" className="nucleus-login-logo" />
             <div className="nucleus-brand-text">
               <span className="nucleus-brand-name">Trailblaize</span>
               <span className="nucleus-brand-tagline">Growth Space</span>
