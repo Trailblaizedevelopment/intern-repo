@@ -7,6 +7,7 @@ import {
   Loader2, ArrowLeft, MousePointer, Inbox, Trash2, Calendar,
   TrendingUp, Copy, Check,
 } from 'lucide-react';
+import EmailTemplatesTab from './EmailTemplatesTab';
 /* ─── Types ─── */
 
 interface Campaign {
@@ -134,6 +135,7 @@ function fmtNum(n: number) {
 /* ─── Main component ─── */
 
 export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
+  const [emailSection, setEmailSection] = useState<'campaigns' | 'templates'>('campaigns');
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -258,6 +260,41 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
     }
   }
 
+  /* ─── Section switcher (Campaigns vs Templates) ─── */
+  const sectionSwitcher = (
+    <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #e5e7eb', marginBottom: 20 }}>
+      {([
+        { id: 'campaigns' as const, label: '📤 Campaigns' },
+        { id: 'templates' as const, label: '📨 Templates' },
+      ]).map(s => (
+        <button
+          key={s.id}
+          onClick={() => setEmailSection(s.id)}
+          style={{
+            padding: '8px 16px', border: 'none',
+            borderBottom: emailSection === s.id ? '2px solid #2563eb' : '2px solid transparent',
+            background: 'none', cursor: 'pointer',
+            fontSize: '0.85rem', fontWeight: emailSection === s.id ? 600 : 400,
+            color: emailSection === s.id ? '#2563eb' : '#6b7280',
+            marginBottom: -1, transition: 'all 0.15s ease-out',
+          }}
+        >
+          {s.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  /* ─── Templates section ─── */
+  if (emailSection === 'templates') {
+    return (
+      <div>
+        {sectionSwitcher}
+        <EmailTemplatesTab showToast={showToast} />
+      </div>
+    );
+  }
+
   /* ─── Render: Campaign list ─── */
 
   if (view === 'list') {
@@ -269,6 +306,7 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {sectionSwitcher}
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plus, X, Calendar, GraduationCap, Edit2, Trash2, Briefcase, BookOpen, MapPin,
-  Linkedin, Loader2,
+  Linkedin, Loader2, CheckSquare, Square, ClipboardList,
 } from 'lucide-react';
 import {
   supabase, ChapterWithOnboarding, ChapterCheckIn, CheckInFrequency,
@@ -25,6 +25,80 @@ interface LoggedMatch {
   date: string;
   notes: string;
 }
+
+// ─── TaskRow sub-component ───────────────────────────────────────────────────
+
+interface TaskRowProps {
+  task: {
+    id: string;
+    title: string;
+    due_date: string | null;
+    assigned_to: string | null;
+    status: 'open' | 'complete';
+    created_at: string;
+  };
+  onToggle: () => void;
+  onDelete: () => void;
+}
+
+function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
+  const isComplete = task.status === 'complete';
+  const today = new Date().toISOString().split('T')[0];
+  const isOverdue = !isComplete && task.due_date && task.due_date < today;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '8px 10px', borderRadius: 2,
+      background: isComplete ? 'rgba(0,0,0,0.02)' : '#F7F5F1',
+      border: '1px solid #E8E4DF',
+      opacity: isComplete ? 0.65 : 1,
+      transition: 'opacity 0.15s',
+    }}>
+      <button
+        onClick={onToggle}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: isComplete ? '#059669' : '#9ca3af', flexShrink: 0, display: 'flex' }}
+        title={isComplete ? 'Mark open' : 'Mark complete'}
+      >
+        {isComplete ? <CheckSquare size={16} /> : <Square size={16} />}
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
+          fontSize: '0.85rem', color: '#1B2A4A',
+          textDecoration: isComplete ? 'line-through' : 'none',
+        }}>
+          {task.title}
+        </span>
+        <div style={{ display: 'flex', gap: 10, marginTop: 2, flexWrap: 'wrap' }}>
+          {task.due_date && (
+            <span style={{
+              fontSize: '0.72rem', fontWeight: 600,
+              color: isOverdue ? '#dc2626' : '#6b7280',
+            }}>
+              {isOverdue ? '⚠ ' : ''}Due {new Date(task.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+          {task.assigned_to && (
+            <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+              → {task.assigned_to}
+            </span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onDelete}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 2, display: 'flex', flexShrink: 0, transition: 'color 0.1s' }}
+        title="Delete task"
+        onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+        onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabProps) {
   // ─── Check-ins ───
@@ -59,6 +133,32 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
   const [bonusNotes, setBonusNotes] = useState(chapter.bonus_notes || '');
   const [savingNotes, setSavingNotes] = useState<'exec' | 'bonus' | null>(null);
 
+  // ─── Tasks ───
+  interface ChapterTask {
+    id: string;
+    chapter_id: string;
+    title: string;
+    due_date: string | null;
+    assigned_to: string | null;
+    status: 'open' | 'complete';
+    created_at: string;
+  }
+  const [tasks, setTasks] = useState<ChapterTask[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [taskForm, setTaskForm] = useState({ title: '', due_date: '', assigned_to: '' });
+  const [savingTask, setSavingTask] = useState(false);
+
+  const fetchTasks = useCallback(async () => {
+    setLoadingTasks(true);
+    try {
+      const res = await fetch(`/api/chapters/${chapter.id}/tasks`);
+      const json = await res.json();
+      if (!json.error && json.data) setTasks(json.data);
+    } catch { /* silent */ }
+    finally { setLoadingTasks(false); }
+  }, [chapter.id]);
+
   const fetchCheckIns = useCallback(async () => {
     if (!supabase) { setLoadingCheckIns(false); return; }
     const { data } = await supabase
@@ -85,7 +185,8 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
   useEffect(() => {
     fetchCheckIns();
     fetchMembers();
-  }, [fetchCheckIns, fetchMembers]);
+    fetchTasks();
+  }, [fetchCheckIns, fetchMembers, fetchTasks]);
 
   useEffect(() => {
     setExecNotes(chapter.exec_notes || '');
@@ -201,6 +302,49 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
     setMatches(p => [...p, { id: Date.now().toString(), ...matchForm }]);
     setMatchForm({ active_member: '', alumni_name: '', date: new Date().toISOString().split('T')[0], notes: '' });
     showToast('Match logged', 'success');
+  }
+
+  async function addTask() {
+    if (!taskForm.title.trim()) return showToast('Task title required', 'error');
+    setSavingTask(true);
+    try {
+      const res = await fetch(`/api/chapters/${chapter.id}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: taskForm.title.trim(),
+          due_date: taskForm.due_date || null,
+          assigned_to: taskForm.assigned_to || null,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) return showToast(json.error, 'error');
+      showToast('Task added', 'success');
+      setTaskForm({ title: '', due_date: '', assigned_to: '' });
+      setShowAddTask(false);
+      fetchTasks();
+    } catch { showToast('Failed to add task', 'error'); }
+    finally { setSavingTask(false); }
+  }
+
+  async function toggleTaskStatus(task: ChapterTask) {
+    const newStatus = task.status === 'open' ? 'complete' : 'open';
+    try {
+      await fetch(`/api/chapters/${chapter.id}/tasks`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: task.id, status: newStatus }),
+      });
+      setTasks(p => p.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+    } catch { showToast('Failed to update task', 'error'); }
+  }
+
+  async function deleteTask(taskId: string) {
+    try {
+      await fetch(`/api/chapters/${chapter.id}/tasks?taskId=${taskId}`, { method: 'DELETE' });
+      setTasks(p => p.filter(t => t.id !== taskId));
+      showToast('Task deleted', 'info');
+    } catch { showToast('Failed to delete task', 'error'); }
   }
 
   const daysUntilCheckIn = chapter.next_check_in_date
@@ -434,6 +578,101 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* ─── NEW: Tasks ─── */}
+      <section>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: '#1B2A4A' }}>
+          <ClipboardList size={16} /> Tasks
+        </h3>
+        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              {tasks.filter(t => t.status === 'open').length} open · {tasks.filter(t => t.status === 'complete').length} complete
+            </span>
+            <button
+              onClick={() => setShowAddTask(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+            >
+              <Plus size={13} /> Add Task
+            </button>
+          </div>
+
+          {/* Add task form */}
+          {showAddTask && (
+            <div style={{ background: '#F7F5F1', borderRadius: 2, padding: '14px 16px', border: '1px solid #D9D4CC', marginBottom: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px', gap: 10, marginBottom: 10 }}>
+                <div className="module-form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.75rem' }}>Task *</label>
+                  <input
+                    value={taskForm.title}
+                    onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))}
+                    placeholder="e.g. Follow up on alumni list"
+                    onKeyDown={e => { if (e.key === 'Enter') addTask(); }}
+                    style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                  />
+                </div>
+                <div className="module-form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.75rem' }}>Due Date</label>
+                  <input
+                    type="date"
+                    value={taskForm.due_date}
+                    onChange={e => setTaskForm(p => ({ ...p, due_date: e.target.value }))}
+                    style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                  />
+                </div>
+                <div className="module-form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.75rem' }}>Assigned To</label>
+                  <input
+                    value={taskForm.assigned_to}
+                    onChange={e => setTaskForm(p => ({ ...p, assigned_to: e.target.value }))}
+                    placeholder="Owen, Ford…"
+                    style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={addTask}
+                  disabled={savingTask || !taskForm.title.trim()}
+                  style={{ padding: '6px 16px', borderRadius: 2, background: savingTask ? '#9ca3af' : '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: savingTask ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  {savingTask ? 'Adding…' : 'Add Task'}
+                </button>
+                <button onClick={() => setShowAddTask(false)} style={{ padding: '6px 14px', borderRadius: 2, background: '#f3f4f6', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Task list */}
+          {loadingTasks ? (
+            <div style={{ color: '#9ca3af', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Loading tasks…
+            </div>
+          ) : tasks.length === 0 ? (
+            <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: 0 }}>No tasks yet. Add one above.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Open tasks first */}
+              {tasks.filter(t => t.status === 'open').map(task => (
+                <TaskRow key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onDelete={() => deleteTask(task.id)} />
+              ))}
+              {/* Completed tasks */}
+              {tasks.filter(t => t.status === 'complete').length > 0 && (
+                <>
+                  {tasks.filter(t => t.status === 'open').length > 0 && (
+                    <div style={{ borderTop: '1px dashed #E8E4DF', margin: '6px 0' }} />
+                  )}
+                  {tasks.filter(t => t.status === 'complete').map(task => (
+                    <TaskRow key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onDelete={() => deleteTask(task.id)} />
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
