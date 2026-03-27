@@ -1,0 +1,534 @@
+'use client';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Users, Phone, Smartphone, RefreshCw, Loader2,
+  MessageSquare, ChevronDown, ChevronRight, Zap,
+  CheckCircle2, Clock, XCircle, Send,
+} from 'lucide-react';
+import { ChapterWithOnboarding, supabase } from '@/lib/supabase';
+import ConversationsTab from '../ConversationsTab';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface AlumniStats {
+  total: number;
+  have_phone: number;
+  imessage: number;
+  contacted: number;
+  responded: number;
+  signed_up: number;
+  touch1_ready: number;
+  touch2_due: number;
+  touch3_due: number;
+  outreach_coverage_pct?: number;
+  outreach_contacted_with_phone?: number;
+}
+
+interface BatchSummary {
+  id: string;
+  status: string;
+  scheduled_date: string;
+  total_contacts: number | null;
+  chapter_id: string | null;
+  touch_breakdown: {
+    t1?: { total: number };
+    t2?: { total: number };
+    t3?: { total: number };
+  } | null;
+}
+
+interface AlumniContact {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone_primary: string | null;
+  outreach_status: string;
+  touch1_sent_at: string | null;
+  touch2_sent_at: string | null;
+  touch3_sent_at: string | null;
+  last_response_at: string | null;
+}
+
+const OUTREACH_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
+  not_contacted:  { label: 'Not Contacted', color: '#6b7280', bg: '#f3f4f6' },
+  touch1_sent:    { label: 'T1 Sent',        color: '#1d4ed8', bg: '#dbeafe' },
+  touch1_confirmed: { label: 'Confirmed',     color: '#b45309', bg: '#fef3c7' },
+  touch2_sent:    { label: 'T2 Sent',        color: '#854d0e', bg: '#fef9c3' },
+  touch3_sent:    { label: 'T3 Sent',        color: '#991b1b', bg: '#fee2e2' },
+  no_response:    { label: 'No Response',    color: '#6b7280', bg: '#f3f4f6' },
+  pitched:        { label: 'Pitched',        color: '#1d4ed8', bg: '#dbeafe' },
+  signed_up:      { label: 'Signed Up ✓',   color: '#065f46', bg: '#d1fae5' },
+  wrong_number:   { label: 'Wrong #',        color: '#9ca3af', bg: '#f3f4f6' },
+  opted_out:      { label: 'Opted Out',      color: '#9ca3af', bg: '#f3f4f6' },
+};
+
+// ── Props ──────────────────────────────────────────────────────────────────────
+
+interface MergedOutreachTabProps {
+  chapter: ChapterWithOnboarding;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onUpdate: () => void;
+}
+
+// ── Sub-section: Outreach Stats ────────────────────────────────────────────────
+
+function OutreachStatsSection({
+  chapterId,
+  chapterName,
+  showToast,
+}: {
+  chapterId: string;
+  chapterName: string;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+}) {
+  const [stats, setStats] = useState<AlumniStats | null>(null);
+  const [batch, setBatch] = useState<BatchSummary | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingBatch, setLoadingBatch] = useState(true);
+  const [compiling, setCompiling] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+
+  const fetchStats = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      const res = await fetch(`/api/alumni/stats?chapter_id=${chapterId}`);
+      const json = await res.json();
+      if (json.data) setStats(json.data);
+    } catch {
+      showToast('Failed to load stats', 'error');
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [chapterId, showToast]);
+
+  const fetchBatch = useCallback(async () => {
+    setLoadingBatch(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/outreach/batches?chapter_id=${chapterId}&date=${today}&limit=1`);
+      const json = await res.json();
+      if (json.data && json.data.length > 0) {
+        setBatch(json.data[0]);
+      } else {
+        setBatch(null);
+      }
+    } catch {
+      setBatch(null);
+    } finally {
+      setLoadingBatch(false);
+    }
+  }, [chapterId]);
+
+  useEffect(() => {
+    fetchStats();
+    fetchBatch();
+  }, [fetchStats, fetchBatch]);
+
+  async function compileBatch() {
+    setCompiling(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch('/api/outreach/compile-chapter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapter_id: chapterId, date: today }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        showToast(json.error, 'error');
+      } else if (json.total === 0) {
+        showToast(json.message || 'No eligible contacts found.', 'info');
+      } else if (json.existing) {
+        showToast('A batch already exists for today — view it in the Linq Outreach tab.', 'info');
+        setBatch(json.batch);
+      } else {
+        showToast(`✓ Compiled batch: ${json.batch?.total_contacts} contacts`, 'success');
+        setBatch(json.batch);
+      }
+    } catch {
+      showToast('Failed to compile batch', 'error');
+    } finally {
+      setCompiling(false);
+    }
+  }
+
+  const pct = stats?.outreach_coverage_pct ?? 0;
+  const pctColor = pct > 50 ? '#059669' : pct >= 25 ? '#d97706' : '#dc2626';
+
+  return (
+    <section style={{ marginBottom: 24 }}>
+      {/* Section Header */}
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, cursor: 'pointer' }}
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {expanded ? <ChevronDown size={16} style={{ color: '#5C5449' }} /> : <ChevronRight size={16} style={{ color: '#5C5449' }} />}
+          <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', margin: 0 }}>
+            Outreach Overview — {chapterName}
+          </h3>
+        </div>
+        <button
+          onClick={e => { e.stopPropagation(); fetchStats(); fetchBatch(); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5C5449', padding: 4 }}
+          title="Refresh"
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
+      {expanded && (
+        <>
+          {/* Coverage stat + compile button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+            {stats && !loadingStats ? (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '8px 14px', borderRadius: 3,
+                background: pct > 50 ? 'rgba(5,150,105,0.08)' : pct >= 25 ? 'rgba(217,119,6,0.08)' : 'rgba(220,38,38,0.08)',
+                border: `1px solid ${pctColor}22`,
+              }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 700, color: pctColor }}>{pct}%</span>
+                <span style={{ fontSize: '0.82rem', color: '#5C5449' }}>
+                  outreach coverage ({(stats.outreach_contacted_with_phone ?? 0).toLocaleString()} / {stats.have_phone.toLocaleString()} with phone)
+                </span>
+              </div>
+            ) : loadingStats ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#9ca3af', fontSize: '0.85rem' }}>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading stats…
+              </div>
+            ) : null}
+
+            <button
+              onClick={compileBatch}
+              disabled={compiling}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 16px', border: 'none', borderRadius: 2,
+                background: compiling ? '#9ca3af' : '#1B2A4A', color: '#F7F5F1',
+                cursor: compiling ? 'not-allowed' : 'pointer',
+                fontSize: '0.82rem', fontWeight: 600, transition: 'background 0.15s ease-out',
+              }}
+            >
+              {compiling ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={13} />}
+              {compiling ? 'Compiling…' : 'Compile Batch'}
+            </button>
+          </div>
+
+          {/* Stats grid */}
+          {stats && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10, marginBottom: 14 }}>
+              {[
+                { label: 'Total Alumni', value: stats.total, icon: <Users size={16} />, color: '#1B2A4A' },
+                { label: 'Have Phone', value: stats.have_phone, icon: <Phone size={16} />, color: '#5C5449' },
+                { label: 'Mobile', value: stats.imessage, icon: <Smartphone size={16} />, color: '#2A4229' },
+                { label: 'Contacted', value: stats.contacted, icon: <MessageSquare size={16} />, color: '#3A5A7A' },
+                { label: 'Signed Up', value: stats.signed_up, icon: <CheckCircle2 size={16} />, color: '#059669' },
+              ].map(s => (
+                <div key={s.label} style={{ background: '#F7F5F1', borderRadius: 2, padding: '10px 12px', border: '1px solid #D9D4CC', textAlign: 'center' }}>
+                  <div style={{ color: s.color, marginBottom: 4, display: 'flex', justifyContent: 'center' }}>{s.icon}</div>
+                  <div style={{ fontSize: '1.1rem', fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, color: s.color }}>{s.value.toLocaleString()}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#5C5449', marginTop: 1 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Touch queue badges */}
+          {stats && (stats.touch1_ready > 0 || stats.touch2_due > 0 || stats.touch3_due > 0) && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {stats.touch1_ready > 0 && (
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, padding: '3px 10px', borderRadius: 2, background: '#FDF0E0', color: '#6B4A1E' }}>
+                  {stats.touch1_ready} ready for T1
+                </span>
+              )}
+              {stats.touch2_due > 0 && (
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, padding: '3px 10px', borderRadius: 2, background: '#F5EFE0', color: '#8A5A20' }}>
+                  {stats.touch2_due} due T2
+                </span>
+              )}
+              {stats.touch3_due > 0 && (
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, padding: '3px 10px', borderRadius: 2, background: '#E8EDF5', color: '#1B2A4A' }}>
+                  {stats.touch3_due} due T3
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Pending batch */}
+          {!loadingBatch && batch && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 14px', borderRadius: 2,
+              background: batch.status === 'pending_approval' ? '#FEF3C7' :
+                          batch.status === 'approved' ? '#D1FAE5' :
+                          batch.status === 'sending' ? '#DBEAFE' : '#F3F4F6',
+              border: '1px solid #D9D4CC',
+              fontSize: '0.82rem',
+            }}>
+              {batch.status === 'pending_approval' && <Clock size={14} style={{ color: '#B45309' }} />}
+              {batch.status === 'approved' && <CheckCircle2 size={14} style={{ color: '#065F46' }} />}
+              {batch.status === 'sending' && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: '#1D4ED8' }} />}
+              {batch.status === 'completed' && <CheckCircle2 size={14} style={{ color: '#6B7280' }} />}
+              <span style={{ color: '#1B2A4A' }}>
+                <strong>Today&apos;s batch:</strong>{' '}
+                {batch.total_contacts ?? 0} contacts · {batch.status.replace('_', ' ')}
+                {batch.touch_breakdown && (
+                  <span style={{ color: '#5C5449' }}>
+                    {' '}· T1: {batch.touch_breakdown.t1?.total ?? 0},
+                    T2: {batch.touch_breakdown.t2?.total ?? 0},
+                    T3: {batch.touch_breakdown.t3?.total ?? 0}
+                  </span>
+                )}
+              </span>
+              <a
+                href="/nucleus/customer-success"
+                style={{ marginLeft: 'auto', color: '#C4874A', fontWeight: 600, fontSize: '0.78rem', textDecoration: 'none' }}
+              >
+                View in Linq Outreach →
+              </a>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ── Sub-section: Contact List ──────────────────────────────────────────────────
+
+function ContactListSection({
+  chapterId,
+  showToast,
+}: {
+  chapterId: string;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+}) {
+  const [contacts, setContacts] = useState<AlumniContact[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const PAGE_SIZE = 50;
+
+  const fetchContacts = useCallback(async (reset = false) => {
+    if (!supabase) return;
+    setLoading(true);
+    const offset = reset ? 0 : page * PAGE_SIZE;
+    try {
+      let query = supabase
+        .from('alumni_contacts')
+        .select('id, first_name, last_name, phone_primary, outreach_status, touch1_sent_at, touch2_sent_at, touch3_sent_at, last_response_at')
+        .eq('chapter_id', chapterId)
+        .order('outreach_status')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (statusFilter !== 'all') {
+        query = query.eq('outreach_status', statusFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        showToast('Failed to load contacts: ' + error.message, 'error');
+        return;
+      }
+      const results = data as AlumniContact[];
+      if (reset) {
+        setContacts(results);
+        setPage(0);
+      } else {
+        setContacts(prev => [...prev, ...results]);
+      }
+      setHasMore(results.length === PAGE_SIZE);
+    } finally {
+      setLoading(false);
+    }
+  }, [chapterId, page, statusFilter, showToast]);
+
+  useEffect(() => {
+    if (expanded) fetchContacts(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapterId, statusFilter, expanded]);
+
+  const STATUS_FILTERS = [
+    { value: 'all', label: 'All' },
+    { value: 'not_contacted', label: 'Not Contacted' },
+    { value: 'touch1_sent', label: 'T1 Sent' },
+    { value: 'touch1_confirmed', label: 'Confirmed' },
+    { value: 'touch2_sent', label: 'T2 Sent' },
+    { value: 'touch3_sent', label: 'T3 Sent' },
+    { value: 'no_response', label: 'No Response' },
+    { value: 'signed_up', label: 'Signed Up' },
+  ];
+
+  return (
+    <section style={{ marginBottom: 24 }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, cursor: 'pointer' }}
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {expanded ? <ChevronDown size={16} style={{ color: '#5C5449' }} /> : <ChevronRight size={16} style={{ color: '#5C5449' }} />}
+          <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', margin: 0 }}>
+            Contact List
+          </h3>
+        </div>
+      </div>
+
+      {expanded && (
+        <>
+          {/* Filter bar */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+            {STATUS_FILTERS.map(f => (
+              <button
+                key={f.value}
+                onClick={() => setStatusFilter(f.value)}
+                style={{
+                  padding: '4px 12px', borderRadius: 2, fontSize: '0.78rem',
+                  border: statusFilter === f.value ? '1px solid #1B2A4A' : '1px solid #D9D4CC',
+                  background: statusFilter === f.value ? '#1B2A4A' : '#F7F5F1',
+                  color: statusFilter === f.value ? '#F7F5F1' : '#5C5449',
+                  cursor: 'pointer', fontWeight: statusFilter === f.value ? 600 : 400,
+                  transition: 'all 0.1s ease-out',
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Contact rows */}
+          {loading && contacts.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', padding: '20px 0', fontSize: '0.85rem' }}>
+              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading contacts…
+            </div>
+          ) : contacts.length === 0 ? (
+            <div style={{ color: '#9ca3af', fontSize: '0.85rem', padding: '12px 0' }}>No contacts found.</div>
+          ) : (
+            <div style={{ border: '1px solid #D9D4CC', borderRadius: 2, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ background: '#F7F5F1', borderBottom: '1px solid #D9D4CC' }}>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#5C5449' }}>Name</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#5C5449' }}>Phone</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#5C5449' }}>Status</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#5C5449' }}>Last Activity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contacts.map((c, i) => {
+                    const meta = OUTREACH_STATUS_META[c.outreach_status] || OUTREACH_STATUS_META.not_contacted;
+                    const lastActivity = c.last_response_at || c.touch3_sent_at || c.touch2_sent_at || c.touch1_sent_at;
+                    return (
+                      <tr
+                        key={c.id}
+                        style={{
+                          borderBottom: i < contacts.length - 1 ? '1px solid #EDE9E4' : 'none',
+                          transition: 'background 0.1s ease-out',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#F7F5F1')}
+                        onMouseLeave={e => (e.currentTarget.style.background = '')}
+                      >
+                        <td style={{ padding: '8px 12px', color: '#1B2A4A', fontWeight: 500 }}>
+                          {[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
+                        </td>
+                        <td style={{ padding: '8px 12px', color: '#5C5449', fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                          {c.phone_primary || '—'}
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 3, fontSize: '0.72rem',
+                            fontWeight: 600, background: meta.bg, color: meta.color,
+                          }}>
+                            {meta.label}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px', color: '#9ca3af', fontSize: '0.75rem' }}>
+                          {lastActivity
+                            ? new Date(lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                            : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {hasMore && (
+                <div style={{ padding: '10px 12px', borderTop: '1px solid #D9D4CC', textAlign: 'center' }}>
+                  <button
+                    onClick={() => { setPage(p => p + 1); fetchContacts(); }}
+                    disabled={loading}
+                    style={{ padding: '6px 16px', border: '1px solid #D9D4CC', borderRadius: 2, background: '#F7F5F1', cursor: 'pointer', fontSize: '0.82rem', color: '#5C5449' }}
+                  >
+                    {loading ? 'Loading…' : 'Load more'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
+
+export default function MergedOutreachTab({ chapter, showToast, onUpdate }: MergedOutreachTabProps) {
+  const [activeSection, setActiveSection] = useState<'conversations' | 'contacts'>('conversations');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {/* Outreach Stats — always visible at top */}
+      <OutreachStatsSection
+        chapterId={chapter.id}
+        chapterName={chapter.chapter_name}
+        showToast={showToast}
+      />
+
+      {/* Section Switcher */}
+      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid #D9D4CC', paddingBottom: 0 }}>
+        {([
+          { id: 'conversations', label: '💬 Conversations', icon: <MessageSquare size={14} /> },
+          { id: 'contacts', label: '👥 Contact List', icon: <Users size={14} /> },
+        ] as const).map(s => (
+          <button
+            key={s.id}
+            onClick={() => setActiveSection(s.id)}
+            style={{
+              padding: '8px 16px', border: 'none',
+              borderBottom: activeSection === s.id ? '2px solid #1B2A4A' : '2px solid transparent',
+              background: 'none', cursor: 'pointer',
+              fontSize: '0.85rem', fontWeight: activeSection === s.id ? 600 : 400,
+              color: activeSection === s.id ? '#1B2A4A' : '#5C5449',
+              marginBottom: -1, transition: 'all 0.15s ease-out',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Conversations — Linq message history */}
+      {activeSection === 'conversations' && (
+        <ConversationsTab
+          showToast={showToast}
+          initialChapterId={chapter.id}
+          initialChapterName={chapter.chapter_name}
+        />
+      )}
+
+      {/* Contact List — filterable by outreach status */}
+      {activeSection === 'contacts' && (
+        <ContactListSection
+          chapterId={chapter.id}
+          showToast={showToast}
+        />
+      )}
+    </div>
+  );
+}

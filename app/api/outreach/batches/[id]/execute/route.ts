@@ -128,18 +128,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   };
 
   try {
-    // 2. Check paused lines — fetch full config including warm-up fields
+    // 2. Check paused lines — fetch full config including warm-up fields and round-robin tracking
     const { data: lineConfigs } = await supabase
       .from('linq_line_config')
-      .select('line_number, is_paused, label, daily_limit, is_warmed_up, warmup_start_date');
+      .select('id, line_number, is_paused, label, daily_limit, is_warmed_up, warmup_start_date, last_used_at, round_robin_sequence')
+      .order('line_number');
 
     type LineConfig = {
+      id: string;
       line_number: number;
       is_paused: boolean;
       label: string;
       daily_limit: number;
       is_warmed_up: boolean | null;
       warmup_start_date: string | null;
+      last_used_at: string | null;
+      round_robin_sequence: number | null;
     };
 
     const lineConfigMap: Record<number, LineConfig> = {};
@@ -151,6 +155,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       (lineConfigs || []).filter((l: LineConfig) => l.is_paused).map((l: LineConfig) => l.line_number)
     );
     const activeLineNumbers = [1, 2, 3].filter(n => !pausedLines.has(n));
+
+    // True round-robin: sort active lines by oldest last_used_at (null = never used = highest priority)
+    const activeLinesSorted = [...activeLineNumbers].sort((a, b) => {
+      const lcA = lineConfigMap[a];
+      const lcB = lineConfigMap[b];
+      const tA = lcA?.last_used_at ? new Date(lcA.last_used_at).getTime() : 0;
+      const tB = lcB?.last_used_at ? new Date(lcB.last_used_at).getTime() : 0;
+      return tA - tB; // oldest first
+    });
 
     if (activeLineNumbers.length === 0) {
       await supabase.from('outreach_batches').update({
@@ -256,26 +269,26 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const t1Pool   = t1ContactsOrdered;
     const t2t3Pool = [...(t2Res.data || []), ...(t3Res.data || [])];
 
-    // Distribute T1 round-robin — per-line warm-up-aware cap
+    // Distribute T1 round-robin — use activeLinesSorted (oldest last_used_at first)
     const byLineT1: Record<number, typeof t1Pool> = {};
     for (const n of activeLineNumbers) byLineT1[n] = [];
     let idx = 0;
     for (const c of t1Pool) {
-      const ln = activeLineNumbers[idx % activeLineNumbers.length];
+      const ln = activeLinesSorted[idx % activeLinesSorted.length];
       if (byLineT1[ln].length < lineT1Caps[ln]) byLineT1[ln].push(c);
       idx++;
-      if (activeLineNumbers.every(n => byLineT1[n].length >= lineT1Caps[n])) break;
+      if (activeLinesSorted.every(n => byLineT1[n].length >= lineT1Caps[n])) break;
     }
 
-    // Distribute T2/T3 round-robin — 150/line cap
+    // Distribute T2/T3 round-robin — use activeLinesSorted
     const byLineT2T3: Record<number, typeof t2t3Pool> = {};
     for (const n of activeLineNumbers) byLineT2T3[n] = [];
     idx = 0;
     for (const c of t2t3Pool) {
-      const ln = activeLineNumbers[idx % activeLineNumbers.length];
+      const ln = activeLinesSorted[idx % activeLinesSorted.length];
       if (byLineT2T3[ln].length < T2T3_CAP_PER_LINE) byLineT2T3[ln].push(c);
       idx++;
-      if (activeLineNumbers.every(n => byLineT2T3[n].length >= T2T3_CAP_PER_LINE)) break;
+      if (activeLinesSorted.every(n => byLineT2T3[n].length >= T2T3_CAP_PER_LINE)) break;
     }
 
     type Contact = T1Contact | NonNullable<typeof t2Res.data>[0] | NonNullable<typeof t3Res.data>[0];
@@ -319,17 +332,17 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const pendingChats: PendingChat[] = [];
 
     // ── Phase A: claim + create chat ─────────────────────────────────────────
-    // Round-robin across lines (Line1 → Line2 → Line1 → Line2...) with 1.5s
-    // between each send. NO inter-line sleep — that caused serverless timeouts.
+    // Round-robin across lines in last_used_at order (oldest-first = true round-robin).
+    // After each successful send, update last_used_at on the line.
     // Phone-level dedup: a phone number can only receive ONE message per execution.
     const sentPhones = new Set<string>();
     const processedIds = new Set<string>(); // belt-and-suspenders: contact ID dedup
-    const maxContacts = activeLineNumbers.length > 0
-      ? Math.max(...activeLineNumbers.map(n => (byLine[n] || []).length))
+    const maxContacts = activeLinesSorted.length > 0
+      ? Math.max(...activeLinesSorted.map(n => (byLine[n] || []).length))
       : 0;
 
     for (let i = 0; i < maxContacts; i++) {
-      for (const lineNum of activeLineNumbers) {
+      for (const lineNum of activeLinesSorted) {
         const contact = (byLine[lineNum] || [])[i];
         if (!contact) continue;
 
@@ -437,6 +450,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           results.sent++;
           if (status === 'not_contacted') results.t1_sent++;
           else results.t2t3_sent++;
+
+          // Round-robin: update last_used_at on the line that just sent
+          const lineRecord = lineConfigMap[lineNum];
+          if (lineRecord?.id) {
+            await supabase
+              .from('linq_line_config')
+              .update({ last_used_at: new Date().toISOString() })
+              .eq('id', lineRecord.id);
+          }
 
           // 1.5s between sends — enough spacing without blowing the timeout budget
           await sleep(1500);

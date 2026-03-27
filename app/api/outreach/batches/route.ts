@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const chapterId = searchParams.get('chapter_id');
+    const date = searchParams.get('date');
     const limit  = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
 
     let query = supabase
@@ -30,6 +32,12 @@ export async function GET(request: NextRequest) {
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
+    }
+    if (chapterId) {
+      query = query.eq('chapter_id', chapterId);
+    }
+    if (date) {
+      query = query.eq('scheduled_date', date);
     }
 
     const { data, error } = await query;

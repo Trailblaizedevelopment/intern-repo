@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
           { count: signed_up },
           { count: imessage },
           { count: sms },
+          { count: contacted_with_phone },
         ] = await Promise.all([
           supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id),
           supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).not('phone_primary', 'is', null),
@@ -40,21 +41,34 @@ export async function GET(request: NextRequest) {
           supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).eq('outreach_status', 'signed_up'),
           supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).eq('is_imessage', true),
           supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).eq('is_imessage', false),
+          // Outreach coverage: contacts with phone who have been contacted (status != not_contacted)
+          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true })
+            .eq('chapter_id', ch.id)
+            .not('phone_primary', 'is', null)
+            .neq('outreach_status', 'not_contacted'),
         ]);
 
         // Skip chapters with no alumni
         if (!total || total === 0) return null;
 
+        const havePhoneNum = have_phone ?? 0;
+        const contactedWithPhoneNum = contacted_with_phone ?? 0;
+        const outreachCoveragePct = havePhoneNum > 0
+          ? Math.round((contactedWithPhoneNum / havePhoneNum) * 100)
+          : 0;
+
         return {
           chapter_id: ch.id,
           chapter_name: ch.chapter_name,
           total: total ?? 0,
-          have_phone: have_phone ?? 0,
+          have_phone: havePhoneNum,
           contacted: contacted ?? 0,
           responded: responded ?? 0,
           signed_up: signed_up ?? 0,
           imessage: imessage ?? 0,
           sms: sms ?? 0,
+          outreach_coverage_pct: outreachCoveragePct,
+          outreach_contacted_with_phone: contactedWithPhoneNum,
           // touch_ready fields omitted from all-chapters summary (expensive, unused by stats cards)
           touch1_ready: 0,
           touch2_due: 0,
@@ -242,12 +256,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const havePhoneNum = havePhone ?? 0;
+    const contactedNum = contacted ?? 0;
+    const outreachCoveragePct = havePhoneNum > 0
+      ? Math.round((contactedNum / havePhoneNum) * 100)
+      : 0;
+
     return NextResponse.json({
       data: {
         total: total ?? 0,
-        have_phone: havePhone ?? 0,
+        have_phone: havePhoneNum,
         have_email: haveEmail ?? 0,
-        contacted: contacted ?? 0,
+        contacted: contactedNum,
+        outreach_coverage_pct: outreachCoveragePct,
         imessage: imessageCount ?? 0,
         sms: smsCount ?? 0,
         unverified: unverifiedCount ?? 0,

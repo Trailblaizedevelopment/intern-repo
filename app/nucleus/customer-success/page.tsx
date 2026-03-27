@@ -73,6 +73,7 @@ export default function CustomerSuccessPage() {
   const [alumniPipeline, setAlumniPipeline] = useState<Record<string, {
     total: number; have_phone: number; imessage: number; contacted: number;
     responded: number; signed_up: number; touch1_ready: number; touch2_due: number; touch3_due: number;
+    outreach_coverage_pct?: number; outreach_contacted_with_phone?: number;
   }>>({});
 
   const [formData, setFormData] = useState({
@@ -447,7 +448,11 @@ export default function CustomerSuccessPage() {
 // ═══════════════════════════════════════════
 
 interface PipeData {
-  total: number; signed_up: number;
+  total: number;
+  signed_up: number;
+  have_phone?: number;
+  outreach_coverage_pct?: number;
+  outreach_contacted_with_phone?: number;
 }
 
 function ChapterNoteCard({
@@ -522,9 +527,36 @@ function ChapterNoteCard({
 
       {/* Alumni signed up */}
       {pipeData && (
-        <div style={{ fontSize: '0.8rem', marginBottom: 8, display: 'flex', gap: 12 }}>
+        <div style={{ fontSize: '0.8rem', marginBottom: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <span><strong style={{ color: '#059669' }}>{pipeData.signed_up}</strong> signed up</span>
           <span style={{ opacity: 0.6 }}>{pipeData.total} in DB</span>
+        </div>
+      )}
+
+      {/* Outreach Coverage */}
+      {pipeData && pipeData.have_phone !== undefined && pipeData.have_phone > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          {(() => {
+            const pct = pipeData.outreach_coverage_pct ?? 0;
+            const contacted = pipeData.outreach_contacted_with_phone ?? 0;
+            const total = pipeData.have_phone ?? 0;
+            const color = pct > 50 ? '#059669' : pct >= 25 ? '#d97706' : '#dc2626';
+            const bg = pct > 50 ? 'rgba(5,150,105,0.08)' : pct >= 25 ? 'rgba(217,119,6,0.08)' : 'rgba(220,38,38,0.08)';
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '2px 7px',
+                  borderRadius: 3,
+                  background: bg,
+                  color,
+                }}>
+                  Outreach: {pct}% ({contacted.toLocaleString()} / {total.toLocaleString()})
+                </span>
+              </div>
+            );
+          })()}
         </div>
       )}
 

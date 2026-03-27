@@ -15,10 +15,9 @@ import ModalOverlay from '@/components/ModalOverlay';
 import SalesTab from './SalesTab';
 import SetUpTab from './SetUpTab';
 import AlumniOutreachTab from './AlumniOutreachTab';
+import MergedOutreachTab from './MergedOutreachTab';
 import SuccessTab from './SuccessTab';
-import ConversationsTab from '../ConversationsTab';
 import EmailOutreachTab from '../EmailOutreachTab';
-import LinqOutreachTab from '../LinqOutreachTab';
 import EmailTemplatesTab from '../EmailTemplatesTab';
 
 const EXECUTIVE_POSITION_LABELS: Record<string, string> = {
@@ -38,7 +37,7 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
-type DashTab = 'setup' | 'alumni' | 'conversations' | 'email' | 'linqoutreach' | 'emailtemplates' | 'success' | 'sales';
+type DashTab = 'setup' | 'outreach' | 'alumni' | 'conversations' | 'email' | 'linqoutreach' | 'emailtemplates' | 'success' | 'sales';
 
 interface SubmissionData {
   chapter: {
@@ -210,10 +209,9 @@ export default function ChapterDashboardPage() {
 
   const TABS: { id: DashTab; label: string }[] = [
     { id: 'setup', label: '🚀 Set Up' },
-    { id: 'alumni', label: '👥 Alumni Outreach' },
-    { id: 'conversations', label: '💬 Linq Conversations' },
+    { id: 'outreach', label: '📤 Outreach' },
+    { id: 'alumni', label: '👥 Alumni Data' },
     { id: 'email', label: '📧 Email Outreach' },
-    { id: 'linqoutreach', label: '📤 Linq Outreach' },
     { id: 'emailtemplates', label: '📨 Email Templates' },
     { id: 'success', label: '✅ Success' },
     { id: 'sales', label: '💰 Sales' },
@@ -306,20 +304,17 @@ export default function ChapterDashboardPage() {
         {activeTab === 'setup' && (
           <SetUpTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
         )}
+        {/* Merged Outreach tab: stats + conversations + contact list */}
+        {activeTab === 'outreach' && (
+          <MergedOutreachTab chapter={chapter} showToast={showToast} onUpdate={fetchChapter} />
+        )}
+        {/* Legacy alumni data tab — kept for CSV import and pipeline detail */}
         {activeTab === 'alumni' && (
           <AlumniOutreachTab chapter={chapter} showToast={showToast} onUpdate={fetchChapter} />
-        )}
-        {activeTab === 'conversations' && (
-          <ConversationsTab
-            showToast={showToast}
-            initialChapterId={chapter.id}
-            initialChapterName={chapter.chapter_name}
-          />
         )}
         {activeTab === 'email' && (
           <EmailOutreachTab showToast={showToast} />
         )}
-        {activeTab === 'linqoutreach' && <LinqOutreachTab showToast={showToast} />}
         {activeTab === 'emailtemplates' && <EmailTemplatesTab showToast={showToast} />}
         {activeTab === 'success' && (
           <SuccessTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
