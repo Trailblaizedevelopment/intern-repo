@@ -90,6 +90,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     { name: 'Dashboard', href: '/nucleus', icon: Zap },
     { name: 'Sales Pipeline', href: '/nucleus/pipeline', icon: TrendingUp },
     { name: 'Customer Success', href: '/nucleus/customer-success', icon: HeartHandshake },
+    { name: 'Client Map', href: '/nucleus/client-map', icon: Map },
     { name: 'Finance', href: '/nucleus/finance', icon: Wallet },
     { name: 'Operations', href: '/nucleus/operations', icon: CheckSquare },
     { name: 'Enterprise', href: '/nucleus/enterprise', icon: Building2 },
