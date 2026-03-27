@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-// Lazy initialize Supabase client to avoid build-time errors
-let supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient {
-  if (!supabase) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!url || !key) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    
-    supabase = createClient(url, key);
-  }
-  return supabase;
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { getAuthUser, unauthorizedResponse } from '@/lib/api-auth';
+import { parsePagination } from '@/lib/utils';
 
 export interface WorkspaceLead {
   id: string;
@@ -34,12 +19,24 @@ export interface WorkspaceLead {
 
 /**
  * GET /api/workspace/leads
- * List leads for an employee
+ * List leads for an employee (paginated)
  */
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request);
+    if (!user) return unauthorizedResponse();
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json(
+        { data: null, error: { message: 'Database not configured', code: 'DB_NOT_CONFIGURED' } },
+        { status: 500 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get('employee_id');
+    const { from, to } = parsePagination(searchParams);
 
     if (!employeeId) {
       return NextResponse.json(
@@ -48,11 +45,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await getSupabase()
+    const { data, error, count } = await supabase
       .from('workspace_leads')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('employee_id', employeeId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('Error fetching leads:', error);
@@ -62,7 +60,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ data, error: null });
+    return NextResponse.json({ data, count, error: null });
   } catch (error) {
     console.error('Leads GET error:', error);
     return NextResponse.json(
@@ -78,6 +76,17 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request);
+    if (!user) return unauthorizedResponse();
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json(
+        { data: null, error: { message: 'Database not configured', code: 'DB_NOT_CONFIGURED' } },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const { employee_id, name, email, phone, organization, status, lead_type, notes } = body;
 
@@ -88,7 +97,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await supabase
       .from('workspace_leads')
       .insert({
         employee_id,
@@ -111,7 +120,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ data, error: null }, { status: 201 });
+    return NextResponse.json({ data, count: null, error: null }, { status: 201 });
   } catch (error) {
     console.error('Leads POST error:', error);
     return NextResponse.json(
