@@ -15,6 +15,8 @@ import {
 import ModalOverlay from '@/components/ModalOverlay';
 import ConfirmModal from '@/components/ConfirmModal';
 import { ArrowLeft, LayoutDashboard, CreditCard, Edit2, Trash2, Link as LinkIcon } from 'lucide-react';
+import OnboardingWizard from './OnboardingWizard';
+import OnboardingNotifications from './OnboardingNotifications';
 
 // ═══════════════════════════════════════════
 // STICKY NOTE COLORS (from Projects pattern)
@@ -64,6 +66,10 @@ export default function CustomerSuccessPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingChapter, setEditingChapter] = useState<ChapterWithOnboarding | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null }>({ show: false, id: null });
+
+  // Onboarding wizard state
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardChapter, setWizardChapter] = useState<ChapterWithOnboarding | null>(null);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -187,6 +193,16 @@ export default function CustomerSuccessPage() {
     setShowModal(false);
   }
 
+  function openWizard(chapterId?: string) {
+    if (chapterId) {
+      const ch = chapters.find(c => c.id === chapterId) || null;
+      setWizardChapter(ch);
+    } else {
+      setWizardChapter(null);
+    }
+    setShowWizard(true);
+  }
+
   function openEditModal(chapter: ChapterWithOnboarding) {
     setEditingChapter(chapter);
     setFormData({
@@ -265,6 +281,12 @@ export default function CustomerSuccessPage() {
           </div>
         ) : (
           <>
+            {/* Onboarding notifications panel */}
+            <OnboardingNotifications
+              chapters={chapters}
+              onOpenWizard={(id) => openWizard(id)}
+            />
+
             {/* Summary bar */}
             <div className="cs-summary-bar">
               <span><strong>{totalChapters}</strong> chapters</span>
@@ -319,7 +341,7 @@ export default function CustomerSuccessPage() {
                 <h3>{quickFilter !== 'all' ? 'No chapters match the filter' : 'No chapters yet'}</h3>
                 <p>Add your first chapter to start tracking customer success.</p>
                 {quickFilter === 'all' && filterStatus === 'all' && (
-                  <button className="sn__create-btn" onClick={() => setShowModal(true)}>
+                  <button className="sn__create-btn" onClick={() => openWizard()}>
                     <Plus size={16} /> Add Chapter
                   </button>
                 )}
@@ -338,7 +360,7 @@ export default function CustomerSuccessPage() {
                   />
                 ))}
                 {/* Add new card */}
-                <button className="sn__add-card" onClick={() => setShowModal(true)}>
+                <button className="sn__add-card" onClick={() => openWizard()}>
                   <Plus size={28} strokeWidth={1.5} />
                   <span>Add Chapter</span>
                 </button>
@@ -347,6 +369,15 @@ export default function CustomerSuccessPage() {
           </>
         )}
       </main>
+
+      {/* Onboarding Wizard */}
+      {showWizard && (
+        <OnboardingWizard
+          chapter={wizardChapter}
+          onClose={() => { setShowWizard(false); setWizardChapter(null); }}
+          onComplete={() => { setShowWizard(false); setWizardChapter(null); fetchChapters(); showToast('Chapter setup complete! 🎉', 'success'); }}
+        />
+      )}
 
       {/* Toasts */}
       <div className="toast-container">
