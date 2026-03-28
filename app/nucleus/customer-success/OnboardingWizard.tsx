@@ -114,6 +114,58 @@ function StepIndicator({ current, max }: { current: number; max: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Mark-as-done confirmation dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface MarkDoneConfirmProps {
+  stepName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}
+
+function MarkDoneConfirm({ stepName, onConfirm, onCancel, loading }: MarkDoneConfirmProps) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1100,
+      background: 'rgba(15,22,40,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16,
+    }}>
+      <div style={{
+        background: '#FDFAF5', borderRadius: 14, padding: '24px 28px',
+        maxWidth: 440, width: '100%',
+        boxShadow: '0 16px 60px rgba(0,0,0,0.25)',
+      }}>
+        <h3 style={{ margin: '0 0 10px', fontSize: '1rem', fontWeight: 700, color: '#1B2A4A' }}>
+          Mark {stepName} as complete?
+        </h3>
+        <p style={{ fontSize: '0.85rem', color: '#6B6058', margin: '0 0 20px', lineHeight: 1.5 }}>
+          This should only be used for steps completed <strong>before this system was set up</strong>. It will set the relevant timestamp to now and advance the wizard.
+        </p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #D9D4CC', background: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#1B2A4A' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#C4874A', color: '#fff', fontWeight: 700, fontSize: '0.875rem', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            {loading ? <Loader2 size={14} /> : null}
+            Mark as Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Wizard Component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -152,6 +204,10 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
   // Step 4 — submission
   const [submissionSent, setSubmissionSent] = useState(!!initialChapter?.submission_sent_at);
+
+  // Mark-as-done confirmation state
+  const [markDoneStep, setMarkDoneStep] = useState<{ step: number; name: string } | null>(null);
+  const [markingDone, setMarkingDone] = useState(false);
 
   // Derived state from chapterData
   const contractSent = !!(chapterData?.contract_sent_at);
@@ -307,6 +363,55 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     setCurrentStep(5);
   }
 
+  // ── Mark As Done (retroactive override) ────────────────────────────────────
+
+  async function handleMarkAsDone(step: number) {
+    if (!chapterId || !supabase) return;
+    setMarkingDone(true); setError(null);
+
+    const now = new Date().toISOString();
+    let updates: Record<string, unknown> = {};
+    let nextStep = step + 1;
+
+    if (step === 2) {
+      // Contract: set sent + signed timestamps, mark as signed
+      updates = {
+        contract_sent_at: now,
+        contract_signed_at: now,
+        contract_status: 'signed',
+        wizard_step: nextStep,
+      };
+    } else if (step === 3) {
+      // Invoice: set sent + paid timestamps
+      updates = {
+        invoice_sent_at: now,
+        invoice_paid_at: now,
+        invoice_status: 'paid',
+        wizard_step: nextStep,
+      };
+    } else if (step === 4) {
+      // Submission
+      nextStep = 5;
+      updates = {
+        submission_sent_at: now,
+        wizard_step: 5,
+      };
+    }
+
+    const { error: err } = await supabase.from('chapters').update(updates).eq('id', chapterId);
+    if (err) {
+      setError(err.message);
+      setMarkingDone(false);
+      setMarkDoneStep(null);
+      return;
+    }
+
+    await refreshChapter(chapterId);
+    setMarkingDone(false);
+    setMarkDoneStep(null);
+    setCurrentStep(nextStep);
+  }
+
   // ── Step 5: Complete ────────────────────────────────────────────────────────
 
   async function handleCompleteSetup() {
@@ -371,6 +476,16 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
           </div>
           <StepIndicator current={currentStep} max={maxUnlockedStep} />
         </div>
+
+        {/* Mark-as-done confirmation */}
+        {markDoneStep && (
+          <MarkDoneConfirm
+            stepName={markDoneStep.name}
+            onConfirm={() => handleMarkAsDone(markDoneStep.step)}
+            onCancel={() => setMarkDoneStep(null)}
+            loading={markingDone}
+          />
+        )}
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
@@ -483,29 +598,56 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
                   >
                     Continue <ChevronRight size={16} />
                   </button>
-                ) : null}
+                ) : (
+                  <button
+                    onClick={() => setMarkDoneStep({ step: 2, name: 'Contract' })}
+                    style={markAsDoneLinkStyle}
+                  >
+                    Mark as already done
+                  </button>
+                )}
               </>
             )}
 
             {currentStep === 3 && (
-              <button
-                onClick={() => setCurrentStep(4)}
-                disabled={!invoiceSent}
-                style={primaryBtnStyle(!invoiceSent)}
-              >
-                Continue <ChevronRight size={16} />
-              </button>
+              <>
+                <button
+                  onClick={() => setCurrentStep(4)}
+                  disabled={!invoiceSent}
+                  style={primaryBtnStyle(!invoiceSent)}
+                >
+                  Continue <ChevronRight size={16} />
+                </button>
+                {!invoiceSent && (
+                  <button
+                    onClick={() => setMarkDoneStep({ step: 3, name: 'Invoice' })}
+                    style={markAsDoneLinkStyle}
+                  >
+                    Mark as already done
+                  </button>
+                )}
+              </>
             )}
 
             {currentStep === 4 && (
-              <button
-                onClick={handleSaveSubmission}
-                disabled={saving || !submissionSent}
-                style={primaryBtnStyle(saving || !submissionSent)}
-              >
-                {saving ? <Loader2 size={16} /> : null}
-                Save & Continue <ChevronRight size={16} />
-              </button>
+              <>
+                <button
+                  onClick={handleSaveSubmission}
+                  disabled={saving || !submissionSent}
+                  style={primaryBtnStyle(saving || !submissionSent)}
+                >
+                  {saving ? <Loader2 size={16} /> : null}
+                  Save & Continue <ChevronRight size={16} />
+                </button>
+                {!submissionFormSent && (
+                  <button
+                    onClick={() => setMarkDoneStep({ step: 4, name: 'Submission Form' })}
+                    style={markAsDoneLinkStyle}
+                  >
+                    Mark as already done
+                  </button>
+                )}
+              </>
             )}
 
             {currentStep === 5 && (
@@ -979,3 +1121,15 @@ function primaryBtnStyle(disabled: boolean): React.CSSProperties {
     transition: 'all 0.15s',
   };
 }
+
+const markAsDoneLinkStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  fontSize: '0.78rem',
+  color: '#8A7E72',
+  textDecoration: 'underline',
+  textUnderlineOffset: 2,
+  padding: '4px 8px',
+  alignSelf: 'center',
+};

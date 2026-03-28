@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Check, CheckCircle2, Clock, Sparkles } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Sparkles, Wand2 } from 'lucide-react';
 import { supabase, ChapterWithOnboarding, ONBOARDING_STEPS } from '@/lib/supabase';
 
 interface SetUpTabProps {
   chapter: ChapterWithOnboarding;
   onUpdate: () => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  /** Called when user clicks "Continue Setup" — opens wizard for this chapter */
+  onOpenWizard?: () => void;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -33,7 +35,7 @@ function generateConfetti(): ConfettiParticle[] {
   }));
 }
 
-export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps) {
+export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }: SetUpTabProps) {
   const [localChapter, setLocalChapter] = useState<ChapterWithOnboarding>(chapter);
   const [celebratingCategory, setCelebratingCategory] = useState<string | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -133,6 +135,48 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
 
   return (
     <div style={{ maxWidth: 720 }}>
+      {/* ── Continue Setup banner — shown if wizard not yet completed ── */}
+      {!chapter.wizard_completed_at && onOpenWizard && (
+        <div style={{
+          background: 'linear-gradient(135deg, #1B2A4A 0%, #243860 100%)',
+          border: '1px solid #1B2A4A',
+          borderRadius: 10,
+          padding: '16px 20px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Wand2 size={20} color="#C4874A" />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#FDFAF5' }}>
+                Onboarding wizard not completed
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                {chapter.wizard_step
+                  ? `Paused at step ${chapter.wizard_step} of 5 — pick up where you left off`
+                  : 'Use the guided wizard to track contract, invoice, and submission'}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onOpenWizard}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '9px 18px', borderRadius: 8, border: 'none',
+              background: '#C4874A', color: '#fff',
+              fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
+              whiteSpace: 'nowrap', flexShrink: 0,
+              transition: 'background 0.15s',
+            }}
+          >
+            Continue Setup →
+          </button>
+        </div>
+      )}
+
       {/* Step skip toggles — mark entire setup sections as N/A */}
       <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '12px 16px', marginBottom: 16 }}>
         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#5C5449', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>

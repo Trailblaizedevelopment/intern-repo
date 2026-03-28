@@ -8,6 +8,7 @@ interface ChapterSetupStatus {
   id: string;
   chapter_name: string;
   school?: string | null;
+  status?: string | null;
   wizard_step?: number;
   wizard_completed_at?: string | null;
   created_at: string;
@@ -41,7 +42,12 @@ export default function OnboardingNotifications({
   chapters,
   onOpenWizard,
 }: OnboardingNotificationsProps) {
-  const incomplete = chapters.filter(c => !c.wizard_completed_at);
+  // Show chapters that are active/onboarding AND haven't finished the wizard.
+  // This ensures existing active chapters surface here, not just newly created ones.
+  // Explicitly exclude churned chapters — they don't need onboarding follow-up.
+  const incomplete = chapters.filter(
+    c => !c.wizard_completed_at && c.status !== 'churned',
+  );
 
   // Track previous state to detect step completions → fire toasts
   const prevChaptersRef = useRef<ChapterSetupStatus[]>([]);
