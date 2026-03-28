@@ -19,7 +19,10 @@ interface WizardChapter extends Chapter {
   docusign_envelope_id?: string | null;
   invoice_sent_at?: string | null;
   invoice_paid_at?: string | null;
-  invoice_status?: 'not_sent' | 'sent' | 'paid';
+  invoice_status?: 'not_sent' | 'sent' | 'paid' | 'payment_failed';
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  member_count?: number | null;
   submission_sent_at?: string | null;
   wizard_step?: number;
   wizard_completed_at?: string | null;
@@ -143,10 +146,9 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   const fileInputRef = useRef<HTMLInputElement>(null) as React.MutableRefObject<HTMLInputElement>;
 
   // Step 3 — invoice
-  const [invoiceSentDate, setInvoiceSentDate] = useState(
-    initialChapter?.invoice_sent_at ? initialChapter.invoice_sent_at.split('T')[0] : '',
-  );
-  const [invoicePaid, setInvoicePaid] = useState(!!initialChapter?.invoice_paid_at);
+  const [memberCount, setMemberCount] = useState<number>(initialChapter?.member_count ?? 0);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [invoiceSentResult, setInvoiceSentResult] = useState<{ url: string; sentAt: string } | null>(null);
 
   // Step 4 — submission
   const [submissionSent, setSubmissionSent] = useState(!!initialChapter?.submission_sent_at);
@@ -259,23 +261,33 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
   // ── Step 3: Invoice ─────────────────────────────────────────────────────────
 
-  async function handleSaveInvoice() {
-    if (!chapterId || !supabase) return;
-    if (!invoiceSentDate) return setError('Please select a date when the invoice was sent');
-    setSaving(true); setError(null);
+  async function handleSendInvoice() {
+    if (!chapterId) return;
+    if (!memberCount || memberCount < 1) return setError('Please enter the number of chapter members');
+    setSendingInvoice(true); setError(null);
 
-    const updates: Record<string, unknown> = {
-      invoice_sent_at: new Date(invoiceSentDate).toISOString(),
-      invoice_status: invoicePaid ? 'paid' : 'sent',
-      wizard_step: 4,
-    };
-    if (invoicePaid) updates.invoice_paid_at = new Date().toISOString();
+    try {
+      const res = await fetch(`/api/chapters/${chapterId}/send-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberCount,
+          contactEmail: chapterData?.contact_email || form.contact_email,
+          chapterName: chapterData?.chapter_name || form.chapter_name,
+        }),
+      });
 
-    const { error: err } = await supabase.from('chapters').update(updates).eq('id', chapterId);
-    if (err) { setError(err.message); setSaving(false); return; }
-    await refreshChapter(chapterId);
-    setSaving(false);
-    setCurrentStep(4);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send invoice');
+
+      const sentAt = new Date().toISOString();
+      setInvoiceSentResult({ url: data.invoiceUrl, sentAt });
+      await refreshChapter(chapterId);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send invoice');
+    } finally {
+      setSendingInvoice(false);
+    }
   }
 
   // ── Step 4: Submission Form ─────────────────────────────────────────────────
@@ -401,12 +413,14 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
           {/* ── STEP 3 ── */}
           {currentStep === 3 && (
             <Step3Invoice
-              invoiceSentDate={invoiceSentDate}
-              setInvoiceSentDate={setInvoiceSentDate}
-              invoicePaid={invoicePaid}
-              setInvoicePaid={setInvoicePaid}
+              memberCount={memberCount}
+              setMemberCount={setMemberCount}
+              onSendInvoice={handleSendInvoice}
+              sending={sendingInvoice}
+              invoiceSentResult={invoiceSentResult}
               existingInvoiceSentAt={chapterData?.invoice_sent_at}
               existingInvoicePaidAt={chapterData?.invoice_paid_at}
+              contactEmail={chapterData?.contact_email || form.contact_email}
             />
           )}
 
@@ -475,12 +489,11 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
             {currentStep === 3 && (
               <button
-                onClick={handleSaveInvoice}
-                disabled={saving || !invoiceSentDate}
-                style={primaryBtnStyle(saving || !invoiceSentDate)}
+                onClick={() => setCurrentStep(4)}
+                disabled={!invoiceSent}
+                style={primaryBtnStyle(!invoiceSent)}
               >
-                {saving ? <Loader2 size={16} /> : null}
-                Save & Continue <ChevronRight size={16} />
+                Continue <ChevronRight size={16} />
               </button>
             )}
 
@@ -705,65 +718,94 @@ function Step2Contract({
   );
 }
 
+function getPriceTierClient(memberCount: number): number {
+  if (memberCount < 100) return 99;
+  if (memberCount < 175) return 199;
+  if (memberCount < 250) return 299;
+  if (memberCount < 325) return 399;
+  if (memberCount < 400) return 499;
+  return 599;
+}
+
 function Step3Invoice({
-  invoiceSentDate, setInvoiceSentDate,
-  invoicePaid, setInvoicePaid,
+  memberCount, setMemberCount,
+  onSendInvoice, sending,
+  invoiceSentResult,
   existingInvoiceSentAt, existingInvoicePaidAt,
+  contactEmail,
 }: {
-  invoiceSentDate: string;
-  setInvoiceSentDate: (v: string) => void;
-  invoicePaid: boolean;
-  setInvoicePaid: (v: boolean) => void;
+  memberCount: number;
+  setMemberCount: (v: number) => void;
+  onSendInvoice: () => void;
+  sending: boolean;
+  invoiceSentResult: { url: string; sentAt: string } | null;
   existingInvoiceSentAt?: string | null;
   existingInvoicePaidAt?: string | null;
+  contactEmail?: string;
 }) {
+  const invoiceAlreadySent = !!existingInvoiceSentAt;
+  const priceTier = memberCount > 0 ? getPriceTierClient(memberCount) : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <SectionTitle icon={<DollarSign size={16} />} title="Invoice" />
-      <p style={{ fontSize: '0.85rem', color: '#6B6058', margin: 0 }}>
-        Track invoice status manually. Stripe automation coming soon.
-      </p>
 
       <StatusRow
         label="Invoice Sent"
-        done={!!existingInvoiceSentAt}
+        done={invoiceAlreadySent}
         timestamp={existingInvoiceSentAt}
         pendingText="Not sent yet"
       />
       <StatusRow
         label="Invoice Paid"
-        done={!!existingInvoicePaidAt || invoicePaid}
+        done={!!existingInvoicePaidAt}
         timestamp={existingInvoicePaidAt}
         pendingText="Waiting for payment..."
-        isWaiting={!!existingInvoiceSentAt && !existingInvoicePaidAt}
+        isWaiting={invoiceAlreadySent && !existingInvoicePaidAt}
       />
 
-      {!existingInvoiceSentAt && (
-        <>
-          <FormField label="Date Invoice Was Sent">
+      {!invoiceAlreadySent && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px', background: '#F7F5F1', borderRadius: 10, border: '1px solid #E5E0D8' }}>
+          <FormField label="Chapter Member Count">
             <input
-              type="date"
-              value={invoiceSentDate}
-              onChange={e => setInvoiceSentDate(e.target.value)}
+              type="number"
+              min={0}
+              value={memberCount || ''}
+              onChange={e => setMemberCount(parseInt(e.target.value, 10) || 0)}
+              placeholder="e.g. 120"
               style={inputStyle}
             />
           </FormField>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '0.875rem', color: '#1B2A4A' }}>
-            <input
-              type="checkbox"
-              checked={invoicePaid}
-              onChange={e => setInvoicePaid(e.target.checked)}
-              style={{ width: 16, height: 16, accentColor: '#C4874A' }}
-            />
-            Invoice already paid
-          </label>
-        </>
+          {priceTier !== null && memberCount > 0 && (
+            <div style={{ fontSize: '0.85rem', color: '#1B2A4A', fontWeight: 600, padding: '8px 12px', background: '#EEF2FA', borderRadius: 8 }}>
+              Based on {memberCount} members → <span style={{ color: '#C4874A' }}>${priceTier}/mo</span>
+            </div>
+          )}
+
+          <button
+            onClick={onSendInvoice}
+            disabled={sending || !memberCount || memberCount < 1}
+            style={primaryBtnStyle(sending || !memberCount || memberCount < 1)}
+          >
+            {sending ? <Loader2 size={16} className="spin" /> : <Send size={15} />}
+            {sending ? 'Sending Invoice...' : 'Send Invoice'}
+          </button>
+
+          {invoiceSentResult && (
+            <div style={{ padding: '10px 14px', background: '#EEFAF3', borderRadius: 8, fontSize: '0.82rem', color: '#1A6B3A', border: '1px solid #A8DFC2' }}>
+              <strong>Invoice sent ✅</strong> — Payment link emailed to {contactEmail || 'chapter contact'}<br />
+              <span style={{ opacity: 0.75 }}>{fmtTs(invoiceSentResult.sentAt)}</span>
+            </div>
+          )}
+        </div>
       )}
 
-      <div style={{ padding: '10px 14px', background: '#FEF9EE', borderRadius: 8, fontSize: '0.78rem', color: '#8A6030', border: '1px solid #F5DFA0' }}>
-        💡 <strong>Note:</strong> Stripe invoice automation is on the roadmap.
-      </div>
+      {invoiceAlreadySent && !existingInvoicePaidAt && (
+        <div style={{ padding: '10px 14px', background: '#FEF9EE', borderRadius: 8, fontSize: '0.78rem', color: '#8A6030', border: '1px solid #F5DFA0' }}>
+          ⏳ <strong>Awaiting payment</strong> — Invoice status will update automatically when payment is received via Stripe webhook.
+        </div>
+      )}
     </div>
   );
 }

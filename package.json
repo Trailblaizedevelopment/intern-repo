@@ -22,6 +22,7 @@
     "react-dom": "^18",
     "react-simple-maps": "^3.0.0",
     "recharts": "^3.7.0",
+    "stripe": "^21.0.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
