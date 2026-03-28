@@ -72,6 +72,9 @@ export async function getAccessToken(): Promise<string> {
 
 /**
  * Creates and sends a DocuSign envelope immediately.
+ * Two-signer routing: customer signs first (routing order 1),
+ * Owen countersigns after (routing order 2).
+ * Uses anchor text tab positioning embedded in the PDF.
  * Embeds chapter_id as a hidden custom field.
  * Returns the envelopeId.
  */
@@ -84,8 +87,11 @@ export async function sendEnvelope(
 ): Promise<string> {
   const accessToken = await getAccessToken();
 
+  // Anchor strings must match what was embedded in the PDF as invisible text.
+  // pdf-lib writes them as \s1\ etc. — DocuSign anchor matching is exact-string.
   const envelopeBody = {
-    emailSubject: `Contract for ${pdfFileName}`,
+    emailSubject: `Trailblaize SaaS Agreement — Please Sign`,
+    emailBlurb: `Hi ${recipientName}, please review and sign the attached Trailblaize Software as a Service Agreement. If you have any questions, reply to this email or reach out to owen@trailblaize.net.`,
     documents: [
       {
         documentBase64: pdfBase64,
@@ -96,6 +102,7 @@ export async function sendEnvelope(
     ],
     recipients: {
       signers: [
+        // ── Signer 1: Customer (signs first) ──────────────────────────────
         {
           email: recipientEmail,
           name: recipientName,
@@ -104,11 +111,71 @@ export async function sendEnvelope(
           tabs: {
             signHereTabs: [
               {
-                // Place signature tab at the bottom of page 1
                 documentId: '1',
-                pageNumber: '1',
-                xPosition: '100',
-                yPosition: '700',
+                anchorString: '\\s1\\',
+                anchorXOffset: '0',
+                anchorYOffset: '0',
+                anchorIgnoreIfNotPresent: 'false',
+                anchorUnits: 'pixels',
+              },
+            ],
+            fullNameTabs: [
+              {
+                documentId: '1',
+                anchorString: '\\n1\\',
+                anchorXOffset: '0',
+                anchorYOffset: '0',
+                anchorIgnoreIfNotPresent: 'false',
+                anchorUnits: 'pixels',
+              },
+            ],
+            dateSignedTabs: [
+              {
+                documentId: '1',
+                anchorString: '\\d1\\',
+                anchorXOffset: '0',
+                anchorYOffset: '0',
+                anchorIgnoreIfNotPresent: 'false',
+                anchorUnits: 'pixels',
+              },
+            ],
+          },
+        },
+        // ── Signer 2: Owen (countersigns after signer 1) ──────────────────
+        {
+          email: 'owen@trailblaize.net',
+          name: 'Owen Ridgeway',
+          recipientId: '2',
+          routingOrder: '2',
+          tabs: {
+            signHereTabs: [
+              {
+                documentId: '1',
+                anchorString: '\\s2\\',
+                anchorXOffset: '0',
+                anchorYOffset: '0',
+                anchorIgnoreIfNotPresent: 'false',
+                anchorUnits: 'pixels',
+              },
+            ],
+            fullNameTabs: [
+              {
+                documentId: '1',
+                anchorString: '\\n2\\',
+                anchorXOffset: '0',
+                anchorYOffset: '0',
+                anchorIgnoreIfNotPresent: 'false',
+                anchorUnits: 'pixels',
+              },
+            ],
+            dateSignedTabs: [
+              {
+                documentId: '1',
+                anchorString: '\\d2\\',
+                anchorXOffset: '0',
+                anchorYOffset: '0',
+                anchorIgnoreIfNotPresent: 'false',
+                anchorUnits: 'pixels',
               },
             ],
           },
