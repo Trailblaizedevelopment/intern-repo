@@ -2,25 +2,29 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Trailblaize | Build the Future of Alumni Networks",
-  description: "Trailblaize is revolutionizing how organizations connect with their communities. Join 5,500+ users across 5 schools building the future of alumni engagement.",
+  title: "Trailblaize",
+  description: "Alumni relationship management for Greek life chapters.",
   keywords: ["alumni", "networking", "community", "organizations", "Trailblaize", "engagement", "growth"],
   authors: [{ name: "Trailblaize" }],
   metadataBase: new URL("https://trailblaize.space"),
   openGraph: {
-    title: "Build the Future of Alumni Networks",
-    description: "Trailblaize is revolutionizing how organizations connect with their communities. Whether you're joining our team or managing your organization, start your journey here.",
+    title: "Trailblaize",
+    description: "Alumni relationship management for Greek life chapters.",
     url: "https://trailblaize.space",
     siteName: "Trailblaize",
+    images: [{ url: "/logos/logo-wordmark-color.png", width: 1200, height: 630 }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Build the Future of Alumni Networks",
-    description: "Trailblaize is revolutionizing how organizations connect with their communities. Join 5,500+ users across 5 schools.",
+    title: "Trailblaize",
+    description: "Alumni relationship management for Greek life chapters.",
+    images: ["/logos/logo-wordmark-color.png"],
   },
   icons: {
-    icon: "/logo-icon.svg",
+    icon: "/logos/logo-icon-white.png",
+    shortcut: "/logos/logo-icon-white.png",
+    apple: "/logos/logo-icon-white.png",
   },
 };
 
