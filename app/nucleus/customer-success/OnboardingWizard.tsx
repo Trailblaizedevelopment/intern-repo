@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  X, Check, Clock, ChevronRight, Upload, Send, FileText,
+  X, Check, Clock, ChevronRight, Send, FileText,
   User, Mail, Phone, DollarSign, Building2, Loader2,
-  AlertTriangle, CheckCircle2, Circle,
+  AlertTriangle, CheckCircle2, Circle, Calendar,
 } from 'lucide-react';
 import { supabase, Chapter } from '@/lib/supabase';
 
@@ -44,15 +44,6 @@ function fmtTs(ts: string | null | undefined): string {
   return new Date(ts).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit',
-  });
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
   });
 }
 
@@ -191,11 +182,15 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   });
 
   // Step 2 — contract
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [recipientName, setRecipientName] = useState(initialChapter?.contact_name || '');
-  const [recipientEmail, setRecipientEmail] = useState(initialChapter?.contact_email || '');
+  const [chapterLegalName, setChapterLegalName] = useState(initialChapter?.chapter_name || '');
+  const [signerName, setSignerName] = useState('');
+  const [signerEmail, setSignerEmail] = useState('');
+  const [contractMemberCount, setContractMemberCount] = useState<number>(initialChapter?.member_count ?? 0);
+  const [contractEffectiveDate, setContractEffectiveDate] = useState(() => {
+    const now = new Date();
+    return now.toISOString().split('T')[0]; // YYYY-MM-DD for date input
+  });
   const [sendingContract, setSendingContract] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null) as React.MutableRefObject<HTMLInputElement>;
 
   // Step 3 — invoice
   const [memberCount, setMemberCount] = useState<number>(initialChapter?.member_count ?? 0);
@@ -225,11 +220,10 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     setMaxUnlockedStep(max);
   }, [chapterId, contractSent, invoiceSent, submissionFormSent]);
 
-  // Re-sync form recipient fields when chapterData updates
+  // Pre-fill chapter legal name from chapter_name when chapter is first loaded/created
   useEffect(() => {
-    if (chapterData) {
-      setRecipientName(prev => prev || chapterData.contact_name || '');
-      setRecipientEmail(prev => prev || chapterData.contact_email || '');
+    if (chapterData?.chapter_name) {
+      setChapterLegalName(prev => prev || chapterData.chapter_name || '');
     }
   }, [chapterData]);
 
@@ -279,22 +273,30 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
   async function handleSendContract() {
     if (!chapterId) return setError('No chapter ID');
-    if (!pdfFile) return setError('Please upload a PDF first');
-    if (!recipientEmail || !recipientName) return setError('Recipient name and email are required');
+    if (!chapterLegalName.trim()) return setError('Chapter legal name is required');
+    if (!signerName.trim()) return setError('Signer name is required');
+    if (!signerEmail.trim()) return setError('Signer email is required');
+    if (!contractMemberCount || contractMemberCount < 1) return setError('Member count is required to calculate pricing');
 
     setSendingContract(true); setError(null);
 
     try {
-      const pdfBase64 = await fileToBase64(pdfFile);
+      // Convert YYYY-MM-DD date input to M/D/YY format for the contract
+      let effectiveDateFormatted: string | undefined;
+      if (contractEffectiveDate) {
+        const [year, month, day] = contractEffectiveDate.split('-').map(Number);
+        effectiveDateFormatted = `${month}/${day}/${String(year).slice(-2)}`;
+      }
 
       const res = await fetch(`/api/chapters/${chapterId}/send-contract`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipientEmail,
-          recipientName,
-          pdfBase64,
-          pdfFileName: pdfFile.name,
+          recipientEmail: signerEmail.trim(),
+          recipientName: signerName.trim(),
+          memberCount: contractMemberCount,
+          chapterLegalName: chapterLegalName.trim(),
+          effectiveDate: effectiveDateFormatted,
         }),
       });
 
@@ -513,13 +515,16 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
               contractSentAt={chapterData?.contract_sent_at}
               contractSignedAt={chapterData?.contract_signed_at}
               contractStatus={chapterData?.contract_status}
-              pdfFile={pdfFile}
-              setPdfFile={setPdfFile}
-              fileInputRef={fileInputRef}
-              recipientName={recipientName}
-              setRecipientName={setRecipientName}
-              recipientEmail={recipientEmail}
-              setRecipientEmail={setRecipientEmail}
+              chapterLegalName={chapterLegalName}
+              setChapterLegalName={setChapterLegalName}
+              signerName={signerName}
+              setSignerName={setSignerName}
+              signerEmail={signerEmail}
+              setSignerEmail={setSignerEmail}
+              memberCount={contractMemberCount}
+              setMemberCount={setContractMemberCount}
+              effectiveDate={contractEffectiveDate}
+              setEffectiveDate={setContractEffectiveDate}
               onSend={handleSendContract}
               sending={sendingContract}
             />
@@ -742,11 +747,23 @@ function Step1ChapterInfo({
   );
 }
 
+function getPriceTierClient(memberCount: number): number {
+  if (memberCount < 100) return 99;
+  if (memberCount < 175) return 199;
+  if (memberCount < 250) return 299;
+  if (memberCount < 325) return 399;
+  if (memberCount < 400) return 499;
+  return 599;
+}
+
 function Step2Contract({
   chapterId, contractSent, contractSigned,
   contractSentAt, contractSignedAt, contractStatus,
-  pdfFile, setPdfFile, fileInputRef,
-  recipientName, setRecipientName, recipientEmail, setRecipientEmail,
+  chapterLegalName, setChapterLegalName,
+  signerName, setSignerName,
+  signerEmail, setSignerEmail,
+  memberCount, setMemberCount,
+  effectiveDate, setEffectiveDate,
   onSend, sending,
 }: {
   chapterId: string | null;
@@ -755,27 +772,33 @@ function Step2Contract({
   contractSentAt?: string | null;
   contractSignedAt?: string | null;
   contractStatus?: string;
-  pdfFile: File | null;
-  setPdfFile: (f: File | null) => void;
-  fileInputRef: React.RefObject<HTMLInputElement>;
-  recipientName: string;
-  setRecipientName: (v: string) => void;
-  recipientEmail: string;
-  setRecipientEmail: (v: string) => void;
+  chapterLegalName: string;
+  setChapterLegalName: (v: string) => void;
+  signerName: string;
+  setSignerName: (v: string) => void;
+  signerEmail: string;
+  setSignerEmail: (v: string) => void;
+  memberCount: number;
+  setMemberCount: (v: number) => void;
+  effectiveDate: string;
+  setEffectiveDate: (v: string) => void;
   onSend: () => void;
   sending: boolean;
 }) {
+  const canSend = !sending && !!chapterId && !!chapterLegalName.trim() && !!signerName.trim() && !!signerEmail.trim() && memberCount > 0;
+  const priceTier = memberCount > 0 ? getPriceTierClient(memberCount) : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <SectionTitle icon={<FileText size={16} />} title="Send Contract via DocuSign" />
 
-      {/* DocuSign status indicators */}
+      {/* Status indicators */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <StatusRow
           label="Contract Sent"
           done={contractSent}
           timestamp={contractSentAt}
-          pendingText={contractSent ? undefined : 'Not sent yet'}
+          pendingText="Not sent yet"
         />
         <StatusRow
           label="Contract Signed"
@@ -798,48 +821,111 @@ function Step2Contract({
 
       {!contractSent && (
         <>
-          <div style={{ marginTop: 8 }}>
-            <label style={labelStyle}>PDF Document</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf"
-              style={{ display: 'none' }}
-              onChange={e => setPdfFile(e.target.files?.[0] || null)}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                width: '100%', padding: '24px 16px',
-                border: '2px dashed #D9D4CC', borderRadius: 10,
-                background: '#fff', cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                color: pdfFile ? '#1B2A4A' : '#8A7E72',
-              }}
-            >
-              <Upload size={20} />
-              <span style={{ fontSize: '0.875rem' }}>
-                {pdfFile ? `✓ ${pdfFile.name}` : 'Click to upload PDF'}
+          {/* ── Section: Contract Document ─────────────────────────────── */}
+          <div style={{
+            padding: '16px', background: '#F7F5F1', borderRadius: 10,
+            border: '1px solid #E5E0D8', display: 'flex', flexDirection: 'column', gap: 12,
+          }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#6B6058', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Contract Document
+            </div>
+
+            <FormField label="Chapter Legal Name *">
+              <input
+                type="text"
+                value={chapterLegalName}
+                onChange={e => setChapterLegalName(e.target.value)}
+                placeholder="e.g. Alabama Beta Chapter of Sigma Phi Epsilon"
+                style={inputStyle}
+              />
+              <span style={{ fontSize: '0.72rem', color: '#8A7E72', marginTop: 2 }}>
+                Full legal name as it will appear in the contract document.
               </span>
-            </button>
+            </FormField>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <FormField label="Member Count *">
+                <input
+                  type="number"
+                  min={1}
+                  value={memberCount || ''}
+                  onChange={e => setMemberCount(parseInt(e.target.value, 10) || 0)}
+                  placeholder="e.g. 120"
+                  style={inputStyle}
+                />
+              </FormField>
+              <FormField label="Effective Date *">
+                <div style={{ position: 'relative' }}>
+                  <Calendar size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A7E72', pointerEvents: 'none' }} />
+                  <input
+                    type="date"
+                    value={effectiveDate}
+                    onChange={e => setEffectiveDate(e.target.value)}
+                    style={{ ...inputStyle, paddingLeft: 30 }}
+                  />
+                </div>
+              </FormField>
+            </div>
+
+            {priceTier !== null && memberCount > 0 && (
+              <div style={{
+                fontSize: '0.85rem', color: '#1B2A4A', fontWeight: 600,
+                padding: '8px 12px', background: '#EEF2FA', borderRadius: 8,
+              }}>
+                Based on {memberCount} members → <span style={{ color: '#C4874A' }}>${priceTier}/mo</span>
+                <span style={{ fontWeight: 400, color: '#6B6058', marginLeft: 6 }}>
+                  (embedded in contract)
+                </span>
+              </div>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <FormField label="Recipient Name">
-              <input type="text" value={recipientName} onChange={e => setRecipientName(e.target.value)} style={inputStyle} />
+          {/* ── Section: Signer Info ───────────────────────────────────── */}
+          <div style={{
+            padding: '16px', background: '#F7F5F1', borderRadius: 10,
+            border: '1px solid #E5E0D8', display: 'flex', flexDirection: 'column', gap: 12,
+          }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#6B6058', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              DocuSign Recipient — Signer 1
+            </div>
+            <p style={{ fontSize: '0.8rem', color: '#8A7E72', margin: 0, lineHeight: 1.5 }}>
+              The individual who will receive and sign the contract (e.g. the chapter president). After they sign, Owen will countersign automatically.
+            </p>
+
+            <FormField label="Signer Name *">
+              <div style={{ position: 'relative' }}>
+                <User size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A7E72' }} />
+                <input
+                  type="text"
+                  value={signerName}
+                  onChange={e => setSignerName(e.target.value)}
+                  placeholder="e.g. Jake Thompson"
+                  style={{ ...inputStyle, paddingLeft: 30 }}
+                />
+              </div>
             </FormField>
-            <FormField label="Recipient Email">
-              <input type="email" value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} style={inputStyle} />
+
+            <FormField label="Signer Email *">
+              <div style={{ position: 'relative' }}>
+                <Mail size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A7E72' }} />
+                <input
+                  type="email"
+                  value={signerEmail}
+                  onChange={e => setSignerEmail(e.target.value)}
+                  placeholder="e.g. jthompson@example.com"
+                  style={{ ...inputStyle, paddingLeft: 30 }}
+                />
+              </div>
             </FormField>
           </div>
 
           <button
             onClick={onSend}
-            disabled={sending || !pdfFile || !recipientEmail || !recipientName}
-            style={primaryBtnStyle(sending || !pdfFile || !recipientEmail || !recipientName)}
+            disabled={!canSend}
+            style={primaryBtnStyle(!canSend)}
           >
             {sending ? <Loader2 size={16} /> : <Send size={16} />}
-            {sending ? 'Sending via DocuSign...' : 'Send Contract'}
+            {sending ? 'Generating & Sending via DocuSign...' : 'Send Contract'}
           </button>
 
           {!chapterId && (
@@ -853,20 +939,17 @@ function Step2Contract({
       {contractSent && !contractSigned && (
         <div style={{ padding: '12px 16px', background: '#EAF5EA', borderRadius: 8, fontSize: '0.85rem', color: '#2A4229' }}>
           <strong>Contract sent ✅</strong> — {fmtTs(contractSentAt)}<br />
-          <span style={{ opacity: 0.8 }}>You can advance to the next step while waiting for the recipient to sign.</span>
+          <span style={{ opacity: 0.8 }}>Owen will countersign automatically after the chapter president signs. You can advance to the next step now.</span>
+        </div>
+      )}
+
+      {contractSent && contractSigned && (
+        <div style={{ padding: '12px 16px', background: '#EAF5EA', borderRadius: 8, fontSize: '0.85rem', color: '#2A4229' }}>
+          <strong>Contract fully executed ✅</strong> — Signed {fmtTs(contractSignedAt)}
         </div>
       )}
     </div>
   );
-}
-
-function getPriceTierClient(memberCount: number): number {
-  if (memberCount < 100) return 99;
-  if (memberCount < 175) return 199;
-  if (memberCount < 250) return 299;
-  if (memberCount < 325) return 399;
-  if (memberCount < 400) return 499;
-  return 599;
 }
 
 function Step3Invoice({
