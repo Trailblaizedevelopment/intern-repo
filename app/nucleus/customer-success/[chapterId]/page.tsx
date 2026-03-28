@@ -5,6 +5,7 @@ import {
   ArrowLeft, HeartHandshake, Edit2, Copy, X, Loader2,
   CreditCard, Eye,
 } from 'lucide-react';
+import OnboardingWizard from '../OnboardingWizard';
 import { useRouter, useParams } from 'next/navigation';
 import {
   supabase, Chapter, ChapterWithOnboarding,
@@ -70,6 +71,9 @@ export default function ChapterDashboardPage() {
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [loadingSubmission, setLoadingSubmission] = useState(false);
+
+  // Onboarding wizard state (for existing chapters)
+  const [showWizard, setShowWizard] = useState(false);
 
   // Delete chapter flow
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -332,7 +336,12 @@ export default function ChapterDashboardPage() {
 
         {/* Tab Content */}
         {activeTab === 'setup' && (
-          <SetUpTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
+          <SetUpTab
+            chapter={chapter}
+            onUpdate={fetchChapter}
+            showToast={showToast}
+            onOpenWizard={() => setShowWizard(true)}
+          />
         )}
         {/* Merged Outreach tab: stats + conversations + contact list */}
         {activeTab === 'outreach' && (
@@ -356,6 +365,19 @@ export default function ChapterDashboardPage() {
           <SalesTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} />
         )}
       </main>
+
+      {/* Onboarding Wizard (resume mode for existing chapter) */}
+      {showWizard && chapter && (
+        <OnboardingWizard
+          chapter={chapter}
+          onClose={() => setShowWizard(false)}
+          onComplete={() => {
+            setShowWizard(false);
+            fetchChapter();
+            showToast('Chapter setup complete! 🎉', 'success');
+          }}
+        />
+      )}
 
       {/* Toasts */}
       <div className="toast-container">
