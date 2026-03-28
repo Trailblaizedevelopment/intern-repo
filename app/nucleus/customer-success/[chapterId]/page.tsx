@@ -15,6 +15,7 @@ import ModalOverlay from '@/components/ModalOverlay';
 import SalesTab from './SalesTab';
 import SetUpTab from './SetUpTab';
 import AlumniOutreachTab from './AlumniOutreachTab';
+import AlumniTab from './AlumniTab';
 import MergedOutreachTab from './MergedOutreachTab';
 import SuccessTab from './SuccessTab';
 import EmailOutreachTab from '../EmailOutreachTab';
@@ -38,7 +39,7 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
-type DashTab = 'setup' | 'outreach' | 'alumni' | 'conversations' | 'email' | 'linqoutreach' | 'emailtemplates' | 'success' | 'sales';
+type DashTab = 'setup' | 'outreach' | 'alumni' | 'alumni_unified' | 'conversations' | 'email' | 'linqoutreach' | 'emailtemplates' | 'success' | 'sales';
 
 interface SubmissionData {
   chapter: {
@@ -238,6 +239,7 @@ export default function ChapterDashboardPage() {
   const TABS: { id: DashTab; label: string }[] = [
     { id: 'setup', label: '🚀 Set Up' },
     { id: 'outreach', label: '📤 Outreach' },
+    { id: 'alumni_unified', label: '🎓 Alumni View' },
     { id: 'alumni', label: '👥 Alumni Data' },
     { id: 'email', label: '📧 Email Outreach' },
     // emailtemplates is now merged into the email tab — removed as standalone
@@ -335,6 +337,10 @@ export default function ChapterDashboardPage() {
         {/* Merged Outreach tab: stats + conversations + contact list */}
         {activeTab === 'outreach' && (
           <MergedOutreachTab chapter={chapter} showToast={showToast} onUpdate={fetchChapter} />
+        )}
+        {/* Unified alumni view: merged internal + external platform data */}
+        {activeTab === 'alumni_unified' && (
+          <AlumniTab chapter={chapter} showToast={showToast} />
         )}
         {/* Legacy alumni data tab — kept for CSV import and pipeline detail */}
         {activeTab === 'alumni' && (
