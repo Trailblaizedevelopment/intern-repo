@@ -302,7 +302,10 @@ export interface Chapter {
   docusign_envelope_id?: string | null;
   invoice_sent_at?: string | null;
   invoice_paid_at?: string | null;
-  invoice_status?: 'not_sent' | 'sent' | 'paid';
+  invoice_status?: 'not_sent' | 'sent' | 'paid' | 'payment_failed';
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  member_count?: number | null;
   submission_sent_at?: string | null;
   wizard_step?: number;
   wizard_completed_at?: string | null;
