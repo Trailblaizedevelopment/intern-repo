@@ -295,6 +295,18 @@ export interface Chapter {
   exec_notes?: string;
   bonus_notes?: string;
 
+  // DocuSign & Onboarding Wizard (docusign-wizard-v1)
+  contract_sent_at?: string | null;
+  contract_signed_at?: string | null;
+  contract_status?: 'not_sent' | 'sent' | 'signed' | 'declined' | 'voided';
+  docusign_envelope_id?: string | null;
+  invoice_sent_at?: string | null;
+  invoice_paid_at?: string | null;
+  invoice_status?: 'not_sent' | 'sent' | 'paid';
+  submission_sent_at?: string | null;
+  wizard_step?: number;
+  wizard_completed_at?: string | null;
+
   created_at: string;
   updated_at: string;
 }
