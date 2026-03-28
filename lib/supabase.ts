@@ -196,6 +196,124 @@ export const STAGE_CONFIG: Record<DealStage, { label: string; points: number; em
 export const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2500, 4000, 6000, 10000];
 export const LEVEL_TITLES = ['Rookie', 'Starter', 'Hustler', 'Closer', 'Dealmaker', 'Rainmaker', 'Sales Star', 'Legend', 'Champion', 'GOAT'];
 
+// ─── Owen's 5-Stage Pipeline Grouping ───────────────────────────────────────
+// Deals are grouped into these high-level stages for the CRM pipeline view.
+// Stage is *derived* from existing deal fields — no DB migration required.
+
+export type OwenStage =
+  | 'closed'
+  | 'closing_this_week'
+  | 'hot'
+  | 'ifc_enterprise'
+  | 'back_burner';
+
+export interface OwenStageConfig {
+  key: OwenStage;
+  label: string;
+  emoji: string;
+  color: string;
+  bg: string;
+  description: string;
+  /** Sort order — lower = shown first */
+  order: number;
+}
+
+export const OWEN_STAGE_CONFIG: Record<OwenStage, OwenStageConfig> = {
+  closed: {
+    key: 'closed',
+    label: 'CLOSED',
+    emoji: '✅',
+    color: '#10b981',
+    bg: '#d1fae5',
+    description: 'Paying or onboarding',
+    order: 0,
+  },
+  closing_this_week: {
+    key: 'closing_this_week',
+    label: 'CLOSING THIS WEEK',
+    emoji: '🔥',
+    color: '#ef4444',
+    bg: '#fee2e2',
+    description: 'Imminent — final step pending',
+    order: 1,
+  },
+  hot: {
+    key: 'hot',
+    label: 'HOT',
+    emoji: '🟡',
+    color: '#f59e0b',
+    bg: '#fef3c7',
+    description: 'Active demos, high intent',
+    order: 2,
+  },
+  ifc_enterprise: {
+    key: 'ifc_enterprise',
+    label: 'IFC/ENTERPRISE',
+    emoji: '🏗️',
+    color: '#8b5cf6',
+    bg: '#ede9fe',
+    description: 'Chapters-first approach in progress',
+    order: 3,
+  },
+  back_burner: {
+    key: 'back_burner',
+    label: 'BACK BURNER',
+    emoji: '🔙',
+    color: '#6b7280',
+    bg: '#f3f4f6',
+    description: 'Summer/fall follow-up',
+    order: 4,
+  },
+};
+
+export const OWEN_STAGE_ORDER: OwenStage[] = [
+  'closed',
+  'closing_this_week',
+  'hot',
+  'ifc_enterprise',
+  'back_burner',
+];
+
+/**
+ * Derives Owen's 5-stage pipeline grouping from existing deal fields.
+ * No DB migration required — fully computed from stage + deal_type + temperature.
+ *
+ * Rules:
+ *  1. closed_won                          → closed
+ *  2. contract_sent (or hot + closing)   → closing_this_week
+ *  3. council / ifc / phc deal_type       → ifc_enterprise
+ *  4. demo_booked / first_demo / second_call (active demos) → hot
+ *  5. hold_off / cold leads / back burner → back_burner
+ *  6. Everything else (lead, closed_lost) → back_burner (filtered by caller)
+ */
+export function getOwenStage(deal: {
+  stage: DealStage;
+  deal_type: string;
+  temperature: string;
+}): OwenStage {
+  // 1. Already closed/won
+  if (deal.stage === 'closed_won') return 'closed';
+
+  // 2. Contract sent = imminent close
+  if (deal.stage === 'contract_sent') return 'closing_this_week';
+
+  // 3. Council/enterprise deals (IFC, PHC, nationals)
+  if (deal.deal_type === 'council' || deal.deal_type === 'national') return 'ifc_enterprise';
+
+  // 4. Active demo pipeline
+  if (
+    deal.stage === 'demo_booked' ||
+    deal.stage === 'first_demo' ||
+    deal.stage === 'second_call'
+  ) return 'hot';
+
+  // 5. Hold-off = back burner
+  if (deal.stage === 'hold_off') return 'back_burner';
+
+  // 6. Everything else (new leads, closed_lost) → back burner
+  return 'back_burner';
+}
+
 /** MRR-based level thresholds (dollars): $1k, $5k, $10k, $15k, $20k, then +$5k each */
 export const MRR_LEVEL_THRESHOLDS = [1000, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000];
 export const MRR_LEVEL_TITLES = ['Getting started', 'Rookie', 'Starter', 'Hustler', 'Closer', 'Dealmaker', 'Rainmaker', 'Sales Star', 'Legend', 'Champion', 'GOAT'];

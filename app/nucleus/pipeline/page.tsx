@@ -5,10 +5,10 @@ import {
   TrendingUp, Search, Filter, Phone, MessageSquare, Clock, Mail,
   ChevronRight, ChevronDown, Building2, Users, Trophy, Globe, X,
   Calendar, Flame, BarChart3, MapPin, ArrowUpRight, Plus, Edit2, Check, Download,
-  Edit3, SlidersHorizontal
+  Edit3, SlidersHorizontal, Layers
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { supabase, STAGE_CONFIG, DealStage } from '@/lib/supabase';
+import { supabase, STAGE_CONFIG, DealStage, OWEN_STAGE_CONFIG, OWEN_STAGE_ORDER, getOwenStage, OwenStage } from '@/lib/supabase';
 import { useToast } from '@/components/Toast';
 import FollowUpPicker from './FollowUpPicker';
 import DealEditPanel from './DealEditPanel';
@@ -524,6 +524,102 @@ function FilterDrawer({
   );
 }
 
+/* ─── Grouped Deals View ─── */
+// NOTE: GroupedDealsView references DealCard which is defined inside the main component.
+// It receives DealCard as a prop to avoid hoisting issues.
+interface GroupedDealsViewProps {
+  deals: PipelineDeal[];
+  showAssigned: boolean;
+  collapsedGroups: Set<OwenStage>;
+  onToggleGroup: (stage: OwenStage) => void;
+  emptyMessage: string;
+}
+
+function GroupedDealsViewInner(
+  { deals, showAssigned, collapsedGroups, onToggleGroup, emptyMessage, DealCard }: GroupedDealsViewProps & { DealCard: React.FC<{ deal: PipelineDeal; showAssigned: boolean }> }
+) {
+  // Group deals by Owen stage
+  const groups = React.useMemo(() => {
+    const map = new Map<OwenStage, PipelineDeal[]>();
+    OWEN_STAGE_ORDER.forEach(s => map.set(s, []));
+    deals.forEach(deal => {
+      const s = getOwenStage(deal);
+      map.get(s)!.push(deal);
+    });
+    return OWEN_STAGE_ORDER
+      .map(key => ({ key, config: OWEN_STAGE_CONFIG[key], deals: map.get(key)! }))
+      .filter(g => g.deals.length > 0); // hide empty groups
+  }, [deals]);
+
+  if (deals.length === 0) {
+    return (
+      <div className="pl2__deals-list">
+        <div className="pl2__empty"><p>{emptyMessage}</p></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pl2__deals-list" style={{ padding: 0 }}>
+      {groups.map(group => {
+        const isCollapsed = collapsedGroups.has(group.key);
+        const totalValue = group.deals.reduce((s, d) => s + (d.value || 0), 0);
+        return (
+          <div key={group.key} style={{ marginBottom: 4 }}>
+            {/* Group Header */}
+            <button
+              onClick={() => onToggleGroup(group.key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: '100%',
+                padding: '10px 16px',
+                background: group.config.bg,
+                border: 'none',
+                borderLeft: `4px solid ${group.config.color}`,
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'background 0.15s',
+              }}
+            >
+              <span style={{ fontSize: '1.1rem' }}>{group.config.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.875rem', color: group.config.color, letterSpacing: '0.04em' }}>
+                  {group.config.label}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: 6 }}>
+                  — {group.config.description}
+                </span>
+              </div>
+              <span style={{
+                fontSize: '0.75rem', fontWeight: 600,
+                padding: '2px 8px', borderRadius: 12,
+                background: group.config.color + '22',
+                color: group.config.color,
+              }}>
+                {group.deals.length} deal{group.deals.length !== 1 ? 's' : ''}
+                {totalValue > 0 && ` · ${totalValue >= 1000 ? `$${(totalValue / 1000).toFixed(totalValue % 1000 === 0 ? 0 : 1)}k` : `$${totalValue}`}`}
+              </span>
+              <span style={{ color: group.config.color, fontSize: '0.85rem', marginLeft: 4 }}>
+                {isCollapsed ? '▶' : '▼'}
+              </span>
+            </button>
+            {/* Group Deals */}
+            {!isCollapsed && (
+              <div style={{ borderLeft: `4px solid ${group.config.color}20` }}>
+                {group.deals.map(deal => (
+                  <DealCard key={deal.id} deal={deal} showAssigned={showAssigned} />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ─── Main Component ─── */
 interface PipelineV2Props {
   /** Pre-select and lock to a specific tab (used by intern workspace pages) */
@@ -597,6 +693,10 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
 
   // Stage advance follow-up prompt
   const [stageAdvancePrompt, setStageAdvancePrompt] = useState<{ dealId: string; followupDate: string } | null>(null);
+
+  // Pipeline stage grouping view
+  const [groupedView, setGroupedView] = useState<boolean>(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<OwenStage>>(new Set());
 
   function openDeal(deal: PipelineDeal | null) {
     setEditingDeal(deal);
@@ -1272,6 +1372,28 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
               <Download size={14} /> Export CSV
             </button>
           )}
+          {(activeTab === 'my-deals' || activeTab === 'all-deals') && (
+            <button
+              onClick={() => setGroupedView(v => !v)}
+              title={groupedView ? 'Switch to flat list' : 'Switch to grouped stages'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                border: `1px solid ${groupedView ? '#C9A84C' : 'var(--ws-border)'}`,
+                borderRadius: '8px',
+                background: groupedView ? '#C9A84C18' : 'var(--ws-surface)',
+                color: groupedView ? '#C9A84C' : 'var(--ws-text-secondary)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Layers size={14} /> {groupedView ? 'Grouped' : 'Flat'}
+            </button>
+          )}
         </div>
       )}
 
@@ -1446,16 +1568,31 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
       <div className="pl2__content">
         {/* My Deals / All Deals */}
         {(activeTab === 'my-deals' || activeTab === 'all-deals') && (
-          <div className="pl2__deals-list">
-            {filteredDeals.length === 0 && (
-              <div className="pl2__empty">
-                <p>{activeTab === 'my-deals' ? 'No deals assigned to you yet.' : 'No deals match your filters.'}</p>
-              </div>
-            )}
-            {filteredDeals.map(deal => (
-              <DealCard key={deal.id} deal={deal} showAssigned={activeTab === 'all-deals'} />
-            ))}
-          </div>
+          groupedView ? (
+            <GroupedDealsViewInner
+              deals={filteredDeals}
+              showAssigned={activeTab === 'all-deals'}
+              collapsedGroups={collapsedGroups}
+              onToggleGroup={(stage: OwenStage) => setCollapsedGroups(prev => {
+                const next = new Set(prev);
+                if (next.has(stage)) next.delete(stage); else next.add(stage);
+                return next;
+              })}
+              emptyMessage={activeTab === 'my-deals' ? 'No deals assigned to you yet.' : 'No deals match your filters.'}
+              DealCard={DealCard}
+            />
+          ) : (
+            <div className="pl2__deals-list">
+              {filteredDeals.length === 0 && (
+                <div className="pl2__empty">
+                  <p>{activeTab === 'my-deals' ? 'No deals assigned to you yet.' : 'No deals match your filters.'}</p>
+                </div>
+              )}
+              {filteredDeals.map(deal => (
+                <DealCard key={deal.id} deal={deal} showAssigned={activeTab === 'all-deals'} />
+              ))}
+            </div>
+          )
         )}
 
         {/* Schools */}
