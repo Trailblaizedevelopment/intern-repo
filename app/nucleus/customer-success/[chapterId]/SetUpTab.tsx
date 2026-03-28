@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Sparkles } from 'lucide-react';
 import { supabase, ChapterWithOnboarding, ONBOARDING_STEPS } from '@/lib/supabase';
 
 interface SetUpTabProps {
@@ -313,6 +313,9 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
         })}
       </div>
 
+      {/* ── Activation Timeline ── */}
+      <ActivationTimeline chapter={localChapter} />
+
       {/* Completion Modal */}
       {showCompletionModal && (
         <div
@@ -348,6 +351,166 @@ export default function SetUpTab({ chapter, onUpdate, showToast }: SetUpTabProps
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Activation Timeline
+// ─────────────────────────────────────────────────────────────────────────────
+
+function fmtDate(ts: string | null | undefined): string | null {
+  if (!ts) return null;
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+interface TimelineMilestone {
+  label: string;
+  /** Timestamp string → show formatted date. null → pending. */
+  date: string | null;
+  /** For boolean-only fields: true = complete, false = pending. Only used when date is not relevant. */
+  boolDone?: boolean;
+  /** If true, this row is boolean-only (no real timestamp). */
+  boolOnly?: boolean;
+}
+
+function ActivationTimeline({ chapter }: { chapter: ChapterWithOnboarding }) {
+  const milestones: TimelineMilestone[] = [
+    {
+      label: 'Chapter created',
+      date: chapter.created_at ?? null,
+    },
+    {
+      label: 'Contract sent',
+      date: chapter.contract_sent_at ?? null,
+    },
+    {
+      label: 'Contract signed',
+      date: chapter.contract_signed_at ?? null,
+    },
+    {
+      label: 'Invoice sent',
+      date: chapter.invoice_sent_at ?? null,
+    },
+    {
+      label: 'Invoice paid',
+      date: chapter.invoice_paid_at ?? null,
+    },
+    {
+      label: 'Submission form sent',
+      date: chapter.submission_sent_at ?? null,
+    },
+    {
+      label: 'Submission received',
+      date: chapter.onboarding_completed
+        ? (typeof chapter.onboarding_completed === 'string' ? chapter.onboarding_completed : null)
+        : null,
+    },
+    {
+      label: 'Alumni list uploaded',
+      boolOnly: true,
+      date: null,
+      boolDone: !!(chapter as ChapterWithOnboarding & { data_list_uploaded?: boolean }).data_list_uploaded,
+    },
+    {
+      label: 'Touch 1 sent',
+      boolOnly: true,
+      date: null,
+      boolDone: !!(chapter as ChapterWithOnboarding & { linq_touch1_sent?: boolean }).linq_touch1_sent,
+    },
+    {
+      label: 'Touch 2 sent',
+      boolOnly: true,
+      date: null,
+      boolDone: !!(chapter as ChapterWithOnboarding & { linq_touch2_sent?: boolean }).linq_touch2_sent,
+    },
+    {
+      label: 'Touch 3 sent',
+      boolOnly: true,
+      date: null,
+      boolDone: !!(chapter as ChapterWithOnboarding & { linq_touch3_sent?: boolean }).linq_touch3_sent,
+    },
+    {
+      label: '100+ alumni signed up',
+      boolOnly: true,
+      date: null,
+      boolDone: !!(chapter as ChapterWithOnboarding & { linq_100_signups?: boolean }).linq_100_signups,
+    },
+    {
+      label: 'Setup complete',
+      date: chapter.wizard_completed_at ?? null,
+    },
+  ];
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      {/* Section header */}
+      <div style={{
+        fontSize: '0.75rem',
+        fontWeight: 700,
+        color: '#5C5449',
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        marginBottom: 14,
+      }}>
+        Activation Timeline
+      </div>
+
+      <div style={{
+        background: '#fff',
+        border: '1px solid #D9D4CC',
+        borderRadius: 2,
+        padding: '4px 0',
+      }}>
+        {milestones.map((m, i) => {
+          const done = m.boolOnly ? !!m.boolDone : !!m.date;
+          const isLast = i === milestones.length - 1;
+
+          return (
+            <div
+              key={m.label}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '9px 16px',
+                borderBottom: isLast ? 'none' : '1px solid #F0EDEA',
+              }}
+            >
+              {/* Icon */}
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                {done
+                  ? <CheckCircle2 size={16} color="#2A7A4A" strokeWidth={2} />
+                  : <Clock size={16} color="#B0A898" strokeWidth={1.8} />}
+              </div>
+
+              {/* Label */}
+              <span style={{
+                flex: 1,
+                fontSize: '0.85rem',
+                color: done ? '#1B2A4A' : '#9ca3af',
+                fontWeight: done ? 500 : 400,
+              }}>
+                {m.label}
+              </span>
+
+              {/* Date / status */}
+              <span style={{
+                fontSize: '0.78rem',
+                fontWeight: done ? 600 : 400,
+                color: done ? '#2A7A4A' : '#B0A898',
+                flexShrink: 0,
+                minWidth: 80,
+                textAlign: 'right',
+              }}>
+                {done
+                  ? (m.boolOnly ? '✓ Complete' : (fmtDate(m.date) ?? '✓ Complete'))
+                  : 'Pending'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
