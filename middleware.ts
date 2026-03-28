@@ -6,6 +6,7 @@ const PUBLIC_API_PREFIXES = [
   '/api/webhooks/',
   '/api/onboarding/',
   '/api/avatar-proxy',
+  '/api/auth/docusign',
 ];
 
 export function middleware(req: NextRequest) {
