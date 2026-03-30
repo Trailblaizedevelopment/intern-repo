@@ -186,6 +186,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
   // Step 4 — submission
   const [submissionSent, setSubmissionSent] = useState(!!initialChapter?.submission_sent_at);
+  const [groupchatMade, setGroupchatMade] = useState(!!(initialChapter as WizardChapter & { setup_groupchat_created?: boolean })?.setup_groupchat_created);
 
   // Mark-as-done confirmation state
   const [markDoneStep, setMarkDoneStep] = useState<{ step: number; name: string } | null>(null);
@@ -296,6 +297,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
     const { error: err } = await supabase.from('chapters').update({
       submission_sent_at: new Date().toISOString(),
+      setup_groupchat_created: groupchatMade,
       wizard_step: 5,
     }).eq('id', chapterId);
     if (err) { setError(err.message); setSaving(false); return; }
@@ -471,6 +473,9 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
               submissionSent={submissionSent}
               setSubmissionSent={setSubmissionSent}
               existingSubmissionSentAt={chapterData?.submission_sent_at}
+              groupchatMade={groupchatMade}
+              setGroupchatMade={setGroupchatMade}
+              alumniJoinLink={(chapterData as WizardChapter & { alumni_join_link?: string | null })?.alumni_join_link ?? null}
             />
           )}
 
@@ -1049,17 +1054,59 @@ function Step3Invoice({
 
 function Step4Submission({
   submissionSent, setSubmissionSent, existingSubmissionSentAt,
+  groupchatMade, setGroupchatMade, alumniJoinLink,
 }: {
   submissionSent: boolean;
   setSubmissionSent: (v: boolean) => void;
   existingSubmissionSentAt?: string | null;
+  groupchatMade: boolean;
+  setGroupchatMade: (v: boolean) => void;
+  alumniJoinLink: string | null;
 }) {
+  const [copied, setCopied] = React.useState(false);
+
+  function copyLink() {
+    if (!alumniJoinLink) return;
+    navigator.clipboard.writeText(alumniJoinLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <SectionTitle icon={<Send size={16} />} title="Submission Form" />
-      <p style={{ fontSize: '0.85rem', color: '#6B6058', margin: 0 }}>
-        Track whether the onboarding submission form has been sent to the chapter and received.
-      </p>
+      <SectionTitle icon={<Send size={16} />} title="Submission & Setup" />
+
+      {/* Alumni join link */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label style={labelStyle}>Alumni Join Link</label>
+        {alumniJoinLink ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{
+              flex: 1, padding: '9px 12px', borderRadius: 8, border: '1px solid #D9D4CC',
+              background: '#F7F5F1', fontSize: '0.75rem', color: '#6B6058',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {alumniJoinLink}
+            </div>
+            <button
+              onClick={copyLink}
+              style={{
+                padding: '9px 16px', borderRadius: 8, border: 'none',
+                background: copied ? '#10b981' : '#1B2A4A', color: '#fff',
+                fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap',
+                transition: 'background 0.2s',
+              }}
+            >
+              {copied ? '✓ Copied!' : 'Copy Link'}
+            </button>
+          </div>
+        ) : (
+          <p style={{ fontSize: '0.8rem', color: '#A09888', margin: 0 }}>
+            No join link set — add it in the chapter settings.
+          </p>
+        )}
+      </div>
 
       <StatusRow
         label="Submission Form Sent"
@@ -1067,23 +1114,34 @@ function Step4Submission({
         timestamp={existingSubmissionSentAt}
         pendingText="Not sent yet"
       />
-      <StatusRow
-        label="Submission Received"
-        done={false}
-        pendingText="Auto-tracked by existing submission system"
-        isWaiting
-      />
 
       {!existingSubmissionSentAt && (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '0.875rem', color: '#1B2A4A', marginTop: 8 }}>
-          <input
-            type="checkbox"
-            checked={submissionSent}
-            onChange={e => setSubmissionSent(e.target.checked)}
-            style={{ width: 16, height: 16, accentColor: '#C4874A' }}
-          />
-          I have sent the submission form to the chapter
-        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 14px', background: '#F7F5F1', borderRadius: 10, border: '1px solid #E5E0D8' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '0.875rem', color: '#1B2A4A' }}>
+            <input
+              type="checkbox"
+              checked={submissionSent}
+              onChange={e => setSubmissionSent(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: '#C4874A' }}
+            />
+            Submission form sent to chapter
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '0.875rem', color: '#1B2A4A' }}>
+            <input
+              type="checkbox"
+              checked={groupchatMade}
+              onChange={e => setGroupchatMade(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: '#C4874A' }}
+            />
+            Group chat created with chapter admin
+          </label>
+        </div>
+      )}
+
+      {existingSubmissionSentAt && (
+        <div style={{ padding: '12px 16px', background: '#EAF5EA', borderRadius: 8, fontSize: '0.85rem', color: '#2A4229' }}>
+          <strong>Submission sent ✅</strong> — {fmtTs(existingSubmissionSentAt)}
+        </div>
       )}
     </div>
   );
