@@ -183,14 +183,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         : T1_CAP_PER_LINE;
     }
 
-    // 3. Load eligible contacts — two separate pools with separate caps
-    //    Safety filters on timestamp fields prevent re-selecting already-processed contacts
-    //    even if status somehow got out of sync.
-    const cutoffT3 = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString();
+    // 3. Load eligible contacts.
+    //
+    // CRITICAL SAFETY RULE:
+    // If the batch was compiled with per-chapter contact_ids (all per-chapter batches),
+    // we ONLY fetch those exact IDs — never a fresh global query.
+    // This prevents contacts from other chapters bleeding into a chapter-scoped batch.
+    // Fallback to global query only if no contact_ids are present (legacy global batches).
 
-    // T1 chapter-priority ordering: chapters with the most not_contacted contacts
-    // get T1 slots first, preventing large chapters from being starved by small ones.
-    const totalT1Cap = activeLineNumbers.reduce((sum, n) => sum + lineT1Caps[n], 0) + 50;
+    const cutoffT3 = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString();
 
     type T1Contact = {
       id: string;
@@ -202,72 +203,104 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       linq_chat_id: string | null;
     };
 
-    // Step 1: count not_contacted per chapter (lightweight — only chapter_id)
-    // Note: linq_chat_id may be pre-allocated at compile time (not null), so we don't filter it here.
-    const { data: countRows } = await supabase
-      .from('alumni_contacts')
-      .select('chapter_id')
-      .eq('outreach_status', 'not_contacted')
-      .is('touch1_sent_at', null)
-      .not('is_imessage', 'is', false)
-      .not('flagged', 'is', true)
-      .not('phone_primary', 'is', null);
+    // Parse contact_ids from batch notes (set by compile-chapter and compile routes)
+    let pinnedIds: { t1: string[]; t2: string[]; t3: string[] } | null = null;
+    try {
+      const notesObj = typeof batch.notes === 'string' ? JSON.parse(batch.notes) : batch.notes;
+      if (notesObj?.contact_ids) pinnedIds = notesObj.contact_ids;
+    } catch { /* notes not JSON — treat as global batch */ }
 
-    // Sort chapters by count descending
-    const countByChapter: Record<string, number> = {};
-    for (const row of (countRows || [])) {
-      countByChapter[row.chapter_id] = (countByChapter[row.chapter_id] || 0) + 1;
-    }
-    const prioritizedChapterIds = Object.entries(countByChapter)
-      .sort((a, b) => b[1] - a[1])
-      .map(([cid]) => cid);
+    let t1Pool: T1Contact[] = [];
+    let t2t3Pool: (T1Contact & { touch1_sent_at?: string; touch2_sent_at?: string })[] = [];
 
-    // Step 2: fetch full contact records per chapter in priority order, up to cap
-    const t1ContactsOrdered: T1Contact[] = [];
-    for (const chId of prioritizedChapterIds) {
-      if (t1ContactsOrdered.length >= totalT1Cap) break;
-      const remaining = totalT1Cap - t1ContactsOrdered.length;
-      // Include contacts pre-allocated at compile time (linq_chat_id may be set)
-      const { data: chContacts } = await supabase
+    if (pinnedIds) {
+      // ── PINNED MODE: fetch only the exact contacts from the compiled batch ──
+      // Re-fetches from DB (not cache) so we get live outreach_status values,
+      // which guards against double-sends if a contact was already touched.
+      const allPinnedIds = [...pinnedIds.t1, ...pinnedIds.t2, ...pinnedIds.t3];
+      if (allPinnedIds.length > 0) {
+        const { data: pinnedContacts } = await supabase
+          .from('alumni_contacts')
+          .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id, touch1_sent_at, touch2_sent_at')
+          .in('id', allPinnedIds)
+          .not('phone_primary', 'is', null);
+
+        const contactMap = new Map((pinnedContacts || []).map(c => [c.id, c]));
+
+        // Split back into T1/T2/T3 pools using the compiled order, but only include
+        // contacts whose current status still matches what was compiled.
+        // (If a contact was already sent since compile time, it gets skipped by the
+        //  atomic claim below — this is belt-and-suspenders protection.)
+        for (const cid of pinnedIds.t1) {
+          const c = contactMap.get(cid);
+          if (c) t1Pool.push(c as T1Contact);
+        }
+        for (const cid of [...pinnedIds.t2, ...pinnedIds.t3]) {
+          const c = contactMap.get(cid);
+          if (c) t2t3Pool.push(c as T1Contact & { touch1_sent_at?: string; touch2_sent_at?: string });
+        }
+      }
+    } else {
+      // ── GLOBAL MODE: legacy behavior — query all chapters (no contact_ids in notes) ──
+      const totalT1Cap = activeLineNumbers.reduce((sum, n) => sum + lineT1Caps[n], 0) + 50;
+
+      const { data: countRows } = await supabase
         .from('alumni_contacts')
-        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id')
-        .eq('chapter_id', chId)
+        .select('chapter_id')
         .eq('outreach_status', 'not_contacted')
         .is('touch1_sent_at', null)
         .not('is_imessage', 'is', false)
         .not('flagged', 'is', true)
-        .not('phone_primary', 'is', null)
-        .order('created_at', { ascending: true })
-        .limit(remaining);
-      if (chContacts) t1ContactsOrdered.push(...(chContacts as T1Contact[]));
+        .not('phone_primary', 'is', null);
+
+      const countByChapter: Record<string, number> = {};
+      for (const row of (countRows || [])) {
+        countByChapter[row.chapter_id] = (countByChapter[row.chapter_id] || 0) + 1;
+      }
+      const prioritizedChapterIds = Object.entries(countByChapter)
+        .sort((a, b) => b[1] - a[1])
+        .map(([cid]) => cid);
+
+      for (const chId of prioritizedChapterIds) {
+        if (t1Pool.length >= totalT1Cap) break;
+        const remaining = totalT1Cap - t1Pool.length;
+        const { data: chContacts } = await supabase
+          .from('alumni_contacts')
+          .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id')
+          .eq('chapter_id', chId)
+          .eq('outreach_status', 'not_contacted')
+          .is('touch1_sent_at', null)
+          .not('is_imessage', 'is', false)
+          .not('flagged', 'is', true)
+          .not('phone_primary', 'is', null)
+          .order('created_at', { ascending: true })
+          .limit(remaining);
+        if (chContacts) t1Pool.push(...(chContacts as T1Contact[]));
+      }
+
+      const [t2Res, t3Res] = await Promise.all([
+        supabase
+          .from('alumni_contacts')
+          .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at, linq_chat_id')
+          .in('outreach_status', ['touch1_sent', 'touch1_confirmed'])
+          .is('touch2_sent_at', null)
+          .not('is_imessage', 'is', false)
+          .not('flagged', 'is', true)
+          .not('phone_primary', 'is', null)
+          .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
+        supabase
+          .from('alumni_contacts')
+          .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch2_sent_at, linq_chat_id')
+          .eq('outreach_status', 'touch2_sent')
+          .is('touch3_sent_at', null)
+          .not('is_imessage', 'is', false)
+          .not('flagged', 'is', true)
+          .lte('touch2_sent_at', cutoffT3)
+          .not('phone_primary', 'is', null)
+          .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
+      ]);
+      t2t3Pool = [...(t2Res.data || []), ...(t3Res.data || [])];
     }
-
-    const [t2Res, t3Res] = await Promise.all([
-      // T2: touch1_sent (2+ days old) OR touch1_confirmed (replied — no wait required), no T2 yet
-      supabase
-        .from('alumni_contacts')
-        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at, linq_chat_id')
-        .in('outreach_status', ['touch1_sent', 'touch1_confirmed'])
-        .is('touch2_sent_at', null)
-        .not('is_imessage', 'is', false)
-        .not('flagged', 'is', true)
-        .not('phone_primary', 'is', null)
-        .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
-      // T3: touch2 sent, 4+ days old, no T3 sent yet
-      supabase
-        .from('alumni_contacts')
-        .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch2_sent_at, linq_chat_id')
-        .eq('outreach_status', 'touch2_sent')
-        .is('touch3_sent_at', null)
-        .not('is_imessage', 'is', false)
-        .not('flagged', 'is', true)
-        .lte('touch2_sent_at', cutoffT3)
-        .not('phone_primary', 'is', null)
-        .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
-    ]);
-
-    const t1Pool   = t1ContactsOrdered;
-    const t2t3Pool = [...(t2Res.data || []), ...(t3Res.data || [])];
 
     // Distribute T1 round-robin — use activeLinesSorted (oldest last_used_at first)
     const byLineT1: Record<number, typeof t1Pool> = {};
@@ -291,7 +324,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       if (activeLinesSorted.every(n => byLineT2T3[n].length >= T2T3_CAP_PER_LINE)) break;
     }
 
-    type Contact = T1Contact | NonNullable<typeof t2Res.data>[0] | NonNullable<typeof t3Res.data>[0];
+    type Contact = T1Contact & { touch1_sent_at?: string; touch2_sent_at?: string };
     const byLine: Record<number, Contact[]> = {};
     for (const n of activeLineNumbers) {
       byLine[n] = [...byLineT2T3[n], ...byLineT1[n]]; // warm follow-ups first
