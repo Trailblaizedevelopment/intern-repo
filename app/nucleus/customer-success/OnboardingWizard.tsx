@@ -176,9 +176,10 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     contact_name: initialChapter?.contact_name || '',
     contact_email: initialChapter?.contact_email || '',
     contact_phone: initialChapter?.contact_phone || '',
+    member_count: initialChapter?.member_count || 0,
     mrr: initialChapter?.mrr || 0,
-    payment_type: initialChapter?.payment_type || 'annual' as Chapter['payment_type'],
-    payment_amount: initialChapter?.payment_amount || 299,
+    payment_type: initialChapter?.payment_type || 'monthly' as Chapter['payment_type'],
+    payment_amount: initialChapter?.payment_amount || 0,
   });
 
   // Step 2 — contract
@@ -186,6 +187,8 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   const [signerName, setSignerName] = useState('');
   const [signerEmail, setSignerEmail] = useState('');
   const [contractMemberCount, setContractMemberCount] = useState<number>(initialChapter?.member_count ?? 0);
+  // Sync from step 1 when chapter is freshly created
+  const syncContractMemberCount = (count: number) => { if (count > 0) setContractMemberCount(count); };
   const [contractEffectiveDate, setContractEffectiveDate] = useState(() => {
     const now = new Date();
     return now.toISOString().split('T')[0]; // YYYY-MM-DD for date input
@@ -194,6 +197,8 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
   // Step 3 — invoice
   const [memberCount, setMemberCount] = useState<number>(initialChapter?.member_count ?? 0);
+  // Also sync invoice member count from step 1
+  useEffect(() => { if (form.member_count > 0 && memberCount === 0) setMemberCount(form.member_count); }, [form.member_count]); // eslint-disable-line
   const [sendingInvoice, setSendingInvoice] = useState(false);
   const [invoiceSentResult, setInvoiceSentResult] = useState<{ url: string; sentAt: string } | null>(null);
 
@@ -265,6 +270,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
       setChapterData(data as WizardChapter);
     }
 
+    syncContractMemberCount(form.member_count);
     setSaving(false);
     setCurrentStep(2);
   }
@@ -684,13 +690,13 @@ function Step1ChapterInfo({
   setForm: React.Dispatch<React.SetStateAction<{
     chapter_name: string; school: string; fraternity: string;
     contact_name: string; contact_email: string; contact_phone: string;
-    mrr: number; payment_type: Chapter['payment_type']; payment_amount: number;
+    member_count: number; mrr: number; payment_type: Chapter['payment_type']; payment_amount: number;
   }>>;
 }) {
   const fv = form as {
     chapter_name: string; school: string; fraternity: string;
     contact_name: string; contact_email: string; contact_phone: string;
-    mrr: number; payment_type: string; payment_amount: number;
+    member_count: number; mrr: number; payment_type: string; payment_amount: number;
   };
 
   return (
@@ -728,21 +734,66 @@ function Step1ChapterInfo({
       </div>
 
       <SectionTitle icon={<DollarSign size={16} />} title="Revenue" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-        <FormField label="ARR / MRR ($)">
-          <input type="number" value={fv.mrr} onChange={e => setForm(f => ({ ...f, mrr: parseFloat(e.target.value) || 0 }))} style={inputStyle} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <FormField label="Member Count">
+          <input
+            type="number"
+            min={0}
+            value={fv.member_count || ''}
+            placeholder="e.g. 120"
+            onChange={e => {
+              const count = parseInt(e.target.value, 10) || 0;
+              const tier = getPriceTierClient(count);
+              setForm(f => ({ ...f, member_count: count, payment_amount: tier, mrr: tier }));
+            }}
+            style={inputStyle}
+          />
         </FormField>
         <FormField label="Payment Type">
           <select value={fv.payment_type} onChange={e => setForm(f => ({ ...f, payment_type: e.target.value as Chapter['payment_type'] }))} style={inputStyle}>
-            <option value="annual">Annual</option>
             <option value="monthly">Monthly</option>
+            <option value="annual">Annual (one-time)</option>
             <option value="one_time">One-Time</option>
           </select>
         </FormField>
-        <FormField label="Amount ($)">
-          <input type="number" value={fv.payment_amount} onChange={e => setForm(f => ({ ...f, payment_amount: parseFloat(e.target.value) || 0 }))} style={inputStyle} />
-        </FormField>
       </div>
+      {fv.member_count > 0 && (() => {
+        const TIERS = [
+          { label: '0–99 members', value: 99 },
+          { label: '100–174 members', value: 199 },
+          { label: '175–249 members', value: 299 },
+          { label: '250–324 members', value: 399 },
+          { label: '325–399 members', value: 499 },
+          { label: '400+ members', value: 599 },
+        ];
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <FormField label="Pricing Tier">
+              <select
+                value={fv.payment_amount}
+                onChange={e => {
+                  const amt = parseInt(e.target.value, 10);
+                  setForm(f => ({ ...f, payment_amount: amt, mrr: amt }));
+                }}
+                style={inputStyle}
+              >
+                {TIERS.map(t => (
+                  <option key={t.value} value={t.value}>{t.label} — ${t.value}/mo</option>
+                ))}
+              </select>
+            </FormField>
+            <div style={{
+              fontSize: '0.82rem', color: '#1B2A4A', fontWeight: 600,
+              padding: '8px 12px', background: '#EEF2FA', borderRadius: 8,
+            }}>
+              {fv.member_count} members → <span style={{ color: '#C4874A' }}>${fv.payment_amount}/mo</span>
+              <span style={{ fontWeight: 400, color: '#6B6058', marginLeft: 6 }}>
+                ({fv.payment_type === 'monthly' ? 'billed monthly' : fv.payment_type === 'annual' ? 'billed annually' : 'one-time'})
+              </span>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
