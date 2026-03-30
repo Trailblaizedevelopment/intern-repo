@@ -175,8 +175,19 @@ interface QuickEditSheetProps {
   onPatch: (id: string, updates: Record<string, unknown>) => Promise<boolean>;
 }
 
+// Maps an OwenStage bucket selection to the canonical DealStage + deal_type
+function owenStageToDealStage(os: OwenStage): { stage: DealStage; deal_type?: string } {
+  switch (os) {
+    case 'closed':           return { stage: 'closed_won' };
+    case 'closing_this_week':return { stage: 'contract_sent' };
+    case 'hot':              return { stage: 'first_demo' };
+    case 'ifc_enterprise':   return { stage: 'first_demo', deal_type: 'council' };
+    case 'back_burner':      return { stage: 'hold_off' };
+  }
+}
+
 function QuickEditSheet({ deal, onClose, onPatch }: QuickEditSheetProps) {
-  const STAGES: DealStage[] = ['lead', 'demo_booked', 'first_demo', 'second_call', 'contract_sent', 'closed_won'];
+  const [owenStage, setOwenStage] = React.useState<OwenStage>(getOwenStage(deal));
   const [stage, setStage] = React.useState<DealStage>(deal.stage);
   const [temperature, setTemperature] = React.useState<'hot' | 'warm' | 'cold'>(deal.temperature);
   const [value, setValue] = React.useState(deal.value?.toString() || '');
@@ -186,14 +197,17 @@ function QuickEditSheet({ deal, onClose, onPatch }: QuickEditSheetProps) {
 
   async function handleClose() {
     setSaving(true);
-    await onPatch(deal.id, {
-      stage,
+    const { stage: mappedStage, deal_type: mappedDealType } = owenStageToDealStage(owenStage);
+    const updates: Record<string, unknown> = {
+      stage: mappedStage,
       temperature,
       value: parseInt(value) || 0,
       next_followup: nextFollowup || null,
       notes: notes.trim() || null,
       last_touched: new Date().toISOString(),
-    });
+    };
+    if (mappedDealType) updates.deal_type = mappedDealType;
+    await onPatch(deal.id, updates);
     setSaving(false);
     onClose();
   }
@@ -232,20 +246,22 @@ function QuickEditSheet({ deal, onClose, onPatch }: QuickEditSheetProps) {
         </div>
 
         <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Stage */}
+          {/* Stage — Owen buckets */}
           <div>
             <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>Stage</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {STAGES.map(s => {
-                const cfg = STAGE_CONFIG[s];
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {OWEN_STAGE_ORDER.map(os => {
+                const cfg = OWEN_STAGE_CONFIG[os];
+                const isSelected = owenStage === os;
                 return (
-                  <button key={s}
-                    onClick={() => setStage(s)}
+                  <button key={os}
+                    onClick={() => setOwenStage(os)}
                     style={{
-                      padding: '6px 12px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 500,
-                      border: `1.5px solid ${stage === s ? cfg.color : 'var(--ws-border,#e5e7eb)'}`,
-                      background: stage === s ? cfg.color + '22' : 'var(--ws-surface,#fff)',
-                      color: stage === s ? cfg.color : 'inherit', cursor: 'pointer',
+                      padding: '9px 14px', borderRadius: 10, fontSize: '0.875rem', fontWeight: 500,
+                      border: `1.5px solid ${isSelected ? cfg.color : 'var(--ws-border,#e5e7eb)'}`,
+                      background: isSelected ? cfg.color + '22' : 'var(--ws-surface,#fff)',
+                      color: isSelected ? cfg.color : 'inherit',
+                      cursor: 'pointer', textAlign: 'left',
                     }}>
                     {cfg.emoji} {cfg.label}
                   </button>
