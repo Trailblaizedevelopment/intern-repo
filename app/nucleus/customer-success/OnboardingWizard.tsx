@@ -182,25 +182,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     payment_amount: initialChapter?.payment_amount || 0,
   });
 
-  // Step 2 — contract
-  const [chapterLegalName, setChapterLegalName] = useState(initialChapter?.chapter_name || '');
-  const [signerName, setSignerName] = useState('');
-  const [signerEmail, setSignerEmail] = useState('');
-  const [contractMemberCount, setContractMemberCount] = useState<number>(initialChapter?.member_count ?? 0);
-  // Sync from step 1 when chapter is freshly created
-  const syncContractMemberCount = (count: number) => { if (count > 0) setContractMemberCount(count); };
-  const [contractEffectiveDate, setContractEffectiveDate] = useState(() => {
-    const now = new Date();
-    return now.toISOString().split('T')[0]; // YYYY-MM-DD for date input
-  });
-  const [sendingContract, setSendingContract] = useState(false);
-
-  // Step 3 — invoice
-  const [memberCount, setMemberCount] = useState<number>(initialChapter?.member_count ?? 0);
-  // Also sync invoice member count from step 1
-  useEffect(() => { if (form.member_count > 0 && memberCount === 0) setMemberCount(form.member_count); }, [form.member_count]); // eslint-disable-line
-  const [sendingInvoice, setSendingInvoice] = useState(false);
-  const [invoiceSentResult, setInvoiceSentResult] = useState<{ url: string; sentAt: string } | null>(null);
+  // (contract and invoice are handled externally — no send state needed)
 
   // Step 4 — submission
   const [submissionSent, setSubmissionSent] = useState(!!initialChapter?.submission_sent_at);
@@ -225,12 +207,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     setMaxUnlockedStep(max);
   }, [chapterId, contractSent, invoiceSent, submissionFormSent]);
 
-  // Pre-fill chapter legal name from chapter_name when chapter is first loaded/created
-  useEffect(() => {
-    if (chapterData?.chapter_name) {
-      setChapterLegalName(prev => prev || chapterData.chapter_name || '');
-    }
-  }, [chapterData]);
+
 
   const refreshChapter = useCallback(async (id: string) => {
     if (!supabase) return;
@@ -270,88 +247,44 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
       setChapterData(data as WizardChapter);
     }
 
-    syncContractMemberCount(form.member_count);
     setSaving(false);
     setCurrentStep(2);
   }
 
-  // ── Step 2: Send Contract ───────────────────────────────────────────────────
+  // ── Step 2: Contract (external) ────────────────────────────────────────────
 
-  async function handleSendContract() {
-    if (!chapterId) return setError('No chapter ID');
-    if (!chapterLegalName.trim()) return setError('Chapter legal name is required');
-    if (!signerName.trim()) return setError('Signer name is required');
-    if (!signerEmail.trim()) return setError('Signer email is required');
-    if (!contractMemberCount || contractMemberCount < 1) return setError('Member count is required to calculate pricing');
-
-    setSendingContract(true); setError(null);
-
-    try {
-      // Convert YYYY-MM-DD date input to M/D/YY format for the contract
-      let effectiveDateFormatted: string | undefined;
-      if (contractEffectiveDate) {
-        const [year, month, day] = contractEffectiveDate.split('-').map(Number);
-        effectiveDateFormatted = `${month}/${day}/${String(year).slice(-2)}`;
-      }
-
-      const res = await fetch(`/api/chapters/${chapterId}/send-contract`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipientEmail: signerEmail.trim(),
-          recipientName: signerName.trim(),
-          memberCount: contractMemberCount,
-          chapterLegalName: chapterLegalName.trim(),
-          effectiveDate: effectiveDateFormatted,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Failed to send contract');
-      }
-
-      // Update wizard_step to 3
-      if (supabase) {
-        await supabase.from('chapters').update({ wizard_step: 3 }).eq('id', chapterId);
-      }
-      await refreshChapter(chapterId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send contract');
-    } finally {
-      setSendingContract(false);
-    }
+  async function handleMarkContractDone() {
+    if (!chapterId || !supabase) return;
+    setSaving(true); setError(null);
+    const now = new Date().toISOString();
+    const { error: err } = await supabase.from('chapters').update({
+      contract_sent_at: now,
+      contract_signed_at: now,
+      contract_status: 'signed',
+      wizard_step: 3,
+    }).eq('id', chapterId);
+    if (err) { setError(err.message); setSaving(false); return; }
+    await refreshChapter(chapterId);
+    setSaving(false);
+    setCurrentStep(3);
   }
 
-  // ── Step 3: Invoice ─────────────────────────────────────────────────────────
+  // ── Step 3: Invoice (external) ──────────────────────────────────────────────
 
-  async function handleSendInvoice() {
-    if (!chapterId) return;
-    if (!memberCount || memberCount < 1) return setError('Please enter the number of chapter members');
-    setSendingInvoice(true); setError(null);
-
-    try {
-      const res = await fetch(`/api/chapters/${chapterId}/send-invoice`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberCount,
-          contactEmail: chapterData?.contact_email || form.contact_email,
-          chapterName: chapterData?.chapter_name || form.chapter_name,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send invoice');
-
-      const sentAt = new Date().toISOString();
-      setInvoiceSentResult({ url: data.invoiceUrl, sentAt });
-      await refreshChapter(chapterId);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to send invoice');
-    } finally {
-      setSendingInvoice(false);
-    }
+  async function handleMarkInvoiceDone() {
+    if (!chapterId || !supabase) return;
+    setSaving(true); setError(null);
+    const now = new Date().toISOString();
+    const { error: err } = await supabase.from('chapters').update({
+      invoice_sent_at: now,
+      invoice_paid_at: now,
+      invoice_status: 'paid',
+      wizard_step: 4,
+    }).eq('id', chapterId);
+    if (err) { setError(err.message); setSaving(false); return; }
+    await refreshChapter(chapterId);
+    setSaving(false);
+    setCurrentStep(4);
   }
 
   // ── Step 4: Submission Form ─────────────────────────────────────────────────
@@ -514,39 +447,21 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
           {/* ── STEP 2 ── */}
           {currentStep === 2 && (
-            <Step2Contract
-              chapterId={chapterId}
-              contractSent={contractSent}
+            <Step2ContractExternal
               contractSigned={contractSigned}
-              contractSentAt={chapterData?.contract_sent_at}
               contractSignedAt={chapterData?.contract_signed_at}
-              contractStatus={chapterData?.contract_status}
-              chapterLegalName={chapterLegalName}
-              setChapterLegalName={setChapterLegalName}
-              signerName={signerName}
-              setSignerName={setSignerName}
-              signerEmail={signerEmail}
-              setSignerEmail={setSignerEmail}
-              memberCount={contractMemberCount}
-              setMemberCount={setContractMemberCount}
-              effectiveDate={contractEffectiveDate}
-              setEffectiveDate={setContractEffectiveDate}
-              onSend={handleSendContract}
-              sending={sendingContract}
+              onMarkDone={handleMarkContractDone}
+              saving={saving}
             />
           )}
 
           {/* ── STEP 3 ── */}
           {currentStep === 3 && (
-            <Step3Invoice
-              memberCount={memberCount}
-              setMemberCount={setMemberCount}
-              onSendInvoice={handleSendInvoice}
-              sending={sendingInvoice}
-              invoiceSentResult={invoiceSentResult}
-              existingInvoiceSentAt={chapterData?.invoice_sent_at}
-              existingInvoicePaidAt={chapterData?.invoice_paid_at}
-              contactEmail={chapterData?.contact_email || form.contact_email}
+            <Step3InvoiceExternal
+              invoicePaid={!!chapterData?.invoice_paid_at}
+              invoicePaidAt={chapterData?.invoice_paid_at}
+              onMarkDone={handleMarkInvoiceDone}
+              saving={saving}
             />
           )}
 
@@ -601,43 +516,19 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
             )}
 
             {currentStep === 2 && (
-              <>
-                {contractSent ? (
-                  <button
-                    onClick={() => setCurrentStep(3)}
-                    style={primaryBtnStyle(false)}
-                  >
-                    Continue <ChevronRight size={16} />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setMarkDoneStep({ step: 2, name: 'Contract' })}
-                    style={markAsDoneLinkStyle}
-                  >
-                    Mark as already done
-                  </button>
-                )}
-              </>
+              contractSigned ? (
+                <button onClick={() => setCurrentStep(3)} style={primaryBtnStyle(false)}>
+                  Continue <ChevronRight size={16} />
+                </button>
+              ) : null
             )}
 
             {currentStep === 3 && (
-              <>
-                <button
-                  onClick={() => setCurrentStep(4)}
-                  disabled={!invoiceSent}
-                  style={primaryBtnStyle(!invoiceSent)}
-                >
+              !!chapterData?.invoice_paid_at ? (
+                <button onClick={() => setCurrentStep(4)} style={primaryBtnStyle(false)}>
                   Continue <ChevronRight size={16} />
                 </button>
-                {!invoiceSent && (
-                  <button
-                    onClick={() => setMarkDoneStep({ step: 3, name: 'Invoice' })}
-                    style={markAsDoneLinkStyle}
-                  >
-                    Mark as already done
-                  </button>
-                )}
-              </>
+              ) : null
             )}
 
             {currentStep === 4 && (
@@ -794,6 +685,76 @@ function Step1ChapterInfo({
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// ── Step 2: Contract (external) ─────────────────────────────────────────────
+
+function Step2ContractExternal({
+  contractSigned, contractSignedAt, onMarkDone, saving,
+}: {
+  contractSigned: boolean;
+  contractSignedAt?: string | null;
+  onMarkDone: () => void;
+  saving: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SectionTitle icon={<FileText size={16} />} title="Contract" />
+      <p style={{ fontSize: '0.875rem', color: '#6B6058', margin: 0, lineHeight: 1.6 }}>
+        Send and collect the contract externally via DocuSign, email, or any method. Once signed, mark it done here to advance.
+      </p>
+
+      {contractSigned ? (
+        <div style={{ padding: '12px 16px', background: '#EAF5EA', borderRadius: 8, fontSize: '0.85rem', color: '#2A4229' }}>
+          <strong>Contract signed ✅</strong>{contractSignedAt ? ` — ${fmtTs(contractSignedAt)}` : ''}
+        </div>
+      ) : (
+        <button
+          onClick={onMarkDone}
+          disabled={saving}
+          style={primaryBtnStyle(saving)}
+        >
+          {saving ? <Loader2 size={16} /> : <CheckCircle2 size={16} />}
+          {saving ? 'Saving…' : 'Contract Signed — Mark Done'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Step 3: Invoice (external) ───────────────────────────────────────────────
+
+function Step3InvoiceExternal({
+  invoicePaid, invoicePaidAt, onMarkDone, saving,
+}: {
+  invoicePaid: boolean;
+  invoicePaidAt?: string | null;
+  onMarkDone: () => void;
+  saving: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SectionTitle icon={<DollarSign size={16} />} title="Invoice & Payment" />
+      <p style={{ fontSize: '0.875rem', color: '#6B6058', margin: 0, lineHeight: 1.6 }}>
+        Send the invoice and collect payment externally (Stripe, Venmo, check, etc.). Once payment is confirmed, mark it done here.
+      </p>
+
+      {invoicePaid ? (
+        <div style={{ padding: '12px 16px', background: '#EAF5EA', borderRadius: 8, fontSize: '0.85rem', color: '#2A4229' }}>
+          <strong>Payment received ✅</strong>{invoicePaidAt ? ` — ${fmtTs(invoicePaidAt)}` : ''}
+        </div>
+      ) : (
+        <button
+          onClick={onMarkDone}
+          disabled={saving}
+          style={primaryBtnStyle(saving)}
+        >
+          {saving ? <Loader2 size={16} /> : <CheckCircle2 size={16} />}
+          {saving ? 'Saving…' : 'Payment Received — Mark Done'}
+        </button>
+      )}
     </div>
   );
 }
