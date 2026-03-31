@@ -17,7 +17,9 @@ import {
 
 interface Chapter {
   id: string;
-  name: string;
+  name?: string;
+  chapter_name?: string;
+  fraternity?: string;
   school?: string;
   payment_amount?: number;
   payment_type?: 'monthly' | 'annual';
@@ -471,7 +473,7 @@ function Dashboard() {
                   const st = paymentStatus(c.next_payment_date);
                   return (
                     <tr key={c.id}>
-                      <td style={tdStyle}>{c.name ?? '—'}</td>
+                      <td style={tdStyle}>{c.chapter_name ?? c.name ?? '—'}</td>
                       <td style={tdStyle}>{c.school ?? '—'}</td>
                       <td style={{ ...tdStyle, color: '#f9fafb', fontWeight: 500 }}>
                         {fmtDollars(c.payment_amount ?? 0)}
