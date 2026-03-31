@@ -93,10 +93,14 @@ interface MergedOutreachTabProps {
 function OutreachStatsSection({
   chapterId,
   chapterName,
+  fraternity,
+  school,
   showToast,
 }: {
   chapterId: string;
   chapterName: string;
+  fraternity: string;
+  school: string;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }) {
   const [stats, setStats] = useState<AlumniStats | null>(null);
@@ -458,6 +462,30 @@ function OutreachStatsSection({
                   {preview.lines.active} active lines · {preview.t1.sent_today ?? 0} sent today across all chapters · {preview.t1.max_cap} remaining
                 </div>
               </div>
+
+              {/* T1 message preview */}
+              {preview.t1.contacts.length > 0 && (() => {
+                const firstContact = preview.t1.contacts[0];
+                const firstName = firstContact.first_name || 'Alumni';
+                const previewMsg = `Hey ${firstName}, is this you? Just verifying we have the right number for the ${fraternity} alumni list at ${school}.`;
+                return (
+                  <div style={{ padding: '10px 14px', background: '#F0F5FF', borderBottom: '1px solid #DBE5F5', borderTop: '1px solid #DBE5F5' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#1B2A4A', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>T1 Message Preview</div>
+                    <div style={{
+                      background: '#fff', border: '1px solid #C7D7F0', borderRadius: 8,
+                      padding: '8px 12px', fontSize: '0.83rem', color: '#1B2A4A', lineHeight: 1.5,
+                      fontStyle: 'italic', position: 'relative',
+                    }}>
+                      <span style={{ display: 'inline-block', marginBottom: 2, fontSize: '0.7rem', fontStyle: 'normal', fontWeight: 600, color: '#5C5449' }}>Sent from your Linq line &rarr;</span>
+                      <br />
+                      &ldquo;{previewMsg}&rdquo;
+                    </div>
+                    <div style={{ marginTop: 5, fontSize: '0.7rem', color: '#6b7280' }}>
+                      Name filled in from first contact on your T1 list: <strong>{firstName}</strong>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Contact list — T1 */}
               {preview.t1.contacts.length > 0 && (
@@ -855,6 +883,8 @@ export default function MergedOutreachTab({ chapter, showToast, onUpdate }: Merg
       <OutreachStatsSection
         chapterId={chapter.id}
         chapterName={chapter.chapter_name}
+        fraternity={chapter.fraternity}
+        school={chapter.school}
         showToast={showToast}
       />
 
