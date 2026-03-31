@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Phone, Smartphone, RefreshCw, Loader2,
   MessageSquare, ChevronDown, ChevronRight, Zap,
-  CheckCircle2, Clock, XCircle, Send,
+  CheckCircle2, Clock, XCircle, Send, Eye, EyeOff, ChevronUp,
 } from 'lucide-react';
 import { ChapterWithOnboarding, supabase } from '@/lib/supabase';
 import ConversationsTab from '../ConversationsTab';
@@ -36,6 +36,20 @@ interface BatchSummary {
     t2?: { total: number };
     t3?: { total: number };
   } | null;
+}
+
+interface PreviewContact {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  year: number | null;
+}
+
+interface BatchPreview {
+  t1: { contacts: PreviewContact[]; total: number; cap: number; max_cap: number };
+  t2: { contacts: PreviewContact[]; total: number };
+  t3: { contacts: PreviewContact[]; total: number };
+  lines: { active: number; t1_cap_total: number };
 }
 
 interface AlumniContact {
@@ -89,6 +103,13 @@ function OutreachStatsSection({
   const [compiling, setCompiling] = useState(false);
   const [approving, setApproving] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [preview, setPreview] = useState<BatchPreview | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [t1Limit, setT1Limit] = useState<number | null>(null);
+  const [expandedBatchContacts, setExpandedBatchContacts] = useState(false);
+  const [batchContacts, setBatchContacts] = useState<(PreviewContact & { touch: 'T1' | 'T2' | 'T3' })[]>([]);
+  const [loadingBatchContacts, setLoadingBatchContacts] = useState(false);
   const [expanded, setExpanded] = useState(true);
 
   const fetchStats = useCallback(async () => {
@@ -173,6 +194,48 @@ function OutreachStatsSection({
     }
   }
 
+  async function fetchPreview(limit?: number) {
+    setLoadingPreview(true);
+    try {
+      const params = new URLSearchParams({ chapter_id: chapterId });
+      if (limit != null) params.set('t1_limit', String(limit));
+      const res = await fetch(`/api/outreach/preview-chapter?${params}`);
+      const json = await res.json();
+      if (json.error) { showToast(json.error, 'error'); return; }
+      setPreview(json);
+      if (t1Limit === null) setT1Limit(json.t1.max_cap);
+      setShowPreview(true);
+    } catch {
+      showToast('Failed to load preview', 'error');
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  async function loadBatchContacts(batchId: string, notes: string) {
+    setLoadingBatchContacts(true);
+    try {
+      let ids: { t1: string[]; t2: string[]; t3: string[] } = { t1: [], t2: [], t3: [] };
+      try {
+        const parsed = typeof notes === 'string' ? JSON.parse(notes) : notes;
+        if (parsed?.contact_ids) ids = parsed.contact_ids;
+      } catch { /* no contact_ids */ }
+      const allIds = [...ids.t1, ...ids.t2, ...ids.t3];
+      if (allIds.length === 0) { setBatchContacts([]); setLoadingBatchContacts(false); return; }
+      const res = await fetch(`/api/outreach/batch-contacts?ids=${allIds.slice(0, 200).join(',')}`);
+      const json = await res.json();
+      const idToTouch: Record<string, 'T1' | 'T2' | 'T3'> = {};
+      ids.t1.forEach((id: string) => { idToTouch[id] = 'T1'; });
+      ids.t2.forEach((id: string) => { idToTouch[id] = 'T2'; });
+      ids.t3.forEach((id: string) => { idToTouch[id] = 'T3'; });
+      setBatchContacts((json.data || []).map((c: PreviewContact) => ({ ...c, touch: idToTouch[c.id] ?? 'T1' })));
+    } catch {
+      setBatchContacts([]);
+    } finally {
+      setLoadingBatchContacts(false);
+    }
+  }
+
   async function compileBatch() {
     setCompiling(true);
     try {
@@ -180,7 +243,7 @@ function OutreachStatsSection({
       const res = await fetch('/api/outreach/compile-chapter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chapter_id: chapterId, date: today }),
+        body: JSON.stringify({ chapter_id: chapterId, date: today, t1_limit: t1Limit ?? undefined }),
       });
       const json = await res.json();
       if (json.error) {
@@ -193,6 +256,7 @@ function OutreachStatsSection({
       } else {
         showToast(`✓ Compiled batch: ${json.batch?.total_contacts} contacts`, 'success');
         setBatch(json.batch);
+        setShowPreview(false);
       }
     } catch {
       showToast('Failed to compile batch', 'error');
@@ -249,7 +313,7 @@ function OutreachStatsSection({
             ) : null}
 
             <button
-              onClick={compileBatch}
+              onClick={() => { if (showPreview) { setShowPreview(false); setPreview(null); } else { fetchPreview(t1Limit ?? undefined); } }}
               disabled={compiling}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -259,8 +323,8 @@ function OutreachStatsSection({
                 fontSize: '0.82rem', fontWeight: 600, transition: 'background 0.15s ease-out',
               }}
             >
-              {compiling ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={13} />}
-              {compiling ? 'Compiling…' : 'Compile Batch'}
+              {loadingPreview || compiling ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Eye size={13} />}
+              {compiling ? 'Compiling…' : loadingPreview ? 'Loading…' : showPreview ? 'Hide Preview' : 'Preview Batch'}
             </button>
           </div>
 
@@ -301,6 +365,129 @@ function OutreachStatsSection({
                   {stats.touch3_due} due T3
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Preview Panel */}
+          {showPreview && preview && (
+            <div style={{ border: '1px solid #D9D4CC', borderRadius: 8, overflow: 'hidden', marginTop: 8 }}>
+              {/* Preview header */}
+              <div style={{ background: '#F5F0EB', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1B2A4A' }}>
+                  Batch Preview — {(preview.t1.total + preview.t2.total + preview.t3.total)} contacts total
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: '0.75rem', color: '#5C5449' }}>
+                    T1: {preview.t1.total} · T2: {preview.t2.total} · T3: {preview.t3.total}
+                  </span>
+                </div>
+              </div>
+
+              {/* T1 limit slider */}
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid #ede8e2', background: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1B2A4A', flexShrink: 0 }}>
+                    T1 sends today:
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={preview.t1.max_cap}
+                    value={t1Limit ?? preview.t1.max_cap}
+                    onChange={e => {
+                      const v = parseInt(e.target.value);
+                      setT1Limit(v);
+                      fetchPreview(v);
+                    }}
+                    style={{ flex: 1, accentColor: '#C4874A' }}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={preview.t1.max_cap}
+                    value={t1Limit ?? preview.t1.max_cap}
+                    onChange={e => {
+                      const v = Math.min(parseInt(e.target.value) || 0, preview.t1.max_cap);
+                      setT1Limit(v);
+                    }}
+                    onBlur={() => fetchPreview(t1Limit ?? undefined)}
+                    style={{
+                      width: 52, padding: '3px 6px', borderRadius: 6,
+                      border: '1px solid #D9D4CC', fontSize: '0.82rem',
+                      textAlign: 'center', color: '#1B2A4A',
+                    }}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af', flexShrink: 0 }}>/ {preview.t1.max_cap} max</span>
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+                  {preview.lines.active} active line{preview.lines.active !== 1 ? 's' : ''} · drag slider to adjust how many T1s go out today
+                </div>
+              </div>
+
+              {/* Contact list — T1 */}
+              {preview.t1.contacts.length > 0 && (
+                <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                  <div style={{ padding: '6px 14px', background: '#F9F7F4', fontSize: '0.7rem', fontWeight: 700, color: '#5C5449', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #ede8e2' }}>
+                    T1 — New Outreach ({preview.t1.total})
+                  </div>
+                  {preview.t1.contacts.map((c, i) => (
+                    <div key={c.id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '6px 14px', borderBottom: i < preview.t1.contacts.length - 1 ? '1px solid #f5f0eb' : 'none',
+                      fontSize: '0.8rem', color: '#1B2A4A', background: '#fff',
+                    }}>
+                      <span>{[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}</span>
+                      <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>{c.year ? `'${String(c.year).slice(-2)}` : '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* T2 contacts */}
+              {preview.t2.contacts.length > 0 && (
+                <div style={{ maxHeight: 160, overflowY: 'auto' }}>
+                  <div style={{ padding: '6px 14px', background: '#F9F7F4', fontSize: '0.7rem', fontWeight: 700, color: '#5C5449', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #ede8e2' }}>
+                    T2 — Follow-up ({preview.t2.total})
+                  </div>
+                  {preview.t2.contacts.map((c, i) => (
+                    <div key={c.id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '6px 14px', borderBottom: i < preview.t2.contacts.length - 1 ? '1px solid #f5f0eb' : 'none',
+                      fontSize: '0.8rem', color: '#1B2A4A', background: '#fff',
+                    }}>
+                      <span>{[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}</span>
+                      <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>{c.year ? `'${String(c.year).slice(-2)}` : '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Compile button */}
+              <div style={{ padding: '10px 14px', background: '#F5F0EB', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  onClick={() => { setShowPreview(false); setPreview(null); }}
+                  style={{
+                    padding: '6px 14px', borderRadius: 7, border: '1px solid #D9D4CC',
+                    background: '#fff', color: '#5C5449', fontSize: '0.82rem', cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={compileBatch}
+                  disabled={compiling}
+                  style={{
+                    padding: '6px 16px', borderRadius: 7, border: 'none',
+                    background: compiling ? '#9ca3af' : '#1B2A4A', color: '#fff',
+                    fontSize: '0.82rem', fontWeight: 600, cursor: compiling ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  {compiling
+                    ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Compiling…</>
+                    : <><Zap size={13} /> Compile {(preview.t1.total + preview.t2.total + preview.t3.total)} contacts</>}
+                </button>
+              </div>
             </div>
           )}
 
