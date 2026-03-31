@@ -419,6 +419,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         if (!fromPhone) continue;
 
         // ── Hard guards BEFORE any DB claim ─────────────────────────────────
+        // Guard: skip contacts with no first name — message would say "Hey ,"
+        if (!contact.first_name || contact.first_name.trim() === '') {
+          results.skipped_already_sent++;
+          continue;
+        }
         // 1. iMessage-only: skip any number confirmed as SMS
         if ((contact as Contact & { is_imessage?: boolean | null }).is_imessage === false) {
           results.skipped_sms++;
@@ -439,8 +444,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         // ── End hard guards ──────────────────────────────────────────────────
 
         const chapter  = chapterMap[contact.chapter_id] || { fraternity_name: 'your fraternity', university: 'your school', alumni_join_link: null };
-        const joinLink = chapter.alumni_join_link || 'https://trailblaize.net';
         const status   = contact.outreach_status;
+
+        // Hard block: never send pitch (T2/T3) with wrong/missing join link.
+        // trailblaize.net is the marketing homepage — not a chapter join link.
+        // If the chapter has no join link, skip T2/T3 and revert their claim.
+        if (!chapter.alumni_join_link && status !== 'not_contacted') {
+          if (status === 'touch1_sent' || status === 'touch1_confirmed') {
+            await supabase.from('alumni_contacts').update({ outreach_status: status, touch2_sent_at: null }).eq('id', contact.id);
+          } else if (status === 'touch2_sent' || status === 'pitched') {
+            await supabase.from('alumni_contacts').update({ outreach_status: status, touch3_sent_at: null }).eq('id', contact.id);
+          }
+          results.failed++;
+          results.errors.push(`Skipped ${contact.first_name} — chapter has no join link`);
+          continue;
+        }
+        const joinLink = chapter.alumni_join_link || 'https://trailblaize.net';
         const now      = new Date().toISOString();
 
         // ── Atomic claim ─────────────────────────────────────────────────────

@@ -4,6 +4,12 @@ import { createChat, getRecipientService } from '@/lib/linq';
 
 export const maxDuration = 300;
 
+// ── Safety constants ──────────────────────────────────────────────────────────
+// Maximum total contacts (T1+T2+T3) per batch. At 9s max per send this gives
+// 270s execution time — within Vercel's 300s limit with 30s headroom.
+// Users should be guided toward 15-20 T1s so T2/T3 have room too.
+const BATCH_TOTAL_CAP = 30;
+
 /**
  * POST /api/outreach/compile-chapter
  * Per-chapter batch compiler. Same T1/T2/T3 eligibility logic as the global
@@ -81,6 +87,14 @@ export async function POST(request: NextRequest) {
 
   const today = date || new Date().toISOString().split('T')[0];
 
+  // Guard: chapter must have a join link before we send any pitch messages (T2/T3).
+  // Sending trailblaize.net as a fallback link is a brand risk — wrong link per chapter.
+  // T1 (verify only, no link) is still allowed even without a join link.
+  if (!chapter.alumni_join_link) {
+    console.warn(`[compile-chapter] Chapter ${chapter.chapter_name} has no alumni_join_link`);
+    // We allow compile but will flag T2/T3 as zero if no link exists
+  }
+
   try {
     // ── 1. Check if a batch already exists for this chapter+date ─────────────
     const { data: existingBatches } = await supabase
@@ -157,7 +171,12 @@ export async function POST(request: NextRequest) {
       ? Math.min(Math.max(0, t1_limit), t1CapRemaining)
       : t1CapRemaining;
 
-    const t2t3Cap = activeCount * 100;
+    // T2+T3 cap = remaining slots after T1. Total batch capped at BATCH_TOTAL_CAP.
+    // This prevents Vercel timeout (300s / 9s max per send = 33 sends max).
+    const t2t3TotalRemaining = Math.max(0, BATCH_TOTAL_CAP - t1Cap);
+    const t2t3Cap = chapter.alumni_join_link
+      ? Math.min(activeCount * 100, t2t3TotalRemaining)
+      : 0; // No join link = no T2/T3 — never send pitch with wrong/missing link
 
     // ── 3. Cutoffs ────────────────────────────────────────────────────────────
     const cutoff2days = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
@@ -192,6 +211,9 @@ export async function POST(request: NextRequest) {
       .is('touch2_sent_at', null)
       .not('is_imessage', 'is', false)
       .not('phone_primary', 'is', null)
+      .not('first_name', 'is', null)
+      .not('flagged', 'is', true)
+      .gte('year', 1970)
       .limit(t2t3Cap);
 
     const { data: t2bRaw } = await supabase
@@ -203,6 +225,9 @@ export async function POST(request: NextRequest) {
       .is('touch2_sent_at', null)
       .not('is_imessage', 'is', false)
       .not('phone_primary', 'is', null)
+      .not('first_name', 'is', null)
+      .not('flagged', 'is', true)
+      .gte('year', 1970)
       .limit(t2t3Cap);
 
     const t2Map = new Map<string, { id: string; chapter_id: string }>();
@@ -226,6 +251,9 @@ export async function POST(request: NextRequest) {
         .is('touch3_sent_at', null)
         .not('is_imessage', 'is', false)
         .not('phone_primary', 'is', null)
+        .not('first_name', 'is', null)
+        .not('flagged', 'is', true)
+        .gte('year', 1970)
         .limit(t3Remaining);
 
       const { data: t3RawA } = await supabase
@@ -237,6 +265,9 @@ export async function POST(request: NextRequest) {
         .is('touch3_sent_at', null)
         .not('is_imessage', 'is', false)
         .not('phone_primary', 'is', null)
+        .not('first_name', 'is', null)
+        .not('flagged', 'is', true)
+        .gte('year', 1970)
         .limit(t3Remaining);
 
       // Merge, dedup
@@ -315,7 +346,10 @@ export async function POST(request: NextRequest) {
     const linesSummary = {
       active: activeCount,
       t1_cap: t1Cap,
-      t2t3_cap: t2t3Cap,
+          t1_remaining: t1CapRemaining,
+          t2t3_cap: t2t3Cap,
+          batch_total_cap: BATCH_TOTAL_CAP,
+          join_link_missing: !chapter.alumni_join_link,
     };
 
     // ── 10. Create batch record ───────────────────────────────────────────────

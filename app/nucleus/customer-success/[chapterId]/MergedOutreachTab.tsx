@@ -50,6 +50,9 @@ interface BatchPreview {
   t2: { contacts: PreviewContact[]; total: number };
   t3: { contacts: PreviewContact[]; total: number };
   lines: { active: number; t1_cap_total: number; sent_today: number };
+  batch_total_cap: number;
+  has_join_link: boolean;
+  warnings: string[];
 }
 
 interface AlumniContact {
@@ -383,6 +386,18 @@ function OutreachStatsSection({
                 </div>
               </div>
 
+              {/* Warnings */}
+              {preview.warnings && preview.warnings.length > 0 && (
+                <div style={{ padding: '10px 14px', background: '#FEF3C7', borderBottom: '1px solid #FDE68A' }}>
+                  {preview.warnings.map((w, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: '0.78rem', color: '#92400E', marginBottom: i < preview.warnings.length - 1 ? 6 : 0 }}>
+                      <span style={{ flexShrink: 0 }}>⚠️</span>
+                      <span>{w}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* T1 limit slider */}
               <div style={{ padding: '12px 14px', borderBottom: '1px solid #ede8e2', background: '#fff' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -392,8 +407,8 @@ function OutreachStatsSection({
                   <input
                     type="range"
                     min={0}
-                    max={preview.t1.max_cap}
-                    value={t1Limit ?? preview.t1.max_cap}
+                    max={Math.min(preview.t1.max_cap, preview.batch_total_cap ?? 30)}
+                    value={t1Limit ?? Math.min(preview.t1.max_cap, preview.batch_total_cap ?? 30)}
                     onChange={e => {
                       const v = parseInt(e.target.value);
                       setT1Limit(v);
@@ -404,8 +419,8 @@ function OutreachStatsSection({
                   <input
                     type="number"
                     min={0}
-                    max={preview.t1.max_cap}
-                    value={t1Limit ?? preview.t1.max_cap}
+                    max={Math.min(preview.t1.max_cap, preview.batch_total_cap ?? 30)}
+                    value={t1Limit ?? Math.min(preview.t1.max_cap, preview.batch_total_cap ?? 30)}
                     onChange={e => {
                       const v = Math.min(parseInt(e.target.value) || 0, preview.t1.max_cap);
                       setT1Limit(v);
@@ -417,7 +432,7 @@ function OutreachStatsSection({
                       textAlign: 'center', color: '#1B2A4A',
                     }}
                   />
-                  <span style={{ fontSize: '0.75rem', color: '#9ca3af', flexShrink: 0 }}>/ {preview.t1.max_cap} max</span>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af', flexShrink: 0 }}>/ {Math.min(preview.t1.max_cap, preview.batch_total_cap ?? 30)} max today</span>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
                   {preview.lines.active} active lines · {preview.t1.sent_today ?? 0} sent today across all chapters · {preview.t1.max_cap} remaining

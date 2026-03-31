@@ -63,7 +63,11 @@ export async function GET(request: NextRequest) {
     const t1CapTotal = Math.max(0, t1CapMax - sentTodayTotal);
 
     // Apply user override if provided, capped at remaining capacity
-    const t1Limit = t1LimitParam ? Math.min(parseInt(t1LimitParam), t1CapTotal) : t1CapTotal;
+    // Also enforce BATCH_TOTAL_CAP so T1 + T2 + T3 never exceeds 30
+    const BATCH_TOTAL_CAP = 30;
+    const t1Limit = t1LimitParam
+      ? Math.min(parseInt(t1LimitParam), t1CapTotal, BATCH_TOTAL_CAP)
+      : Math.min(t1CapTotal, BATCH_TOTAL_CAP);
 
     const cutoff2days = new Date(Date.now() - 2 * 86400000).toISOString();
     const cutoff4days = new Date(Date.now() - 4 * 86400000).toISOString();
@@ -128,11 +132,29 @@ export async function GET(request: NextRequest) {
       t3Contacts = t3Raw || [];
     }
 
+    // Check for missing join link — warn before compile
+    const { data: chapterRow } = await supabase
+      .from('chapters')
+      .select('alumni_join_link')
+      .eq('id', chapterId)
+      .single();
+
+    const hasJoinLink = !!chapterRow?.alumni_join_link;
+    const t2t3Remaining = Math.max(0, BATCH_TOTAL_CAP - (t1Raw || []).length);
+
+    const warnings: string[] = [];
+    if (!hasJoinLink) warnings.push('No chapter join link set — T2/T3 sends are blocked until you add one in chapter settings.');
+    if (sentTodayTotal > 0) warnings.push(`${sentTodayTotal} T1s already sent today across all chapters — remaining capacity: ${t1CapTotal}.`);
+    if (t1CapTotal === 0) warnings.push('Daily T1 capacity reached across all chapters. Only T2/T3 follow-ups can go out today.');
+
     return NextResponse.json({
       t1: { contacts: t1Raw || [], total: (t1Raw || []).length, cap: t1Limit, max_cap: t1CapTotal, sent_today: sentTodayTotal, daily_max: t1CapMax },
-      t2: { contacts: t2Contacts, total: t2Contacts.length },
-      t3: { contacts: t3Contacts, total: t3Contacts.length },
+      t2: { contacts: hasJoinLink ? t2Contacts.slice(0, t2t3Remaining) : [], total: hasJoinLink ? Math.min(t2Contacts.length, t2t3Remaining) : 0 },
+      t3: { contacts: hasJoinLink ? t3Contacts.slice(0, Math.max(0, t2t3Remaining - t2Contacts.length)) : [], total: hasJoinLink ? Math.min(t3Contacts.length, Math.max(0, t2t3Remaining - t2Contacts.length)) : 0 },
       lines: { active: activeCount, t1_cap_total: t1CapTotal, sent_today: sentTodayTotal },
+      batch_total_cap: BATCH_TOTAL_CAP,
+      has_join_link: hasJoinLink,
+      warnings,
     });
   } catch (err) {
     console.error('[preview-chapter]', err);
