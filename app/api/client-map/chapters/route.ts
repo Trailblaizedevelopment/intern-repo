@@ -86,6 +86,7 @@ function deriveState(school: string): string {
 }
 
 export async function GET() {
+  const supabase = getDB();
   // Query chapters table — active/on-map means status='active' OR onboarding_completed IS NOT NULL
   const { data, error } = await supabase
     .from('chapters')
