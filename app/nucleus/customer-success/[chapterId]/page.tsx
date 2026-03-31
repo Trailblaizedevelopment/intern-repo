@@ -3,14 +3,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, HeartHandshake, Edit2, Copy, X, Loader2,
-  CreditCard, Eye,
+  CreditCard, Eye, AlertTriangle, CheckCircle2, Clock,
+  Activity, Instagram, TrendingUp, Users, ChevronRight,
+  Zap,
 } from 'lucide-react';
 import OnboardingWizard from '../OnboardingWizard';
 import { useRouter, useParams } from 'next/navigation';
 import {
   supabase, Chapter, ChapterWithOnboarding,
   CheckInFrequency as CIF, CHECK_IN_FREQUENCY_LABELS,
-  HEALTH_SCORE_COLORS,
+  ONBOARDING_STEPS,
 } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import SalesTab from './SalesTab';
@@ -20,19 +22,8 @@ import AlumniTab from './AlumniTab';
 import MergedOutreachTab from './MergedOutreachTab';
 import SuccessTab from './SuccessTab';
 import EmailOutreachTab from '../EmailOutreachTab';
-import EmailTemplatesTab from '../EmailTemplatesTab';
-// EmailTemplatesTab is now embedded inside EmailOutreachTab — kept for direct import if needed
 
-const EXECUTIVE_POSITION_LABELS: Record<string, string> = {
-  president: 'President', vp: 'Vice President', treasurer: 'Treasurer',
-  secretary: 'Secretary', alumni_chair: 'Alumni Chair', risk_chair: 'Risk Chair',
-  recruitment_chair: 'Recruitment Chair', social_chair: 'Social Chair', other: 'Other',
-};
-const OUTREACH_CHANNEL_LABELS: Record<string, string> = {
-  facebook_group: 'Facebook Group', linkedin_group: 'LinkedIn Group',
-  groupme: 'GroupMe', slack: 'Slack', discord: 'Discord',
-  email_newsletter: 'Email Newsletter', website: 'Website', other: 'Other',
-};
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Toast {
   id: string;
@@ -40,21 +31,100 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
-type DashTab = 'setup' | 'outreach' | 'alumni' | 'alumni_unified' | 'conversations' | 'email' | 'linqoutreach' | 'emailtemplates' | 'success' | 'sales';
+type DashTab = 'setup' | 'outreach' | 'alumni' | 'alumni_unified' | 'email' | 'success' | 'sales';
 
 interface SubmissionData {
   chapter: {
-    id: string;
-    chapter_name: string;
-    school: string;
-    fraternity: string;
-    estimated_alumni?: number;
-    alumni_list_url?: string;
+    id: string; chapter_name: string; school: string; fraternity: string;
+    estimated_alumni?: number; alumni_list_url?: string;
   };
   executives: { full_name: string; position: string; email: string }[];
   outreach_channels: { channel_type: string; facebook_member_count?: number; email_subscriber_count?: number; linkedin_member_count?: number; description?: string }[];
   submitted_at: string | null;
 }
+
+interface AlumniStats {
+  total: number;
+  have_phone: number;
+  signed_up: number;
+  outreach_coverage_pct: number;
+  contacted: number;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const EXEC_POSITION_LABELS: Record<string, string> = {
+  president: 'President', vp: 'Vice President', treasurer: 'Treasurer',
+  secretary: 'Secretary', alumni_chair: 'Alumni Chair', risk_chair: 'Risk Chair',
+  recruitment_chair: 'Recruitment Chair', social_chair: 'Social Chair', other: 'Other',
+};
+
+const OUTREACH_CHANNEL_LABELS: Record<string, string> = {
+  facebook_group: 'Facebook Group', linkedin_group: 'LinkedIn Group',
+  groupme: 'GroupMe', slack: 'Slack', discord: 'Discord',
+  email_newsletter: 'Email Newsletter', website: 'Website', other: 'Other',
+};
+
+const TABS: { id: DashTab; label: string; icon?: string }[] = [
+  { id: 'setup',         label: 'Setup' },
+  { id: 'outreach',      label: 'Outreach' },
+  { id: 'alumni_unified', label: 'Alumni View' },
+  { id: 'alumni',        label: 'Alumni Data' },
+  { id: 'email',         label: 'Email' },
+  { id: 'success',       label: 'Success' },
+  { id: 'sales',         label: 'Sales' },
+];
+
+function computeHealthScore(chapter: ChapterWithOnboarding, stats?: AlumniStats): { score: number; tier: 'red' | 'yellow' | 'green' } {
+  let score = 0;
+  const now = Date.now();
+
+  // Payment (30 pts)
+  if (chapter.next_payment_date) {
+    const payDue = new Date(chapter.next_payment_date).getTime();
+    if (payDue > now) score += 30;
+    else if ((now - payDue) < 7 * 86400000) score += 15;
+  } else if (chapter.status === 'active') {
+    score += 15;
+  }
+
+  // Onboarding (20 pts)
+  if (chapter.onboarding_completed) score += 20;
+
+  // Outreach coverage (20 pts)
+  const cov = stats?.outreach_coverage_pct ?? 0;
+  if (cov >= 50) score += 20;
+  else if (cov >= 25) score += 10;
+  else if (cov > 0) score += 5;
+
+  // Check-in recency (15 pts)
+  if (chapter.last_check_in_date) {
+    const daysSince = Math.floor((now - new Date(chapter.last_check_in_date).getTime()) / 86400000);
+    if (daysSince <= 14) score += 15;
+    else if (daysSince <= 30) score += 8;
+    else if (daysSince <= 60) score += 3;
+  }
+
+  // Signups (15 pts)
+  const signups = stats?.signed_up ?? 0;
+  if (signups >= 10) score += 15;
+  else if (signups > 0) score += 10;
+
+  // Instagram flyer (5 pts)
+  if (chapter.instagram_flyer_posted) score += 5;
+
+  score = Math.max(0, Math.min(100, score));
+  const tier: 'red' | 'yellow' | 'green' = score < 40 ? 'red' : score < 70 ? 'yellow' : 'green';
+  return { score, tier };
+}
+
+const TIER_CONFIG = {
+  red:    { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  label: 'Needs Attention' },
+  yellow: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', label: 'Monitoring'      },
+  green:  { color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)', label: 'Healthy'         },
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ChapterDashboardPage() {
   const router = useRouter();
@@ -66,16 +136,17 @@ export default function ChapterDashboardPage() {
   const [activeTab, setActiveTab] = useState<DashTab>('setup');
   const [showEditModal, setShowEditModal] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [alumniStats, setAlumniStats] = useState<AlumniStats | null>(null);
 
   // Submission viewer
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [loadingSubmission, setLoadingSubmission] = useState(false);
 
-  // Onboarding wizard state (for existing chapters)
+  // Wizard
   const [showWizard, setShowWizard] = useState(false);
 
-  // Delete chapter flow
+  // Delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -98,21 +169,22 @@ export default function ChapterDashboardPage() {
 
   const fetchChapter = useCallback(async () => {
     if (!supabase || !chapterId) { setLoading(false); return; }
-    const { data, error } = await supabase
-      .from('chapters')
-      .select('*')
-      .eq('id', chapterId)
-      .single();
-    if (error || !data) {
-      showToast('Failed to load chapter', 'error');
-      setLoading(false);
-      return;
-    }
+    const { data, error } = await supabase.from('chapters').select('*').eq('id', chapterId).single();
+    if (error || !data) { showToast('Failed to load chapter', 'error'); setLoading(false); return; }
     setChapter(data as ChapterWithOnboarding);
     setLoading(false);
   }, [chapterId, showToast]);
 
-  useEffect(() => { fetchChapter(); }, [fetchChapter]);
+  const fetchAlumniStats = useCallback(async () => {
+    if (!chapterId) return;
+    try {
+      const res = await fetch(`/api/alumni/stats?chapter_id=${chapterId}`);
+      const json = await res.json();
+      if (json.data) setAlumniStats(json.data);
+    } catch { /* silent */ }
+  }, [chapterId]);
+
+  useEffect(() => { fetchChapter(); fetchAlumniStats(); }, [fetchChapter, fetchAlumniStats]);
 
   useEffect(() => {
     if (!chapter) return;
@@ -162,21 +234,13 @@ export default function ChapterDashboardPage() {
     setDeleting(true);
     try {
       const res = await fetch(`/api/chapters/${chapter.id}`, {
-        method: 'DELETE',
-        headers: { 'x-confirm-delete': 'CONFIRMED' },
+        method: 'DELETE', headers: { 'x-confirm-delete': 'CONFIRMED' },
       });
       const json = await res.json();
-      if (!res.ok) {
-        showToast(json.error ?? 'Delete failed', 'error');
-        setDeleting(false);
-        return;
-      }
+      if (!res.ok) { showToast(json.error ?? 'Delete failed', 'error'); setDeleting(false); return; }
       showToast(`"${json.deleted}" has been permanently deleted.`, 'info');
       router.push('/nucleus/customer-success');
-    } catch {
-      showToast('Delete failed', 'error');
-      setDeleting(false);
-    }
+    } catch { showToast('Delete failed', 'error'); setDeleting(false); }
   }
 
   async function viewSubmission() {
@@ -186,172 +250,238 @@ export default function ChapterDashboardPage() {
     try {
       const res = await fetch(`/api/onboarding/submission/${chapter.id}`);
       const json = await res.json();
-      if (json.error) {
-        showToast(json.error.message || 'Failed to load submission', 'error');
-        setShowSubmissionModal(false);
-      } else {
-        setSubmission(json.data);
-      }
-    } catch {
-      showToast('Failed to load submission', 'error');
-      setShowSubmissionModal(false);
-    } finally {
-      setLoadingSubmission(false);
-    }
+      if (json.error) { showToast(json.error.message || 'Failed to load submission', 'error'); setShowSubmissionModal(false); }
+      else setSubmission(json.data);
+    } catch { showToast('Failed to load submission', 'error'); setShowSubmissionModal(false); }
+    finally { setLoadingSubmission(false); }
   }
+
+  // ─── Derived ──────────────────────────────────────────────────────────────
+
+  const { score: healthScore, tier: healthTier } = chapter
+    ? computeHealthScore(chapter, alumniStats ?? undefined)
+    : { score: 0, tier: 'yellow' as const };
+
+  const tierCfg = TIER_CONFIG[healthTier];
+
+  const onboardingPct = chapter
+    ? Math.round((ONBOARDING_STEPS.filter(s => chapter[s.key as keyof ChapterWithOnboarding]).length / ONBOARDING_STEPS.length) * 100)
+    : 0;
+
+  const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
+    onboarding: { label: 'Onboarding', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+    active:     { label: 'Active',     color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+    at_risk:    { label: 'At Risk',    color: '#ef4444', bg: 'rgba(239,68,68,0.12)'  },
+    churned:    { label: 'Churned',    color: '#6b7280', bg: 'rgba(107,114,128,0.12)' },
+  };
+
+  // ─── Loading / Error States ───────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', gap: 12 }}>
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
-        <span>Loading chapter…</span>
+      <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#6b7280' }}>
+        <Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontSize: '0.9rem' }}>Loading chapter…</span>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   if (!chapter) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <h2>Chapter not found</h2>
-        <button onClick={() => router.push('/nucleus/customer-success')} style={{ marginTop: 16, padding: '8px 20px', cursor: 'pointer' }}>
+      <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: '#e8e8f0' }}>
+        <AlertTriangle size={40} style={{ color: '#ef4444' }} />
+        <h2 style={{ margin: 0 }}>Chapter not found</h2>
+        <button
+          onClick={() => router.push('/nucleus/customer-success')}
+          style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #374151', background: '#111118', color: '#e8e8f0', cursor: 'pointer' }}
+        >
           Back to Customer Success
         </button>
       </div>
     );
   }
 
-  const statusLabels: Record<Chapter['status'], string> = {
-    onboarding: 'Onboarding', active: 'Active', at_risk: 'At Risk', churned: 'Churned',
-  };
-
-  const statusColors: Record<string, { bg: string; color: string }> = {
-    onboarding: { bg: '#F5EFE0', color: '#6B4A1E' },
-    active:     { bg: '#EAF0E8', color: '#2A4229' },
-    at_risk:    { bg: '#F5E8E0', color: '#6B2A1E' },
-    churned:    { bg: '#F0EDEA', color: '#5C5449' },
-  };
-
-  const healthColors: Record<string, { bg: string; color: string }> = {
-    good:     { bg: '#EAF0E8', color: '#2A4229' },
-    warning:  { bg: '#F5EFE0', color: '#6B4A1E' },
-    critical: { bg: '#F5E8E0', color: '#6B2A1E' },
-  };
-
-  const sc = statusColors[chapter.status] || statusColors.onboarding;
-  const hc = healthColors[chapter.health] || healthColors.good;
-
-  const TABS: { id: DashTab; label: string }[] = [
-    { id: 'setup', label: '🚀 Set Up' },
-    { id: 'outreach', label: '📤 Outreach' },
-    { id: 'alumni_unified', label: '🎓 Alumni View' },
-    { id: 'alumni', label: '👥 Alumni Data' },
-    { id: 'email', label: '📧 Email Outreach' },
-    // emailtemplates is now merged into the email tab — removed as standalone
-    { id: 'success', label: '✅ Success' },
-    { id: 'sales', label: '💰 Sales' },
-  ];
+  const sc = statusConfig[chapter.status] || statusConfig.onboarding;
 
   return (
-    <div className="module-page">
-      {/* Header */}
-      <header className="module-header">
-        <div className="module-header-content">
-          <div className="module-back-links">
-            <button
-              className="module-back"
-              onClick={() => router.push('/nucleus/customer-success')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: '#5C5449', fontSize: '0.875rem', transition: 'color 0.15s ease-out' }}
-            >
-              <ArrowLeft size={18} /> Customer Success
-            </button>
-          </div>
-          <div className="module-title-row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div className="module-icon" style={{ backgroundColor: 'rgba(196,135,74,0.12)', color: '#C4874A' }}>
-                <HeartHandshake size={22} />
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e8e8f0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* ── Header ── */}
+      <header style={{ background: '#0d0d14', borderBottom: '1px solid #1e1e2e', padding: '0' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 24px' }}>
+          {/* Back nav */}
+          <button
+            onClick={() => router.push('/nucleus/customer-success')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6b7280', fontSize: '0.78rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 12px', transition: 'color 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#9ca3af')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#6b7280')}
+          >
+            <ArrowLeft size={13} /> Customer Success
+          </button>
+
+          {/* Chapter identity row */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              {/* Health score orb */}
+              <div style={{
+                width: 48, height: 48, borderRadius: 12, flexShrink: 0,
+                background: tierCfg.bg, border: `2px solid ${tierCfg.border}`,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: tierCfg.color, lineHeight: 1 }}>{healthScore}</span>
+                <span style={{ fontSize: '0.5rem', color: tierCfg.color, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>score</span>
               </div>
+
               <div>
-                <h1 style={{ fontSize: '1.5rem', lineHeight: 1.2, fontFamily: "'Instrument Serif', 'Playfair Display', Georgia, serif", fontWeight: 400, color: '#1B2A4A' }}>{chapter.chapter_name}</h1>
-                <p style={{ color: '#5C5449', marginTop: 2 }}>
-                  {chapter.fraternity}{chapter.fraternity && chapter.school ? ' · ' : ''}{chapter.school}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#f0f0f8', lineHeight: 1.2 }}>
+                    {chapter.chapter_name}
+                  </h1>
+                  {/* Tier badge */}
+                  <span style={{
+                    fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                    background: tierCfg.bg, color: tierCfg.color, border: `1px solid ${tierCfg.border}`,
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: tierCfg.color, display: 'inline-block' }} />
+                    {tierCfg.label}
+                  </span>
+                  {/* Status badge */}
+                  <span style={{
+                    fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                    background: sc.bg, color: sc.color,
+                  }}>
+                    {sc.label}
+                  </span>
+                </div>
+                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '0.82rem' }}>
+                  {[chapter.fraternity, chapter.school].filter(Boolean).join(' · ')}
                 </p>
+
+                {/* Quick stat chips */}
+                <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                  {alumniStats && alumniStats.total > 0 && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
+                        <Users size={12} style={{ color: '#60a5fa' }} />
+                        <span><strong style={{ color: '#60a5fa' }}>{alumniStats.total}</strong> alumni</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
+                        <Zap size={12} style={{ color: '#10b981' }} />
+                        <span><strong style={{ color: '#10b981' }}>{alumniStats.signed_up}</strong> signed up</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
+                        <TrendingUp size={12} style={{ color: alumniStats.outreach_coverage_pct >= 50 ? '#10b981' : alumniStats.outreach_coverage_pct >= 25 ? '#f59e0b' : '#ef4444' }} />
+                        <span style={{ color: alumniStats.outreach_coverage_pct >= 50 ? '#10b981' : alumniStats.outreach_coverage_pct >= 25 ? '#f59e0b' : '#ef4444' }}>
+                          <strong>{alumniStats.outreach_coverage_pct}%</strong> outreach
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  {chapter.last_check_in_date && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
+                      <Clock size={12} />
+                      Last check-in: {new Date(chapter.last_check_in_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                  )}
+                  {chapter.mrr ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
+                      <CreditCard size={12} style={{ color: '#a78bfa' }} />
+                      <span><strong style={{ color: '#a78bfa' }}>${chapter.mrr}/mo</strong></span>
+                    </div>
+                  ) : null}
+                  {chapter.instagram_flyer_posted && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#f472b6' }}>
+                      <Instagram size={12} />
+                      <span>Flyer posted</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color }}>
-                {statusLabels[chapter.status]}
-              </span>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: hc.bg, color: hc.color }}>
-                {chapter.health === 'good' ? '✓ Good' : chapter.health === 'warning' ? '⚠ Warning' : '🔴 Critical'}
-              </span>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <button
                 onClick={viewSubmission}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, border: '1px solid #D9D4CC', background: '#F7F5F1', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500, color: '#5C5449', transition: 'border-color 0.15s ease-out' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #1e1e2e', background: '#111118', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem', transition: 'all 0.15s' }}
               >
-                <Eye size={13} /> View Submission
+                <Eye size={13} /> Submission
               </button>
               <button
                 onClick={() => setShowEditModal(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, border: '1px solid #D9D4CC', background: '#F7F5F1', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500, color: '#5C5449', transition: 'border-color 0.15s ease-out' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #1e1e2e', background: '#111118', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem' }}
               >
                 <Edit2 size={13} /> Edit
               </button>
               <button
                 onClick={generateOnboardingLink}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, border: 'none', background: '#1B2A4A', color: '#F7F5F1', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}
               >
                 <Copy size={13} /> Onboarding Link
               </button>
             </div>
           </div>
+
+          {/* Setup progress bar */}
+          {!chapter.onboarding_completed && (
+            <div style={{ marginTop: 16, padding: '10px 14px', background: '#111118', borderRadius: 8, border: '1px solid #1e1e2e' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Setup Progress</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: onboardingPct >= 75 ? '#10b981' : '#f59e0b' }}>{onboardingPct}%</span>
+              </div>
+              <div style={{ height: 4, background: '#1e1e2e', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 2,
+                  width: `${onboardingPct}%`,
+                  background: onboardingPct >= 75 ? '#10b981' : onboardingPct >= 40 ? '#f59e0b' : '#ef4444',
+                  transition: 'width 0.3s ease',
+                }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Tab Navigation ── */}
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 24px' }}>
+          <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderTop: '1px solid #1e1e2e', scrollbarWidth: 'none' }}>
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '12px 18px',
+                  border: 'none',
+                  borderBottom: activeTab === tab.id ? '2px solid #10b981' : '2px solid transparent',
+                  background: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.82rem',
+                  fontWeight: activeTab === tab.id ? 700 : 400,
+                  color: activeTab === tab.id ? '#10b981' : '#6b7280',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'all 0.15s',
+                  letterSpacing: activeTab === tab.id ? '0.01em' : '0',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      <main className="module-main">
-        {/* Tab Bar */}
-        <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid #D9D4CC', paddingBottom: 0, overflowX: 'auto' }}>
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '10px 18px',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid #1B2A4A' : '2px solid transparent',
-                background: 'none',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: activeTab === tab.id ? 600 : 400,
-                color: activeTab === tab.id ? '#1B2A4A' : '#5C5449',
-                marginBottom: -1,
-                transition: 'color 0.15s ease-out, border-color 0.15s ease-out',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab Content */}
+      {/* ── Tab Content ── */}
+      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '24px' }}>
         {activeTab === 'setup' && (
-          <SetUpTab
-            chapter={chapter}
-            onUpdate={fetchChapter}
-            showToast={showToast}
-            onOpenWizard={() => setShowWizard(true)}
-          />
+          <SetUpTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} onOpenWizard={() => setShowWizard(true)} />
         )}
-        {/* Merged Outreach tab: stats + conversations + contact list */}
         {activeTab === 'outreach' && (
           <MergedOutreachTab chapter={chapter} showToast={showToast} onUpdate={fetchChapter} />
         )}
-        {/* Unified alumni view: merged internal + external platform data */}
         {activeTab === 'alumni_unified' && (
           <AlumniTab chapter={chapter} showToast={showToast} />
         )}
-        {/* Legacy alumni data tab — kept for CSV import and pipeline detail */}
         {activeTab === 'alumni' && (
           <AlumniOutreachTab chapter={chapter} showToast={showToast} onUpdate={fetchChapter} />
         )}
@@ -366,268 +496,248 @@ export default function ChapterDashboardPage() {
         )}
       </main>
 
-      {/* Onboarding Wizard (resume mode for existing chapter) */}
+      {/* ── Onboarding Wizard ── */}
       {showWizard && chapter && (
         <OnboardingWizard
           chapter={chapter}
           onClose={() => setShowWizard(false)}
-          onComplete={() => {
-            setShowWizard(false);
-            fetchChapter();
-            showToast('Chapter setup complete! 🎉', 'success');
-          }}
+          onComplete={() => { setShowWizard(false); fetchChapter(); fetchAlumniStats(); showToast('Chapter setup complete! 🎉', 'success'); }}
         />
       )}
 
-      {/* Toasts */}
-      <div className="toast-container">
+      {/* ── Toasts ── */}
+      <div style={{ position: 'fixed', bottom: 24, right: 24, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 9999 }}>
         {toasts.map(t => (
-          <div key={t.id} className={`toast toast-${t.type}`}>
-            <span>{t.message}</span>
-            <button className="toast-dismiss" onClick={() => setToasts(p => p.filter(x => x.id !== t.id))}><X size={14} /></button>
+          <div key={t.id} style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 8, maxWidth: 360,
+            background: t.type === 'success' ? '#064e3b' : t.type === 'error' ? '#450a0a' : '#1e1e2e',
+            border: `1px solid ${t.type === 'success' ? '#10b981' : t.type === 'error' ? '#ef4444' : '#374151'}`,
+            color: '#f0f0f8', fontSize: '0.85rem', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          }}>
+            <span style={{ flex: 1 }}>{t.message}</span>
+            <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0, display: 'flex' }}><X size={13} /></button>
           </div>
         ))}
       </div>
 
-      {/* Edit Modal */}
+      {/* ── Edit Modal ── */}
       {showEditModal && (
         <ModalOverlay className="module-modal-overlay" onClose={() => setShowEditModal(false)}>
-          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()}>
-            <div className="module-modal-header">
-              <h2>Edit Chapter</h2>
+          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()} style={{ background: '#111118', border: '1px solid #1e1e2e', color: '#e8e8f0' }}>
+            <div className="module-modal-header" style={{ borderBottom: '1px solid #1e1e2e' }}>
+              <h2 style={{ color: '#f0f0f8' }}>Edit Chapter</h2>
               <button className="module-modal-close" onClick={() => setShowEditModal(false)}><X size={20} /></button>
             </div>
             <div className="module-modal-body">
-              <div className="module-form-row">
-                <div className="module-form-group"><label>Chapter Name *</label><input type="text" value={formData.chapter_name} onChange={e => setFormData({ ...formData, chapter_name: e.target.value })} /></div>
-                <div className="module-form-group"><label>Fraternity</label><input type="text" value={formData.fraternity} onChange={e => setFormData({ ...formData, fraternity: e.target.value })} /></div>
-              </div>
-              <div className="module-form-row">
-                <div className="module-form-group"><label>School</label><input type="text" value={formData.school} onChange={e => setFormData({ ...formData, school: e.target.value })} /></div>
-                <div className="module-form-group"><label>MRR ($)</label><input type="number" value={formData.mrr} onChange={e => setFormData({ ...formData, mrr: parseFloat(e.target.value) || 0 })} /></div>
-              </div>
-              <div className="module-form-row">
-                <div className="module-form-group"><label>Contact Name</label><input type="text" value={formData.contact_name} onChange={e => setFormData({ ...formData, contact_name: e.target.value })} /></div>
-                <div className="module-form-group"><label>Contact Email</label><input type="email" value={formData.contact_email} onChange={e => setFormData({ ...formData, contact_email: e.target.value })} /></div>
-                <div className="module-form-group"><label>Contact Phone</label><input type="tel" value={formData.contact_phone} onChange={e => setFormData({ ...formData, contact_phone: e.target.value })} /></div>
-              </div>
-              <div className="module-form-row">
-                <div className="module-form-group"><label>Status</label><select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as Chapter['status'] })}><option value="onboarding">Onboarding</option><option value="active">Active</option><option value="at_risk">At Risk</option><option value="churned">Churned</option></select></div>
-                <div className="module-form-group"><label>Health</label><select value={formData.health} onChange={e => setFormData({ ...formData, health: e.target.value as Chapter['health'] })}><option value="good">Good</option><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
-                <div className="module-form-group"><label>Check-in Frequency</label><select value={formData.check_in_frequency} onChange={e => setFormData({ ...formData, check_in_frequency: e.target.value as CIF })}>{Object.entries(CHECK_IN_FREQUENCY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-              </div>
-              <div style={{ marginTop: 16, marginBottom: 16, padding: 16, background: '#F7F5F1', borderRadius: 2, border: '1px solid #D9D4CC' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}><CreditCard size={18} style={{ color: '#C4874A' }} /><span style={{ fontWeight: 600, color: '#1B2A4A' }}>Payment Tracking</span></div>
-                <div className="module-form-row">
-                  <div className="module-form-group"><label>Payment Day</label><input type="number" min="1" max="31" value={formData.payment_day || ''} onChange={e => setFormData({ ...formData, payment_day: e.target.value ? parseInt(e.target.value) : null })} /></div>
-                  <div className="module-form-group"><label>Payment Type</label><select value={formData.payment_type} onChange={e => setFormData({ ...formData, payment_type: e.target.value as Chapter['payment_type'] })}><option value="annual">Annual</option><option value="monthly">Monthly</option><option value="one_time">One-Time</option></select></div>
-                  <div className="module-form-group"><label>Amount ($)</label><input type="number" value={formData.payment_amount} onChange={e => setFormData({ ...formData, payment_amount: parseFloat(e.target.value) || 299 })} /></div>
-                </div>
-                <div className="module-form-row">
-                  <div className="module-form-group"><label>Start Date</label><input type="date" value={formData.payment_start_date} onChange={e => setFormData({ ...formData, payment_start_date: e.target.value })} /></div>
-                  <div className="module-form-group"><label>Last Payment</label><input type="date" value={formData.last_payment_date} onChange={e => setFormData({ ...formData, last_payment_date: e.target.value })} /></div>
-                  <div className="module-form-group"><label>Next Payment</label><input type="date" value={formData.next_payment_date} onChange={e => setFormData({ ...formData, next_payment_date: e.target.value })} /></div>
-                </div>
-              </div>
-              <div className="module-form-group"><label>Next Action</label><input type="text" value={formData.next_action} onChange={e => setFormData({ ...formData, next_action: e.target.value })} /></div>
-              <div className="module-form-group"><label>Alumni Channels</label><input type="text" value={formData.alumni_channels} onChange={e => setFormData({ ...formData, alumni_channels: e.target.value })} /></div>
-              <div className="module-form-group"><label>Notes</label><textarea value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} rows={3} /></div>
+              <EditChapterForm formData={formData} setFormData={setFormData} />
 
-              {/* ── Danger Zone ── */}
-              <div style={{ marginTop: 28, borderTop: '1px solid #fca5a5', paddingTop: 16 }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                  Danger Zone
-                </div>
+              {/* Danger Zone */}
+              <div style={{ marginTop: 24, borderTop: '1px solid rgba(239,68,68,0.2)', paddingTop: 16 }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Danger Zone</div>
                 <button
                   onClick={() => { setShowEditModal(false); setDeleteConfirmName(''); setShowDeleteModal(true); }}
-                  style={{
-                    padding: '6px 14px', borderRadius: 2,
-                    background: 'transparent', border: '1px solid #fca5a5',
-                    color: '#dc2626', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500,
-                  }}
+                  style={{ padding: '6px 14px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', cursor: 'pointer', fontSize: '0.78rem' }}
                 >
                   Delete this chapter…
                 </button>
-                <span style={{ marginLeft: 10, fontSize: '0.75rem', color: '#9ca3af' }}>
-                  Permanently removes all data. Cannot be undone.
-                </span>
               </div>
             </div>
-            <div className="module-modal-footer">
+            <div className="module-modal-footer" style={{ borderTop: '1px solid #1e1e2e' }}>
               <button className="module-cancel-btn" onClick={() => setShowEditModal(false)}>Cancel</button>
-              <button className="module-primary-btn" onClick={updateChapter} disabled={!formData.chapter_name}>Update</button>
+              <button
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                onClick={updateChapter} disabled={!formData.chapter_name}
+              >
+                Update
+              </button>
             </div>
           </div>
         </ModalOverlay>
       )}
 
-      {/* Submission Viewer Modal */}
+      {/* ── Submission Modal ── */}
       {showSubmissionModal && (
         <ModalOverlay className="module-modal-overlay" onClose={() => { setShowSubmissionModal(false); setSubmission(null); }}>
-          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()}>
-            <div className="module-modal-header">
-              <h2>Onboarding Submission</h2>
+          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()} style={{ background: '#111118', border: '1px solid #1e1e2e', color: '#e8e8f0' }}>
+            <div className="module-modal-header" style={{ borderBottom: '1px solid #1e1e2e' }}>
+              <h2 style={{ color: '#f0f0f8' }}>Onboarding Submission</h2>
               <button className="module-modal-close" onClick={() => { setShowSubmissionModal(false); setSubmission(null); }}><X size={20} /></button>
             </div>
             <div className="module-modal-body">
               {loadingSubmission ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 0', color: '#6b7280' }}>
-                  <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-                  Loading submission…
+                  <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
                 </div>
               ) : submission ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  {/* Chapter info */}
-                  <div style={{ background: '#f9fafb', borderRadius: 10, padding: '14px 18px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 8 }}>{submission.chapter.chapter_name}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: '0.85rem', color: '#374151' }}>
-                      {submission.chapter.school && <div><span style={{ color: '#6b7280' }}>School:</span> {submission.chapter.school}</div>}
-                      {submission.chapter.fraternity && <div><span style={{ color: '#6b7280' }}>Fraternity:</span> {submission.chapter.fraternity}</div>}
-                      {submission.chapter.estimated_alumni && <div><span style={{ color: '#6b7280' }}>Est. Alumni:</span> {submission.chapter.estimated_alumni}</div>}
-                      {submission.submitted_at && <div><span style={{ color: '#6b7280' }}>Submitted:</span> {new Date(submission.submitted_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>}
-                    </div>
-                    {submission.chapter.alumni_list_url && (
-                      <div style={{ marginTop: 10 }}>
-                        <a href={submission.chapter.alumni_list_url} target="_blank" rel="noopener noreferrer" style={{ color: '#C4874A', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>
-                          📎 Download Alumni List
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Exec board */}
-                  {submission.executives.length > 0 && (
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 10 }}>Executive Board</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {submission.executives.map((exec, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#f9fafb', borderRadius: 8, fontSize: '0.85rem' }}>
-                            <div style={{ fontWeight: 600, flex: 1 }}>{exec.full_name}</div>
-                            <div style={{ color: '#6b7280', fontSize: '0.8rem' }}>{EXECUTIVE_POSITION_LABELS[exec.position] || exec.position}</div>
-                            <div style={{ color: '#2563eb', fontSize: '0.8rem' }}>{exec.email}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Outreach channels */}
-                  {submission.outreach_channels.length > 0 && (
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 10 }}>Outreach Channels</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {submission.outreach_channels.map((ch, i) => {
-                          const memberCount = ch.facebook_member_count || ch.email_subscriber_count || ch.linkedin_member_count;
-                          return (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#f9fafb', borderRadius: 8, fontSize: '0.85rem' }}>
-                              <div style={{ fontWeight: 600, flex: 1 }}>{OUTREACH_CHANNEL_LABELS[ch.channel_type] || ch.channel_type}</div>
-                              {memberCount && <div style={{ color: '#6b7280' }}>{memberCount.toLocaleString()} members</div>}
-                              {ch.description && <div style={{ color: '#9ca3af', fontSize: '0.78rem' }}>{ch.description}</div>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {submission.executives.length === 0 && submission.outreach_channels.length === 0 && (
-                    <p style={{ color: '#9ca3af', fontSize: '0.875rem', textAlign: 'center', padding: '20px 0' }}>
-                      No detailed submission data available yet.
-                    </p>
-                  )}
-                </div>
+                <SubmissionView submission={submission} />
               ) : (
-                <p style={{ color: '#9ca3af', fontSize: '0.875rem', textAlign: 'center', padding: '20px 0' }}>
-                  No submission found for this chapter.
-                </p>
+                <p style={{ color: '#6b7280', textAlign: 'center', padding: '20px 0' }}>No submission found for this chapter.</p>
               )}
             </div>
-            <div className="module-modal-footer">
+            <div className="module-modal-footer" style={{ borderTop: '1px solid #1e1e2e' }}>
               <button className="module-cancel-btn" onClick={() => { setShowSubmissionModal(false); setSubmission(null); }}>Close</button>
             </div>
           </div>
         </ModalOverlay>
       )}
 
-      {/* ── Delete Chapter Modal ── */}
+      {/* ── Delete Modal ── */}
       {showDeleteModal && (
         <ModalOverlay className="module-modal-overlay" onClose={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}>
-          <div
-            className="module-modal"
-            onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 480, borderTop: '4px solid #dc2626' }}
-          >
-            <div className="module-modal-header" style={{ borderBottom: '1px solid #fee2e2' }}>
-              <h2 style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
-                ⚠ Delete Chapter
+          <div className="module-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, background: '#111118', border: '1px solid #1e1e2e', borderTop: '4px solid #ef4444', color: '#e8e8f0' }}>
+            <div className="module-modal-header" style={{ borderBottom: '1px solid rgba(239,68,68,0.15)' }}>
+              <h2 style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={18} /> Delete Chapter
               </h2>
-              <button
-                className="module-modal-close"
-                onClick={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}
-              >
-                <X size={20} />
-              </button>
+              <button className="module-modal-close" onClick={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}><X size={20} /></button>
             </div>
             <div className="module-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '12px 16px', fontSize: '0.875rem', color: '#991b1b', lineHeight: 1.6 }}>
-                <strong>This action is permanent and cannot be undone.</strong> Deleting this chapter will permanently remove:
-                <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                  <li>All alumni contacts &amp; outreach history</li>
-                  <li>All Linq conversations</li>
-                  <li>All tasks &amp; check-ins</li>
-                  <li>All email campaigns &amp; templates for this chapter</li>
-                  <li>All members, matches, and notes</li>
-                </ul>
+              <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '12px 16px', fontSize: '0.875rem', color: '#fca5a5', lineHeight: 1.6 }}>
+                <strong>This cannot be undone.</strong> This will permanently remove all alumni contacts, outreach history, conversations, tasks, and campaigns for this chapter.
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                  Type <strong style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 6px', borderRadius: 4 }}>{chapter.chapter_name}</strong> to confirm:
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#9ca3af', marginBottom: 6 }}>
+                  Type <strong style={{ fontFamily: 'monospace', background: '#1e1e2e', padding: '1px 6px', borderRadius: 4, color: '#e8e8f0' }}>{chapter.chapter_name}</strong> to confirm:
                 </label>
                 <input
-                  type="text"
-                  value={deleteConfirmName}
-                  onChange={e => setDeleteConfirmName(e.target.value)}
-                  placeholder={chapter.chapter_name}
-                  autoFocus
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    padding: '9px 12px', border: '1.5px solid #fca5a5',
-                    borderRadius: 6, fontSize: '0.875rem', outline: 'none',
-                    fontFamily: 'inherit',
-                    borderColor: deleteConfirmName === chapter.chapter_name ? '#dc2626' : '#fca5a5',
-                  }}
+                  type="text" value={deleteConfirmName} onChange={e => setDeleteConfirmName(e.target.value)}
+                  placeholder={chapter.chapter_name} autoFocus
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${deleteConfirmName === chapter.chapter_name ? '#ef4444' : '#374151'}`, background: '#0a0a0f', color: '#e8e8f0', fontSize: '0.875rem' }}
                 />
               </div>
             </div>
-            <div className="module-modal-footer" style={{ borderTop: '1px solid #fee2e2' }}>
-              <button
-                className="module-cancel-btn"
-                onClick={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}
-                disabled={deleting}
-              >
-                Cancel
-              </button>
+            <div className="module-modal-footer" style={{ borderTop: '1px solid rgba(239,68,68,0.15)' }}>
+              <button className="module-cancel-btn" onClick={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }} disabled={deleting}>Cancel</button>
               <button
                 onClick={deleteChapter}
                 disabled={deleteConfirmName !== chapter.chapter_name || deleting}
                 style={{
-                  padding: '8px 20px', borderRadius: 2, border: 'none',
-                  background: deleteConfirmName === chapter.chapter_name ? '#dc2626' : '#fca5a5',
+                  padding: '8px 20px', borderRadius: 8, border: 'none',
+                  background: deleteConfirmName === chapter.chapter_name ? '#ef4444' : '#374151',
                   color: '#fff', cursor: deleteConfirmName === chapter.chapter_name && !deleting ? 'pointer' : 'not-allowed',
-                  fontSize: '0.875rem', fontWeight: 700,
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  transition: 'background 0.15s',
+                  fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8,
                 }}
               >
-                {deleting ? (
-                  <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Deleting…</>
-                ) : (
-                  <>🗑 Delete Forever</>
-                )}
+                {deleting ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Deleting…</> : '🗑 Delete Forever'}
               </button>
             </div>
           </div>
         </ModalOverlay>
+      )}
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Edit Form ────────────────────────────────────────────────────────────────
+
+interface EditFormState {
+  chapter_name: string; school: string; fraternity: string;
+  contact_name: string; contact_email: string; contact_phone: string;
+  status: Chapter['status']; health: Chapter['health']; mrr: number;
+  next_action: string; notes: string; alumni_channels: string;
+  payment_day: number | null; payment_type: Chapter['payment_type'];
+  payment_amount: number; payment_start_date: string;
+  last_payment_date: string; next_payment_date: string;
+  check_in_frequency: CIF;
+}
+
+function EditChapterForm({ formData, setFormData }: { formData: EditFormState; setFormData: React.Dispatch<React.SetStateAction<EditFormState>> }) {
+  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8, border: '1px solid #374151', background: '#0a0a0f', color: '#e8e8f0', fontSize: '0.85rem' };
+  const labelStyle: React.CSSProperties = { display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="module-form-row">
+        <div><label style={labelStyle}>Chapter Name *</label><input style={inputStyle} type="text" value={formData.chapter_name} onChange={e => setFormData(p => ({ ...p, chapter_name: e.target.value }))} /></div>
+        <div><label style={labelStyle}>Fraternity</label><input style={inputStyle} type="text" value={formData.fraternity} onChange={e => setFormData(p => ({ ...p, fraternity: e.target.value }))} /></div>
+      </div>
+      <div className="module-form-row">
+        <div><label style={labelStyle}>School</label><input style={inputStyle} type="text" value={formData.school} onChange={e => setFormData(p => ({ ...p, school: e.target.value }))} /></div>
+        <div><label style={labelStyle}>MRR ($)</label><input style={inputStyle} type="number" value={formData.mrr} onChange={e => setFormData(p => ({ ...p, mrr: parseFloat(e.target.value) || 0 }))} /></div>
+      </div>
+      <div className="module-form-row">
+        <div><label style={labelStyle}>Contact Name</label><input style={inputStyle} type="text" value={formData.contact_name} onChange={e => setFormData(p => ({ ...p, contact_name: e.target.value }))} /></div>
+        <div><label style={labelStyle}>Contact Email</label><input style={inputStyle} type="email" value={formData.contact_email} onChange={e => setFormData(p => ({ ...p, contact_email: e.target.value }))} /></div>
+      </div>
+      <div className="module-form-row">
+        <div>
+          <label style={labelStyle}>Status</label>
+          <select style={inputStyle} value={formData.status} onChange={e => setFormData(p => ({ ...p, status: e.target.value as Chapter['status'] }))}>
+            <option value="onboarding">Onboarding</option><option value="active">Active</option>
+            <option value="at_risk">At Risk</option><option value="churned">Churned</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Check-in Frequency</label>
+          <select style={inputStyle} value={formData.check_in_frequency} onChange={e => setFormData(p => ({ ...p, check_in_frequency: e.target.value as CIF }))}>
+            {Object.entries(CHECK_IN_FREQUENCY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ padding: '12px', background: '#0a0a0f', borderRadius: 8, border: '1px solid #1e1e2e' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+          <CreditCard size={14} style={{ color: '#a78bfa' }} />
+          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payment</span>
+        </div>
+        <div className="module-form-row">
+          <div>
+            <label style={labelStyle}>Type</label>
+            <select style={inputStyle} value={formData.payment_type} onChange={e => setFormData(p => ({ ...p, payment_type: e.target.value as Chapter['payment_type'] }))}>
+              <option value="annual">Annual</option><option value="monthly">Monthly</option><option value="one_time">One-Time</option>
+            </select>
+          </div>
+          <div><label style={labelStyle}>Amount ($)</label><input style={inputStyle} type="number" value={formData.payment_amount} onChange={e => setFormData(p => ({ ...p, payment_amount: parseFloat(e.target.value) || 299 }))} /></div>
+        </div>
+        <div className="module-form-row">
+          <div><label style={labelStyle}>Last Payment</label><input style={inputStyle} type="date" value={formData.last_payment_date} onChange={e => setFormData(p => ({ ...p, last_payment_date: e.target.value }))} /></div>
+          <div><label style={labelStyle}>Next Payment</label><input style={inputStyle} type="date" value={formData.next_payment_date} onChange={e => setFormData(p => ({ ...p, next_payment_date: e.target.value }))} /></div>
+        </div>
+      </div>
+      <div><label style={labelStyle}>Next Action</label><input style={inputStyle} type="text" value={formData.next_action} onChange={e => setFormData(p => ({ ...p, next_action: e.target.value }))} /></div>
+      <div><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, resize: 'vertical' }} value={formData.notes} onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))} rows={3} /></div>
+    </div>
+  );
+}
+
+// ─── Submission View ──────────────────────────────────────────────────────────
+
+function SubmissionView({ submission }: { submission: SubmissionData }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ background: '#0a0a0f', borderRadius: 10, padding: '14px 18px', border: '1px solid #1e1e2e' }}>
+        <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 8, color: '#f0f0f8' }}>{submission.chapter.chapter_name}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: '0.85rem', color: '#9ca3af' }}>
+          {submission.chapter.school && <div><span style={{ color: '#6b7280' }}>School:</span> {submission.chapter.school}</div>}
+          {submission.chapter.estimated_alumni && <div><span style={{ color: '#6b7280' }}>Est. Alumni:</span> {submission.chapter.estimated_alumni}</div>}
+          {submission.submitted_at && <div><span style={{ color: '#6b7280' }}>Submitted:</span> {new Date(submission.submitted_at).toLocaleDateString()}</div>}
+        </div>
+        {submission.chapter.alumni_list_url && (
+          <div style={{ marginTop: 10 }}>
+            <a href={submission.chapter.alumni_list_url} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>
+              📎 Download Alumni List
+            </a>
+          </div>
+        )}
+      </div>
+      {submission.executives.length > 0 && (
+        <div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 10 }}>Executive Board</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {submission.executives.map((exec, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#0a0a0f', borderRadius: 8, border: '1px solid #1e1e2e', fontSize: '0.85rem' }}>
+                <div style={{ fontWeight: 600, flex: 1, color: '#e8e8f0' }}>{exec.full_name}</div>
+                <div style={{ color: '#6b7280', fontSize: '0.78rem' }}>{EXEC_POSITION_LABELS[exec.position] || exec.position}</div>
+                <div style={{ color: '#60a5fa', fontSize: '0.78rem' }}>{exec.email}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
