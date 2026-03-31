@@ -93,13 +93,13 @@ export default function USMap({ chapters, activeStates, selected, onSelect, chap
                 <Geography
                   key={geo.rsmKey}
                   geography={geo}
-                  fill={isSelectedState ? '#10b981' : isActive ? '#059669' : '#1e2d45'}
-                  stroke="#0d1117"
+                  fill={isSelectedState ? '#10b981' : isActive ? '#16a34a' : '#e5e7eb'}
+                  stroke="#ffffff"
                   strokeWidth={0.5}
                   style={{
                     default: { outline: 'none' },
                     hover: {
-                      fill: isActive ? '#10b981' : '#253550',
+                      fill: isActive ? '#16a34a' : '#d1d5db',
                       outline: 'none',
                       cursor: isActive ? 'pointer' : 'default',
                     },
@@ -141,39 +141,39 @@ export default function USMap({ chapters, activeStates, selected, onSelect, chap
       {statePanel && panelChapters.length > 0 && (
         <div
           ref={panelRef}
-          className="absolute top-4 left-4 w-72 bg-[#0d1117] border border-slate-600 rounded-xl shadow-2xl z-50 overflow-hidden"
+          className="absolute top-4 left-4 w-72 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-[#141b27]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <div>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-sm font-semibold text-gray-900">
                 {STATE_NAMES[statePanel] ?? statePanel}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5">
                 {panelChapters.length} chapter{panelChapters.length !== 1 ? 's' : ''}
               </p>
             </div>
             <button
               onClick={() => setStatePanel(null)}
-              className="text-slate-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-700"
+              className="text-gray-400 hover:text-gray-700 transition-colors p-1 rounded-lg hover:bg-gray-100"
             >
               <X size={14} />
             </button>
           </div>
 
           {/* Chapter list */}
-          <div className="max-h-64 overflow-y-auto divide-y divide-slate-800">
+          <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
             {panelChapters.map((c) => {
               const isActive = c.status === 'active';
               return (
                 <div
                   key={c.id}
-                  className="px-4 py-3 hover:bg-slate-800/50 transition-colors"
+                  className="px-4 py-3 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{c.chapter_name.trim()}</p>
-                      <p className="text-xs text-slate-400 mt-0.5 truncate">{c.school.trim()}</p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{c.chapter_name.trim()}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{c.school.trim()}</p>
                     </div>
                     <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium mt-0.5 ${
                       isActive

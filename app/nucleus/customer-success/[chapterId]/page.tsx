@@ -279,7 +279,7 @@ export default function ChapterDashboardPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#6b7280' }}>
+      <div style={{ minHeight: '100vh', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#6b7280' }}>
         <Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} />
         <span style={{ fontSize: '0.9rem' }}>Loading chapter…</span>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -289,12 +289,12 @@ export default function ChapterDashboardPage() {
 
   if (!chapter) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: '#e8e8f0' }}>
+      <div style={{ minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: '#111827' }}>
         <AlertTriangle size={40} style={{ color: '#ef4444' }} />
         <h2 style={{ margin: 0 }}>Chapter not found</h2>
         <button
           onClick={() => router.push('/nucleus/customer-success')}
-          style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #374151', background: '#111118', color: '#e8e8f0', cursor: 'pointer' }}
+          style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#111827', cursor: 'pointer' }}
         >
           Back to Customer Success
         </button>
@@ -305,9 +305,9 @@ export default function ChapterDashboardPage() {
   const sc = statusConfig[chapter.status] || statusConfig.onboarding;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e8e8f0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#ffffff', color: '#111827', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* ── Header ── */}
-      <header style={{ background: '#0d0d14', borderBottom: '1px solid #1e1e2e', padding: '0' }}>
+      <header style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '0' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 24px' }}>
           {/* Back nav */}
           <button
@@ -334,7 +334,7 @@ export default function ChapterDashboardPage() {
 
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#f0f0f8', lineHeight: 1.2 }}>
+                  <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>
                     {chapter.chapter_name}
                   </h1>
                   {/* Tier badge */}
@@ -404,13 +404,13 @@ export default function ChapterDashboardPage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <button
                 onClick={viewSubmission}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #1e1e2e', background: '#111118', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem', transition: 'all 0.15s' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem', transition: 'all 0.15s' }}
               >
                 <Eye size={13} /> Submission
               </button>
               <button
                 onClick={() => setShowEditModal(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #1e1e2e', background: '#111118', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem' }}
               >
                 <Edit2 size={13} /> Edit
               </button>
@@ -425,12 +425,12 @@ export default function ChapterDashboardPage() {
 
           {/* Setup progress bar */}
           {!chapter.onboarding_completed && (
-            <div style={{ marginTop: 16, padding: '10px 14px', background: '#111118', borderRadius: 8, border: '1px solid #1e1e2e' }}>
+            <div style={{ marginTop: 16, padding: '10px 14px', background: '#ffffff', borderRadius: 8, border: '1px solid #e5e7eb' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Setup Progress</span>
                 <span style={{ fontSize: '0.72rem', fontWeight: 700, color: onboardingPct >= 75 ? '#10b981' : '#f59e0b' }}>{onboardingPct}%</span>
               </div>
-              <div style={{ height: 4, background: '#1e1e2e', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', borderRadius: 2,
                   width: `${onboardingPct}%`,
@@ -444,7 +444,7 @@ export default function ChapterDashboardPage() {
 
         {/* ── Tab Navigation ── */}
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderTop: '1px solid #1e1e2e', scrollbarWidth: 'none' }}>
+          <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderTop: '1px solid #e5e7eb', scrollbarWidth: 'none' }}>
             {TABS.map(tab => (
               <button
                 key={tab.id}
@@ -510,9 +510,9 @@ export default function ChapterDashboardPage() {
         {toasts.map(t => (
           <div key={t.id} style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 8, maxWidth: 360,
-            background: t.type === 'success' ? '#064e3b' : t.type === 'error' ? '#450a0a' : '#1e1e2e',
-            border: `1px solid ${t.type === 'success' ? '#10b981' : t.type === 'error' ? '#ef4444' : '#374151'}`,
-            color: '#f0f0f8', fontSize: '0.85rem', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            background: t.type === 'success' ? '#f0fdf4' : t.type === 'error' ? '#fef2f2' : '#ffffff',
+            border: `1px solid ${t.type === 'success' ? '#16a34a' : t.type === 'error' ? '#ef4444' : '#e5e7eb'}`,
+            color: '#111827', fontSize: '0.85rem', boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
           }}>
             <span style={{ flex: 1 }}>{t.message}</span>
             <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0, display: 'flex' }}><X size={13} /></button>
@@ -523,9 +523,9 @@ export default function ChapterDashboardPage() {
       {/* ── Edit Modal ── */}
       {showEditModal && (
         <ModalOverlay className="module-modal-overlay" onClose={() => setShowEditModal(false)}>
-          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()} style={{ background: '#111118', border: '1px solid #1e1e2e', color: '#e8e8f0' }}>
-            <div className="module-modal-header" style={{ borderBottom: '1px solid #1e1e2e' }}>
-              <h2 style={{ color: '#f0f0f8' }}>Edit Chapter</h2>
+          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()} style={{ background: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }}>
+            <div className="module-modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <h2 style={{ color: '#111827' }}>Edit Chapter</h2>
               <button className="module-modal-close" onClick={() => setShowEditModal(false)}><X size={20} /></button>
             </div>
             <div className="module-modal-body">
@@ -542,7 +542,7 @@ export default function ChapterDashboardPage() {
                 </button>
               </div>
             </div>
-            <div className="module-modal-footer" style={{ borderTop: '1px solid #1e1e2e' }}>
+            <div className="module-modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
               <button className="module-cancel-btn" onClick={() => setShowEditModal(false)}>Cancel</button>
               <button
                 style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
@@ -558,9 +558,9 @@ export default function ChapterDashboardPage() {
       {/* ── Submission Modal ── */}
       {showSubmissionModal && (
         <ModalOverlay className="module-modal-overlay" onClose={() => { setShowSubmissionModal(false); setSubmission(null); }}>
-          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()} style={{ background: '#111118', border: '1px solid #1e1e2e', color: '#e8e8f0' }}>
-            <div className="module-modal-header" style={{ borderBottom: '1px solid #1e1e2e' }}>
-              <h2 style={{ color: '#f0f0f8' }}>Onboarding Submission</h2>
+          <div className="module-modal module-modal-large" onClick={e => e.stopPropagation()} style={{ background: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }}>
+            <div className="module-modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <h2 style={{ color: '#111827' }}>Onboarding Submission</h2>
               <button className="module-modal-close" onClick={() => { setShowSubmissionModal(false); setSubmission(null); }}><X size={20} /></button>
             </div>
             <div className="module-modal-body">
@@ -574,7 +574,7 @@ export default function ChapterDashboardPage() {
                 <p style={{ color: '#6b7280', textAlign: 'center', padding: '20px 0' }}>No submission found for this chapter.</p>
               )}
             </div>
-            <div className="module-modal-footer" style={{ borderTop: '1px solid #1e1e2e' }}>
+            <div className="module-modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
               <button className="module-cancel-btn" onClick={() => { setShowSubmissionModal(false); setSubmission(null); }}>Close</button>
             </div>
           </div>
@@ -584,7 +584,7 @@ export default function ChapterDashboardPage() {
       {/* ── Delete Modal ── */}
       {showDeleteModal && (
         <ModalOverlay className="module-modal-overlay" onClose={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}>
-          <div className="module-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, background: '#111118', border: '1px solid #1e1e2e', borderTop: '4px solid #ef4444', color: '#e8e8f0' }}>
+          <div className="module-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, background: '#ffffff', border: '1px solid #e5e7eb', borderTop: '4px solid #ef4444', color: '#111827' }}>
             <div className="module-modal-header" style={{ borderBottom: '1px solid rgba(239,68,68,0.15)' }}>
               <h2 style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AlertTriangle size={18} /> Delete Chapter
@@ -597,12 +597,12 @@ export default function ChapterDashboardPage() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#9ca3af', marginBottom: 6 }}>
-                  Type <strong style={{ fontFamily: 'monospace', background: '#1e1e2e', padding: '1px 6px', borderRadius: 4, color: '#e8e8f0' }}>{chapter.chapter_name}</strong> to confirm:
+                  Type <strong style={{ fontFamily: 'monospace', background: '#e5e7eb', padding: '1px 6px', borderRadius: 4, color: '#111827' }}>{chapter.chapter_name}</strong> to confirm:
                 </label>
                 <input
                   type="text" value={deleteConfirmName} onChange={e => setDeleteConfirmName(e.target.value)}
                   placeholder={chapter.chapter_name} autoFocus
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${deleteConfirmName === chapter.chapter_name ? '#ef4444' : '#374151'}`, background: '#0a0a0f', color: '#e8e8f0', fontSize: '0.875rem' }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${deleteConfirmName === chapter.chapter_name ? '#ef4444' : '#e5e7eb'}`, background: '#ffffff', color: '#111827', fontSize: '0.875rem' }}
                 />
               </div>
             </div>
@@ -613,7 +613,7 @@ export default function ChapterDashboardPage() {
                 disabled={deleteConfirmName !== chapter.chapter_name || deleting}
                 style={{
                   padding: '8px 20px', borderRadius: 8, border: 'none',
-                  background: deleteConfirmName === chapter.chapter_name ? '#ef4444' : '#374151',
+                  background: deleteConfirmName === chapter.chapter_name ? '#ef4444' : '#6b7280',
                   color: '#fff', cursor: deleteConfirmName === chapter.chapter_name && !deleting ? 'pointer' : 'not-allowed',
                   fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8,
                 }}
@@ -628,8 +628,8 @@ export default function ChapterDashboardPage() {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0a0f; }
-        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: #ffffff; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
       `}</style>
     </div>
   );
@@ -649,7 +649,7 @@ interface EditFormState {
 }
 
 function EditChapterForm({ formData, setFormData }: { formData: EditFormState; setFormData: React.Dispatch<React.SetStateAction<EditFormState>> }) {
-  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8, border: '1px solid #374151', background: '#0a0a0f', color: '#e8e8f0', fontSize: '0.85rem' };
+  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#111827', fontSize: '0.85rem' };
   const labelStyle: React.CSSProperties = { display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -680,7 +680,7 @@ function EditChapterForm({ formData, setFormData }: { formData: EditFormState; s
           </select>
         </div>
       </div>
-      <div style={{ padding: '12px', background: '#0a0a0f', borderRadius: 8, border: '1px solid #1e1e2e' }}>
+      <div style={{ padding: '12px', background: '#ffffff', borderRadius: 8, border: '1px solid #e5e7eb' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
           <CreditCard size={14} style={{ color: '#a78bfa' }} />
           <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payment</span>
@@ -710,8 +710,8 @@ function EditChapterForm({ formData, setFormData }: { formData: EditFormState; s
 function SubmissionView({ submission }: { submission: SubmissionData }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ background: '#0a0a0f', borderRadius: 10, padding: '14px 18px', border: '1px solid #1e1e2e' }}>
-        <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 8, color: '#f0f0f8' }}>{submission.chapter.chapter_name}</div>
+      <div style={{ background: '#ffffff', borderRadius: 10, padding: '14px 18px', border: '1px solid #e5e7eb' }}>
+        <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 8, color: '#111827' }}>{submission.chapter.chapter_name}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: '0.85rem', color: '#9ca3af' }}>
           {submission.chapter.school && <div><span style={{ color: '#6b7280' }}>School:</span> {submission.chapter.school}</div>}
           {submission.chapter.estimated_alumni && <div><span style={{ color: '#6b7280' }}>Est. Alumni:</span> {submission.chapter.estimated_alumni}</div>}
@@ -730,8 +730,8 @@ function SubmissionView({ submission }: { submission: SubmissionData }) {
           <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 10 }}>Executive Board</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {submission.executives.map((exec, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#0a0a0f', borderRadius: 8, border: '1px solid #1e1e2e', fontSize: '0.85rem' }}>
-                <div style={{ fontWeight: 600, flex: 1, color: '#e8e8f0' }}>{exec.full_name}</div>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#ffffff', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem' }}>
+                <div style={{ fontWeight: 600, flex: 1, color: '#111827' }}>{exec.full_name}</div>
                 <div style={{ color: '#6b7280', fontSize: '0.78rem' }}>{EXEC_POSITION_LABELS[exec.position] || exec.position}</div>
                 <div style={{ color: '#60a5fa', fontSize: '0.78rem' }}>{exec.email}</div>
               </div>

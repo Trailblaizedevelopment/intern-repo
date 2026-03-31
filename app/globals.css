@@ -33913,3 +33913,268 @@ body { background: #FAFAFA; }
 @media (max-width: 768px) {
   .sn__platform-toggle { display: none; }
 }
+
+/* ================================================================
+   PHASE 5: WHITE DESIGN SYSTEM — FINAL CONSOLIDATION
+   All Workspace/Nucleus pages: true white, no dark mode, 
+   no navy (#1a2744), no cream (#FAFAF8) backgrounds.
+   Color reserved for status signals only.
+   ================================================================ */
+
+/* ── Page surfaces ──────────────────────────────────────────────── */
+body { background: #ffffff !important; }
+.ws-layout { background: #ffffff !important; }
+.ws-main { background: #ffffff !important; }
+.nucleus { background: #ffffff !important; }
+.nucleus-main { background: transparent !important; }
+.module-page { background: #ffffff !important; }
+.ws-content { background: transparent !important; }
+
+/* ── Sidebar: already white; reinforce active state as soft highlight ── */
+.ws-nav-item.active {
+  background: #f3f4f6 !important;
+  color: #111111 !important;
+  font-weight: 600 !important;
+  border-left: 3px solid #111111 !important;
+}
+
+/* ── Nucleus: module icon — no gradient, flat gray ──────────────── */
+.nucleus-module-icon-enhanced {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+  box-shadow: none !important;
+}
+
+/* ── Nucleus: company stat accent stripe — remove hover gradient ── */
+.nucleus-company-stat::before { display: none !important; }
+
+/* ── Nucleus: attention banner — no gradient ─────────────────────── */
+.nucleus-attention-banner {
+  background: #fef3c7 !important;
+  border: 1px solid #d97706 !important;
+}
+
+/* ── Nucleus: module stats row background ────────────────────────── */
+.nucleus-module-stats-row { background: #f9fafb !important; }
+
+/* ── Headings: remove serif font, use system sans ───────────────── */
+.ws-subpage-header-left h1,
+.nucleus-section-title,
+.module-title-row h1,
+.nucleus-module-title-enhanced,
+.nucleus-title h1,
+.tasks-header h1,
+.inbox-header h1,
+.projects-header h1,
+.team-header h1 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif !important;
+}
+
+/* ── Navy → dark gray for all text that used #1a2744 ───────────── */
+.module-title-row h1,
+.module-table-name,
+.module-stat-value,
+.nucleus-stat-value,
+.nucleus-company-stat-value,
+.nucleus-module-stat-item .nucleus-module-stat-value,
+.nucleus-title h1,
+.ws-subpage-stat-value,
+.tasks-header h1,
+.inbox-header h1,
+.projects-header h1 {
+  color: #111827 !important;
+}
+
+/* ── Module icon in header — flat gray ───────────────────────────── */
+.module-icon {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+}
+
+/* ── Primary button — solid black (not navy, not var(--color-navy)) */
+.module-primary-btn {
+  background: #111827 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+}
+.module-primary-btn:hover {
+  background: #1f2937 !important;
+}
+
+/* ── Module search + filter — clean border ───────────────────────── */
+.module-search {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+}
+.module-filter-btn {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #374151 !important;
+}
+.module-filter-btn:hover {
+  background: #f9fafb !important;
+  border-color: #d1d5db !important;
+  color: #111827 !important;
+}
+
+/* ── Module table container ─────────────────────────────────────── */
+.module-table-container {
+  border-radius: 8px !important;
+}
+
+/* ── Module back link ───────────────────────────────────────────── */
+.module-back { color: #6b7280 !important; }
+.module-back:hover { color: #111827 !important; }
+
+/* ── Tasks page ─────────────────────────────────────────────────── */
+.tasks-stat {
+  border: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+}
+.tasks-list-container {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.tasks-filter-tab.active {
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+.tasks-filters {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.tasks-empty button { background: #111827 !important; }
+.tasks-new-btn {
+  background: #111827 !important;
+  border-radius: 8px !important;
+}
+.tasks-count {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+}
+.tasks-item.overdue { background: #fff9f9 !important; }
+
+/* ── Inbox page ─────────────────────────────────────────────────── */
+.inbox-container {
+  border: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+}
+.inbox-sidebar {
+  background: #f9fafb !important;
+  border-right: 1px solid #e5e7eb !important;
+}
+.inbox-tab.active {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+  font-weight: 600 !important;
+}
+.inbox-compose-btn {
+  background: #111827 !important;
+  border-radius: 8px !important;
+}
+.inbox-compose-btn:hover { background: #1f2937 !important; }
+
+/* ── Projects page ──────────────────────────────────────────────── */
+.projects-stat {
+  border: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+}
+.projects-count {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+}
+.projects-new-btn {
+  background: #111827 !important;
+  border-radius: 8px !important;
+}
+.projects-filter-tab.active {
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+/* ── Shared ws-subpage stats: remove colored warning/success tints ── */
+.ws-subpage-stat.warning {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+.ws-subpage-stat.warning svg { color: #d97706 !important; }
+.ws-subpage-stat.success {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+.ws-subpage-stat.success svg { color: #16a34a !important; }
+
+/* ── ws-filter tabs: soft active state ──────────────────────────── */
+.ws-filter-tab.active {
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+/* ── ws-subpage stat values — system font ───────────────────────── */
+.ws-subpage-stat-value {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif !important;
+  color: #111827 !important;
+}
+
+/* ── Global h1-h6 in ws/nucleus context: no serif ───────────────── */
+.ws-main h1, .ws-main h2, .ws-main h3, .ws-main h4, .ws-main h5, .ws-main h6 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif !important;
+}
+
+/* ── No italic action prompts ───────────────────────────────────── */
+.ws-main em, .ws-main i,
+.nucleus em, .nucleus i,
+.module-page em, .module-page i {
+  font-style: normal !important;
+}
+
+/* ── ws-nucleus link in sidebar ─────────────────────────────────── */
+.ws-nucleus-link {
+  background: #111827 !important;
+  color: #ffffff !important;
+  border-radius: 6px !important;
+}
+.ws-nucleus-link:hover {
+  background: #1f2937 !important;
+  transform: none !important;
+}
+
+/* ── Nucleus action buttons: not navy ──────────────────────────── */
+.nucleus-action-button:hover {
+  background: #111827 !important;
+  color: #ffffff !important;
+  border-color: #111827 !important;
+}
+
+/* ── Module table hover ─────────────────────────────────────────── */
+.module-table tr:hover { background: #f9fafb !important; }
+
+/* ── ws-topbar: clean white ─────────────────────────────────────── */
+.ws-topbar {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* ── ws-search ─────────────────────────────────────────────────── */
+.ws-search {
+  background: #f9fafb !important;
+  border-color: #e5e7eb !important;
+  border-radius: 8px !important;
+}
+.ws-search:focus-within {
+  background: #ffffff !important;
+  border-color: #111827 !important;
+}
+
+/* ── ws-icon-btn ────────────────────────────────────────────────── */
+.ws-icon-btn:hover {
+  background: #111827 !important;
+  border-color: #111827 !important;
+  color: #ffffff !important;
+}

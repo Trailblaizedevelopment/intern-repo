@@ -189,23 +189,23 @@ export default function ClientMapPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-white p-4 md:p-6">
+    <div className="min-h-screen bg-white text-gray-900 p-4 md:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           🗺️ <span>Client Map &amp; Revenue Goals</span>
         </h1>
-        <p className="text-slate-400 text-sm mt-1">
+        <p className="text-gray-500 text-sm mt-1">
           {count} active chapter{count !== 1 ? 's' : ''} · {states} state{states !== 1 ? 's' : ''} · {fmt$(totalARR)} ARR
         </p>
       </div>
 
       <div className="flex flex-col xl:flex-row gap-6">
         {/* ── LEFT: MAP ──────────────────────────────────────────────────── */}
-        <div className="xl:w-[65%] bg-[#141b27] rounded-2xl border border-slate-700/50 p-4 relative overflow-hidden">
+        <div className="xl:w-[65%] bg-white rounded-2xl border border-gray-200 p-4 relative overflow-hidden">
           <div className="flex items-center gap-2 mb-3">
             <Globe size={16} className="text-emerald-400" />
-            <span className="text-sm font-semibold text-slate-300">US Chapter Coverage</span>
-            <span className="ml-auto text-xs text-slate-500">Click a highlighted state or pin</span>
+            <span className="text-sm font-semibold text-gray-700">US Chapter Coverage</span>
+            <span className="ml-auto text-xs text-gray-400">Click a highlighted state or pin</span>
           </div>
 
           <USMap
@@ -217,13 +217,13 @@ export default function ClientMapPage() {
           />
 
           {/* Legend */}
-          <div className="flex gap-4 mt-3 text-xs text-slate-400">
+          <div className="flex gap-4 mt-3 text-xs text-gray-500">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-emerald-600 inline-block" />
               Active state
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-[#1e2d45] border border-slate-600 inline-block" />
+              <span className="w-3 h-3 rounded-sm bg-gray-100 border border-gray-300 inline-block" />
               No chapters
             </span>
             <span className="flex items-center gap-1.5">
@@ -234,13 +234,13 @@ export default function ClientMapPage() {
 
           {/* Pin Tooltip */}
           {selected && (
-            <div className="absolute top-16 right-4 w-64 bg-[#0d1117] border border-slate-600 rounded-xl p-4 shadow-2xl z-50">
+            <div className="absolute top-16 right-4 w-64 bg-white border border-gray-200 rounded-xl p-4 shadow-lg z-50">
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <p className="font-semibold text-white text-sm">{selected.chapter_name.trim()}</p>
-                  <p className="text-slate-400 text-xs mt-0.5">{selected.school.trim()}</p>
+                  <p className="font-semibold text-gray-900 text-sm">{selected.chapter_name.trim()}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">{selected.school.trim()}</p>
                 </div>
-                <button onClick={() => setSelected(null)} className="text-slate-500 hover:text-white ml-2">
+                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-700 ml-2">
                   <X size={14} />
                 </button>
               </div>
@@ -252,11 +252,11 @@ export default function ClientMapPage() {
                 }`}>
                   {selected.status === 'active' ? 'Active' : 'Onboarding'}
                 </span>
-                <span className="text-xs text-slate-400">{selected.state}</span>
+                <span className="text-xs text-gray-500">{selected.state}</span>
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-700">
-                <p className="text-xs text-slate-400">ARR Contribution</p>
-                <p className="text-base font-bold text-emerald-400">${selected.arr.toLocaleString()}/yr</p>
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500">ARR Contribution</p>
+                <p className="text-base font-bold text-emerald-600">${selected.arr.toLocaleString()}/yr</p>
               </div>
             </div>
           )}
@@ -268,24 +268,24 @@ export default function ClientMapPage() {
           style={{ minWidth: '380px', maxHeight: 'calc(100vh - 180px)', paddingRight: '4px' }}
         >
           {/* ARR Progress */}
-          <div className="bg-[#141b27] rounded-2xl border border-slate-700/50 p-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <div className="flex items-center gap-2 mb-4">
               <DollarSign size={17} className="text-emerald-400" />
-              <span className="text-base font-semibold text-slate-200">ARR Progress</span>
+              <span className="text-base font-semibold text-gray-800">ARR Progress</span>
             </div>
-            <div className="text-3xl font-bold text-white mb-1">{fmt$(totalARR)}</div>
-            <p className="text-xs text-slate-400 mb-4">
+            <div className="text-3xl font-bold text-gray-900 mb-1">{fmt$(totalARR)}</div>
+            <p className="text-xs text-gray-500 mb-4">
               Currently at {fmt$(totalARR)} —{' '}
               <span className="text-amber-400 font-medium">{fmt$(nextMilestone - totalARR)} to go</span>
               {' '}until {fmt$(nextMilestone)}
             </p>
-            <div className="w-full bg-slate-800 rounded-full h-2.5 mb-2">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
               <div
                 className="h-2.5 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all"
                 style={{ width: `${Math.min(arrProgress, 100)}%` }}
               />
             </div>
-            <div className="flex justify-between text-xs text-slate-500 mb-4">
+            <div className="flex justify-between text-xs text-gray-400 mb-4">
               <span>{fmt$(prevMilestone)}</span>
               <span>{fmt$(nextMilestone)}</span>
             </div>
@@ -293,10 +293,10 @@ export default function ClientMapPage() {
               {ARR_MILESTONES.map((m) => (
                 <span key={m} className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
                   totalARR >= m
-                    ? 'bg-emerald-900/50 border-emerald-600 text-emerald-400'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                     : m === nextMilestone
-                    ? 'bg-amber-900/40 border-amber-500 text-amber-400'
-                    : 'bg-slate-800 border-slate-700 text-slate-500'
+                    ? 'bg-amber-50 border-amber-300 text-amber-700'
+                    : 'bg-gray-100 border-gray-200 text-gray-400'
                 }`}>
                   {fmt$(m)}
                 </span>
@@ -305,22 +305,22 @@ export default function ClientMapPage() {
           </div>
 
           {/* Chapter Count Tiers */}
-          <div className="bg-[#141b27] rounded-2xl border border-slate-700/50 p-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <div className="flex items-center gap-2 mb-4">
               <Users size={17} className="text-emerald-400" />
-              <span className="text-base font-semibold text-slate-200">Chapter Growth Tiers</span>
+              <span className="text-base font-semibold text-gray-800">Chapter Growth Tiers</span>
             </div>
             <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-5xl font-black text-white">{count}</span>
-              <span className="text-slate-400 text-sm">chapters</span>
+              <span className="text-5xl font-black text-gray-900">{count}</span>
+              <span className="text-gray-500 text-sm">chapters</span>
             </div>
-            <div className="w-full bg-slate-800 rounded-full h-2.5 mb-2">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
               <div
                 className="h-2.5 rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all"
                 style={{ width: `${Math.min(tierProgress, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-slate-400 mb-5">
+            <p className="text-xs text-gray-500 mb-5">
               {count - prevTier} of {nextTier - prevTier} to reach{' '}
               <span className="text-amber-400 font-medium">{nextTier} chapters</span>
             </p>
@@ -331,14 +331,14 @@ export default function ClientMapPage() {
                 return (
                   <div key={tier} className="flex items-center gap-3 py-1">
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
-                      done ? 'bg-emerald-600 text-white' : current ? 'bg-amber-500 text-black animate-pulse' : 'bg-slate-800 border border-slate-600 text-slate-500'
+                      done ? 'bg-emerald-600 text-white' : current ? 'bg-amber-500 text-black animate-pulse' : 'bg-gray-100 border border-gray-300 text-gray-400'
                     }`}>
                       {done ? '✓' : ''}
                     </div>
-                    <span className={`text-sm font-medium ${done ? 'text-emerald-400' : current ? 'text-amber-400' : 'text-slate-500'}`}>
+                    <span className={`text-sm font-medium ${done ? 'text-emerald-700' : current ? 'text-amber-700' : 'text-gray-400'}`}>
                       {tier} chapters
                     </span>
-                    {current && <span className="ml-auto text-xs text-amber-500 font-bold">← next</span>}
+                    {current && <span className="ml-auto text-xs text-amber-600 font-bold">← next</span>}
                   </div>
                 );
               })}
@@ -355,17 +355,17 @@ export default function ClientMapPage() {
 
           {/* Regional Breakdown */}
           {regionData.length > 0 && (
-            <div className="bg-[#141b27] rounded-2xl border border-slate-700/50 p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 size={17} className="text-emerald-400" />
-                <span className="text-base font-semibold text-slate-200">Regional Breakdown</span>
+                <span className="text-base font-semibold text-gray-800">Regional Breakdown</span>
               </div>
               <ResponsiveContainer width="100%" height={140}>
                 <BarChart data={regionData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{ background: '#0d1117', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                    contentStyle={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 12 }}
                     cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                   />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]}>
@@ -375,7 +375,7 @@ export default function ClientMapPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <p className="text-xs text-slate-500 mt-2">
+              <p className="text-xs text-gray-500 mt-2">
                 Strongest: <span className="text-emerald-400 font-medium">{topRegion}</span>{' '}
                 ({regionData[0]?.value ?? 0} chapters)
               </p>
@@ -389,12 +389,12 @@ export default function ClientMapPage() {
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="bg-[#141b27] rounded-xl border border-slate-700/50 p-4">
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
       <div className="flex items-center gap-1.5 mb-2">
         {icon}
-        <span className="text-xs text-slate-400">{label}</span>
+        <span className="text-xs text-gray-500">{label}</span>
       </div>
-      <p className="text-xl font-bold text-white">{value}</p>
+      <p className="text-xl font-bold text-gray-900">{value}</p>
     </div>
   );
 }

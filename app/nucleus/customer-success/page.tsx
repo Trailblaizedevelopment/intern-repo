@@ -253,10 +253,10 @@ export default function CustomerSuccessPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e8e8f0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#ffffff', color: '#111827', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header style={{ borderBottom: '1px solid #1e1e2e', background: '#0d0d14', padding: '16px 0' }}>
+      <header style={{ borderBottom: '1px solid #e5e7eb', background: '#ffffff', padding: '16px 0' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 24px' }}>
           <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
             <Link href="/nucleus" style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6b7280', fontSize: '0.8rem', textDecoration: 'none' }}>
@@ -278,7 +278,7 @@ export default function CustomerSuccessPage() {
                 <HeartHandshake size={22} />
               </div>
               <div>
-                <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f0f0f8', lineHeight: 1.2, margin: 0 }}>
+                <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#111827', lineHeight: 1.2, margin: 0 }}>
                   Customer Success
                 </h1>
                 <p style={{ color: '#6b7280', fontSize: '0.8rem', margin: '2px 0 0' }}>
@@ -293,7 +293,7 @@ export default function CustomerSuccessPage() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '7px 14px', borderRadius: 8,
-                  border: '1px solid #1e1e2e', background: '#111118',
+                  border: '1px solid #e5e7eb', background: '#ffffff',
                   color: '#9ca3af', cursor: 'pointer', fontSize: '0.8rem',
                 }}
               >
@@ -305,7 +305,7 @@ export default function CustomerSuccessPage() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '7px 14px', borderRadius: 8,
-                  border: '1px solid #1e1e2e', background: '#111118',
+                  border: '1px solid #e5e7eb', background: '#ffffff',
                   color: '#9ca3af', cursor: 'pointer', fontSize: '0.8rem',
                 }}
               >
@@ -382,7 +382,7 @@ export default function CustomerSuccessPage() {
               <div style={{
                 flex: 1, minWidth: 220, display: 'flex', alignItems: 'center', gap: 8,
                 padding: '8px 12px', borderRadius: 8,
-                border: '1px solid #1e1e2e', background: '#111118',
+                border: '1px solid #e5e7eb', background: '#ffffff',
               }}>
                 <Search size={15} style={{ color: '#6b7280', flexShrink: 0 }} />
                 <input
@@ -392,7 +392,7 @@ export default function CustomerSuccessPage() {
                   onChange={e => setSearchQuery(e.target.value)}
                   style={{
                     background: 'none', border: 'none', outline: 'none',
-                    color: '#e8e8f0', fontSize: '0.85rem', flex: 1, minWidth: 0,
+                    color: '#111827', fontSize: '0.85rem', flex: 1, minWidth: 0,
                   }}
                 />
                 {searchQuery && (
@@ -421,8 +421,8 @@ export default function CustomerSuccessPage() {
                       padding: '6px 12px', borderRadius: 20,
                       border: filterHealth === pill.key
                         ? `1px solid ${pill.color}`
-                        : '1px solid #1e1e2e',
-                      background: filterHealth === pill.key ? pill.activeBg : '#111118',
+                        : '1px solid #e5e7eb',
+                      background: filterHealth === pill.key ? pill.activeBg : '#ffffff',
                       color: filterHealth === pill.key ? pill.color : '#6b7280',
                       cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
                       transition: 'all 0.15s',
@@ -463,16 +463,16 @@ export default function CustomerSuccessPage() {
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center',
                     justifyContent: 'center', gap: 8, padding: '32px 24px',
-                    borderRadius: 12, border: '2px dashed #1e1e2e',
+                    borderRadius: 12, border: '2px dashed #e5e7eb',
                     background: 'transparent', color: '#4b5563',
                     cursor: 'pointer', transition: 'all 0.15s', minHeight: 180,
                   }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#374151';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#d1d5db';
                     (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af';
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#1e1e2e';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb';
                     (e.currentTarget as HTMLButtonElement).style.color = '#4b5563';
                   }}
                 >
@@ -505,9 +505,9 @@ export default function CustomerSuccessPage() {
           <div key={t.id} style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 16px', borderRadius: 8, maxWidth: 360,
-            background: t.type === 'success' ? '#064e3b' : t.type === 'error' ? '#450a0a' : '#1e1e2e',
-            border: `1px solid ${t.type === 'success' ? '#10b981' : t.type === 'error' ? '#ef4444' : '#374151'}`,
-            color: '#f0f0f8', fontSize: '0.85rem',
+            background: t.type === 'success' ? '#f0fdf4' : t.type === 'error' ? '#fef2f2' : '#ffffff',
+            border: `1px solid ${t.type === 'success' ? '#10b981' : t.type === 'error' ? '#ef4444' : '#e5e7eb'}`,
+            color: '#111827', fontSize: '0.85rem',
             boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
             animation: 'fadeIn 0.2s ease',
           }}>
@@ -528,16 +528,16 @@ export default function CustomerSuccessPage() {
           <div
             className="module-modal module-modal-large"
             onClick={e => e.stopPropagation()}
-            style={{ background: '#111118', border: '1px solid #1e1e2e', color: '#e8e8f0' }}
+            style={{ background: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }}
           >
-            <div className="module-modal-header" style={{ borderBottom: '1px solid #1e1e2e' }}>
-              <h2 style={{ color: '#f0f0f8' }}>{editingChapter ? 'Edit Chapter' : 'Add Chapter'}</h2>
+            <div className="module-modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <h2 style={{ color: '#111827' }}>{editingChapter ? 'Edit Chapter' : 'Add Chapter'}</h2>
               <button className="module-modal-close" onClick={resetForm}><X size={20} /></button>
             </div>
             <div className="module-modal-body">
               <ChapterForm formData={formData} setFormData={setFormData} />
             </div>
-            <div className="module-modal-footer" style={{ borderTop: '1px solid #1e1e2e' }}>
+            <div className="module-modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
               <button className="module-cancel-btn" onClick={resetForm}>Cancel</button>
               <button
                 style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
@@ -557,10 +557,10 @@ export default function CustomerSuccessPage() {
           <div
             className="module-modal"
             onClick={e => e.stopPropagation()}
-            style={{ background: '#111118', border: '1px solid #1e1e2e', color: '#e8e8f0' }}
+            style={{ background: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }}
           >
-            <div className="module-modal-header" style={{ borderBottom: '1px solid #1e1e2e' }}>
-              <h2 style={{ color: '#f0f0f8' }}>Settings</h2>
+            <div className="module-modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <h2 style={{ color: '#111827' }}>Settings</h2>
               <button className="module-modal-close" onClick={() => setShowSettingsModal(false)}><X size={20} /></button>
             </div>
             <div className="module-modal-body">
@@ -572,11 +572,11 @@ export default function CustomerSuccessPage() {
                   type="url" value={bookingLink}
                   onChange={e => setBookingLink(e.target.value)}
                   placeholder="https://calendar.google.com/…"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: '1px solid #374151', background: '#0a0a0f', color: '#e8e8f0', fontSize: '0.875rem' }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#111827', fontSize: '0.875rem' }}
                 />
               </div>
             </div>
-            <div className="module-modal-footer" style={{ borderTop: '1px solid #1e1e2e' }}>
+            <div className="module-modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
               <button className="module-cancel-btn" onClick={() => setShowSettingsModal(false)}>Cancel</button>
               <button
                 style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
@@ -621,7 +621,7 @@ function StatCard({ icon, iconBg, iconColor, value, label, valueColor }: {
   return (
     <div style={{
       padding: '16px', borderRadius: 12,
-      background: '#111118', border: '1px solid #1e1e2e',
+      background: '#ffffff', border: '1px solid #e5e7eb',
     }}>
       <div style={{
         width: 32, height: 32, borderRadius: 8,
@@ -631,7 +631,7 @@ function StatCard({ icon, iconBg, iconColor, value, label, valueColor }: {
       }}>
         {icon}
       </div>
-      <div style={{ fontSize: '1.6rem', fontWeight: 700, color: valueColor || '#f0f0f8', lineHeight: 1 }}>
+      <div style={{ fontSize: '1.6rem', fontWeight: 700, color: valueColor || '#111827', lineHeight: 1 }}>
         {value}
       </div>
       <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: 5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -658,8 +658,8 @@ function ChapterTriageCard({ chapter, onOpen, onEdit }: {
 
   return (
     <div style={{
-      background: '#111118',
-      border: '1px solid #1e1e2e',
+      background: '#ffffff',
+      border: '1px solid #e5e7eb',
       borderRadius: 12,
       cursor: 'pointer',
       transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.15s',
@@ -677,7 +677,7 @@ function ChapterTriageCard({ chapter, onOpen, onEdit }: {
       }}
       onMouseLeave={e => {
         const el = e.currentTarget as HTMLDivElement;
-        el.style.borderColor = '#1e1e2e';
+        el.style.borderColor = '#e5e7eb';
         el.style.transform = 'translateY(0)';
         el.style.boxShadow = 'none';
       }}
@@ -696,7 +696,7 @@ function ChapterTriageCard({ chapter, onOpen, onEdit }: {
         {/* Row 1: Name + health score + edit */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#f0f0f8', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#111827', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {chapter.chapter_name}
             </h3>
             <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -786,7 +786,7 @@ function ChapterTriageCard({ chapter, onOpen, onEdit }: {
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '6px 12px', borderRadius: 8,
-              border: '1px solid #1e1e2e', background: 'transparent',
+              border: '1px solid #e5e7eb', background: 'transparent',
               color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem',
               fontWeight: 600, transition: 'all 0.15s',
             }}
@@ -795,7 +795,7 @@ function ChapterTriageCard({ chapter, onOpen, onEdit }: {
               (e.currentTarget as HTMLButtonElement).style.color = tier.color;
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = '#1e1e2e';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb';
               (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af';
             }}
           >
@@ -839,19 +839,19 @@ function LoadingSkeleton() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {[1, 2, 3, 4].map(i => (
           <div key={i} style={{
-            height: 88, borderRadius: 12, background: '#111118',
+            height: 88, borderRadius: 12, background: '#ffffff',
             animation: 'pulse 1.5s ease-in-out infinite',
             animationDelay: `${i * 0.1}s`,
           }} />
         ))}
       </div>
       {/* Filter row skeleton */}
-      <div style={{ height: 40, borderRadius: 8, background: '#111118', animation: 'pulse 1.5s ease-in-out infinite' }} />
+      <div style={{ height: 40, borderRadius: 8, background: '#ffffff', animation: 'pulse 1.5s ease-in-out infinite' }} />
       {/* Cards skeleton */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
         {[1, 2, 3, 4, 5, 6].map(i => (
           <div key={i} style={{
-            height: 220, borderRadius: 12, background: '#111118',
+            height: 220, borderRadius: 12, background: '#ffffff',
             animation: 'pulse 1.5s ease-in-out infinite',
             animationDelay: `${i * 0.08}s`,
           }} />
@@ -874,15 +874,15 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       }}>
         <AlertTriangle size={26} strokeWidth={1.5} />
       </div>
-      <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f0f0f8', margin: '0 0 8px' }}>Something went wrong</h3>
+      <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', margin: '0 0 8px' }}>Something went wrong</h3>
       <p style={{ color: '#6b7280', margin: '0 0 24px', maxWidth: 360, lineHeight: 1.6, fontSize: '0.88rem' }}>{message}</p>
       <button
         onClick={onRetry}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '9px 20px', borderRadius: 10,
-          border: '1px solid #374151', background: '#111118',
-          color: '#e8e8f0', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+          border: '1px solid #e5e7eb', background: '#ffffff',
+          color: '#111827', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
         }}
       >
         <RefreshCw size={15} /> Try Again
@@ -905,7 +905,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       }}>
         <HeartHandshake size={30} strokeWidth={1.5} />
       </div>
-      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#f0f0f8', margin: '0 0 8px' }}>No chapters yet</h3>
+      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#111827', margin: '0 0 8px' }}>No chapters yet</h3>
       <p style={{ color: '#6b7280', margin: '0 0 24px', maxWidth: 360, lineHeight: 1.6 }}>
         Add your first chapter to start tracking onboarding, outreach, and health scores.
       </p>
@@ -943,8 +943,8 @@ function ChapterForm({ formData, setFormData }: {
 }) {
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', padding: '8px 10px',
-    borderRadius: 8, border: '1px solid #374151',
-    background: '#0a0a0f', color: '#e8e8f0', fontSize: '0.85rem',
+    borderRadius: 8, border: '1px solid #e5e7eb',
+    background: '#ffffff', color: '#111827', fontSize: '0.85rem',
   };
   const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: '0.75rem', fontWeight: 600,
@@ -987,7 +987,7 @@ function ChapterForm({ formData, setFormData }: {
       </div>
 
       {/* Payment section */}
-      <div style={{ padding: '12px', background: '#0a0a0f', borderRadius: 8, border: '1px solid #1e1e2e' }}>
+      <div style={{ padding: '12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
           <CreditCard size={14} style={{ color: '#a78bfa' }} />
           <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payment</span>
