@@ -243,7 +243,7 @@ function OutreachStatsSection({
       const res = await fetch('/api/outreach/compile-chapter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chapter_id: chapterId, date: today, t1_limit: t1Limit ?? undefined }),
+        body: JSON.stringify({ chapter_id: chapterId, date: today, t1_limit: t1Limit ?? undefined, force: true }),
       });
       const json = await res.json();
       if (json.error) {
@@ -251,7 +251,7 @@ function OutreachStatsSection({
       } else if (json.total === 0) {
         showToast(json.message || 'No eligible contacts found.', 'info');
       } else if (json.existing) {
-        showToast('A batch already exists for today — view it in the Linq Outreach tab.', 'info');
+        showToast('Batch loaded — approve and execute below.', 'info');
         setBatch(json.batch);
       } else {
         showToast(`✓ Compiled batch: ${json.batch?.total_contacts} contacts`, 'success');

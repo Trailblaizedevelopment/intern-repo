@@ -56,14 +56,14 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
-  let body: { chapter_id: string; date?: string };
+  let body: { chapter_id: string; date?: string; force?: boolean; t1_limit?: number };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { chapter_id, date } = body;
+  const { chapter_id, date, force, t1_limit } = body;
   if (!chapter_id) {
     return NextResponse.json({ error: 'chapter_id is required' }, { status: 400 });
   }
@@ -93,7 +93,13 @@ export async function POST(request: NextRequest) {
 
     if (existingBatches && existingBatches.length > 0) {
       const existing = existingBatches[0];
-      if (existing.status === 'pending_approval' || existing.status === 'approved') {
+      if (existing.status === 'pending_approval' && force) {
+        // Delete old pending batch so we can recompile with new settings
+        await supabase.from('outreach_batches').delete().eq('id', existing.id);
+      } else if (existing.status === 'approved' && force) {
+        // Don't allow force-recompile over an approved batch — too risky
+        return NextResponse.json({ error: 'Batch is already approved — cannot recompile. Reject it first.' }, { status: 409 });
+      } else if (existing.status === 'pending_approval' || existing.status === 'approved') {
         return NextResponse.json({ existing: true, batch: existing });
       }
     }
@@ -115,7 +121,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ total: 0, message: 'All lines are paused — resume at least one line first.' });
     }
 
-    const t1Cap = activeLines.reduce((sum, l) => sum + getLineT1Cap(l), 0);
+    const t1CapMax = activeLines.reduce((sum, l) => sum + getLineT1Cap(l), 0);
+    const t1Cap = (t1_limit != null && Number.isFinite(t1_limit))
+      ? Math.min(Math.max(0, t1_limit), t1CapMax)
+      : t1CapMax;
     const t2t3Cap = activeCount * 100;
 
     // ── 3. Cutoffs ────────────────────────────────────────────────────────────
