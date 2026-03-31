@@ -1,30 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(request: NextRequest) {
   try {
     // Check for required environment variables
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error('Missing environment variables:', {
-        hasUrl: !!supabaseUrl,
-        hasServiceKey: !!serviceRoleKey,
-      });
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error: Missing Supabase credentials', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
     // Admin client with service role key - bypasses RLS and email confirmation
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const body = await request.json();
     const { email, password, name, role, seniority, department, status, start_date } = body;

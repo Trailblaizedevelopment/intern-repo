@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { 
   verifyLinearWebhookSignature, 
@@ -6,9 +7,6 @@ import {
   LinearWebhookPayload,
   LinearWebhookAction
 } from '@/lib/linear';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
  * POST /api/linear/webhooks
@@ -56,9 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Create Supabase admin client
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const supabase = getSupabaseAdmin();
 
     // Store webhook event for audit/debugging
     await supabase.from('linear_webhook_events').insert({

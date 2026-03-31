@@ -15,21 +15,15 @@
  *   5. If matched to an alumni_contact (by phone or email), updates outreach_status → signed_up
  */
 
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 const WEBHOOK_SECRET     = process.env.ALUMNI_WEBHOOK_SECRET    || '';
 const supabaseUrl        = process.env.NEXT_PUBLIC_SUPABASE_URL  || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // Bulk-imported chapter — skip entirely
 const BULK_IMPORT_CHAPTER_ID = '404e65ab-1123-44a0-81c7-e8e75118e741';
 const DEMO_NAMES = ['Sales Demo Chapter', 'Trailblaize Demo Chapter'];
-
-function getAdmin() {
-  if (!supabaseUrl || !supabaseServiceKey) return null;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 function normalizePhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -109,7 +103,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'profile.id required' }, { status: 400 });
   }
 
-  const db = getAdmin();
+  const db = getSupabaseAdmin();
   if (!db) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
   const now = new Date().toISOString();

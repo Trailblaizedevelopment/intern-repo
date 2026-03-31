@@ -1,13 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-function getAdmin() {
-  if (!supabaseUrl || !supabaseServiceKey) return null;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
  * POST /api/outreach/batches/[id]/approve
@@ -18,7 +10,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const admin = getAdmin();
+  const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
 
   const { id } = await params;

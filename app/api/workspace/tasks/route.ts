@@ -1,21 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-let supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient {
-  if (!supabase) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!url || !key) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    
-    supabase = createClient(url, key);
-  }
-  return supabase;
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export interface WorkspaceTask {
   id: string;
@@ -54,7 +38,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const completedSince = searchParams.get('completed_since');
 
-    let query = getSupabase()
+    let query = getSupabaseAdmin()
       .from('workspace_tasks')
       .select(TASK_SELECT)
       .order('created_at', { ascending: false });
@@ -107,7 +91,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await getSupabaseAdmin()
       .from('workspace_tasks')
       .insert({
         employee_id,

@@ -1,21 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-let supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient {
-  if (!supabase) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!url || !key) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    
-    supabase = createClient(url, key);
-  }
-  return supabase;
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 const TASK_SELECT = `
   *,
@@ -34,7 +18,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await getSupabaseAdmin()
       .from('workspace_tasks')
       .select(TASK_SELECT)
       .eq('id', id)
@@ -95,7 +79,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       updates.completed_at = null;
     }
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await getSupabaseAdmin()
       .from('workspace_tasks')
       .update(updates)
       .eq('id', id)
@@ -133,7 +117,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 
-    const { error } = await getSupabase()
+    const { error } = await getSupabaseAdmin()
       .from('workspace_tasks')
       .delete()
       .eq('id', id);

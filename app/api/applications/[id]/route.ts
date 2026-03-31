@@ -1,8 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // GET - Fetch single application
 export async function GET(
@@ -10,17 +7,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
     const { id } = await params;
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { data, error } = await supabaseAdmin
       .from('job_applications')
@@ -51,17 +39,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
     const { id } = await params;
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const body = await request.json();
     const updateData: Record<string, unknown> = {};
@@ -117,17 +96,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
     const { id } = await params;
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { error } = await supabaseAdmin
       .from('job_applications')

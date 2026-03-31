@@ -101,6 +101,7 @@ function OutreachStatsSection({
 }) {
   const [stats, setStats] = useState<AlumniStats | null>(null);
   const [batch, setBatch] = useState<BatchSummary | null>(null);
+  const [batchHistory, setBatchHistory] = useState<BatchSummary[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingBatch, setLoadingBatch] = useState(true);
   const [compiling, setCompiling] = useState(false);
@@ -114,6 +115,7 @@ function OutreachStatsSection({
   const [batchContacts, setBatchContacts] = useState<(PreviewContact & { touch: 'T1' | 'T2' | 'T3' })[]>([]);
   const [loadingBatchContacts, setLoadingBatchContacts] = useState(false);
   const [expanded, setExpanded] = useState(true);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -146,10 +148,28 @@ function OutreachStatsSection({
     }
   }, [chapterId]);
 
+  const fetchBatchHistory = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/outreach/batches?chapter_id=${chapterId}&limit=6`);
+      const json = await res.json();
+      if (json.data) {
+        // Exclude today's active batch (already shown in the pending batch row)
+        const history = (json.data as BatchSummary[]).filter(
+          b => b.scheduled_date < today || b.status === 'completed' || b.status === 'rejected'
+        ).slice(0, 5);
+        setBatchHistory(history);
+      }
+    } catch {
+      // silently ignore
+    }
+  }, [chapterId]);
+
   useEffect(() => {
     fetchStats();
     fetchBatch();
-  }, [fetchStats, fetchBatch]);
+    fetchBatchHistory();
+  }, [fetchStats, fetchBatch, fetchBatchHistory]);
 
   async function handleApproveBatch() {
     if (!batch) return;
@@ -574,6 +594,69 @@ function OutreachStatsSection({
                   </a>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Batch History */}
+          {batchHistory.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <button
+                onClick={() => setHistoryExpanded(v => !v)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  color: '#5C5449', fontSize: '0.8rem', fontWeight: 500,
+                }}
+              >
+                {historyExpanded
+                  ? <ChevronUp size={13} style={{ color: '#9ca3af' }} />
+                  : <ChevronRight size={13} style={{ color: '#9ca3af' }} />}
+                Batch history ({batchHistory.length})
+              </button>
+              {historyExpanded && (
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {batchHistory.map(h => {
+                    const statusColor =
+                      h.status === 'completed' ? '#065f46' :
+                      h.status === 'rejected'  ? '#9ca3af' :
+                      h.status === 'sending'   ? '#1d4ed8' : '#6b7280';
+                    const statusBg =
+                      h.status === 'completed' ? '#d1fae5' :
+                      h.status === 'rejected'  ? '#f3f4f6' :
+                      h.status === 'sending'   ? '#dbeafe' : '#f3f4f6';
+                    return (
+                      <div
+                        key={h.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '7px 12px', borderRadius: 2,
+                          border: '1px solid #EDE9E4', background: '#FAFAF8',
+                          fontSize: '0.79rem',
+                        }}
+                      >
+                        <span style={{ color: '#5C5449', fontWeight: 500, minWidth: 70 }}>
+                          {new Date(h.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                        <span style={{ color: '#1B2A4A' }}>
+                          {h.total_contacts ?? 0} contacts
+                          {h.touch_breakdown && (
+                            <span style={{ color: '#9ca3af' }}>
+                              {' '}· T1: {h.touch_breakdown.t1?.total ?? 0}, T2: {h.touch_breakdown.t2?.total ?? 0}, T3: {h.touch_breakdown.t3?.total ?? 0}
+                            </span>
+                          )}
+                        </span>
+                        <span style={{
+                          marginLeft: 'auto', padding: '2px 8px', borderRadius: 3,
+                          fontSize: '0.71rem', fontWeight: 600,
+                          background: statusBg, color: statusColor,
+                        }}>
+                          {h.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </>

@@ -21,15 +21,8 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { NextRequest, NextResponse } from 'next/server';
-
-const internalUrl        = process.env.NEXT_PUBLIC_SUPABASE_URL  || '';
-const internalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-function getInternal() {
-  if (!internalUrl || !internalServiceKey) return null;
-  return createClient(internalUrl, internalServiceKey);
-}
 
 function normalizePhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -77,7 +70,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ext = createClient(body.external_url, body.external_key);
-  const db  = getInternal();
+  const db  = getSupabaseAdmin();
   if (!db) return NextResponse.json({ error: 'Internal DB not configured' }, { status: 500 });
 
   // Paginate through all alumni profiles from external platform (Supabase caps at 1000/page)

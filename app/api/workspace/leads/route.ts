@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // Lazy initialize Supabase client to avoid build-time errors
-let supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient {
-  if (!supabase) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!url || !key) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    
-    supabase = createClient(url, key);
-  }
-  return supabase;
-}
 
 export interface WorkspaceLead {
   id: string;
@@ -48,7 +33,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await getSupabaseAdmin()
       .from('workspace_leads')
       .select('*')
       .eq('employee_id', employeeId)
@@ -88,7 +73,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await getSupabaseAdmin()
       .from('workspace_leads')
       .insert({
         employee_id,

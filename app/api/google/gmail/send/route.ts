@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { 
   sendGmailMessage, 
   refreshAccessToken,
   getGoogleUserInfo,
   SendEmailParams
 } from '@/lib/google';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
  * POST /api/google/gmail/send
@@ -32,9 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const supabase = getSupabaseAdmin();
 
     // Get tokens from database
     const { data: tokenData, error: tokenError } = await supabase

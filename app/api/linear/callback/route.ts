@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { exchangeLinearCodeForTokens, getLinearCurrentUser } from '@/lib/linear';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
  * GET /api/linear/callback
@@ -50,9 +47,7 @@ export async function GET(request: NextRequest) {
       : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
 
     // Create Supabase admin client to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const supabase = getSupabaseAdmin();
 
     // Upsert tokens in database
     const { error: dbError } = await supabase

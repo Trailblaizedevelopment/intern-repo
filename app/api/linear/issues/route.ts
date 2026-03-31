@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { 
   getLinearIssues, 
   createLinearIssue, 
   getLinearTeams,
   getLinearWorkflowStates 
 } from '@/lib/linear';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
  * GET /api/linear/issues
@@ -31,9 +28,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const supabase = getSupabaseAdmin();
 
     // If fetching from cache (synced via webhooks)
     if (source === 'cache') {
@@ -122,9 +117,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const supabase = getSupabaseAdmin();
 
     // Get access token
     const { data: tokenData, error: tokenError } = await supabase

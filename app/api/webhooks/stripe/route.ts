@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
+
+const getDB = () => getSupabaseAdmin()!;
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 

@@ -1,8 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export interface JobApplication {
   id: string;
@@ -33,16 +30,7 @@ export interface JobApplication {
 // GET - Fetch all applications (for admin review)
 export async function GET(request: NextRequest) {
   try {
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -83,16 +71,7 @@ export async function GET(request: NextRequest) {
 // POST - Submit a new application (public endpoint for careers page)
 export async function POST(request: NextRequest) {
   try {
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const body = await request.json();
     const {

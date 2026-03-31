@@ -1,8 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // GET single payment
 export async function GET(
@@ -12,16 +9,7 @@ export async function GET(
   try {
     const { id } = await params;
     
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { data, error } = await supabaseAdmin
       .from('payments')
@@ -57,16 +45,7 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const body = await request.json();
     const { amount, payment_date, payment_method, status, reference_number, notes, period_start, period_end } = body;
@@ -115,16 +94,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { data: null, error: { message: 'Server configuration error', code: 'CONFIG_ERROR' } },
-        { status: 500 }
-      );
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { error } = await supabaseAdmin
       .from('payments')

@@ -1,15 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-function getAdmin() {
-  if (!supabaseUrl || !supabaseServiceKey) return null;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const admin = getAdmin();
+  const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
   const { id } = await params;
 
@@ -24,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const admin = getAdmin();
+  const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
   const { id } = await params;
   const body = await req.json();
@@ -38,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const admin = getAdmin();
+  const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
   const { id } = await params;
 

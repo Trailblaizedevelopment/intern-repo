@@ -16,7 +16,9 @@ export function getSupabaseAdmin(): SupabaseClient | null {
     return null;
   }
   if (!_adminClient) {
-    _adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    _adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
   }
   return _adminClient;
 }
