@@ -87,6 +87,8 @@ function OutreachStatsSection({
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingBatch, setLoadingBatch] = useState(true);
   const [compiling, setCompiling] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [executing, setExecuting] = useState(false);
   const [expanded, setExpanded] = useState(true);
 
   const fetchStats = useCallback(async () => {
@@ -124,6 +126,52 @@ function OutreachStatsSection({
     fetchStats();
     fetchBatch();
   }, [fetchStats, fetchBatch]);
+
+  async function handleApproveBatch() {
+    if (!batch) return;
+    setApproving(true);
+    try {
+      const res = await fetch(`/api/outreach/batches/${batch.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast(json.error ?? 'Approval failed', 'error');
+      } else {
+        showToast('Batch approved — ready to execute', 'success');
+        setBatch(prev => prev ? { ...prev, status: 'approved' } : prev);
+      }
+    } catch {
+      showToast('Failed to approve batch', 'error');
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleExecuteBatch() {
+    if (!batch) return;
+    setExecuting(true);
+    showToast('Executing batch — this may take a few minutes…', 'info');
+    try {
+      const res = await fetch(`/api/outreach/batches/${batch.id}/execute`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast(json.error ?? 'Execution failed', 'error');
+      } else {
+        const sent = json.data?.sent ?? 0;
+        const sms = json.data?.sent_to_sms ?? 0;
+        showToast(`✓ Batch complete — ${sent} sent${sms > 0 ? `, ${sms} SMS skipped` : ''}`, 'success');
+        await fetchBatch();
+      }
+    } catch {
+      showToast('Batch execution failed', 'error');
+    } finally {
+      setExecuting(false);
+    }
+  }
 
   async function compileBatch() {
     setCompiling(true);
@@ -282,12 +330,48 @@ function OutreachStatsSection({
                   </span>
                 )}
               </span>
-              <a
-                href="/nucleus/customer-success"
-                style={{ marginLeft: 'auto', color: '#C4874A', fontWeight: 600, fontSize: '0.78rem', textDecoration: 'none' }}
-              >
-                View in Linq Outreach →
-              </a>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                {batch.status === 'pending_approval' && (
+                  <button
+                    onClick={handleApproveBatch}
+                    disabled={approving}
+                    style={{
+                      padding: '4px 12px', borderRadius: 6, border: 'none',
+                      background: approving ? '#9ca3af' : '#1B2A4A', color: '#fff',
+                      fontSize: '0.75rem', fontWeight: 600, cursor: approving ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    {approving
+                      ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Approving…</>
+                      : <><CheckCircle2 size={11} /> Approve</>}
+                  </button>
+                )}
+                {batch.status === 'approved' && (
+                  <button
+                    onClick={handleExecuteBatch}
+                    disabled={executing}
+                    style={{
+                      padding: '4px 12px', borderRadius: 6, border: 'none',
+                      background: executing ? '#9ca3af' : '#C4874A', color: '#fff',
+                      fontSize: '0.75rem', fontWeight: 600, cursor: executing ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    {executing
+                      ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</>
+                      : <><Send size={11} /> Execute</>}
+                  </button>
+                )}
+                {(batch.status === 'completed' || batch.status === 'sending') && (
+                  <a
+                    href="/nucleus/customer-success"
+                    style={{ color: '#C4874A', fontWeight: 600, fontSize: '0.78rem', textDecoration: 'none' }}
+                  >
+                    View details →
+                  </a>
+                )}
+              </div>
             </div>
           )}
         </>

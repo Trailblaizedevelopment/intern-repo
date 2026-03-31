@@ -717,6 +717,103 @@ function ConvListPanel({
 }
 
 // ThreadPanel — STATE 3
+// ── PitchConfirmModal ────────────────────────────────────────────────────────
+interface PitchConfirmModalProps {
+  contactName: string;
+  firstName: string | null;
+  chapterName: string | null;
+  joinLink: string;
+  contactId: string;
+  onConfirm: () => Promise<void>;
+  onCancel: () => void;
+  sending: boolean;
+  error: string | null;
+}
+
+function PitchConfirmModal({
+  contactName, firstName, chapterName, joinLink,
+  onConfirm, onCancel, sending, error,
+}: PitchConfirmModalProps) {
+  const name = firstName || 'there';
+  const chapter = chapterName || 'your fraternity';
+  const previewMsg = `Hey ${name} - I work with Trailblaize. We just built a private alumni network for ${chapter}. It is where guys stay connected, find jobs through the network, and see what the chapter is up to. Takes 2 min to join - ${joinLink}`;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, padding: 16,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 14, padding: 24,
+        maxWidth: 480, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+      }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: '1rem', color: '#111827' }}>Send Pitch to {contactName}</div>
+          {chapterName && <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 2 }}>{chapterName}</div>}
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: '0.72rem', color: '#6b7280', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Message Preview</div>
+          <div style={{
+            background: '#f3f4f6', borderRadius: 8, padding: '10px 12px',
+            fontSize: '0.8375rem', color: '#374151', lineHeight: 1.5,
+          }}>
+            {previewMsg}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <span style={{ fontSize: '0.72rem', color: '#6b7280', flexShrink: 0 }}>Join link:</span>
+          <span style={{
+            fontSize: '0.72rem', color: '#2563eb', fontFamily: 'monospace',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+          }}>{joinLink}</span>
+          <button
+            onClick={() => navigator.clipboard.writeText(joinLink)}
+            style={{
+              padding: '2px 8px', borderRadius: 5, border: '1px solid #e5e7eb',
+              background: '#f9fafb', color: '#374151', fontSize: '0.68rem',
+              cursor: 'pointer', fontWeight: 500, flexShrink: 0,
+            }}
+          >Copy</button>
+        </div>
+
+        {error && (
+          <div style={{ background: '#fee2e2', color: '#991b1b', borderRadius: 7, padding: '8px 12px', fontSize: '0.8rem', marginBottom: 14 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onCancel}
+            disabled={sending}
+            style={{
+              padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb',
+              background: '#fff', color: '#374151', fontSize: '0.875rem',
+              fontWeight: 500, cursor: sending ? 'default' : 'pointer',
+            }}
+          >Cancel</button>
+          <button
+            onClick={onConfirm}
+            disabled={sending}
+            style={{
+              padding: '8px 18px', borderRadius: 8, border: 'none',
+              background: sending ? '#93c5fd' : '#2563eb', color: '#fff',
+              fontSize: '0.875rem', fontWeight: 600,
+              cursor: sending ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {sending ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</> : <><Send size={14} /> Send Pitch</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ThreadPanelProps {
   conv: LinqConversation;
   messages: LinqMessage[];
@@ -724,17 +821,19 @@ interface ThreadPanelProps {
   handling: boolean;
   flagging: boolean;
   isMobile: boolean;
+  joinLink?: string | null;
   onBack: () => void;
   onMarkHandled: () => void;
   onFlag: () => void;
+  onSendPitch?: () => void;
   onReplySent: () => void;
   onReplyError: (msg: string) => void;
   messagesEndRef: React.RefObject<HTMLDivElement>;
 }
 
 function ThreadPanel({
-  conv, messages, loadingMsgs, handling, flagging, isMobile,
-  onBack, onMarkHandled, onFlag, onReplySent, onReplyError, messagesEndRef,
+  conv, messages, loadingMsgs, handling, flagging, isMobile, joinLink,
+  onBack, onMarkHandled, onFlag, onSendPitch, onReplySent, onReplyError, messagesEndRef,
 }: ThreadPanelProps) {
   const line = lineFor(conv.line_phone);
   const outreachMeta = conv.outreach_status ? OUTREACH_META[conv.outreach_status] : null;
@@ -791,16 +890,42 @@ function ThreadPanel({
               </span>
             )}
           </div>
+          {joinLink && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Join link:</span>
+              <a
+                href={joinLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: '0.7rem', color: '#2563eb', fontFamily: 'monospace',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  maxWidth: 280, display: 'inline-block',
+                }}
+              >{joinLink}</a>
+              <button
+                onClick={() => navigator.clipboard.writeText(joinLink)}
+                style={{
+                  padding: '1px 7px', borderRadius: 5, border: '1px solid #e5e7eb',
+                  background: '#f9fafb', color: '#374151', fontSize: '0.65rem',
+                  cursor: 'pointer', fontWeight: 500, flexShrink: 0,
+                }}
+              >Copy</button>
+            </div>
+          )}
         </div>
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {stage && (
-            <button style={{
-              padding: '5px 11px', borderRadius: 7, border: '1px solid #a5b4fc',
-              background: '#eef2ff', color: '#4f46e5', cursor: 'pointer',
-              fontSize: '0.73rem', fontWeight: 600,
-            }}>
+            <button
+              onClick={onSendPitch}
+              style={{
+                padding: '5px 11px', borderRadius: 7, border: '1px solid #a5b4fc',
+                background: '#eef2ff', color: '#4f46e5', cursor: 'pointer',
+                fontSize: '0.73rem', fontWeight: 600,
+              }}
+            >
               {stage}
             </button>
           )}
@@ -1030,6 +1155,16 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   const [syncing, setSyncing] = useState(false);
   const [handling, setHandling] = useState(false);
   const [flagging, setFlagging] = useState(false);
+  const [pitchModal, setPitchModal] = useState<{
+    contactId: string;
+    contactName: string;
+    firstName: string | null;
+    chapterName: string | null;
+    joinLink: string;
+  } | null>(null);
+  const [pitchSending, setPitchSending] = useState(false);
+  const [pitchError, setPitchError] = useState<string | null>(null);
+  const [chapterJoinLink, setChapterJoinLink] = useState<string | null>(null);
 
   // UI
   const [isMobile, setIsMobile] = useState(false);
@@ -1224,9 +1359,9 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChapter, page]);
 
-  // Load messages on conversation select
+  // Load messages + chapter join link on conversation select
   useEffect(() => {
-    if (!selectedConv) { setMessages([]); return; }
+    if (!selectedConv) { setMessages([]); setChapterJoinLink(null); return; }
     setMessages([]);
     setLoadingMsgs(true);
     fetch(`${API}/${selectedConv.id}/messages`, { headers: { Authorization: AUTH } })
@@ -1237,6 +1372,15 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       })
       .catch(err => setError(String(err)))
       .finally(() => setLoadingMsgs(false));
+    // Fetch chapter join link
+    if (selectedConv.chapter_id) {
+      fetch(`/api/chapters/${selectedConv.chapter_id}`, { headers: { Authorization: AUTH } })
+        .then(r => r.json())
+        .then(json => setChapterJoinLink(json?.alumni_join_link ?? null))
+        .catch(() => setChapterJoinLink(null));
+    } else {
+      setChapterJoinLink(null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConv?.id]);
 
@@ -1246,6 +1390,52 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   }, [messages]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+
+  function handleSendPitch() {
+    if (!selectedConv) return;
+    setPitchModal({
+      contactId: selectedConv.contact_id ?? '',
+      contactName: selectedConv.contact_name ?? 'this alumni',
+      firstName: selectedConv.contact_name?.split(' ')[0] ?? null,
+      chapterName: selectedConv.chapter_name,
+      joinLink: chapterJoinLink ?? 'https://trailblaize.net',
+    });
+    setPitchError(null);
+  }
+
+  async function handlePitchConfirm() {
+    if (!pitchModal) return;
+    setPitchSending(true);
+    setPitchError(null);
+    try {
+      const res = await fetch('/api/outreach/conversations/send-pitch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: AUTH },
+        body: JSON.stringify({ contact_id: pitchModal.contactId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setPitchError(json.error ?? 'Send failed');
+        return;
+      }
+      showToast('Pitch sent!', 'success');
+      setPitchModal(null);
+      setSelectedConv(null);
+      if (selectedChapter) {
+        if (initialChapterId) {
+          fetchCategoryCounts(initialChapterId);
+          loadConvs(selectedChapter.id, tab, page, selectedCategory, categorySearch);
+        } else {
+          loadChapterSummaries();
+          loadConvs(selectedChapter.id, tab, page);
+        }
+      }
+    } catch (err) {
+      setPitchError(String(err));
+    } finally {
+      setPitchSending(false);
+    }
+  }
 
   function handleTabChange(t: Tab) {
     setTab(t);
@@ -1508,9 +1698,11 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
         handling={handling}
         flagging={flagging}
         isMobile={isMobile}
+        joinLink={chapterJoinLink}
         onBack={() => setSelectedConv(null)}
         onMarkHandled={handleMarkHandled}
         onFlag={handleFlag}
+        onSendPitch={handleSendPitch}
         onReplySent={handleReplySent}
         onReplyError={msg => setError(msg)}
         messagesEndRef={messagesEndRef as React.RefObject<HTMLDivElement>}
@@ -1613,9 +1805,11 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       handling={handling}
       flagging={flagging}
       isMobile={isMobile}
+      joinLink={chapterJoinLink}
       onBack={handleBackToConvs}
       onMarkHandled={handleMarkHandled}
       onFlag={handleFlag}
+      onSendPitch={handleSendPitch}
       onReplySent={handleReplySent}
       onReplyError={msg => setError(msg)}
       messagesEndRef={messagesEndRef as React.RefObject<HTMLDivElement>}
@@ -1652,6 +1846,15 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   return (
     <div style={containerStyle}>
       {errorBanner}
+      {pitchModal && (
+        <PitchConfirmModal
+          {...pitchModal}
+          onConfirm={handlePitchConfirm}
+          onCancel={() => { setPitchModal(null); setPitchError(null); }}
+          sending={pitchSending}
+          error={pitchError}
+        />
+      )}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
         {/* Left panel: 40% */}
         <div style={{
