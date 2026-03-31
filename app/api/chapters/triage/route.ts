@@ -35,8 +35,7 @@ export async function GET(_request: NextRequest) {
         payment_amount, payment_type, last_payment_date, next_payment_date,
         last_check_in_date, next_check_in_date, check_in_frequency,
         onboarding_completed, next_action, notes,
-        active_members, estimated_alumni, created_at, last_activity,
-        instagram_flyer_posted, instagram_flyer_post_date,
+        active_members, estimated_alumni, created_at,
         contact_name, contact_email, contact_phone,
         mrr, payment_day
       `)
@@ -127,9 +126,6 @@ export async function GET(_request: NextRequest) {
       if (stats.signed_up >= 10) score += 15;
       else if (stats.signed_up > 0) score += 10;
 
-      // Instagram flyer (5 pts)
-      if (ch.instagram_flyer_posted) score += 5;
-
       // Clamp to 0–100
       score = Math.max(0, Math.min(100, score));
 
@@ -140,8 +136,8 @@ export async function GET(_request: NextRequest) {
       else triage_tier = 'green';
 
       // Days since last activity
-      const days_since_last_activity = ch.last_activity
-        ? Math.floor((now - new Date(ch.last_activity).getTime()) / 86400000)
+      const days_since_last_activity = ch.last_check_in_date
+        ? Math.floor((now - new Date(ch.last_check_in_date).getTime()) / 86400000)
         : null;
 
       // Onboarding completion pct — use chapter's own health field as fallback
@@ -157,8 +153,6 @@ export async function GET(_request: NextRequest) {
           next_required_action = 'Upload alumni list';
         } else if (stats.outreach_coverage_pct === 0) {
           next_required_action = 'Start alumni outreach';
-        } else if (!ch.instagram_flyer_posted) {
-          next_required_action = 'Get Instagram flyer posted';
         }
       }
 
