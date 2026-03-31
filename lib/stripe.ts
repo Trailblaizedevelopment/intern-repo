@@ -1,10 +1,30 @@
 import Stripe from 'stripe';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Stripe client
+// Stripe client — lazy initialization to avoid build-time crash when key is missing
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+let _stripe: Stripe | null = null;
+
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+  return _stripe;
+}
+
+// Keep stripe export for backward compat — lazily initialized
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const stripe: Stripe = new Proxy({} as Stripe, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get(_target: any, prop: string | symbol) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (getStripe() as any)[prop];
+  },
+}) as Stripe;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pricing tiers (monthly, in dollars)

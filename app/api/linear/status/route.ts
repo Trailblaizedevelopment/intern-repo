@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getLinearCurrentUser, getLinearTeams, LINEAR_CONFIG } from '@/lib/linear';

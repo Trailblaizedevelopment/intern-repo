@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 export async function GET(request: NextRequest) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
     const { searchParams } = new URL(request.url);
     const chapterId = searchParams.get('chapter_id');
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
 
-    let query = supabaseAdmin
+    let query = supabaseAdmin!
       .from('payments')
       .select(`
         *,
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin!
       .from('payments')
       .insert([{
         chapter_id,
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the chapter's last_payment_date
-    await supabaseAdmin
+    await supabaseAdmin!
       .from('chapters')
       .update({ 
         last_payment_date: payment_date || new Date().toISOString().split('T')[0],

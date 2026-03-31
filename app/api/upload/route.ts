@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 export async function POST(request: NextRequest) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
     const formData = await request.formData();
     const file = formData.get('file') as File;

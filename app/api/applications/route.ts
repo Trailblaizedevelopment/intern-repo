@@ -31,12 +31,13 @@ export interface JobApplication {
 export async function GET(request: NextRequest) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const position = searchParams.get('position');
 
-    let query = supabaseAdmin
+    let query = supabaseAdmin!
       .from('job_applications')
       .select('*')
       .order('applied_at', { ascending: false });
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin!
       .from('job_applications')
       .insert([{
         name,

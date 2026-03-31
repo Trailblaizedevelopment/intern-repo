@@ -6,6 +6,7 @@ export async function POST(request: NextRequest) {
     // Check for required environment variables
     // Admin client with service role key - bypasses RLS and email confirmation
     const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
     const body = await request.json();
     const { email, password, name, role, seniority, department, status, start_date } = body;

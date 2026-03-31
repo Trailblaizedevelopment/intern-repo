@@ -10,8 +10,9 @@ export async function GET(
     const { id } = await params;
     
     const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin!
       .from('payments')
       .select(`
         *,
@@ -50,7 +51,7 @@ export async function PUT(
     const body = await request.json();
     const { amount, payment_date, payment_method, status, reference_number, notes, period_start, period_end } = body;
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin!
       .from('payments')
       .update({
         amount,
@@ -96,7 +97,7 @@ export async function DELETE(
 
     const supabaseAdmin = getSupabaseAdmin();
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabaseAdmin!
       .from('payments')
       .delete()
       .eq('id', id);

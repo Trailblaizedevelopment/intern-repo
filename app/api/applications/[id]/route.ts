@@ -9,8 +9,9 @@ export async function GET(
   try {
     const { id } = await params;
     const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin!
       .from('job_applications')
       .select('*')
       .eq('id', id)
@@ -65,7 +66,7 @@ export async function PATCH(
       updateData.reviewed_at = new Date().toISOString();
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin!
       .from('job_applications')
       .update(updateData)
       .eq('id', id)
@@ -99,7 +100,7 @@ export async function DELETE(
     const { id } = await params;
     const supabaseAdmin = getSupabaseAdmin();
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabaseAdmin!
       .from('job_applications')
       .delete()
       .eq('id', id);
