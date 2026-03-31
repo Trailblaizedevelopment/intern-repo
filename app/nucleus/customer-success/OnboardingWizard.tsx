@@ -381,15 +381,17 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(15, 22, 40, 0.7)', backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
         padding: 16,
+        paddingTop: 'max(16px, env(safe-area-inset-top))',
+        overflowY: 'auto',
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         style={{
           background: '#FDFAF5', borderRadius: 20, width: '100%', maxWidth: 640,
-          maxHeight: '90vh', overflow: 'hidden',
+          maxHeight: 'min(90dvh, 90vh)', overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
           boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
         }}
@@ -431,7 +433,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
         )}
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
           {error && (
             <div style={{
               background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8,
