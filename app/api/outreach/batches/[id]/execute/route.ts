@@ -57,6 +57,10 @@ function buildT2ALongGapMessage(firstName: string, fraternityName: string, schoo
 function buildT3AMessage(firstName: string): string {
   return `Hey ${firstName}, just checking - did you get a chance to join? Happy to answer any questions.`;
 }
+// Track A T3 — they confirmed AND received the link (pitched), still haven't joined
+function buildT3PitchedMessage(firstName: string, fraternityName: string): string {
+  return `Hey ${firstName}, just circling back - the ${fraternityName} network is live and guys are already on it. Let me know if you have any questions or I can help you get set up.`;
+}
 
 // Track B — no response to T1 (touch1_sent, 2+ days)
 function buildT2BMessage(firstName: string, fraternityName: string, school: string, joinLink: string): string {
@@ -175,12 +179,31 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }
 
     // Build per-line T1 cap using warm-up logic
-    const lineT1Caps: Record<number, number> = {};
+    const lineT1CapsMax: Record<number, number> = {};
     for (const n of activeLineNumbers) {
       const lc = lineConfigMap[n];
-      lineT1Caps[n] = lc
-        ? getLineT1Cap(lc)
-        : T1_CAP_PER_LINE;
+      lineT1CapsMax[n] = lc ? getLineT1Cap(lc) : T1_CAP_PER_LINE;
+    }
+
+    // Cross-chapter oversend guard: subtract T1s already sent today across ALL chapters
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const { data: sentTodayRows } = await supabase
+      .from('alumni_contacts')
+      .select('assigned_line')
+      .not('touch1_sent_at', 'is', null)
+      .gte('touch1_sent_at', todayStart.toISOString());
+
+    const sentTodayPerLine: Record<number, number> = {};
+    for (const row of sentTodayRows || []) {
+      const ln = row.assigned_line as number;
+      if (ln) sentTodayPerLine[ln] = (sentTodayPerLine[ln] || 0) + 1;
+    }
+
+    const lineT1Caps: Record<number, number> = {};
+    for (const n of activeLineNumbers) {
+      const used = sentTodayPerLine[n] || 0;
+      lineT1Caps[n] = Math.max(0, lineT1CapsMax[n] - used);
     }
 
     // 3. Load eligible contacts.
@@ -453,6 +476,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           useT2ALongGap                 ? buildT2ALongGapMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
           status === 'touch1_confirmed' ? buildT2AMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
           status === 'touch1_sent'      ? buildT2BMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
+          status === 'pitched'          ? buildT3PitchedMessage(contact.first_name, chapter.fraternity_name) :
           contact.linq_chat_id          ? buildT3AMessage(contact.first_name) :
                                           buildT3BMessage(contact.first_name, chapter.fraternity_name);
 

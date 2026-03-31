@@ -122,9 +122,41 @@ export async function POST(request: NextRequest) {
     }
 
     const t1CapMax = activeLines.reduce((sum, l) => sum + getLineT1Cap(l), 0);
+
+    // ── 2b. Check how many T1s already sent TODAY across ALL chapters ─────────
+    // This is the cross-chapter oversend guard. Each line has a daily limit.
+    // We count touch1_sent_at from today 00:00 UTC per line to find remaining slots.
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayStartISO = todayStart.toISOString();
+
+    const { data: sentTodayRows } = await supabase
+      .from('alumni_contacts')
+      .select('assigned_line')
+      .not('touch1_sent_at', 'is', null)
+      .gte('touch1_sent_at', todayStartISO);
+
+    // Count per line
+    const sentTodayPerLine: Record<number, number> = {};
+    for (const row of sentTodayRows || []) {
+      const ln = row.assigned_line as number;
+      if (ln) sentTodayPerLine[ln] = (sentTodayPerLine[ln] || 0) + 1;
+    }
+
+    // Remaining capacity per line
+    const remainingPerLine: Record<number, number> = {};
+    for (const line of activeLines) {
+      const cap = getLineT1Cap(line);
+      const used = sentTodayPerLine[line.line_number] || 0;
+      remainingPerLine[line.line_number] = Math.max(0, cap - used);
+    }
+    const t1CapRemaining = Object.values(remainingPerLine).reduce((a, b) => a + b, 0);
+
+    // Apply user override, but never exceed remaining capacity
     const t1Cap = (t1_limit != null && Number.isFinite(t1_limit))
-      ? Math.min(Math.max(0, t1_limit), t1CapMax)
-      : t1CapMax;
+      ? Math.min(Math.max(0, t1_limit), t1CapRemaining)
+      : t1CapRemaining;
+
     const t2t3Cap = activeCount * 100;
 
     // ── 3. Cutoffs ────────────────────────────────────────────────────────────
@@ -145,7 +177,12 @@ export async function POST(request: NextRequest) {
 
     const t1Contacts = t1Raw || [];
 
-    // ── 5. T2 eligible ────────────────────────────────────────────────────────
+    // ── 5. T2 eligible (Track B ONLY — no-response drip) ─────────────────────
+    // NOTE: touch1_confirmed contacts are intentionally excluded here.
+    // The response monitor (alumni-response-monitor cron) owns Track A —
+    // it fires T2 pitch immediately when someone replies. Putting confirmed
+    // contacts in the batch drip would create a race condition and potentially
+    // send two T2s. The batch handles only non-responders.
     const { data: t2aRaw } = await supabase
       .from('alumni_contacts')
       .select('id, chapter_id')
@@ -175,10 +212,12 @@ export async function POST(request: NextRequest) {
     const t2Contacts = [...t2Map.values()].slice(0, t2t3Cap);
 
     // ── 6. T3 eligible ────────────────────────────────────────────────────────
+    // Includes both touch2_sent (Track B drip) and pitched (Track A — confirmed,
+    // received link, didn't sign up after 4 days). Separate message tone in execute.
     const t3Remaining = Math.max(0, t2t3Cap - t2Contacts.length);
     let t3Contacts: { id: string; chapter_id: string }[] = [];
     if (t3Remaining > 0) {
-      const { data: t3Raw } = await supabase
+      const { data: t3RawB } = await supabase
         .from('alumni_contacts')
         .select('id, chapter_id')
         .eq('chapter_id', chapter_id)
@@ -188,7 +227,24 @@ export async function POST(request: NextRequest) {
         .not('is_imessage', 'is', false)
         .not('phone_primary', 'is', null)
         .limit(t3Remaining);
-      t3Contacts = t3Raw || [];
+
+      const { data: t3RawA } = await supabase
+        .from('alumni_contacts')
+        .select('id, chapter_id')
+        .eq('chapter_id', chapter_id)
+        .eq('outreach_status', 'pitched')
+        .lte('touch2_sent_at', cutoff4days)
+        .is('touch3_sent_at', null)
+        .not('is_imessage', 'is', false)
+        .not('phone_primary', 'is', null)
+        .limit(t3Remaining);
+
+      // Merge, dedup
+      const t3Map = new Map<string, { id: string; chapter_id: string }>();
+      for (const c of [...(t3RawB || []), ...(t3RawA || [])]) {
+        if (!t3Map.has(c.id)) t3Map.set(c.id, c);
+      }
+      t3Contacts = [...t3Map.values()].slice(0, t3Remaining);
     }
 
     // ── 7. Pre-allocate iMessage chats for T1 ────────────────────────────────

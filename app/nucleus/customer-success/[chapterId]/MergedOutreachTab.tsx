@@ -46,10 +46,10 @@ interface PreviewContact {
 }
 
 interface BatchPreview {
-  t1: { contacts: PreviewContact[]; total: number; cap: number; max_cap: number };
+  t1: { contacts: PreviewContact[]; total: number; cap: number; max_cap: number; sent_today: number; daily_max: number };
   t2: { contacts: PreviewContact[]; total: number };
   t3: { contacts: PreviewContact[]; total: number };
-  lines: { active: number; t1_cap_total: number };
+  lines: { active: number; t1_cap_total: number; sent_today: number };
 }
 
 interface AlumniContact {
@@ -420,7 +420,7 @@ function OutreachStatsSection({
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af', flexShrink: 0 }}>/ {preview.t1.max_cap} max</span>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
-                  {preview.lines.active} active line{preview.lines.active !== 1 ? 's' : ''} · drag slider to adjust how many T1s go out today
+                  {preview.lines.active} active lines · {preview.t1.sent_today ?? 0} sent today across all chapters · {preview.t1.max_cap} remaining
                 </div>
               </div>
 

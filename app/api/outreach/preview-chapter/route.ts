@@ -46,11 +46,23 @@ export async function GET(request: NextRequest) {
       return line.daily_limit;
     }
 
-    const t1CapTotal = activeLines.length > 0
+    const t1CapMax = activeLines.length > 0
       ? activeLines.reduce((sum: number, l: { is_warmed_up: boolean | null; warmup_start_date: string | null; daily_limit: number }) => sum + getLineT1Cap(l), 0)
       : activeCount * DEFAULT_DAILY_LIMIT;
 
-    // Apply user override if provided
+    // Cross-chapter oversend guard: subtract T1s already sent today across ALL chapters
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const { data: sentTodayRows } = await supabase
+      .from('alumni_contacts')
+      .select('assigned_line')
+      .not('touch1_sent_at', 'is', null)
+      .gte('touch1_sent_at', todayStart.toISOString());
+
+    const sentTodayTotal = (sentTodayRows || []).length;
+    const t1CapTotal = Math.max(0, t1CapMax - sentTodayTotal);
+
+    // Apply user override if provided, capped at remaining capacity
     const t1Limit = t1LimitParam ? Math.min(parseInt(t1LimitParam), t1CapTotal) : t1CapTotal;
 
     const cutoff2days = new Date(Date.now() - 2 * 86400000).toISOString();
@@ -117,10 +129,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      t1: { contacts: t1Raw || [], total: (t1Raw || []).length, cap: t1Limit, max_cap: t1CapTotal },
+      t1: { contacts: t1Raw || [], total: (t1Raw || []).length, cap: t1Limit, max_cap: t1CapTotal, sent_today: sentTodayTotal, daily_max: t1CapMax },
       t2: { contacts: t2Contacts, total: t2Contacts.length },
       t3: { contacts: t3Contacts, total: t3Contacts.length },
-      lines: { active: activeCount, t1_cap_total: t1CapTotal },
+      lines: { active: activeCount, t1_cap_total: t1CapTotal, sent_today: sentTodayTotal },
     });
   } catch (err) {
     console.error('[preview-chapter]', err);
