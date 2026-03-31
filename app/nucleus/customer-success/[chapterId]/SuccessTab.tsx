@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plus, X, Calendar, GraduationCap, Edit2, Trash2, Briefcase, BookOpen, MapPin,
-  Linkedin, Loader2, CheckSquare, Square, ClipboardList,
+  Linkedin, Loader2, CheckSquare, Square, ClipboardList, Instagram,
 } from 'lucide-react';
 import {
   supabase, ChapterWithOnboarding, ChapterCheckIn, CheckInFrequency,
@@ -128,6 +128,13 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
   const [matches, setMatches] = useState<LoggedMatch[]>([]);
   const [matchForm, setMatchForm] = useState({ active_member: '', alumni_name: '', date: new Date().toISOString().split('T')[0], notes: '' });
 
+  // ─── Instagram Flyer Tracker ───
+  const [flyerPosted, setFlyerPosted] = useState<boolean>(chapter.instagram_flyer_posted ?? false);
+  const [flyerPostDate, setFlyerPostDate] = useState<string>(chapter.instagram_flyer_post_date ?? '');
+  const [flyerPostUrl, setFlyerPostUrl] = useState<string>(chapter.instagram_flyer_post_url ?? '');
+  const [flyerNotes, setFlyerNotes] = useState<string>(chapter.instagram_flyer_notes ?? '');
+  const [savingFlyer, setSavingFlyer] = useState(false);
+
   // ─── Notes ───
   const [execNotes, setExecNotes] = useState(chapter.exec_notes || '');
   const [bonusNotes, setBonusNotes] = useState(chapter.bonus_notes || '');
@@ -191,7 +198,11 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
   useEffect(() => {
     setExecNotes(chapter.exec_notes || '');
     setBonusNotes(chapter.bonus_notes || '');
-  }, [chapter.exec_notes, chapter.bonus_notes]);
+    setFlyerPosted(chapter.instagram_flyer_posted ?? false);
+    setFlyerPostDate(chapter.instagram_flyer_post_date ?? '');
+    setFlyerPostUrl(chapter.instagram_flyer_post_url ?? '');
+    setFlyerNotes(chapter.instagram_flyer_notes ?? '');
+  }, [chapter.exec_notes, chapter.bonus_notes, chapter.instagram_flyer_posted, chapter.instagram_flyer_post_date, chapter.instagram_flyer_post_url, chapter.instagram_flyer_notes]);
 
   async function updateCheckInFrequency(frequency: CheckInFrequency) {
     try {
@@ -274,6 +285,36 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
       await fetch(`/api/chapter-members?id=${memberId}`, { method: 'DELETE' });
       setMembers(p => p.filter(m => m.id !== memberId));
     } finally { setDeletingMemberId(null); }
+  }
+
+  async function saveFlyer(overrides?: Partial<{ posted: boolean; date: string; url: string; notes: string }>) {
+    if (!supabase) return;
+    setSavingFlyer(true);
+    const posted = overrides?.posted ?? flyerPosted;
+    const date = overrides?.date ?? flyerPostDate;
+    const url = overrides?.url ?? flyerPostUrl;
+    const notes = overrides?.notes ?? flyerNotes;
+    try {
+      const { error } = await supabase.from('chapters').update({
+        instagram_flyer_posted: posted,
+        instagram_flyer_post_date: date || null,
+        instagram_flyer_post_url: url || null,
+        instagram_flyer_notes: notes || null,
+        // Also mark the onboarding checklist step
+        activate_ig_flyer: posted,
+      }).eq('id', chapter.id);
+      if (error) {
+        if (error.message?.includes('column') || error.code === 'PGRST204') {
+          showToast('Saved locally (DB column missing — run migration)', 'info');
+        } else {
+          showToast(`Failed: ${error.message}`, 'error');
+        }
+      } else {
+        showToast('Instagram flyer status saved', 'success');
+        onUpdate();
+      }
+    } catch { showToast('Failed to save', 'error'); }
+    finally { setSavingFlyer(false); }
   }
 
   async function saveNotes(type: 'exec' | 'bonus') {
@@ -423,6 +464,125 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
           ) : (
             <p style={{ fontSize: '0.8rem', color: '#9ca3af' }}>No check-ins logged yet.</p>
           )}
+        </div>
+      </section>
+
+      {/* ─── Instagram Flyer Tracker ─── */}
+      <section>
+        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: '#1B2A4A' }}>
+          <Instagram size={16} /> Instagram Story Flyer
+        </h3>
+        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '18px 20px' }}>
+          {/* Status badge + toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{
+                fontSize: '0.75rem', fontWeight: 700, padding: '3px 12px', borderRadius: 99,
+                background: flyerPosted ? '#EAF0E8' : '#F5EFE0',
+                color: flyerPosted ? '#2A4229' : '#6B4A1E',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                {flyerPosted ? '✓ Posted' : '⏳ Not Posted'}
+              </span>
+              {!flyerPosted && chapter.status === 'active' && (() => {
+                const daysSinceActive = chapter.payment_start_date
+                  ? Math.floor((Date.now() - new Date(chapter.payment_start_date).getTime()) / 86400000)
+                  : null;
+                return daysSinceActive !== null && daysSinceActive > 14 ? (
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: '#fef3c7', color: '#92400e' }}>
+                    ⚠ {daysSinceActive}d since activation — no flyer yet
+                  </span>
+                ) : null;
+              })()}
+            </div>
+            <button
+              onClick={() => {
+                const next = !flyerPosted;
+                setFlyerPosted(next);
+                if (next && !flyerPostDate) {
+                  const today = new Date().toISOString().split('T')[0];
+                  setFlyerPostDate(today);
+                  saveFlyer({ posted: next, date: today });
+                } else {
+                  saveFlyer({ posted: next });
+                }
+              }}
+              disabled={savingFlyer}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 2,
+                background: flyerPosted ? '#F5E8E0' : '#1B2A4A',
+                color: flyerPosted ? '#6B2A1E' : '#F7F5F1',
+                border: flyerPosted ? '1px solid #F5C5B5' : 'none',
+                cursor: savingFlyer ? 'not-allowed' : 'pointer',
+                fontSize: '0.8rem', fontWeight: 600,
+                transition: 'all 0.15s ease-out',
+              }}
+            >
+              {savingFlyer ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+              {flyerPosted ? 'Mark Not Posted' : 'Mark as Posted ✓'}
+            </button>
+          </div>
+
+          {/* Details form — only shown when posted */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="module-form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+                  Post Date
+                </label>
+                <input
+                  type="date"
+                  value={flyerPostDate}
+                  onChange={e => setFlyerPostDate(e.target.value)}
+                  onBlur={() => saveFlyer()}
+                  style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.85rem', padding: '6px 10px', border: '1px solid #D9D4CC', borderRadius: 2, outline: 'none', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div className="module-form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+                  Post URL <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
+                </label>
+                <input
+                  type="url"
+                  value={flyerPostUrl}
+                  onChange={e => setFlyerPostUrl(e.target.value)}
+                  onBlur={() => saveFlyer()}
+                  placeholder="https://instagram.com/p/..."
+                  style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.85rem', padding: '6px 10px', border: '1px solid #D9D4CC', borderRadius: 2, outline: 'none', fontFamily: 'inherit' }}
+                />
+              </div>
+            </div>
+            <div className="module-form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+                Notes <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={flyerNotes}
+                onChange={e => setFlyerNotes(e.target.value)}
+                onBlur={() => saveFlyer()}
+                placeholder="e.g. Posted to story + feed, tagged Trailblaize"
+                style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.85rem', padding: '6px 10px', border: '1px solid #D9D4CC', borderRadius: 2, outline: 'none', fontFamily: 'inherit' }}
+              />
+            </div>
+            {flyerPosted && flyerPostUrl && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <a
+                  href={flyerPostUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '0.8rem', color: '#C4874A', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  <Instagram size={13} /> View Post →
+                </a>
+              </div>
+            )}
+          </div>
+
+          <p style={{ marginTop: 14, fontSize: '0.75rem', color: '#9ca3af', lineHeight: 1.5 }}>
+            Social proof milestone — chapters that post flyers drive organic inbound from other schools. No post after 14 days active = health warning.
+          </p>
         </div>
       </section>
 

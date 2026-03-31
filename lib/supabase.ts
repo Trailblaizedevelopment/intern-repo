@@ -442,6 +442,7 @@ export const ONBOARDING_STEPS = [
   { key: 'setup_submission_received',  label: 'Submission form received',            category: 'setup' },
   // Alumni Activation
   { key: 'activate_ig_collab',         label: 'Collab IG post done',                 category: 'activation' },
+  { key: 'activate_ig_flyer',          label: 'Instagram story flyer posted',        category: 'activation' },
   { key: 'activate_facebook_flyer',    label: 'Facebook group flyer sent',           category: 'activation' },
   { key: 'activate_linkedin_post',     label: 'LinkedIn group post done',            category: 'activation' },
   { key: 'activate_groupme_blast',     label: 'GroupMe blast sent',                  category: 'activation' },
@@ -733,6 +734,7 @@ export interface ChapterWithOnboarding extends Chapter {
   setup_submission_form_sent?: boolean;
   setup_submission_received?: boolean;
   activate_ig_collab?: boolean;
+  activate_ig_flyer?: boolean;
   activate_facebook_flyer?: boolean;
   activate_linkedin_post?: boolean;
   activate_groupme_blast?: boolean;
@@ -750,6 +752,12 @@ export interface ChapterWithOnboarding extends Chapter {
   success_actives_list?: boolean;
   success_first_match?: boolean;
   success_video_sent?: boolean;
+
+  // Instagram flyer tracker
+  instagram_flyer_posted?: boolean;
+  instagram_flyer_post_date?: string | null;
+  instagram_flyer_post_url?: string | null;
+  instagram_flyer_notes?: string | null;
 }
 
 // List of common US universities for autocomplete
