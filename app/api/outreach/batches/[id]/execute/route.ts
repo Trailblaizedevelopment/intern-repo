@@ -3,6 +3,10 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { createChat, getChat, getRecipientService, sleep } from '@/lib/linq';
 
 // Vercel Pro: allow up to 300s for this route (batch sends take time)
+// 300s = 5 min. For large batches (150+ sends × up to 9s each = 22+ min), consider
+// running execute as a background job. For now 300s covers ~33 sends max at 9s.
+// Real batches should stay under 45 T1s + reasonable T2/T3 to fit within timeout.
+// TODO: move to background queue for large batches.
 export const maxDuration = 300;
 
 const ALL_LINE_PHONES: Record<number, string> = {
@@ -370,20 +374,29 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     //    after chat creation is unreliable and causes SMS contacts to slip through.
     //
     //    Fix:
-    //    Phase A — atomically claim each contact, create a Linq chat with message.
-    //              Lines are processed SEQUENTIALLY with a 2-minute gap between them.
-    //              3-second sleep between sends within each line (rate limit protection).
-    //    Phase B — after a shared 10-second wait, GET each chat to read the resolved
-    //              service, then REVERT SMS contacts back to their pre-send DB state.
-    //              SMS chats are tracked as sent_to_sms (message was sent but we revert
-    //              status so the next batch can detect and handle properly).
+    //    Per-chapter batches (pinnedIds): contacts are iMessage-verified at compile time.
+    //    Phase B is skipped entirely — no need to re-check service after sending.
+    //
+    //    Legacy global batches: Phase B still runs to detect/revert SMS sends.
+    //
+    //    Pacing: randomized delay between sends (4–9s) to mimic human behavior.
+    //    188 sends × avg 6.5s ≈ 20 minutes. Apple rate detection looks for bursts;
+    //    randomized spacing with natural variance avoids pattern matching.
+
+    const isPerChapterBatch = !!pinnedIds;
+
+    // Random delay: uniform between minMs and maxMs
+    function randomDelay(minMs: number, maxMs: number): Promise<void> {
+      const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+      return sleep(ms);
+    }
 
     type PendingChat = {
       contact: Contact;
       chatId: string;
       message: string;
       originalStatus: string;
-      skipServiceCheck: boolean; // true if pre-allocated at compile time (already iMessage-verified)
+      skipServiceCheck: boolean;
     };
     const pendingChats: PendingChat[] = [];
 
@@ -517,8 +530,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
               .eq('id', lineRecord.id);
           }
 
-          // 1.5s between sends — enough spacing without blowing the timeout budget
-          await sleep(1500);
+          // Randomized human-like delay: 4–9s between sends
+          // 188 contacts × avg 6.5s ≈ 20 min total — natural variance avoids carrier pattern detection
+          await randomDelay(4000, 9000);
         } catch (e) {
           const errMsg = String(e);
           results.errors.push(`${contact.first_name} (${contact.phone_primary}): createChat failed: ${errMsg}`);
@@ -528,10 +542,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }
 
     // ── Phase B: verify service, revert SMS contacts ──────────────────────────
-    // Phase A already sent messages. This phase reads back the resolved service
-    // type from Linq and REVERTS SMS contacts to their pre-send DB state so they
-    // can be properly handled in future runs.
-    if (pendingChats.length > 0) {
+    // Only runs for legacy global batches. Per-chapter batches are iMessage-verified
+    // at compile time (createChat + service check during compile-chapter), so all
+    // contacts have linq_chat_id and skipServiceCheck=true. Phase B is a no-op for them.
+    if (!isPerChapterBatch && pendingChats.length > 0) {
       // Shared wait — Linq resolves service within ~5s for most numbers
       await sleep(10000);
 
