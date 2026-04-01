@@ -127,28 +127,26 @@ export async function GET(
   const allContacts: AlumniContact[] = ((contacts as any) || []) as AlumniContact[];
 
   // ── Step 2: Find the external chapter_id ─────────────────────────────────
-  // First try from alumni_contacts (populated by backfill/webhook)
+  // Primary source: chapter_external_mappings table — this is the authoritative mapping.
   let externalChapterId: string | null = null;
-  for (const c of allContacts) {
-    if (c.platform_chapter_id) {
-      externalChapterId = c.platform_chapter_id;
-      break;
-    }
+
+  const { data: mapping } = await supabase
+    .from('chapter_external_mappings')
+    .select('external_chapter_id')
+    .eq('internal_chapter_id', id)
+    .single();
+
+  if (mapping?.external_chapter_id) {
+    externalChapterId = mapping.external_chapter_id;
   }
 
-  // Fallback: check chapters table for external_chapter_id column
+  // Fallback 1: check alumni_contacts for platform_chapter_id (populated by backfill)
   if (!externalChapterId) {
-    const { data: chapterRow } = await supabase
-      .from('chapters')
-      .select('*')
-      .eq('id', id)
-      .single();
-    // Try common column names
-    if (chapterRow) {
-      externalChapterId =
-        (chapterRow as Record<string, unknown>).external_chapter_id as string | null ||
-        (chapterRow as Record<string, unknown>).platform_chapter_id as string | null ||
-        null;
+    for (const c of allContacts) {
+      if (c.platform_chapter_id) {
+        externalChapterId = c.platform_chapter_id;
+        break;
+      }
     }
   }
 
