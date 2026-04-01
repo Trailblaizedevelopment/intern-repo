@@ -2,10 +2,9 @@
 
 import React, { useEffect, useState, useCallback, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Map, List, LayoutList, ChevronDown, X, RefreshCw, Plus } from 'lucide-react';
+import { Map, List, LayoutList, ChevronDown, X, RefreshCw, Plus, ChevronRight, GanttChart } from 'lucide-react';
 import type { RoadmapTicket, RawTicket, RoadmapProject, Employee, Filters } from './types';
-import { buildTicket } from './utils';
-import { GanttView } from './GanttView';
+import { buildTicket, projectColor } from './utils';
 import { ListView } from './ListView';
 import { TicketModal } from './TicketModal';
 
@@ -23,6 +22,310 @@ async function fetchFromSupabase<T>(path: string): Promise<T[]> {
   });
   if (!res.ok) throw new Error(`Supabase fetch failed: ${res.status}`);
   return res.json() as Promise<T[]>;
+}
+
+// ── Extended project type with date fields ───────────────────────────────────
+interface GanttProject extends RoadmapProject {
+  color: string | null;
+  start_date: string | null;
+  target_date: string | null;
+  estimated_start: string | null;
+  estimated_end: string | null;
+  actual_start: string | null;
+  actual_end: string | null;
+}
+
+// ── Gantt helpers ────────────────────────────────────────────────────────────
+const PROJECT_COLORS_PALETTE = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6'];
+
+function getProjectColor(p: GanttProject, index: number): string {
+  if (p.color) return p.color;
+  const hashed = projectColor(p.name);
+  return hashed || PROJECT_COLORS_PALETTE[index % PROJECT_COLORS_PALETTE.length];
+}
+
+function statusFillPct(status: string | null): number {
+  switch (status) {
+    case 'done': case 'completed': case 'resolved': return 100;
+    case 'in_progress': case 'in_review': case 'testing': return 50;
+    default: return 0;
+  }
+}
+
+const TESTER_INITIALS: Record<string, string> = {
+  Owen: 'O',
+  Adam: 'A',
+  Ford: 'F',
+  Devin: 'D',
+};
+
+function testerInitial(name: string | null | undefined): string | null {
+  if (!name) return null;
+  for (const [full, init] of Object.entries(TESTER_INITIALS)) {
+    if (name.toLowerCase().includes(full.toLowerCase())) return init;
+  }
+  return name.charAt(0).toUpperCase();
+}
+
+// ── Project Gantt View ───────────────────────────────────────────────────────
+
+interface ProjectGanttProps {
+  projects: GanttProject[];
+  tickets: RoadmapTicket[];
+  timeScale: 'week' | 'month';
+}
+
+function ProjectGantt({ projects, tickets, timeScale }: ProjectGanttProps) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const toggle = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+
+  // Build timeline
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Determine timeline window
+  const allDates: Date[] = [];
+  for (const p of projects) {
+    const start = p.estimated_start || p.start_date;
+    const end = p.estimated_end || p.target_date;
+    if (start) allDates.push(new Date(start + 'T00:00:00'));
+    if (end) allDates.push(new Date(end + 'T00:00:00'));
+  }
+  // Always include today
+  allDates.push(today);
+
+  const minDate = allDates.length > 0
+    ? new Date(Math.min(...allDates.map(d => d.getTime())))
+    : today;
+  const maxDate = allDates.length > 0
+    ? new Date(Math.max(...allDates.map(d => d.getTime())))
+    : new Date(today.getTime() + 30 * 86400000);
+
+  // Snap to week/month boundaries
+  const snapStart = new Date(minDate);
+  snapStart.setDate(snapStart.getDate() - 3);
+  const snapEnd = new Date(maxDate);
+  snapEnd.setDate(snapEnd.getDate() + 7);
+
+  const totalDays = Math.max(Math.ceil((snapEnd.getTime() - snapStart.getTime()) / 86400000), 14);
+
+  const LABEL_WIDTH = 220;
+  const DAY_PX = timeScale === 'week' ? 80 : 28;
+
+  function dayOffset(dateStr: string | null): number | null {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    return Math.round((d.getTime() - snapStart.getTime()) / 86400000);
+  }
+
+  function dayOffsetDate(d: Date): number {
+    return Math.round((d.getTime() - snapStart.getTime()) / 86400000);
+  }
+
+  // Header: weeks or months
+  const headers: { label: string; days: number; offset: number }[] = [];
+  if (timeScale === 'week') {
+    // Week headers
+    let cur = new Date(snapStart);
+    while (cur <= snapEnd) {
+      const weekStart = new Date(cur);
+      const weekEnd = new Date(cur);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const endClamped = weekEnd > snapEnd ? snapEnd : weekEnd;
+      const days = Math.ceil((endClamped.getTime() - weekStart.getTime()) / 86400000) + 1;
+      const offset = dayOffsetDate(weekStart);
+      const label = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      headers.push({ label, days, offset });
+      cur.setDate(cur.getDate() + 7);
+    }
+  } else {
+    // Month headers
+    let cur = new Date(snapStart.getFullYear(), snapStart.getMonth(), 1);
+    while (cur <= snapEnd) {
+      const monthEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
+      const startClamped = cur < snapStart ? snapStart : cur;
+      const endClamped = monthEnd > snapEnd ? snapEnd : monthEnd;
+      const days = Math.ceil((endClamped.getTime() - startClamped.getTime()) / 86400000) + 1;
+      const offset = dayOffsetDate(startClamped);
+      const label = cur.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      headers.push({ label, days, offset });
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    }
+  }
+
+  // Scheduled vs unscheduled
+  const scheduled = projects.filter(p => p.estimated_start || p.start_date || p.estimated_end || p.target_date);
+  const unscheduled = projects.filter(p => !p.estimated_start && !p.start_date && !p.estimated_end && !p.target_date);
+
+  const totalWidth = totalDays * DAY_PX;
+  const todayX = LABEL_WIDTH + dayOffsetDate(today) * DAY_PX;
+
+  function renderProjectRow(p: GanttProject, idx: number) {
+    const color = getProjectColor(p, idx);
+    const startStr = p.estimated_start || p.start_date;
+    const endStr = p.estimated_end || p.target_date;
+    const startOff = dayOffset(startStr);
+    const endOff = dayOffset(endStr);
+    const isExpanded = expanded[p.id];
+    const projTickets = tickets.filter(t => t.project_id === p.id || t.project === p.name);
+
+    const avgFill = projTickets.length > 0
+      ? Math.round(projTickets.reduce((s, t) => s + statusFillPct(t.status), 0) / projTickets.length)
+      : statusFillPct(p.status);
+
+    const tester = testerInitial(projTickets[0]?.assignee_id ? projTickets[0]?.project : null);
+
+    const barX = startOff !== null ? LABEL_WIDTH + startOff * DAY_PX : null;
+    const barWidth = (startOff !== null && endOff !== null && endOff > startOff)
+      ? (endOff - startOff) * DAY_PX
+      : (barX !== null ? 120 : null);
+
+    return (
+      <React.Fragment key={p.id}>
+        <div className="flex items-center border-b border-gray-100 hover:bg-gray-50/50 transition-colors" style={{ height: 40 }}>
+          {/* Label */}
+          <div
+            className="flex items-center gap-2 px-3 shrink-0 cursor-pointer"
+            style={{ width: LABEL_WIDTH }}
+            onClick={() => toggle(p.id)}
+          >
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+            <span className="text-sm text-gray-800 font-medium truncate flex-1">{p.name}</span>
+            {projTickets.length > 0 && (
+              isExpanded
+                ? <ChevronDown size={13} className="text-gray-400 shrink-0" />
+                : <ChevronRight size={13} className="text-gray-400 shrink-0" />
+            )}
+          </div>
+
+          {/* Chart area */}
+          <div className="relative flex-1 overflow-hidden h-full" style={{ minWidth: totalWidth }}>
+            {/* Today line */}
+            <div
+              className="absolute top-0 bottom-0 w-px bg-red-400/60 z-10 pointer-events-none"
+              style={{ left: todayX - LABEL_WIDTH }}
+            />
+            {barX !== null && barWidth !== null && (
+              <div
+                className="absolute top-2 rounded-md overflow-hidden flex items-center"
+                style={{
+                  left: barX - LABEL_WIDTH,
+                  width: barWidth,
+                  height: 24,
+                  background: `${color}25`,
+                  border: `1.5px solid ${color}`,
+                }}
+              >
+                {/* Fill % */}
+                <div
+                  className="h-full opacity-50"
+                  style={{ width: `${avgFill}%`, background: color }}
+                />
+                {/* Tester dot */}
+                {tester && (
+                  <div
+                    className="absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
+                    style={{ background: color }}
+                  >
+                    {tester}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Ticket sub-rows */}
+        {isExpanded && projTickets.map(ticket => {
+          const tStartOff = dayOffset(ticket.barStart);
+          const tEndOff = dayOffset(ticket.barEnd);
+          const tBarX = tStartOff !== null ? LABEL_WIDTH + tStartOff * DAY_PX : null;
+          const tBarWidth = (tStartOff !== null && tEndOff !== null && tEndOff > tStartOff)
+            ? (tEndOff - tStartOff) * DAY_PX
+            : 80;
+          const fill = statusFillPct(ticket.status);
+
+          return (
+            <div key={ticket.id} className="flex items-center border-b border-gray-100 bg-indigo-50/30 hover:bg-indigo-50/50" style={{ height: 34 }}>
+              <div className="flex items-center gap-2 px-3 shrink-0 pl-8" style={{ width: LABEL_WIDTH }}>
+                <span className="text-xs text-gray-500 truncate">#{ticket.number} {ticket.title}</span>
+              </div>
+              <div className="relative flex-1 overflow-hidden h-full" style={{ minWidth: totalWidth }}>
+                <div
+                  className="absolute top-0 bottom-0 w-px bg-red-400/40 z-10 pointer-events-none"
+                  style={{ left: todayX - LABEL_WIDTH }}
+                />
+                {tBarX !== null && (
+                  <div
+                    className="absolute top-2 rounded overflow-hidden"
+                    style={{
+                      left: tBarX - LABEL_WIDTH,
+                      width: tBarWidth,
+                      height: 20,
+                      background: `${color}18`,
+                      border: `1px solid ${color}80`,
+                    }}
+                  >
+                    <div
+                      className="h-full opacity-40"
+                      style={{ width: `${fill}%`, background: color }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </React.Fragment>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      {/* Timeline header */}
+      <div className="flex sticky top-0 z-20 bg-white border-b border-gray-200">
+        <div className="shrink-0 bg-white" style={{ width: LABEL_WIDTH }} />
+        <div className="flex" style={{ minWidth: totalWidth }}>
+          {headers.map((h, i) => (
+            <div
+              key={i}
+              className="border-l border-gray-100 px-2 py-1.5 text-xs font-medium text-gray-500"
+              style={{ width: h.days * DAY_PX, minWidth: 40, flexShrink: 0 }}
+            >
+              {h.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Rows */}
+      <div>
+        {scheduled.map((p, i) => renderProjectRow(p, i))}
+      </div>
+
+      {/* Unscheduled */}
+      {unscheduled.length > 0 && (
+        <div>
+          <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Unscheduled</span>
+          </div>
+          {unscheduled.map((p, i) => {
+            const color = getProjectColor(p, scheduled.length + i);
+            const projTickets = tickets.filter(t => t.project_id === p.id || t.project === p.name);
+            return (
+              <div key={p.id} className="flex items-center gap-3 px-3 py-2 border-b border-gray-100 hover:bg-gray-50">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+                <span className="text-sm text-gray-700 flex-1">{p.name}</span>
+                <span className="text-xs text-gray-400">{projTickets.length} tickets</span>
+                <span className="text-xs text-gray-300 italic">no dates set</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Skeleton ────────────────────────────────────────────────────────────────
@@ -142,7 +445,6 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
         className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900">New Ticket</h2>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 transition-colors" aria-label="Close">
@@ -150,13 +452,11 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={e => void handleSubmit(e)} className="p-5 space-y-4">
           {error && (
             <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
           )}
 
-          {/* Title */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
               Title <span className="text-red-500">*</span>
@@ -172,7 +472,6 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Project */}
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Project</label>
               <select
@@ -185,7 +484,6 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
               </select>
             </div>
 
-            {/* Priority */}
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Priority</label>
               <select
@@ -201,7 +499,6 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
               </select>
             </div>
 
-            {/* Sprint */}
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Sprint</label>
               <select
@@ -215,7 +512,6 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
               </select>
             </div>
 
-            {/* Status */}
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Status</label>
               <select
@@ -232,7 +528,6 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               type="button"
@@ -271,21 +566,24 @@ function EmptyState({ onClear }: { onClear: () => void }) {
   );
 }
 
-// ── Main Page (wrapped in Suspense for useSearchParams) ─────────────────────
+// ── Main Page ────────────────────────────────────────────────────────────────
 function RoadmapPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [view, setView] = useState<'gantt' | 'list'>(() => {
+  type ViewType = 'gantt' | 'list';
+  const [view, setView] = useState<ViewType>(() => {
     if (typeof window === 'undefined') return 'gantt';
     if (window.innerWidth < 768) return 'list';
-    try { return (localStorage.getItem('roadmap_view') as 'gantt' | 'list') ?? 'gantt'; }
+    try { return (localStorage.getItem('roadmap_view') as ViewType) ?? 'gantt'; }
     catch { return 'gantt'; }
   });
 
+  const [timeScale, setTimeScale] = useState<'week' | 'month'>('month');
+
   // Data
   const [tickets, setTickets] = useState<RoadmapTicket[]>([]);
-  const [projects, setProjects] = useState<RoadmapProject[]>([]);
+  const [projects, setProjects] = useState<GanttProject[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -317,16 +615,17 @@ function RoadmapPageInner() {
     updateFilters({ sprint: 'all', priority: [], projectIds: [], assigneeId: '' });
   }, [updateFilters]);
 
-  // Load data
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [rawTickets, rawProjects, rawEmployees] = await Promise.all([
         fetchFromSupabase<RawTicket>(
-          'tickets?select=id,number,title,description,type,priority,status,assignee_id,project,project_id,due_date,created_at,sprint,labels&order=number.asc'
+          'tickets?select=id,number,title,description,type,priority,status,assignee_id,project,project_id,due_date,created_at,sprint,labels,estimated_start,estimated_end,actual_start,actual_end&order=number.asc'
         ),
-        fetchFromSupabase<RoadmapProject>('projects?select=id,name,status'),
+        fetchFromSupabase<GanttProject>(
+          'projects?select=id,name,status,color,start_date,target_date,estimated_start,estimated_end,actual_start,actual_end'
+        ),
         fetchFromSupabase<Employee>('employees?select=id,name'),
       ]);
       setTickets(rawTickets.map(buildTicket));
@@ -341,12 +640,11 @@ function RoadmapPageInner() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const handleViewChange = (v: 'gantt' | 'list') => {
+  const handleViewChange = (v: ViewType) => {
     setView(v);
     try { localStorage.setItem('roadmap_view', v); } catch { /* ignore */ }
   };
 
-  // Filter tickets
   const filteredTickets = useMemo(() => {
     return tickets.filter(t => {
       if (filters.sprint !== 'all') {
@@ -371,7 +669,6 @@ function RoadmapPageInner() {
     });
   }, [tickets, filters, projects]);
 
-  // Handle drag reschedule
   const handleReschedule = useCallback(async (ticketId: string, newEnd: string) => {
     setTickets(ts => ts.map(t => t.id === ticketId ? buildTicket({ ...t, due_date: newEnd }) : t));
     try {
@@ -382,19 +679,16 @@ function RoadmapPageInner() {
       });
       if (!res.ok) throw new Error('Failed');
     } catch {
-      // Revert by reloading
       void load();
     }
   }, [load]);
 
-  // Handle ticket field update (from modal)
   const handleTicketUpdate = useCallback((updated: RawTicket) => {
     const rebuilt = buildTicket(updated);
     setTickets(ts => ts.map(t => t.id === rebuilt.id ? rebuilt : t));
     setSelectedTicket(updated);
   }, []);
 
-  // Handle status change (from list view action menu)
   const handleStatusChange = useCallback(async (ticketId: string, newStatus: string) => {
     setTickets(ts => ts.map(t => t.id === ticketId ? buildTicket({ ...t, status: newStatus }) : t));
     try {
@@ -409,14 +703,12 @@ function RoadmapPageInner() {
     }
   }, [load]);
 
-  // Handle new ticket created
   const handleCreated = useCallback((raw: RawTicket) => {
     const built = buildTicket(raw);
     setTickets(ts => [...ts, built]);
     setShowCreateModal(false);
   }, []);
 
-  // Open ticket modal (convert RoadmapTicket → RawTicket)
   const openModal = useCallback((t: RoadmapTicket) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { barStart: _bs, barEnd: _be, ...raw } = t;
@@ -435,17 +727,17 @@ function RoadmapPageInner() {
             Product Roadmap
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Sprint 1 (Mar 17–21) · Sprint 2 (Mar 22–31) · {tickets.length} tickets
+            {projects.length} projects · {tickets.length} tickets
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* View toggle — hide gantt on mobile */}
+          {/* View toggle */}
           <div className="hidden md:flex items-center border border-gray-200 rounded-lg overflow-hidden">
             <button
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${view === 'gantt' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
               onClick={() => handleViewChange('gantt')}
             >
-              <LayoutList size={16} />
+              <GanttChart size={16} />
               Gantt
             </button>
             <button
@@ -456,6 +748,22 @@ function RoadmapPageInner() {
               List
             </button>
           </div>
+
+          {/* Time scale toggle (gantt only) */}
+          {view === 'gantt' && (
+            <div className="hidden md:flex items-center border border-gray-200 rounded-lg overflow-hidden">
+              {(['week', 'month'] as const).map(s => (
+                <button
+                  key={s}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-r last:border-r-0 border-gray-200 capitalize ${timeScale === s ? 'bg-gray-100 text-gray-800' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  onClick={() => setTimeScale(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
           <button
             onClick={() => void load()}
             className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 text-gray-500"
@@ -466,83 +774,77 @@ function RoadmapPageInner() {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg sticky top-0 z-20">
-        {/* Sprint button group */}
-        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-          {(['all', 'sprint1', 'sprint2'] as const).map(s => {
-            const labels: Record<string, string> = {
-              all: 'All',
-              sprint1: 'Sprint 1',
-              sprint2: 'Sprint 2',
-            };
-            return (
-              <button
-                key={s}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors border-r last:border-r-0 border-gray-200 ${filters.sprint === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                onClick={() => updateFilters({ sprint: s })}
-              >
-                {labels[s]}
-              </button>
-            );
-          })}
-        </div>
+      {/* Filter Bar (list view only) */}
+      {view === 'list' && (
+        <div className="flex flex-wrap items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg sticky top-0 z-20">
+          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+            {(['all', 'sprint1', 'sprint2'] as const).map(s => {
+              const labels: Record<string, string> = { all: 'All', sprint1: 'Sprint 1', sprint2: 'Sprint 2' };
+              return (
+                <button
+                  key={s}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-r last:border-r-0 border-gray-200 ${filters.sprint === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => updateFilters({ sprint: s })}
+                >
+                  {labels[s]}
+                </button>
+              );
+            })}
+          </div>
 
-        <MultiSelect
-          label="Priority"
-          options={[
-            { value: 'critical', label: '🔴 Critical' },
-            { value: 'high',     label: '🟠 High' },
-            { value: 'medium',   label: '🟡 Medium' },
-            { value: 'low',      label: '⚪ Low' },
-            { value: 'none',     label: '— None' },
-          ]}
-          selected={filters.priority}
-          onChange={vals => updateFilters({ priority: vals })}
-        />
+          <MultiSelect
+            label="Priority"
+            options={[
+              { value: 'critical', label: '🔴 Critical' },
+              { value: 'high', label: '🟠 High' },
+              { value: 'medium', label: '🟡 Medium' },
+              { value: 'low', label: '⚪ Low' },
+              { value: 'none', label: '— None' },
+            ]}
+            selected={filters.priority}
+            onChange={vals => updateFilters({ priority: vals })}
+          />
 
-        <MultiSelect
-          label="Project"
-          options={projects.map(p => ({ value: p.id, label: p.name }))}
-          selected={filters.projectIds}
-          onChange={vals => updateFilters({ projectIds: vals })}
-        />
+          <MultiSelect
+            label="Project"
+            options={projects.map(p => ({ value: p.id, label: p.name }))}
+            selected={filters.projectIds}
+            onChange={vals => updateFilters({ projectIds: vals })}
+          />
 
-        <select
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white hover:border-gray-300 transition-colors"
-          value={filters.assigneeId}
-          onChange={e => updateFilters({ assigneeId: e.target.value })}
-        >
-          <option value="">All Assignees</option>
-          {employees.map(e => (
-            <option key={e.id} value={e.id}>{e.name}</option>
-          ))}
-        </select>
-
-        {/* Clear filters */}
-        {hasFilters && (
-          <button
-            className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
-            onClick={clearFilters}
+          <select
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white hover:border-gray-300 transition-colors"
+            value={filters.assigneeId}
+            onChange={e => updateFilters({ assigneeId: e.target.value })}
           >
-            <X size={12} /> Clear
+            <option value="">All Assignees</option>
+            {employees.map(e => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
+          </select>
+
+          {hasFilters && (
+            <button
+              className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+              onClick={clearFilters}
+            >
+              <X size={12} /> Clear
+            </button>
+          )}
+
+          <span className="ml-auto text-xs text-gray-400">
+            {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
+          </span>
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={14} />
+            New Ticket
           </button>
-        )}
-
-        {/* Ticket count */}
-        <span className="ml-auto text-xs text-gray-400">
-          {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
-        </span>
-
-        {/* New Ticket button */}
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={14} />
-          New Ticket
-        </button>
-      </div>
+        </div>
+      )}
 
       {/* Content */}
       {loading ? (
@@ -553,13 +855,20 @@ function RoadmapPageInner() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
           Error loading roadmap data: {error}
         </div>
+      ) : view === 'gantt' ? (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <ProjectGantt
+            projects={projects}
+            tickets={tickets}
+            timeScale={timeScale}
+          />
+        </div>
       ) : filteredTickets.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <EmptyState onClear={clearFilters} />
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          {/* Mobile: always list */}
           <div className="md:hidden">
             <ListView
               tickets={filteredTickets}
@@ -569,29 +878,19 @@ function RoadmapPageInner() {
               onStatusChange={handleStatusChange}
             />
           </div>
-          {/* Desktop: gantt or list */}
           <div className="hidden md:block">
-            {view === 'gantt' ? (
-              <GanttView
-                tickets={filteredTickets}
-                employees={employees}
-                onTicketClick={openModal}
-                onReschedule={handleReschedule}
-              />
-            ) : (
-              <ListView
-                tickets={filteredTickets}
-                employees={employees}
-                totalCount={tickets.length}
-                onTicketClick={openModal}
-                onStatusChange={handleStatusChange}
-              />
-            )}
+            <ListView
+              tickets={filteredTickets}
+              employees={employees}
+              totalCount={tickets.length}
+              onTicketClick={openModal}
+              onStatusChange={handleStatusChange}
+            />
           </div>
         </div>
       )}
 
-      {/* Ticket editor modal */}
+      {/* Modals */}
       {selectedTicket && (
         <TicketModal
           ticket={selectedTicket}
@@ -601,7 +900,6 @@ function RoadmapPageInner() {
         />
       )}
 
-      {/* Create ticket modal */}
       {showCreateModal && (
         <CreateTicketModal
           projects={projects}
