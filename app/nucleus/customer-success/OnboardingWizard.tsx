@@ -361,9 +361,11 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     if (!chapterId || !supabase) return;
     setSaving(true); setError(null);
 
+    const now = new Date().toISOString();
     const { error: err } = await supabase.from('chapters').update({
-      wizard_completed_at: new Date().toISOString(),
-      status: 'onboarding',
+      wizard_completed_at: now,
+      onboarding_completed: now.split('T')[0],
+      status: 'active',
       wizard_step: 5,
     }).eq('id', chapterId);
 
@@ -539,24 +541,28 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
             )}
 
             {currentStep === 4 && (
-              <>
-                <button
-                  onClick={handleSaveSubmission}
-                  disabled={saving || !submissionSent}
-                  style={primaryBtnStyle(saving || !submissionSent)}
-                >
-                  {saving ? <Loader2 size={16} /> : null}
-                  Save & Continue <ChevronRight size={16} />
+              submissionFormSent ? (
+                <button onClick={() => setCurrentStep(5)} style={primaryBtnStyle(false)}>
+                  Continue <ChevronRight size={16} />
                 </button>
-                {!submissionFormSent && (
+              ) : (
+                <>
+                  <button
+                    onClick={handleSaveSubmission}
+                    disabled={saving || !submissionSent}
+                    style={primaryBtnStyle(saving || !submissionSent)}
+                  >
+                    {saving ? <Loader2 size={16} /> : null}
+                    Save & Continue <ChevronRight size={16} />
+                  </button>
                   <button
                     onClick={() => setMarkDoneStep({ step: 4, name: 'Submission Form' })}
                     style={markAsDoneLinkStyle}
                   >
                     Mark as already done
                   </button>
-                )}
-              </>
+                </>
+              )
             )}
 
             {currentStep === 5 && (
