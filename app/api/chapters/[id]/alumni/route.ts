@@ -117,7 +117,7 @@ export async function GET(
       'touch1_sent_at, touch2_sent_at, touch3_sent_at, is_imessage, year, platform_chapter_id'
     )
     .eq('chapter_id', id)
-    .limit(10000); // Supabase default cap is 1000 — override for large chapters
+    .limit(10000); // Supabase default row cap is 1000 — explicitly raise to 10000 for large chapters (2783+ contacts)
 
   if (contactsError) {
     return NextResponse.json({ error: contactsError.message }, { status: 500 });
