@@ -3,22 +3,39 @@ import { supabase } from '@/lib/supabase';
 
 // ── Header aliases (extended for real-world fraternity lists) ─────────────────
 const HEADER_ALIASES: Record<string, string[]> = {
-  full_name: ['name', 'full name', 'fullname', 'member name', 'alumnus', 'alumni name', 'member', 'alumnus name'],
-  first_name: ['first name', 'fname', 'first', 'firstname', 'given name', 'givenname', 'preferred name', 'preferred', 'forename'],
-  last_name: ['last name', 'lname', 'last', 'lastname', 'surname', 'family name', 'familyname', 'family', 'surname'],
+  full_name: ['name', 'full name', 'fullname', 'member name', 'alumnus', 'alumni name', 'member', 'alumnus name', 'addressee'],
+  first_name: [
+    'first name', 'fname', 'first', 'firstname', 'given name', 'givenname', 'preferred name', 'preferred', 'forename',
+    // Nationals export formats
+    'frsname', 'frs name', 'frs', 'nckname', 'nick name', 'nickname', 'first nm', 'firstnm',
+  ],
+  last_name: [
+    'last name', 'lname', 'last', 'lastname', 'surname', 'family name', 'familyname', 'family', 'surname',
+    // Nationals export formats
+    'lstname', 'lst name', 'lst', 'last nm', 'lastnm',
+  ],
   phone: [
     'phone', 'phone number', 'phonenumber', 'cell', 'cell phone', 'cellphone', 'mobile', 'telephone', 'tel',
     'cell phone number', 'mobile number', 'contact number', 'direct', 'phone #', 'number',
+    // Nationals export formats
+    'home phone', 'homephone', 'busn cell', 'busncell', 'personal cell',
   ],
   phone_primary: ['phone 1', 'phone1', 'primary phone', 'primary', 'cell 1', 'cell1', 'mobile 1', 'phone primary'],
   phone_secondary: [
     'phone 2', 'phone2', 'secondary phone', 'secondary', 'cell 2', 'cell2', 'mobile 2', 'phone secondary',
     'alt phone', 'alternate phone', 'other phone', 'imessage', 'imessage number',
   ],
-  email: ['email', 'email address', 'emailaddress', 'e-mail', 'mail', 'email 1', 'primary email', 'contact email'],
+  email: [
+    'email', 'email address', 'emailaddress', 'e-mail', 'mail', 'email 1', 'primary email', 'contact email',
+    // Nationals export formats
+    'busn email', 'busnemail', 'personal email',
+  ],
   year: [
     'year', 'grad year', 'graduation year', 'class year', 'class', 'initiation year', 'init year', 'grad', 'graduation',
-    'class of', 'pledge year', 'initiated', 'year initiated', 'graduation year',
+    'class of', 'pledge year', 'initiated', 'year initiated',
+    // Nationals export formats — "Init. Ceremony" contains initiation year (e.g. "Fall 1995")
+    'init. ceremony', 'init ceremony', 'initceremony', 'cand. ceremony', 'cand ceremony',
+    'initiation date', 'init date', 'pledge date', 'init year', 'graduation', 'grad date',
   ],
 };
 
@@ -219,7 +236,10 @@ export async function POST(request: NextRequest) {
 
       // ── Year filter ───────────────────────────────────────────────────────
       const rawYear = record.year?.trim() || '';
-      const year = rawYear ? parseInt(rawYear) : null;
+      // Handle formats like "Fall 1995", "Spring 2003", "1995-2000", "05/1995" etc.
+      // Extract the 4-digit year from anywhere in the string
+      const yearMatch = rawYear.match(/\b(19[7-9]\d|20[0-2]\d)\b/);
+      const year = yearMatch ? parseInt(yearMatch[1]) : (rawYear ? parseInt(rawYear) : null);
       const validYear = year && year > 1900 && year < 2100 ? year : null;
 
       if (hasYearCol && year !== null && year < 1970) {

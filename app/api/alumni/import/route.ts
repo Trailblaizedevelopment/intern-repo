@@ -4,13 +4,32 @@ import { autoAssignQueue } from '@/lib/outreach';
 import { batchLookupPhoneTypes } from '@/lib/telnyx';
 
 const HEADER_ALIASES: Record<string, string[]> = {
-  first_name: ['first name', 'fname', 'first', 'firstname', 'given name', 'givenname'],
-  last_name: ['last name', 'lname', 'last', 'lastname', 'surname', 'family name', 'familyname'],
-  phone: ['phone', 'phone number', 'phonenumber', 'cell', 'cell phone', 'cellphone', 'mobile', 'telephone', 'tel'],
+  full_name: ['name', 'full name', 'fullname', 'member name', 'alumnus', 'alumni name', 'member', 'alumnus name', 'addressee'],
+  first_name: [
+    'first name', 'fname', 'first', 'firstname', 'given name', 'givenname', 'preferred name', 'preferred', 'forename',
+    'frsname', 'frs name', 'frs', 'nckname', 'nick name', 'nickname', 'first nm', 'firstnm',
+  ],
+  last_name: [
+    'last name', 'lname', 'last', 'lastname', 'surname', 'family name', 'familyname', 'family',
+    'lstname', 'lst name', 'lst', 'last nm', 'lastnm',
+  ],
+  phone: [
+    'phone', 'phone number', 'phonenumber', 'cell', 'cell phone', 'cellphone', 'mobile', 'telephone', 'tel',
+    'cell phone number', 'mobile number', 'contact number', 'direct', 'phone #', 'number',
+    'home phone', 'homephone', 'busn cell', 'busncell', 'personal cell',
+  ],
   phone_primary: ['phone 1', 'phone1', 'primary phone', 'primary', 'cell 1', 'cell1', 'mobile 1', 'phone primary'],
   phone_secondary: ['phone 2', 'phone2', 'secondary phone', 'secondary', 'cell 2', 'cell2', 'mobile 2', 'phone secondary', 'alt phone', 'alternate phone', 'other phone', 'imessage', 'imessage number'],
-  email: ['email', 'email address', 'emailaddress', 'e-mail', 'mail'],
-  year: ['year', 'grad year', 'graduation year', 'class year', 'class', 'initiation year', 'init year', 'grad', 'graduation'],
+  email: [
+    'email', 'email address', 'emailaddress', 'e-mail', 'mail', 'email 1', 'primary email', 'contact email',
+    'busn email', 'busnemail', 'personal email',
+  ],
+  year: [
+    'year', 'grad year', 'graduation year', 'class year', 'class', 'initiation year', 'init year', 'grad', 'graduation',
+    'class of', 'pledge year', 'initiated', 'year initiated',
+    'init. ceremony', 'init ceremony', 'initceremony', 'cand. ceremony', 'cand ceremony',
+    'initiation date', 'init date', 'pledge date', 'graduation', 'grad date',
+  ],
 };
 
 function matchHeader(raw: string): string | null {
@@ -149,8 +168,21 @@ export async function POST(request: NextRequest) {
         record[field] = row[parseInt(colIdx)] || '';
       }
 
-      const firstName = record.first_name?.trim();
-      const lastName = record.last_name?.trim();
+      let firstName = record.first_name?.trim() || '';
+      let lastName = record.last_name?.trim() || '';
+
+      // Handle full_name column — split on last space
+      if ((!firstName || !lastName) && record.full_name?.trim()) {
+        const parts = record.full_name.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          firstName = parts.slice(0, -1).join(' ');
+          lastName = parts[parts.length - 1];
+        } else {
+          firstName = parts[0];
+          lastName = '';
+        }
+      }
+
       const rawEmail = record.email?.trim() || '';
       const rawYear = record.year?.trim() || '';
 
@@ -194,7 +226,9 @@ export async function POST(request: NextRequest) {
       if (phonePrimary && phoneSecondary) dualPhoneCount++;
 
       const email = rawEmail || null;
-      const year = rawYear ? parseInt(rawYear) : null;
+      // Handle "Fall 1995", "Spring 2003", date formats — extract 4-digit year
+      const yearMatch = rawYear.match(/\b(19[7-9]\d|20[0-2]\d)\b/);
+      const year = yearMatch ? parseInt(yearMatch[1]) : (rawYear ? parseInt(rawYear) : null);
 
       if (phonePrimary && existingPhones.has(phonePrimary)) { duplicates++; continue; }
       if (phonePrimary && seenPhones.has(phonePrimary)) { duplicates++; continue; }
