@@ -16,7 +16,7 @@ const DEFAULT_LINES = [
   { line_number: 3, label: 'Ford',  line_phone: '+16462442696', daily_limit: 45 },
 ];
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ data: DEFAULT_LINES.map(l => ({ ...l, is_paused: false, pause_reason: null })), error: null });
 
@@ -33,16 +33,52 @@ export async function GET() {
     });
   }
 
-  // If DB has rows, return them directly (source of truth)
-  // Fall back to DEFAULT_LINES only if DB is empty
-  if (data && data.length > 0) {
-    return NextResponse.json({ data, error: null });
+  // Base DB data
+  const baseData = (data && data.length > 0)
+    ? data
+    : DEFAULT_LINES.map(l => ({ ...l, is_paused: false, pause_reason: null }));
+
+  // ── Merge with live Linq line-health ──────────────────────────────────────
+  // Build the absolute URL for the line-health endpoint
+  try {
+    const reqUrl = new URL(request.url);
+    const healthUrl = `${reqUrl.protocol}//${reqUrl.host}/api/linq/line-health`;
+
+    const healthRes = await fetch(healthUrl, { next: { revalidate: 0 } });
+    if (healthRes.ok) {
+      const healthJson = await healthRes.json();
+      const healthByPhone: Record<string, {
+        linq_status: string;
+        linq_active: boolean | null;
+        sent_today: number;
+      }> = {};
+
+      for (const h of (healthJson.data || [])) {
+        healthByPhone[h.phone] = {
+          linq_status: h.linq_status,
+          linq_active: h.linq_active,
+          sent_today: h.sent_today,
+        };
+      }
+
+      const merged = baseData.map((line: Record<string, unknown>) => {
+        const h = healthByPhone[line.line_phone as string];
+        if (!h) return line;
+        return {
+          ...line,
+          linq_status: h.linq_status,
+          linq_active: h.linq_active,
+          sent_today: h.sent_today,
+        };
+      });
+
+      return NextResponse.json({ data: merged, error: null, linq_api_ok: healthJson.linq_api_ok });
+    }
+  } catch {
+    // Fall through to return base data if health fetch fails
   }
 
-  return NextResponse.json({
-    data: DEFAULT_LINES.map(l => ({ ...l, is_paused: false, pause_reason: null })),
-    error: null,
-  });
+  return NextResponse.json({ data: baseData, error: null });
 }
 
 export async function PATCH(request: NextRequest) {
