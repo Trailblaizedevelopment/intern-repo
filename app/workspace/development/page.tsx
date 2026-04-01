@@ -7,7 +7,7 @@ import {
   ChevronDown, ChevronRight,
 } from 'lucide-react';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface DevTicket {
   id: string;
@@ -15,7 +15,7 @@ interface DevTicket {
   title: string;
   status: string;
   priority: string;
-  ticket_type: 'ios' | 'web';
+  type: string;
   linear_id: string | null;
   assigned_tester: string | null;
   test_result: 'pass' | 'revisions' | null;
@@ -46,11 +46,11 @@ interface Project {
   color: string | null;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const AUTH = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_BADGE: Record<string, string> = {
   todo: 'bg-gray-100 text-gray-600',
   backlog: 'bg-gray-100 text-gray-500',
   open: 'bg-gray-100 text-gray-600',
@@ -60,7 +60,6 @@ const STATUS_COLOR: Record<string, string> = {
   done: 'bg-green-100 text-green-700',
   canceled: 'bg-red-100 text-red-500',
   // Linear state types
-  backlog_type: 'bg-gray-100 text-gray-600',
   unstarted: 'bg-gray-100 text-gray-600',
   started: 'bg-blue-100 text-blue-700',
   completed: 'bg-green-100 text-green-700',
@@ -72,19 +71,19 @@ const PRIORITY_DOT: Record<number, string> = {
   2: 'bg-orange-400',
   3: 'bg-blue-400',
   4: 'bg-gray-300',
+  0: 'bg-gray-200',
 };
 
-function statusBadge(status: string, stateType?: string) {
-  const key = stateType || status.toLowerCase().replace(/\s+/g, '_');
-  const cls = STATUS_COLOR[key] || STATUS_COLOR[status] || 'bg-gray-100 text-gray-600';
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
-      {status.replace(/_/g, ' ')}
-    </span>
-  );
-}
+const PRIORITY_TEXT_BADGE: Record<string, string> = {
+  critical: 'bg-red-100 text-red-700',
+  high: 'bg-orange-100 text-orange-700',
+  medium: 'bg-blue-100 text-blue-700',
+  low: 'bg-gray-100 text-gray-500',
+  none: 'bg-gray-100 text-gray-400',
+};
 
 const PROJECT_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6'];
+
 function projectColor(name: string, color?: string | null) {
   if (color) return color;
   let h = 0;
@@ -92,23 +91,42 @@ function projectColor(name: string, color?: string | null) {
   return PROJECT_COLORS[h % PROJECT_COLORS.length];
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+function StatusBadge({ status, stateType }: { status: string; stateType?: string }) {
+  const key = stateType || status.toLowerCase().replace(/\s+/g, '_');
+  const cls = STATUS_BADGE[key] || STATUS_BADGE[status] || 'bg-gray-100 text-gray-600';
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+      {status.replace(/_/g, ' ')}
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const cls = PRIORITY_TEXT_BADGE[priority.toLowerCase()] || 'bg-gray-100 text-gray-400';
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+      {priority}
+    </span>
+  );
+}
 
 function LinearBadge() {
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-semibold rounded border border-indigo-200">
+    <span className="inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-medium rounded border border-gray-200">
       Linear
     </span>
   );
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
 function TicketRow({ ticket }: { ticket: DevTicket }) {
   return (
     <div className="flex items-center gap-3 py-2.5 px-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
-      <span className="text-xs text-gray-400 w-10 shrink-0">#{ticket.number}</span>
+      <span className="text-xs text-gray-400 w-10 shrink-0 font-mono">#{ticket.number}</span>
       <span className="flex-1 text-sm text-gray-800 truncate">{ticket.title}</span>
-      {ticket.assigned_tester && (
-        <span className="text-xs text-gray-500">{ticket.assigned_tester}</span>
+      {ticket.assignee?.name && (
+        <span className="text-xs text-gray-500 hidden sm:block">{ticket.assignee.name}</span>
       )}
       {ticket.test_result && (
         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
@@ -117,24 +135,37 @@ function TicketRow({ ticket }: { ticket: DevTicket }) {
           {ticket.test_result}
         </span>
       )}
-      {statusBadge(ticket.status)}
+      {ticket.priority && ticket.priority !== 'none' && (
+        <PriorityBadge priority={ticket.priority} />
+      )}
+      <StatusBadge status={ticket.status} />
     </div>
   );
 }
 
-function LinearIssueRow({ issue, projects }: { issue: LinearIssue; projects: Project[] }) {
-  const proj = projects.find(p => p.id === issue.project_id);
+function LinearIssueRow({ issue }: { issue: LinearIssue }) {
   return (
     <div className="flex items-center gap-3 py-2.5 px-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
-      <span className="text-xs text-gray-400 w-16 shrink-0">{issue.identifier}</span>
+      <span className="text-xs text-gray-400 w-16 shrink-0 font-mono">{issue.identifier}</span>
       <span className="flex-1 text-sm text-gray-800 truncate">{issue.title}</span>
       {issue.assignee_name && (
         <span className="text-xs text-gray-500 hidden sm:block">{issue.assignee_name}</span>
       )}
+      {issue.priority > 0 && (
+        <span className="flex items-center gap-1 text-xs text-gray-500">
+          <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[issue.priority] || 'bg-gray-300'}`} />
+        </span>
+      )}
       <LinearBadge />
-      {statusBadge(issue.state_name, issue.state_type)}
+      <StatusBadge status={issue.state_name} stateType={issue.state_type} />
       {issue.url && (
-        <a href={issue.url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-indigo-500">
+        <a
+          href={issue.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+          onClick={e => e.stopPropagation()}
+        >
           <ExternalLink size={12} />
         </a>
       )}
@@ -152,27 +183,28 @@ interface ProjectGroupProps {
 function ProjectGroup({ name, color, children, count }: ProjectGroupProps) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="mb-3">
+    <div className="mb-1">
       <button
-        className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-50 transition-colors"
+        className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-50 transition-colors text-left"
         onClick={() => setOpen(o => !o)}
       >
-        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-        <span className="font-semibold text-sm text-gray-800 flex-1 text-left">{name}</span>
-        <span className="text-xs text-gray-400">{count}</span>
-        {open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+        <span className="font-medium text-sm text-gray-700 flex-1">{name}</span>
+        <span className="text-xs text-gray-400 tabular-nums">{count}</span>
+        {open
+          ? <ChevronDown size={13} className="text-gray-400" />
+          : <ChevronRight size={13} className="text-gray-400" />}
       </button>
-      {open && <div>{children}</div>}
+      {open && <div className="ml-0">{children}</div>}
     </div>
   );
 }
 
 // ─── iOS Tab ──────────────────────────────────────────────────────────────────
 
-function iOSTab({ tickets, projects }: { tickets: DevTicket[]; projects: Project[] }) {
-  const iosTickets = tickets.filter(t => t.ticket_type === 'ios');
+function IOSTab({ tickets, projects }: { tickets: DevTicket[]; projects: Project[] }) {
+  const iosTickets = tickets.filter(t => t.type === 'ios');
 
-  // Group by project
   const byProject: Record<string, DevTicket[]> = {};
   for (const t of iosTickets) {
     const key = t.project || 'No Project';
@@ -183,15 +215,15 @@ function iOSTab({ tickets, projects }: { tickets: DevTicket[]; projects: Project
   if (iosTickets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Smartphone size={40} strokeWidth={1} className="text-gray-300 mb-3" />
-        <p className="text-gray-500 font-medium">No iOS tickets yet</p>
-        <p className="text-gray-400 text-sm mt-1">Submit a request to create the first one</p>
+        <Smartphone size={36} strokeWidth={1} className="text-gray-300 mb-3" />
+        <p className="text-sm font-medium text-gray-500">No iOS tickets yet</p>
+        <p className="text-xs text-gray-400 mt-1">Submit a request to create the first one</p>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="divide-y-0">
       {Object.entries(byProject).map(([projName, projTickets]) => {
         const proj = projects.find(p => p.name === projName);
         const color = projectColor(projName, proj?.color);
@@ -205,7 +237,7 @@ function iOSTab({ tickets, projects }: { tickets: DevTicket[]; projects: Project
   );
 }
 
-// ─── Web Tab ─────────────────────────────────────────────────────────────────
+// ─── Web Tab ──────────────────────────────────────────────────────────────────
 
 function WebTab({
   tickets,
@@ -220,9 +252,8 @@ function WebTab({
   syncing: boolean;
   onSync: () => void;
 }) {
-  const webTickets = tickets.filter(t => t.ticket_type === 'web');
+  const webTickets = tickets.filter(t => t.type === 'web');
 
-  // Group everything by project
   const byProject: Record<string, { tickets: DevTicket[]; linear: LinearIssue[] }> = {};
 
   for (const t of webTickets) {
@@ -247,41 +278,41 @@ function WebTab({
   return (
     <div>
       {/* Sync bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50/80">
         <span className="text-xs text-gray-500">
-          {linearIssues.length} Linear issues · {webTickets.length} native tickets
+          {linearIssues.length} Linear issue{linearIssues.length !== 1 ? 's' : ''} · {webTickets.length} native ticket{webTickets.length !== 1 ? 's' : ''}
         </span>
         <button
           onClick={onSync}
           disabled={syncing}
-          className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-md hover:bg-white hover:border-gray-300 hover:text-gray-800 transition-colors disabled:opacity-50 bg-white"
         >
-          <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
+          <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
           {syncing ? 'Syncing…' : 'Sync with Linear'}
         </button>
       </div>
 
       {projectNames.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Globe size={40} strokeWidth={1} className="text-gray-300 mb-3" />
-          <p className="text-gray-500 font-medium">No web tickets yet</p>
-          <p className="text-gray-400 text-sm mt-1">Sync Linear or submit a new request</p>
+          <Globe size={36} strokeWidth={1} className="text-gray-300 mb-3" />
+          <p className="text-sm font-medium text-gray-500">No web tickets yet</p>
+          <p className="text-xs text-gray-400 mt-1">Sync with Linear or submit a new request</p>
         </div>
       ) : (
-        projectNames.map(projName => {
-          const group = byProject[projName];
-          const proj = projects.find(p => p.name === projName);
-          const color = projectColor(projName, proj?.color);
-          const total = group.tickets.length + group.linear.length;
-          return (
-            <ProjectGroup key={projName} name={projName} color={color} count={total}>
-              {group.tickets.map(t => <TicketRow key={t.id} ticket={t} />)}
-              {group.linear.map(issue => (
-                <LinearIssueRow key={issue.id} issue={issue} projects={projects} />
-              ))}
-            </ProjectGroup>
-          );
-        })
+        <div>
+          {projectNames.map(projName => {
+            const group = byProject[projName];
+            const proj = projects.find(p => p.name === projName);
+            const color = projectColor(projName, proj?.color);
+            const total = group.tickets.length + group.linear.length;
+            return (
+              <ProjectGroup key={projName} name={projName} color={color} count={total}>
+                {group.tickets.map(t => <TicketRow key={t.id} ticket={t} />)}
+                {group.linear.map(issue => <LinearIssueRow key={issue.id} issue={issue} />)}
+              </ProjectGroup>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -337,7 +368,6 @@ export default function DevelopmentPage() {
         },
         body: JSON.stringify({}),
       });
-      // Reload linear issues
       const res = await fetch('/api/linear/issues?source=cache', {
         headers: { Authorization: AUTH },
       });
@@ -353,18 +383,16 @@ export default function DevelopmentPage() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-0">
+      {/* Page Header */}
+      <div className="flex items-center justify-between px-1 pb-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            Development
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">iOS & Web engineering work</p>
+          <h1 className="text-xl font-semibold text-gray-900">Development</h1>
+          <p className="text-sm text-gray-500 mt-0.5">iOS &amp; Web engineering work</p>
         </div>
         <Link
           href="/workspace/development/submit"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
         >
           <Plus size={14} />
           Submit Request
@@ -372,42 +400,42 @@ export default function DevelopmentPage() {
       </div>
 
       {/* Tab Bar */}
-      <div className="flex items-center border-b border-gray-200">
+      <div className="flex items-center border-b border-gray-200 mb-0">
         <button
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
             tab === 'ios'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
           }`}
           onClick={() => setTab('ios')}
         >
-          <Smartphone size={15} />
-          iOS Development
+          <Smartphone size={14} />
+          iOS
         </button>
         <button
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
             tab === 'web'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
           }`}
           onClick={() => setTab('web')}
         >
-          <Globe size={15} />
-          Web Development
+          <Globe size={14} />
+          Web
         </button>
       </div>
 
-      {/* Content */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {/* Content Card */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-2 text-gray-400">
-            <Loader2 size={20} className="animate-spin" />
+            <Loader2 size={18} className="animate-spin" />
             <span className="text-sm">Loading…</span>
           </div>
         ) : error ? (
-          <div className="p-4 text-sm text-red-600 bg-red-50">{error}</div>
+          <div className="p-4 text-sm text-red-600 bg-red-50 rounded-lg">{error}</div>
         ) : tab === 'ios' ? (
-          iOSTab({ tickets, projects })
+          <IOSTab tickets={tickets} projects={projects} />
         ) : (
           <WebTab
             tickets={tickets}
