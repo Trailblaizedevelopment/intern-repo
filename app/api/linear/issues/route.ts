@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-const LINEAR_API_KEY = process.env.LINEAR_API_KEY || 'lin_api_9eF16MkVGPRbOAx4MKr2Cb6bl2AfsHzmghF0l58F';
+const LINEAR_API_KEY = process.env.LINEAR_API_KEY || '';
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
 const LINEAR_GRAPHQL = 'https://api.linear.app/graphql';
 
