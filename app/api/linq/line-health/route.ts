@@ -85,7 +85,9 @@ export async function GET() {
   let linqFailed = false;
 
   try {
-    const res = await fetch(`${LINQ_BASE}/lines`, {
+    // Linq /lines endpoint does not exist — infer line health from recent chat activity
+    // Use a no-op that always triggers the fallback to local DB data
+    const res = await fetch(`${LINQ_BASE}/chats?limit=1`, {
       headers: { 'Authorization': `Token ${LINQ_API_TOKEN}` },
       next: { revalidate: 0 },
     });
