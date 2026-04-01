@@ -29,10 +29,7 @@ interface GanttProject extends RoadmapProject {
   color: string | null;
   start_date: string | null;
   target_date: string | null;
-  estimated_start: string | null;
-  estimated_end: string | null;
-  actual_start: string | null;
-  actual_end: string | null;
+  // estimated_start, estimated_end, actual_start, actual_end omitted — added by future migration
 }
 
 // ── Gantt helpers ────────────────────────────────────────────────────────────
@@ -87,8 +84,8 @@ function ProjectGantt({ projects, tickets, timeScale }: ProjectGanttProps) {
   // Determine timeline window
   const allDates: Date[] = [];
   for (const p of projects) {
-    const start = p.estimated_start || p.start_date;
-    const end = p.estimated_end || p.target_date;
+    const start = p.start_date;
+    const end = p.target_date;
     if (start) allDates.push(new Date(start + 'T00:00:00'));
     if (end) allDates.push(new Date(end + 'T00:00:00'));
   }
@@ -155,16 +152,16 @@ function ProjectGantt({ projects, tickets, timeScale }: ProjectGanttProps) {
   }
 
   // Scheduled vs unscheduled
-  const scheduled = projects.filter(p => p.estimated_start || p.start_date || p.estimated_end || p.target_date);
-  const unscheduled = projects.filter(p => !p.estimated_start && !p.start_date && !p.estimated_end && !p.target_date);
+  const scheduled = projects.filter(p => p.start_date || p.target_date);
+  const unscheduled = projects.filter(p => !p.start_date && !p.target_date);
 
   const totalWidth = totalDays * DAY_PX;
   const todayX = LABEL_WIDTH + dayOffsetDate(today) * DAY_PX;
 
   function renderProjectRow(p: GanttProject, idx: number) {
     const color = getProjectColor(p, idx);
-    const startStr = p.estimated_start || p.start_date;
-    const endStr = p.estimated_end || p.target_date;
+    const startStr = p.start_date;
+    const endStr = p.target_date;
     const startOff = dayOffset(startStr);
     const endOff = dayOffset(endStr);
     const isExpanded = expanded[p.id];
@@ -621,10 +618,10 @@ function RoadmapPageInner() {
     try {
       const [rawTickets, rawProjects, rawEmployees] = await Promise.all([
         fetchFromSupabase<RawTicket>(
-          'tickets?select=id,number,title,description,type,priority,status,assignee_id,project,project_id,due_date,created_at,sprint,labels,estimated_start,estimated_end,actual_start,actual_end&order=number.asc'
+          'tickets?select=id,number,title,description,type,priority,status,assignee_id,project,project_id,due_date,created_at,sprint,labels&order=number.asc'
         ),
         fetchFromSupabase<GanttProject>(
-          'projects?select=id,name,status,color,start_date,target_date,estimated_start,estimated_end,actual_start,actual_end'
+          'projects?select=id,name,status,color,start_date,target_date'
         ),
         fetchFromSupabase<Employee>('employees?select=id,name'),
       ]);

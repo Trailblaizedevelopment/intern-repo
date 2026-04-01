@@ -127,8 +127,7 @@ export default function SubmitRequestPage() {
           priority,
           status: 'backlog',
           project_id: projectId || null,
-          ticket_type: ticketType,
-          spec: JSON.stringify(spec),
+          // ticket_type and spec columns are added by a future migration — omitted for now
         }),
       });
 
@@ -157,15 +156,8 @@ export default function SubmitRequestPage() {
           });
           const linearData = await linearRes.json() as { data?: { id: string; identifier: string } };
           if (linearData.data?.identifier) {
-            // Patch ticket with Linear ID
-            await fetch(`/api/tickets/${ticketId}`, {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: AUTH,
-              },
-              body: JSON.stringify({ linear_id: linearData.data.identifier }),
-            });
+            // linear_id column is added by a future migration — skip patching for now
+            console.log('Linear issue created:', linearData.data.identifier);
           }
         } catch {
           // Linear creation is best-effort

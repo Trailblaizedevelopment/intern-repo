@@ -203,7 +203,9 @@ function ProjectGroup({ name, color, children, count }: ProjectGroupProps) {
 // ─── iOS Tab ──────────────────────────────────────────────────────────────────
 
 function IOSTab({ tickets, projects }: { tickets: DevTicket[]; projects: Project[] }) {
-  const iosTickets = tickets.filter(t => t.type === 'ios');
+  // Temporary: show all tickets until the development system migration runs and
+  // tickets are properly categorized as iOS or Web.
+  const iosTickets = tickets;
 
   const byProject: Record<string, DevTicket[]> = {};
   for (const t of iosTickets) {
@@ -212,18 +214,18 @@ function IOSTab({ tickets, projects }: { tickets: DevTicket[]; projects: Project
     byProject[key].push(t);
   }
 
-  if (iosTickets.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Smartphone size={36} strokeWidth={1} className="text-gray-300 mb-3" />
-        <p className="text-sm font-medium text-gray-500">No iOS tickets yet</p>
-        <p className="text-xs text-gray-400 mt-1">Submit a request to create the first one</p>
-      </div>
-    );
-  }
-
   return (
     <div className="divide-y-0">
+      <div className="px-4 py-2 bg-amber-50 border-b border-amber-100">
+        <p className="text-xs text-amber-600">Tickets will be categorized as iOS or Web once the development system migration runs.</p>
+      </div>
+      {iosTickets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Smartphone size={36} strokeWidth={1} className="text-gray-300 mb-3" />
+          <p className="text-sm font-medium text-gray-500">No tickets yet</p>
+          <p className="text-xs text-gray-400 mt-1">Submit a request to create the first one</p>
+        </div>
+      ) : null}
       {Object.entries(byProject).map(([projName, projTickets]) => {
         const proj = projects.find(p => p.name === projName);
         const color = projectColor(projName, proj?.color);
@@ -252,7 +254,9 @@ function WebTab({
   syncing: boolean;
   onSync: () => void;
 }) {
-  const webTickets = tickets.filter(t => t.type === 'web');
+  // Temporary: show all tickets until the development system migration runs and
+  // tickets are properly categorized as iOS or Web.
+  const webTickets = tickets;
 
   const byProject: Record<string, { tickets: DevTicket[]; linear: LinearIssue[] }> = {};
 
@@ -277,6 +281,11 @@ function WebTab({
 
   return (
     <div>
+      {/* Migration note */}
+      <div className="px-4 py-2 bg-amber-50 border-b border-amber-100">
+        <p className="text-xs text-amber-600">Tickets will be categorized as iOS or Web once the development system migration runs.</p>
+      </div>
+
       {/* Sync bar */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50/80">
         <span className="text-xs text-gray-500">
