@@ -11,7 +11,7 @@ function linearGQL(query: string, variables?: Record<string, unknown>) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${LINEAR_API_KEY}`,
+      Authorization: LINEAR_API_KEY,
     },
     body: JSON.stringify({ query, variables }),
   }).then(r => r.json());
