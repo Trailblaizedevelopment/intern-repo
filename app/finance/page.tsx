@@ -279,7 +279,7 @@ function Dashboard() {
 
     // ── Deals ──
     try {
-      const res = await fetch('/api/deals', {
+      const res = await fetch('/api/pipeline/deals?limit=500', {
         headers: { Authorization: AUTH_HEADER },
       });
       if (res.ok) {
@@ -293,21 +293,8 @@ function Dashboard() {
       } else {
         throw new Error(`${res.status}`);
       }
-    } catch {
-      // Fallback to workspace leads
-      try {
-        const res2 = await fetch('/api/workspace/leads', {
-          headers: { Authorization: AUTH_HEADER },
-        });
-        if (res2.ok) {
-          const data2 = await res2.json();
-          setDeals(Array.isArray(data2) ? data2 : (data2.leads ?? data2.data ?? []));
-        } else {
-          errs.push(`Deals/Leads API: ${res2.status}`);
-        }
-      } catch (e2) {
-        errs.push(`Deals: ${e2 instanceof Error ? e2.message : 'fetch error'}`);
-      }
+    } catch (e) {
+      errs.push(`Deals API: ${e instanceof Error ? e.message : 'fetch error'}`);
     }
 
     // ── Stripe ──
@@ -551,8 +538,8 @@ function Dashboard() {
                   const stageColor = stageColors[matchedStage] ?? '#9ca3af';
                   return (
                     <tr key={d.id}>
-                      <td style={tdStyle}>{d.name ?? d.organization_name ?? '—'}</td>
-                      <td style={tdStyle}>{d.school ?? '—'}</td>
+                      <td style={tdStyle}>{(d as unknown as {organization?: {name?: string; school?: {name?: string}}}).organization?.name ?? d.name ?? d.organization_name ?? '—'}</td>
+                      <td style={tdStyle}>{(d as unknown as {organization?: {school?: {name?: string}}}).organization?.school?.name ?? d.school ?? '—'}</td>
                       <td style={{ ...tdStyle, color: '#f9fafb', fontWeight: 500 }}>{fmtDollars(val)}</td>
                       <td style={tdStyle}>
                         <span style={{ color: stageColor, fontSize: 13 }}>{matchedStage || stage}</span>
