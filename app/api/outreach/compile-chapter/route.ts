@@ -42,7 +42,7 @@ type LineConfig = {
 
 const DEFAULT_LINES: LineConfig[] = [
   { id: 'default-1', line_number: 1, label: 'Owen', line_phone: '+16462101111', daily_limit: 45, is_paused: false, is_warmed_up: null, warmup_start_date: null, last_used_at: null, round_robin_sequence: 0 },
-  { id: 'default-2', line_number: 2, label: 'Adam', line_phone: '+16462668785', daily_limit: 45, is_paused: false, is_warmed_up: null, warmup_start_date: null, last_used_at: null, round_robin_sequence: 0 },
+  { id: 'default-2', line_number: 2, label: 'Adam', line_phone: '+16462178274', daily_limit: 45, is_paused: false, is_warmed_up: null, warmup_start_date: null, last_used_at: null, round_robin_sequence: 0 },
   { id: 'default-3', line_number: 3, label: 'Ford', line_phone: '+16462442696', daily_limit: 45, is_paused: false, is_warmed_up: null, warmup_start_date: null, last_used_at: null, round_robin_sequence: 0 },
 ];
 

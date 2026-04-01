@@ -11,7 +11,7 @@ export const maxDuration = 300;
 
 const ALL_LINE_PHONES: Record<number, string> = {
   1: '+16462101111', // Owen (updated March 2026 — old number was +16462408056)
-  2: '+16462668785', // Adam
+  2: '+16462178274', // Adam
   3: '+16462442696', // Ford
 };
 

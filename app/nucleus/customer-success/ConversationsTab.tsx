@@ -16,7 +16,7 @@ const LIMIT = 50;
 // Owen=blue, Adam=green, Ford=purple (per spec)
 const LINES: { phone: string; label: string; color: { bg: string; text: string } }[] = [
   { phone: '+16462101111', label: 'Owen', color: { bg: '#dbeafe', text: '#1d4ed8' } },
-  { phone: '+16462668785', label: 'Adam', color: { bg: '#d1fae5', text: '#065f46' } },
+  { phone: '+16462178274', label: 'Adam', color: { bg: '#d1fae5', text: '#065f46' } },
   { phone: '+16462442696', label: 'Ford', color: { bg: '#ede9fe', text: '#7c3aed' } },
 ];
 

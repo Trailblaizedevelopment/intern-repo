@@ -4,13 +4,13 @@ import { sendMessage, getMessages } from '@/lib/linq';
 
 const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
-const LINQ_LINE_PHONES = new Set(['+16462101111', '+16462668785', '+16462442696']);
+const LINQ_LINE_PHONES = new Set(['+16462101111', '+16462178274', '+16462442696']);
 
 // Map assigned_line number → phone. Kept in sync with linq_line_config table.
 // IMPORTANT: Update these when lines are added/rotated.
 const LINE_NUMBER_TO_PHONE: Record<number, string> = {
   1: '+16462101111', // Owen (new line, warming up 2026-03-17)
-  2: '+16462668785', // Adam
+  2: '+16462178274', // Adam
   3: '+16462442696', // Ford
 };
 // Fallback: Ford's line is always active; use if assigned line is paused/unknown

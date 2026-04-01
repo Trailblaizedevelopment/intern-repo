@@ -12,7 +12,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 const DEFAULT_LINES = [
   { line_number: 1, label: 'Owen',  line_phone: '+16462101111', daily_limit: 45 },
-  { line_number: 2, label: 'Adam',  line_phone: '+16462668785', daily_limit: 45 },
+  { line_number: 2, label: 'Adam',  line_phone: '+16462178274', daily_limit: 45 },
   { line_number: 3, label: 'Ford',  line_phone: '+16462442696', daily_limit: 45 },
 ];
 

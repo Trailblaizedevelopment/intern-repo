@@ -6,7 +6,7 @@ const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf42
 
 const LINE_PHONES: Record<number, string> = {
   1: '+16462101111', // Owen (new line, warming up 2026-03-17)
-  2: '+16462668785', // Adam
+  2: '+16462178274', // Adam
   3: '+16462442696', // Ford
 };
 
