@@ -34178,3 +34178,355 @@ body { background: #ffffff !important; }
   border-color: #111827 !important;
   color: #ffffff !important;
 }
+
+/* ================================================================
+   PHASE 6: UI LIFT — WORKSPACE DESIGN CONSISTENCY PASS
+   Target: every Workspace/Nucleus page feels like same designer.
+   White surfaces, clean cards, color as functional signal only.
+   ================================================================ */
+
+/* ── Override cream vars to white across all contexts ──────────── */
+:root {
+  --color-cream: #ffffff !important;
+  --color-cream-dark: #f9fafb !important;
+  --color-cream-darker: #e5e7eb !important;
+  --color-bg: #ffffff !important;
+  --ws-bg: #ffffff !important;
+}
+
+/* ── Pipeline pl2 namespace ─────────────────────────────────────── */
+.pl2 { background: #ffffff !important; }
+.pl2__tabs { background: #ffffff !important; }
+.pl2__tab--active {
+  color: #111827 !important;
+  border-bottom-color: #111827 !important;
+}
+.pl2__tab:hover { color: #111827 !important; }
+.pl2__search { background: #ffffff !important; border-color: #e5e7eb !important; }
+.pl2__filter-toggle, .pl2__filter-select {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #374151 !important;
+}
+.pl2__stats-bar {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+.pl2__stat {
+  border-left: 1px solid #f3f4f6 !important;
+}
+.pl2__deal-card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-left-width: 3px !important;
+}
+.pl2__deal-card:hover {
+  border-color: #d1d5db !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+}
+.pl2__deal-card--overdue {
+  background: #fef9f9 !important;
+  border-left-color: #ef4444 !important;
+}
+.pl2__school-card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+.pl2__school-card:hover {
+  background: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+.pl2__nat-card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+.pl2__nat-card:hover {
+  background: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+.pl2__contact-card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+.pl2__lb-card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+.pl2__detail-panel { background: #ffffff !important; }
+.pl2__org-card {
+  background: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+}
+.pl2__add-deal-btn {
+  background: #111827 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+}
+.pl2__add-deal-btn:hover { background: #1f2937 !important; }
+.pl2__btn--primary {
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+/* ── module-page: white bg, no f8f9fa ────────────────────────────── */
+.module-page { background: #ffffff !important; }
+
+/* ── module-header: white, clean border ─────────────────────────── */
+.module-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 1.25rem 0 !important;
+}
+.module-header h1 { color: #111827 !important; }
+.module-header p, .module-header span { color: #6b7280 !important; }
+
+/* ── module-stats-row stat cards ─────────────────────────────────── */
+.module-stat {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+.module-stat-value { color: #111827 !important; font-weight: 700 !important; }
+.module-stat-label { color: #6b7280 !important; }
+
+/* ── module-table: white, light gray dividers, no zebra ─────────── */
+.module-table-container {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+.module-table thead {
+  background: #f9fafb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+.module-table th {
+  color: #6b7280 !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  font-weight: 600 !important;
+}
+.module-table td {
+  color: #374151 !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+.module-table tr:last-child td { border-bottom: none !important; }
+.module-table tr:hover { background: #f9fafb !important; }
+.module-table-name { color: #111827 !important; font-weight: 600 !important; }
+
+/* ── module-table-action buttons ────────────────────────────────── */
+.module-table-action {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #6b7280 !important;
+  border-radius: 6px !important;
+}
+.module-table-action:hover {
+  background: #f9fafb !important;
+  border-color: #111827 !important;
+  color: #111827 !important;
+}
+.module-table-action.delete:hover {
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+  background: #fef2f2 !important;
+}
+
+/* ── module-search / filter / primary-btn — finalize ────────────── */
+.module-search {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+}
+.module-filter-btn {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  color: #374151 !important;
+}
+.module-filter-btn:hover {
+  background: #f9fafb !important;
+  border-color: #d1d5db !important;
+  color: #111827 !important;
+}
+.module-primary-btn {
+  background: #111827 !important;
+  border: none !important;
+  color: #ffffff !important;
+  border-radius: 8px !important;
+}
+.module-primary-btn:hover { background: #1f2937 !important; }
+
+/* ── module-modal: white, clean border ──────────────────────────── */
+.module-modal {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 14px !important;
+}
+.module-modal-header {
+  border-bottom: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+}
+.module-modal-header h2 { color: #111827 !important; }
+.module-modal-body { background: #ffffff !important; }
+.module-modal-footer {
+  border-top: 1px solid #e5e7eb !important;
+  background: #f9fafb !important;
+}
+.module-cancel-btn {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #374151 !important;
+  border-radius: 8px !important;
+}
+.module-cancel-btn:hover {
+  background: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
+/* ── module-form-group inputs ────────────────────────────────────── */
+.module-form-group input,
+.module-form-group select,
+.module-form-group textarea {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #111827 !important;
+  border-radius: 8px !important;
+}
+.module-form-group input:focus,
+.module-form-group select:focus,
+.module-form-group textarea:focus {
+  border-color: #111827 !important;
+  box-shadow: 0 0 0 2px rgba(17,24,39,0.08) !important;
+  outline: none !important;
+}
+.module-form-group label { color: #6b7280 !important; }
+
+/* ── module-icon in header: light gray ──────────────────────────── */
+.module-icon {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+}
+
+/* ── Status / priority / health / temp badges: keep semantic colors */
+.module-status.active    { background: #dcfce7 !important; color: #15803d !important; }
+.module-status.pending   { background: #fef9c3 !important; color: #a16207 !important; }
+.module-status.inactive  { background: #f3f4f6 !important; color: #6b7280 !important; }
+.module-priority.high    { background: #fee2e2 !important; color: #b91c1c !important; }
+.module-priority.medium  { background: #fef9c3 !important; color: #a16207 !important; }
+.module-priority.low     { background: #dbeafe !important; color: #1d4ed8 !important; }
+.module-health.good      { background: #dcfce7 !important; color: #15803d !important; }
+.module-health.warning   { background: #fef9c3 !important; color: #a16207 !important; }
+.module-health.critical  { background: #fee2e2 !important; color: #b91c1c !important; }
+
+/* ── Finance page tab overrides ──────────────────────────────────── */
+.finance-tab-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.finance-tab-btn.active,
+.finance-tab-btn[data-active="true"] {
+  color: #111827 !important;
+  border-bottom-color: #111827 !important;
+}
+
+/* ── Client Map: override Tailwind cream/bg tokens ─────────────── */
+.client-map-page { background: #ffffff !important; }
+
+/* ── Nucleus dashboard: section-title uppercase ─────────────────── */
+.nucleus-section-title {
+  font-size: 0.7rem !important;
+  letter-spacing: 0.08em !important;
+  color: #9ca3af !important;
+  font-weight: 600 !important;
+}
+
+/* ── Nucleus module card: consistent hover, no gradient top bar ── */
+.nucleus-module-card-enhanced {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+.nucleus-module-card-enhanced:hover {
+  border-color: #d1d5db !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+  transform: none !important;
+}
+.nucleus-module-card-enhanced::before { display: none !important; }
+
+/* ── Nucleus stat cards: no colored backgrounds ─────────────────── */
+.nucleus-stat-card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+.nucleus-stat-icon {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+}
+
+/* ── Nucleus company stat cards ──────────────────────────────────── */
+.nucleus-company-stat {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+.nucleus-company-stat-icon { background: #f3f4f6 !important; }
+.nucleus-company-stat-value { color: #111827 !important; }
+.nucleus-company-stat-label { color: #6b7280 !important; }
+.nucleus-company-stat-trend.positive {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+}
+.nucleus-company-stat-trend.negative {
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+}
+
+/* ── Workspace sidebar: clean active state ───────────────────────── */
+.ws-sidebar { background: #ffffff !important; border-right: 1px solid #e5e7eb !important; }
+
+/* ── ws-subpage: white surfaces throughout ───────────────────────── */
+.ws-subpage-header { background: #ffffff !important; border-bottom: 1px solid #e5e7eb !important; }
+.ws-subpage-stat {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+/* ── Global: remove box shadows from internal cards ─────────────── */
+.nucleus-module-card,
+.module-stat,
+.module-table-container {
+  box-shadow: none !important;
+}
+
+/* ── Ensure all Nucleus/ws main containers are white ──────────────── */
+.nucleus-main--compact { background: transparent !important; }
+.ws-content { background: transparent !important; }
+
+/* ── Nucleus footer ──────────────────────────────────────────────── */
+.nucleus-footer {
+  background: #ffffff !important;
+  border-top: 1px solid #e5e7eb !important;
+}
+
+/* ── Scrollbars: subtle styling ──────────────────────────────────── */
+.ws-main::-webkit-scrollbar { width: 6px; }
+.ws-main::-webkit-scrollbar-track { background: transparent; }
+.ws-main::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
+.ws-main::-webkit-scrollbar-thumb:hover { background: #d1d5db; }

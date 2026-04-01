@@ -616,17 +616,24 @@ function RoadmapPageInner() {
     setLoading(true);
     setError(null);
     try {
-      const [rawTickets, rawProjects, rawEmployees] = await Promise.all([
+      const [rawTickets, rawProjects] = await Promise.all([
         fetchFromSupabase<RawTicket>(
           'tickets?select=id,number,title,description,type,priority,status,assignee_id,project,project_id,due_date,created_at,sprint,labels&order=number.asc'
         ),
         fetchFromSupabase<GanttProject>(
           'projects?select=id,name,status,color,start_date,target_date'
         ),
-        fetchFromSupabase<Employee>('employees?select=id,name'),
       ]);
       setTickets(rawTickets.map(buildTicket));
       setProjects(rawProjects);
+
+      // employees table may not exist — not critical for Gantt
+      let rawEmployees: Employee[] = [];
+      try {
+        rawEmployees = await fetchFromSupabase<Employee>('employees?select=id,name');
+      } catch {
+        // employees table may not exist — silently ignore
+      }
       setEmployees(rawEmployees);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load data');

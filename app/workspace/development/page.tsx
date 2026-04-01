@@ -356,6 +356,10 @@ export default function DevelopmentPage() {
       const projectsJson = await projectsRes.json();
       const linearJson = await linearRes.json();
 
+      console.log('[DevelopmentPage] tickets response:', ticketsJson);
+      console.log('[DevelopmentPage] projects response:', projectsJson);
+      console.log('[DevelopmentPage] linear response:', linearJson);
+
       if (ticketsJson.data) setTickets(ticketsJson.data as DevTicket[]);
       if (projectsJson.data) setProjects(projectsJson.data as Project[]);
       if (linearJson.data) setLinearIssues(linearJson.data as LinearIssue[]);

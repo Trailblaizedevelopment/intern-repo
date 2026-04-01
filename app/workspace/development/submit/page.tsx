@@ -29,7 +29,7 @@ interface QueueTicket {
   status: string;
 }
 
-const AUTH = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
 const COMPLEXITY_COLOR = {
   Small: 'bg-green-100 text-green-700 border-green-200',
@@ -251,19 +251,44 @@ export default function SubmitRequestPage() {
 
           {/* Step 2: Spec Preview */}
           {spec && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+            <div className="bg-white border border-indigo-200 rounded-xl p-5 space-y-4 shadow-sm">
+              {/* Header label + Regenerate */}
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} className="text-indigo-500 shrink-0" />
+                  <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
+                    Generated Spec — review before submitting
+                  </span>
+                </div>
+                <button
+                  onClick={generateSpec}
+                  disabled={generatingSpec || !description.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-40"
+                >
+                  {generatingSpec ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={11} />
+                  )}
+                  Regenerate
+                </button>
+              </div>
+
+              {/* Title + complexity badge */}
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-semibold text-gray-900">{spec.title}</h3>
-                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${COMPLEXITY_COLOR[spec.complexity]}`}>
+                <h3 className="text-lg font-bold text-gray-900 leading-snug">{spec.title}</h3>
+                <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border shrink-0 ${COMPLEXITY_COLOR[spec.complexity]}`}>
                   {spec.complexity}
                 </span>
               </div>
 
+              {/* Description */}
               <p className="text-sm text-gray-600 leading-relaxed">{spec.description}</p>
 
+              {/* Acceptance Criteria */}
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Acceptance Criteria</p>
-                <ul className="space-y-1">
+                <ul className="space-y-1.5">
                   {spec.acceptance_criteria.map((criterion, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
                       <CheckCircle2 size={14} className="text-green-500 mt-0.5 shrink-0" />
@@ -273,10 +298,11 @@ export default function SubmitRequestPage() {
                 </ul>
               </div>
 
+              {/* Edge Cases */}
               {spec.edge_cases.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Edge Cases</p>
-                  <ul className="space-y-1">
+                  <ul className="space-y-1.5">
                     {spec.edge_cases.map((ec, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
                         <AlertCircle size={14} className="text-amber-400 mt-0.5 shrink-0" />
