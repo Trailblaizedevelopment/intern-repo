@@ -5,7 +5,7 @@ import {
   ArrowLeft, HeartHandshake, Edit2, Copy, X, Loader2,
   CreditCard, Eye, AlertTriangle, CheckCircle2, Clock,
   Activity, Instagram, TrendingUp, Users, ChevronRight,
-  Zap,
+  Zap, BadgeCheck,
 } from 'lucide-react';
 import OnboardingWizard from '../OnboardingWizard';
 import { useRouter, useParams } from 'next/navigation';
@@ -384,6 +384,18 @@ export default function ChapterDashboardPage() {
                   }}>
                     {sc.label}
                   </span>
+                  {/* Setup Complete badge */}
+                  {chapter.onboarding_completed && (
+                    <span style={{
+                      fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                      background: 'rgba(16,185,129,0.12)', color: '#10b981',
+                      border: '1px solid rgba(16,185,129,0.25)',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}>
+                      <BadgeCheck size={11} />
+                      Setup Complete
+                    </span>
+                  )}
                 </div>
                 <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '0.82rem' }}>
                   {[chapter.fraternity, chapter.school].filter(Boolean).join(' · ')}

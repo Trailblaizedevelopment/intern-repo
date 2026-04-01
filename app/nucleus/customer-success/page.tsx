@@ -5,7 +5,7 @@ import {
   HeartHandshake, Plus, Search, X, AlertTriangle,
   Settings, RefreshCw, Users, CheckCircle2, Zap,
   CreditCard, ChevronRight, Activity, Edit2,
-  ArrowLeft, LayoutDashboard,
+  ArrowLeft, LayoutDashboard, BadgeCheck,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -724,7 +724,7 @@ function ChapterTriageCard({ chapter, onOpen, onEdit }: {
           </div>
         </div>
 
-        {/* Row 2: Status + payment badge */}
+        {/* Row 2: Status + payment badge + setup complete badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{
             fontSize: '0.7rem', fontWeight: 700,
@@ -733,6 +733,19 @@ function ChapterTriageCard({ chapter, onOpen, onEdit }: {
           }}>
             {status.label}
           </span>
+          {chapter.onboarding_completed && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: '0.68rem', fontWeight: 700,
+              padding: '2px 8px', borderRadius: 20,
+              background: 'rgba(16,185,129,0.12)',
+              color: '#10b981',
+              border: '1px solid rgba(16,185,129,0.25)',
+            }}>
+              <BadgeCheck size={10} />
+              Setup Complete
+            </span>
+          )}
           {chapter.next_payment_date && (
             <PaymentBadge nextPaymentDate={chapter.next_payment_date} />
           )}

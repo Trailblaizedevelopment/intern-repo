@@ -2,6 +2,49 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
+ * PATCH /api/chapters/[id]
+ * Update writable fields on a chapter, including onboarding_completed.
+ *
+ * Body: any subset of chapter fields to update.
+ * The following sensitive fields are stripped and cannot be updated via this endpoint:
+ *   id, created_at
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: chapterId } = await params;
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
+  }
+
+  const body = await req.json();
+
+  // Strip immutable fields
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id: _id, created_at: _created_at, ...updates } = body;
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+  }
+
+  const { data, error } = await supabase
+    .from('chapters')
+    .update(updates)
+    .eq('id', chapterId)
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ data });
+}
+
+/**
  * DELETE /api/chapters/[id]
  * Hard-delete a chapter and all cascade-related records.
  * Requires a confirmation header to prevent accidental calls.

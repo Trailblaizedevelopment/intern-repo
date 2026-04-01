@@ -51,6 +51,29 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
     setConversationsEnabled(chapter.conversations_enabled !== false);
   }, [chapter]);
 
+  // ── Auto-complete check on page load ──────────────────────────────────────
+  // If onboarding_completed is null but every step is already checked, mark it.
+  useEffect(() => {
+    if (chapter.onboarding_completed) return; // already done
+    if (!supabase) return;
+
+    const allKeys = ONBOARDING_STEPS.map(s => s.key);
+    const allDone = allKeys.every(k => chapter[k as keyof ChapterWithOnboarding]);
+    if (!allDone) return;
+
+    const completion = new Date().toISOString().split('T')[0];
+    supabase
+      .from('chapters')
+      .update({ onboarding_completed: completion, status: 'active' })
+      .eq('id', chapter.id)
+      .then(({ error }) => {
+        if (!error) {
+          onUpdate();
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapter.id]);
+
   const saveOptOut = useCallback(async (field: 'email_outreach_enabled' | 'conversations_enabled', value: boolean) => {
     if (!supabase) return;
     const { error } = await supabase.from('chapters').update({ [field]: value }).eq('id', chapter.id);
