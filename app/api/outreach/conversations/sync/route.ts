@@ -4,7 +4,7 @@ import { getMessages } from '@/lib/linq';
 
 const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
-const LINQ_LINE_PHONES = new Set(['+16462408056', '+16462668785', '+16462442696']);
+const LINQ_LINE_PHONES = new Set(['+16462101111', '+16462668785', '+16462442696']);
 
 /**
  * POST /api/outreach/conversations/sync

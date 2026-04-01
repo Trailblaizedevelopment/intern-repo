@@ -3,7 +3,7 @@ import { listChats, LinqChat } from '@/lib/linq';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 const LINES = [
-  { number: 1, label: 'Owen', phone: '+16462408056' },
+  { number: 1, label: 'Owen', phone: '+16462101111' },
   { number: 2, label: 'Adam', phone: '+16462668785' },
   { number: 3, label: 'Ford', phone: '+16462442696' },
 ] as const;
