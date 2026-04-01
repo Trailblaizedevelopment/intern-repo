@@ -116,7 +116,8 @@ export async function GET(
       'id, chapter_id, first_name, last_name, phone_primary, email, outreach_status, ' +
       'touch1_sent_at, touch2_sent_at, touch3_sent_at, is_imessage, year, platform_chapter_id'
     )
-    .eq('chapter_id', id);
+    .eq('chapter_id', id)
+    .limit(10000); // Supabase default cap is 1000 — override for large chapters
 
   if (contactsError) {
     return NextResponse.json({ error: contactsError.message }, { status: 500 });
