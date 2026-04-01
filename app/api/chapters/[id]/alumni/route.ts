@@ -220,6 +220,31 @@ export async function GET(
     };
   });
 
+  // ── Step 5b: Add unmatched external profiles (signed up but not in outreach list) ──
+  // These are alumni who joined the platform organically without being contacted via outreach.
+  // They should always appear in the alumni view regardless of whether they're in the contact list.
+  for (const profile of externalProfiles) {
+    if (!matchedProfileIds.has(profile.id)) {
+      merged.push({
+        id: `platform-${profile.id}`,
+        first_name: profile.first_name || profile.full_name?.split(' ')[0] || '',
+        last_name: profile.last_name || profile.full_name?.split(' ').slice(1).join(' ') || '',
+        full_name: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+        avatar_url: profile.avatar_url || null,
+        grad_year: profile.grad_year ?? null,
+        location: profile.location || null,
+        email: profile.email || null,
+        phone: null,
+        linkedin_url: profile.linkedin_url || null,
+        outreach_status: 'signed_up',
+        platform_joined: true,
+        last_active_at: profile.last_active_at || null,
+        member_status: profile.member_status || null,
+        engagement_score: calcEngagement(profile),
+      });
+    }
+  }
+
   // ── Step 6: Apply filters ─────────────────────────────────────────────────
   let filtered = merged;
 
