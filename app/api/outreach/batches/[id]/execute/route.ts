@@ -101,7 +101,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
-  // 1. Fetch and verify batch — status must be 'approved'
+  // Parse optional chunk_size from request body
+  let chunk_size = 25; // default
+  try {
+    const body = await _req.json().catch(() => ({}));
+    if (body?.chunk_size && Number.isFinite(body.chunk_size) && body.chunk_size > 0) {
+      chunk_size = Math.min(Number(body.chunk_size), 150); // never exceed 150
+    }
+  } catch { /* ignore parse errors — use default */ }
+
+  // 1. Fetch and verify batch — status must be 'approved' OR 'executing'
   const { data: batch, error: bErr } = await supabase
     .from('outreach_batches')
     .select('*')
@@ -109,18 +118,17 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .single();
 
   if (bErr || !batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 });
-  if (batch.status !== 'approved') {
+  if (batch.status !== 'approved' && batch.status !== 'executing') {
     return NextResponse.json({
-      error: `Cannot execute: batch status is '${batch.status}' (must be 'approved'). Each batch can only be executed once.`
+      error: `Cannot execute: batch status is '${batch.status}' (must be 'approved' or 'executing').`
     }, { status: 409 });
   }
 
-  // Immediately mark the batch as 'completed' to prevent a second Execute click
-  // from racing through. We'll overwrite with real results at the end.
-  // If we crash before that, the batch stays 'completed' — intentional, use a new batch to retry.
+  // Mark as 'executing' immediately to prevent concurrent runs.
+  // We'll update to 'completed' when remaining === 0, or leave as 'executing' for cron.
   await supabase
     .from('outreach_batches')
-    .update({ status: 'completed', sent_at: new Date().toISOString(), notes: 'Executing…' })
+    .update({ status: 'executing', sent_at: new Date().toISOString(), notes: 'Executing chunk…' })
     .eq('id', id);
 
   const results = {
@@ -174,8 +182,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     });
 
     if (activeLineNumbers.length === 0) {
+      // Roll back to 'approved' so the cron (or user) can retry when lines resume
       await supabase.from('outreach_batches').update({
-        status: 'approved',
+        status: batch.status === 'executing' ? 'executing' : 'approved',
         sent_at: null,
         notes: 'Rolled back — all lines are paused.',
       }).eq('id', id);
@@ -352,9 +361,47 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }
 
     type Contact = T1Contact & { touch1_sent_at?: string; touch2_sent_at?: string };
+
+    // ── CHUNK LIMITING: only process first chunk_size unclaimed contacts ─────
+    // Contacts already sent (touch1_sent_at, touch2_sent_at, touch3_sent_at set)
+    // will be skipped by the atomic claim. We need to limit to chunk_size TOTAL
+    // across all lines to stay within Vercel's 300s per-run limit.
+    // Remaining = total_pinned - already_sent → returned in response for cron tracking.
+    const allPinnedForChunk: Contact[] = [
+      ...byLineT2T3[activeLinesSorted[0] ?? 1] ?? [],
+    ];
+    // Build a flat ordered list: T2/T3 first (warm follow-ups), then T1
+    const flatOrdered: Contact[] = [];
+    const maxLineLen = Math.max(...activeLinesSorted.map(n => Math.max((byLineT2T3[n] || []).length, (byLineT1[n] || []).length)));
+    for (let i = 0; i < maxLineLen; i++) {
+      for (const n of activeLinesSorted) {
+        if ((byLineT2T3[n] || [])[i]) flatOrdered.push((byLineT2T3[n] || [])[i]);
+      }
+      for (const n of activeLinesSorted) {
+        if ((byLineT1[n] || [])[i]) flatOrdered.push((byLineT1[n] || [])[i]);
+      }
+    }
+    void allPinnedForChunk;
+
+    // Deduplicate and limit to chunk_size
+    const seenIds = new Set<string>();
+    const chunkContacts: Contact[] = [];
+    for (const c of flatOrdered) {
+      if (seenIds.has(c.id)) continue;
+      seenIds.add(c.id);
+      if (chunkContacts.length < chunk_size) {
+        chunkContacts.push(c);
+      }
+    }
+
+    // Rebuild byLine using only chunkContacts
     const byLine: Record<number, Contact[]> = {};
-    for (const n of activeLineNumbers) {
-      byLine[n] = [...byLineT2T3[n], ...byLineT1[n]]; // warm follow-ups first
+    for (const n of activeLineNumbers) byLine[n] = [];
+    let chunkIdx = 0;
+    for (const c of chunkContacts) {
+      const ln = activeLinesSorted[chunkIdx % activeLinesSorted.length];
+      byLine[ln].push(c);
+      chunkIdx++;
     }
 
     // 4. Load chapter info
@@ -617,23 +664,77 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    // 6. Write final results
+    // 6. Calculate remaining contacts (total_pinned - already_sent)
+    let totalPinned = 0;
+    let alreadySent = 0;
+    try {
+      if (pinnedIds) {
+        totalPinned = pinnedIds.t1.length + pinnedIds.t2.length + pinnedIds.t3.length;
+        // Count how many of the pinned contacts now have sent timestamps
+        const allPinnedIds = [...pinnedIds.t1, ...pinnedIds.t2, ...pinnedIds.t3];
+        if (allPinnedIds.length > 0) {
+          const { data: sentContacts } = await supabase
+            .from('alumni_contacts')
+            .select('id')
+            .in('id', allPinnedIds)
+            .not('touch1_sent_at', 'is', null);
+          // For T2/T3 we check touch2 and touch3 too
+          const { data: sentT2 } = await supabase
+            .from('alumni_contacts')
+            .select('id')
+            .in('id', pinnedIds.t2)
+            .not('touch2_sent_at', 'is', null);
+          const { data: sentT3 } = await supabase
+            .from('alumni_contacts')
+            .select('id')
+            .in('id', pinnedIds.t3)
+            .not('touch3_sent_at', 'is', null);
+          const sentSet = new Set([
+            ...(sentContacts || []).filter(c => pinnedIds!.t1.includes(c.id)).map(c => c.id),
+            ...(sentT2 || []).map(c => c.id),
+            ...(sentT3 || []).map(c => c.id),
+          ]);
+          alreadySent = sentSet.size;
+        }
+      } else {
+        // Non-pinned (legacy global) batch — mark completed
+        totalPinned = results.sent + results.failed;
+        alreadySent = results.sent;
+      }
+    } catch { /* non-fatal — just report 0 remaining */ }
+
+    const remaining = Math.max(0, totalPinned - alreadySent);
+    const newStatus = remaining === 0 ? 'completed' : 'executing';
+
+    // Write final results
     await supabase
       .from('outreach_batches')
       .update({
-        status: 'completed',
+        status: newStatus,
         sent_at: new Date().toISOString(),
         notes: JSON.stringify({
           ...results,
           active_lines: activeLineNumbers,
           paused_lines: [...pausedLines],
           line_t1_caps: lineT1Caps,
+          chunk_size,
+          total_pinned: totalPinned,
+          already_sent: alreadySent,
+          remaining,
         }),
       })
       .eq('id', id);
 
     return NextResponse.json({
-      data: { ...results, active_lines: activeLineNumbers, paused_lines: [...pausedLines] },
+      data: {
+        ...results,
+        active_lines: activeLineNumbers,
+        paused_lines: [...pausedLines],
+        remaining,
+        total_pinned: totalPinned,
+        already_sent: alreadySent,
+        status: newStatus,
+      },
       error: null,
     });
 

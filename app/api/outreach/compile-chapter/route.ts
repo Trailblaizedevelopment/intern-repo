@@ -5,10 +5,11 @@ import { createChat, getRecipientService } from '@/lib/linq';
 export const maxDuration = 300;
 
 // ── Safety constants ──────────────────────────────────────────────────────────
-// Maximum total contacts (T1+T2+T3) per batch. At 9s max per send this gives
-// 270s execution time — within Vercel's 300s limit with 30s headroom.
-// Users should be guided toward 15-20 T1s so T2/T3 have room too.
-const BATCH_TOTAL_CAP = 30;
+// Maximum total contacts (T1+T2+T3) per batch.
+// Raised from 30 → 150 (3 lines × 50 T1 cap).
+// Large batches are now executed in chunks via cron (25 contacts per run,
+// every 30 min 11am–4pm CST). The execute route handles chunking — no timeout risk.
+const BATCH_TOTAL_CAP = 150;
 
 /**
  * POST /api/outreach/compile-chapter
@@ -172,10 +173,10 @@ export async function POST(request: NextRequest) {
       : t1CapRemaining;
 
     // T2+T3 cap = remaining slots after T1. Total batch capped at BATCH_TOTAL_CAP.
-    // This prevents Vercel timeout (300s / 9s max per send = 33 sends max).
+    // Chunked cron execution handles large batches — no single-request timeout risk.
     const t2t3TotalRemaining = Math.max(0, BATCH_TOTAL_CAP - t1Cap);
     const t2t3Cap = chapter.alumni_join_link
-      ? Math.min(activeCount * 100, t2t3TotalRemaining)
+      ? Math.min(Math.min(activeCount * 100, 100), t2t3TotalRemaining)
       : 0; // No join link = no T2/T3 — never send pitch with wrong/missing link
 
     // ── 3. Cutoffs ────────────────────────────────────────────────────────────
@@ -346,10 +347,10 @@ export async function POST(request: NextRequest) {
     const linesSummary = {
       active: activeCount,
       t1_cap: t1Cap,
-          t1_remaining: t1CapRemaining,
-          t2t3_cap: t2t3Cap,
-          batch_total_cap: BATCH_TOTAL_CAP,
-          join_link_missing: !chapter.alumni_join_link,
+      t1_remaining: t1CapRemaining,
+      t2t3_cap: t2t3Cap,
+      batch_total_cap: BATCH_TOTAL_CAP,
+      join_link_missing: !chapter.alumni_join_link,
     };
 
     // ── 10. Create batch record ───────────────────────────────────────────────

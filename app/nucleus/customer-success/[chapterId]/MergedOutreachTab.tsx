@@ -36,6 +36,7 @@ interface BatchSummary {
     t2?: { total: number };
     t3?: { total: number };
   } | null;
+  notes?: string | null;
 }
 
 interface PreviewContact {
@@ -555,75 +556,116 @@ function OutreachStatsSection({
           )}
 
           {/* Pending batch */}
-          {!loadingBatch && batch && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 14px', borderRadius: 2,
-              background: batch.status === 'pending_approval' ? '#FEF3C7' :
-                          batch.status === 'approved' ? '#D1FAE5' :
-                          batch.status === 'sending' ? '#DBEAFE' : '#F3F4F6',
-              border: '1px solid #D9D4CC',
-              fontSize: '0.82rem',
-            }}>
-              {batch.status === 'pending_approval' && <Clock size={14} style={{ color: '#B45309' }} />}
-              {batch.status === 'approved' && <CheckCircle2 size={14} style={{ color: '#065F46' }} />}
-              {batch.status === 'sending' && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: '#1D4ED8' }} />}
-              {batch.status === 'completed' && <CheckCircle2 size={14} style={{ color: '#6B7280' }} />}
-              <span style={{ color: '#1B2A4A' }}>
-                <strong>Today&apos;s batch:</strong>{' '}
-                {batch.total_contacts ?? 0} contacts · {batch.status.replace('_', ' ')}
-                {batch.touch_breakdown && (
-                  <span style={{ color: '#5C5449' }}>
-                    {' '}· T1: {batch.touch_breakdown.t1?.total ?? 0},
-                    T2: {batch.touch_breakdown.t2?.total ?? 0},
-                    T3: {batch.touch_breakdown.t3?.total ?? 0}
+          {!loadingBatch && batch && (() => {
+            // Parse sent/remaining from batch notes for executing batches
+            let batchSent = 0;
+            let batchRemaining: number | null = null;
+            try {
+              const notesObj = typeof batch.notes === 'string' ? JSON.parse(batch.notes) : batch.notes;
+              if (notesObj?.sent != null) batchSent = notesObj.sent;
+              if (notesObj?.remaining != null) batchRemaining = notesObj.remaining;
+            } catch { /* ignore */ }
+            const total = batch.total_contacts ?? 0;
+            const progressPct = total > 0 ? Math.round((batchSent / total) * 100) : 0;
+
+            return (
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 8,
+                padding: '10px 14px', borderRadius: 2,
+                background: batch.status === 'pending_approval' ? '#FEF3C7' :
+                            batch.status === 'approved' ? '#D1FAE5' :
+                            batch.status === 'executing' ? '#DBEAFE' :
+                            batch.status === 'sending' ? '#DBEAFE' : '#F3F4F6',
+                border: '1px solid #D9D4CC',
+                fontSize: '0.82rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {batch.status === 'pending_approval' && <Clock size={14} style={{ color: '#B45309' }} />}
+                  {batch.status === 'approved' && <CheckCircle2 size={14} style={{ color: '#065F46' }} />}
+                  {batch.status === 'executing' && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: '#1D4ED8' }} />}
+                  {batch.status === 'sending' && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: '#1D4ED8' }} />}
+                  {batch.status === 'completed' && <CheckCircle2 size={14} style={{ color: '#6B7280' }} />}
+                  <span style={{ color: '#1B2A4A' }}>
+                    <strong>Today&apos;s batch:</strong>{' '}
+                    {total} contacts · {batch.status.replace(/_/g, ' ')}
+                    {batch.touch_breakdown && (
+                      <span style={{ color: '#5C5449' }}>
+                        {' '}· T1: {batch.touch_breakdown.t1?.total ?? 0},
+                        T2: {batch.touch_breakdown.t2?.total ?? 0},
+                        T3: {batch.touch_breakdown.t3?.total ?? 0}
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                {batch.status === 'pending_approval' && (
-                  <button
-                    onClick={handleApproveBatch}
-                    disabled={approving}
-                    style={{
-                      padding: '4px 12px', borderRadius: 6, border: 'none',
-                      background: approving ? '#9ca3af' : '#1B2A4A', color: '#fff',
-                      fontSize: '0.75rem', fontWeight: 600, cursor: approving ? 'default' : 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 4,
-                    }}
-                  >
-                    {approving
-                      ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Approving…</>
-                      : <><CheckCircle2 size={11} /> Approve</>}
-                  </button>
-                )}
-                {batch.status === 'approved' && (
-                  <button
-                    onClick={handleExecuteBatch}
-                    disabled={executing}
-                    style={{
-                      padding: '4px 12px', borderRadius: 6, border: 'none',
-                      background: executing ? '#9ca3af' : '#C4874A', color: '#fff',
-                      fontSize: '0.75rem', fontWeight: 600, cursor: executing ? 'default' : 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 4,
-                    }}
-                  >
-                    {executing
-                      ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</>
-                      : <><Send size={11} /> Execute</>}
-                  </button>
-                )}
-                {(batch.status === 'completed' || batch.status === 'sending') && (
-                  <a
-                    href="/nucleus/customer-success"
-                    style={{ color: '#C4874A', fontWeight: 600, fontSize: '0.78rem', textDecoration: 'none' }}
-                  >
-                    View details →
-                  </a>
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                    {batch.status === 'pending_approval' && (
+                      <button
+                        onClick={handleApproveBatch}
+                        disabled={approving}
+                        style={{
+                          padding: '4px 12px', borderRadius: 6, border: 'none',
+                          background: approving ? '#9ca3af' : '#1B2A4A', color: '#fff',
+                          fontSize: '0.75rem', fontWeight: 600, cursor: approving ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        {approving
+                          ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Approving…</>
+                          : <><CheckCircle2 size={11} /> Approve</>}
+                      </button>
+                    )}
+                    {batch.status === 'approved' && (
+                      <button
+                        onClick={handleExecuteBatch}
+                        disabled={executing}
+                        style={{
+                          padding: '4px 12px', borderRadius: 6, border: 'none',
+                          background: executing ? '#9ca3af' : '#C4874A', color: '#fff',
+                          fontSize: '0.75rem', fontWeight: 600, cursor: executing ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        {executing
+                          ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</>
+                          : <><Send size={11} /> Execute</>}
+                      </button>
+                    )}
+                    {(batch.status === 'completed' || batch.status === 'sending') && (
+                      <a
+                        href="/nucleus/customer-success"
+                        style={{ color: '#C4874A', fontWeight: 600, fontSize: '0.78rem', textDecoration: 'none' }}
+                      >
+                        View details →
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Progress bar for executing batches */}
+                {batch.status === 'executing' && total > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: '#1D4ED8' }}>
+                      <span style={{ fontWeight: 600 }}>In Progress — {batchSent} / {total} sent ({progressPct}%)</span>
+                      {batchRemaining !== null && batchRemaining > 0 && (
+                        <span style={{ color: '#6B7280' }}>{batchRemaining} remaining</span>
+                      )}
+                    </div>
+                    <div style={{ height: 6, background: '#BFDBFE', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${progressPct}%`,
+                        background: '#2563EB',
+                        borderRadius: 3,
+                        transition: 'width 0.3s ease-out',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>
+                      Sending in progress — 25 contacts per run, every 30 min
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Batch History */}
           {batchHistory.length > 0 && (
@@ -647,10 +689,12 @@ function OutreachStatsSection({
                     const statusColor =
                       h.status === 'completed' ? '#065f46' :
                       h.status === 'rejected'  ? '#9ca3af' :
+                      h.status === 'executing' ? '#1d4ed8' :
                       h.status === 'sending'   ? '#1d4ed8' : '#6b7280';
                     const statusBg =
                       h.status === 'completed' ? '#d1fae5' :
                       h.status === 'rejected'  ? '#f3f4f6' :
+                      h.status === 'executing' ? '#dbeafe' :
                       h.status === 'sending'   ? '#dbeafe' : '#f3f4f6';
                     return (
                       <div
