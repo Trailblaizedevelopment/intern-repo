@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getMessages } from '@/lib/linq';
+import { runSyncAll } from '../sync-all/route';
 
 const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
@@ -86,9 +87,18 @@ export async function POST(req: NextRequest) {
       .eq('id', update.id);
   }
 
+  // ── Also run full chat-match sync (links existing Linq chats to alumni) ──
+  let syncAllResults: { matched?: number; updated?: number; scanned?: number } = {};
+  try {
+    syncAllResults = await runSyncAll();
+  } catch (e) {
+    console.warn('[conversations/sync] sync-all failed (non-fatal):', e);
+  }
+
   return NextResponse.json({
     detected,
     scanned: contacts.length,
     errors: errors.length > 0 ? errors.slice(0, 5) : undefined,
+    sync_all: syncAllResults,
   });
 }
