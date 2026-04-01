@@ -376,14 +376,14 @@ function Dashboard() {
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 'clamp(16px, 4vw, 32px) clamp(12px, 4vw, 24px)', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 32 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#f9fafb', letterSpacing: '-0.3px' }}>Trailblaize</div>
           <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Finance Dashboard</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <span style={{ fontSize: 12, color: '#4b5563' }}>
             Last refresh: {lastRefresh.toLocaleTimeString()}
           </span>
@@ -417,7 +417,7 @@ function Dashboard() {
       )}
 
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 40 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 32 }}>
         <StatCard
           icon={<DollarSign size={16} />}
           label="Monthly Recurring"
@@ -456,7 +456,7 @@ function Dashboard() {
         ) : activeChapters.length === 0 ? (
           <div style={{ color: '#6b7280', fontSize: 14 }}>No active chapters found.</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={tableStyle}>
               <thead>
                 <tr>
@@ -503,7 +503,7 @@ function Dashboard() {
             </table>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 24, marginTop: 16, paddingTop: 16, borderTop: '1px solid #1e1e2e' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16, paddingTop: 16, borderTop: '1px solid #1e1e2e' }}>
           <div style={{ fontSize: 13, color: '#6b7280' }}>
             MRR: <span style={{ color: '#10b981', fontWeight: 600 }}>{fmtDollars(mrr)}</span>
           </div>
@@ -524,7 +524,7 @@ function Dashboard() {
         ) : hotDeals.length === 0 ? (
           <div style={{ color: '#6b7280', fontSize: 14 }}>No hot pipeline deals found.</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={tableStyle}>
               <thead>
                 <tr>
@@ -566,7 +566,7 @@ function Dashboard() {
             </table>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 24, marginTop: 16, paddingTop: 16, borderTop: '1px solid #1e1e2e' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16, paddingTop: 16, borderTop: '1px solid #1e1e2e' }}>
           <div style={{ fontSize: 13, color: '#6b7280' }}>
             Total hot pipeline: <span style={{ color: '#818cf8', fontWeight: 600 }}>{fmtDollars(pipelineTotal)}</span>
           </div>
@@ -588,9 +588,9 @@ function Dashboard() {
         ) : !stripeData ? (
           <div style={{ color: '#f87171', fontSize: 14 }}>Stripe data unavailable. Check STRIPE_SECRET_KEY.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {/* Active subscriptions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <CheckCircle size={18} color="#10b981" />
               <span style={{ color: '#d1d5db', fontSize: 14 }}>
                 Active Stripe subscriptions:{' '}
