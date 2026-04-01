@@ -304,8 +304,39 @@ export default function ChapterDashboardPage() {
 
   const sc = statusConfig[chapter.status] || statusConfig.onboarding;
 
+  // Payment alert calculation
+  const paymentAlertInfo = (() => {
+    if (!chapter.next_payment_date) return null;
+    const daysUntil = Math.ceil((new Date(chapter.next_payment_date).getTime() - Date.now()) / 86400000);
+    if (daysUntil < 0) return { type: 'overdue' as const, days: Math.abs(daysUntil) };
+    if (daysUntil <= 7) return { type: 'due_soon' as const, days: daysUntil };
+    return null;
+  })();
+
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff', color: '#111827', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* ── Payment Alert Banner ── */}
+      {paymentAlertInfo && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 24px',
+          background: paymentAlertInfo.type === 'overdue' ? '#fef2f2' : '#fffbeb',
+          borderBottom: `1px solid ${paymentAlertInfo.type === 'overdue' ? '#fecaca' : '#fde68a'}`,
+          color: paymentAlertInfo.type === 'overdue' ? '#991b1b' : '#92400e',
+          fontSize: '0.82rem', fontWeight: 600,
+        }}>
+          <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+          {paymentAlertInfo.type === 'overdue'
+            ? `Payment overdue by ${paymentAlertInfo.days} day${paymentAlertInfo.days !== 1 ? 's' : ''} — was due ${new Date(chapter.next_payment_date!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+            : `Payment due in ${paymentAlertInfo.days} day${paymentAlertInfo.days !== 1 ? 's' : ''} — ${new Date(chapter.next_payment_date!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+          }
+          {chapter.payment_amount ? (
+            <span style={{ opacity: 0.75, fontWeight: 400 }}>
+              {' '}· ${chapter.payment_amount.toLocaleString()}
+            </span>
+          ) : null}
+        </div>
+      )}
       {/* ── Header ── */}
       <header style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '0' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 24px' }}>

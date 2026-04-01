@@ -956,9 +956,13 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     const active = filteredDeals.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
     const totalValue = active.reduce((s, d) => s + (d.value || 0), 0);
     const overdue = active.filter(d => followupUrgency(d.next_followup) === 'overdue').length;
+    const goingCold = active.filter(d => {
+      const days = daysAgo(d.updated_at || d.last_touched || d.created_at);
+      return days !== null && days >= 7;
+    }).length;
     const byStage: Record<string, number> = {};
     active.forEach(d => { byStage[d.stage] = (byStage[d.stage] || 0) + 1; });
-    return { totalValue, overdue, byStage, total: active.length };
+    return { totalValue, overdue, goingCold, byStage, total: active.length };
   }, [filteredDeals]);
 
   const conferences = useMemo(() => {
@@ -975,6 +979,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     const urgency = followupUrgency(deal.next_followup);
     // BUG-5: prefer updated_at, fallback to last_touched, then created_at
     const days = daysAgo(deal.updated_at || deal.last_touched || deal.created_at);
+    const isGoingCold = days !== null && days >= 7 && deal.stage !== 'closed_lost' && deal.stage !== 'hold_off';
     const stageConf = STAGE_CONFIG[deal.stage];
     const assignee = showAssigned ? employees.find(e => e.id === deal.assigned_to) : null;
     const orgIcon = getOrgIcon(deal);
@@ -1034,8 +1039,9 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
               </span>
             ) : null}
             {days !== null && (
-              <span className="pl2__last-touch">
+              <span className="pl2__last-touch" style={isGoingCold ? { color: '#ef4444' } : undefined}>
                 <Clock size={12} /> {days === 0 ? 'Today' : `${days}d ago`}
+                {isGoingCold && <span style={{ marginLeft: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>Going Cold</span>}
               </span>
             )}
           </div>
@@ -1536,6 +1542,12 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
             <span className="pl2__stat-value">{stats.overdue}</span>
             <span className="pl2__stat-label">Overdue</span>
           </div>
+          {stats.goingCold > 0 && (
+            <div className="pl2__stat" style={{ borderLeft: '2px solid rgba(239,68,68,0.3)' }}>
+              <span className="pl2__stat-value" style={{ color: '#ef4444' }}>{stats.goingCold}</span>
+              <span className="pl2__stat-label" style={{ color: '#ef4444' }}>🧊 Going Cold</span>
+            </div>
+          )}
           {Object.entries(stats.byStage).slice(0, 4).map(([stage, count]) => (
             <div key={stage} className="pl2__stat">
               <span className="pl2__stat-value">{count}</span>
