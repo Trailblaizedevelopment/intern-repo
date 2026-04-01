@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ExternalLink, Loader2, Users, Phone, Mail, Smartphone, Copy, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ExternalLink, Loader2, Users, Phone, Mail, Smartphone, Copy, Check, Upload, X } from 'lucide-react';
 import { ChapterWithOnboarding, supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -24,6 +24,35 @@ interface AlumniStats {
   touch3_due: number;
 }
 
+interface DetectedColumn {
+  raw_header: string;
+  mapped_to: string | null;
+}
+
+interface SampleRow {
+  first_name: string;
+  last_name: string;
+  phone_primary: string | null;
+  email: string | null;
+  year: number | null;
+}
+
+interface PreviewData {
+  detected_columns: DetectedColumn[];
+  sample_rows: SampleRow[];
+  counts: {
+    total_rows: number;
+    will_import: number;
+    skip_pre_1970: number;
+    skip_no_name: number;
+    skip_invalid_phone: number;
+    duplicates: number;
+  };
+  warnings: string[];
+  unmapped_headers: string[];
+  has_required_fields: boolean;
+}
+
 export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: AlumniOutreachTabProps) {
   const [stats, setStats] = useState<AlumniStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +60,10 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
   // CSV import state
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; duplicates: number; errors: { row: number; message: string }[] } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Signup links state
@@ -50,6 +82,33 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
     setActivesJoinLink(chapter.actives_join_link || '');
   }, [chapter.alumni_join_link, chapter.actives_join_link]);
 
+  const handleFileSelect = useCallback((file: File | null) => {
+    setImportFile(file);
+    setPreviewData(null);
+    setImportResult(null);
+  }, []);
+
+  async function handlePreview() {
+    if (!importFile) return;
+    setPreviewing(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      formData.append('chapter_id', chapter.id);
+      const res = await fetch('/api/alumni/import/preview', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (json.error) {
+        showToast(json.error.message || 'Preview failed', 'error');
+      } else {
+        setPreviewData(json.data);
+      }
+    } catch {
+      showToast('Preview failed', 'error');
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
   async function handleImport() {
     if (!importFile) return;
     setImporting(true);
@@ -63,6 +122,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
         showToast(json.error.message || 'Import failed', 'error');
       } else {
         setImportResult(json.data);
+        setPreviewData(null);
         showToast(`✓ Imported ${json.data.imported}, skipped ${json.data.skipped}, duplicates ${json.data.duplicates}`, 'success');
         fetchStats();
       }
@@ -71,6 +131,13 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
     } finally {
       setImporting(false);
     }
+  }
+
+  function resetImport() {
+    setImportFile(null);
+    setPreviewData(null);
+    setImportResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function saveLinks() {
@@ -142,47 +209,251 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
         <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
           Import Alumni List
         </h3>
-        <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <div className="module-form-group" style={{ margin: 0, flex: 1 }}>
-              <input
-                type="file"
-                accept=".csv"
-                ref={fileInputRef}
-                onChange={e => { setImportFile(e.target.files?.[0] || null); setImportResult(null); }}
-                style={{ fontSize: '0.85rem' }}
-              />
-            </div>
-            <button
-              className="module-primary-btn"
-              onClick={handleImport}
-              disabled={!importFile || importing}
-              style={{ flexShrink: 0, padding: '7px 18px', fontSize: '0.85rem' }}
+
+        {/* Step 1: File drop zone */}
+        {!importResult && (
+          <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 18px' }}>
+            {/* Drag & drop zone */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => {
+                e.preventDefault();
+                setDragOver(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f && f.name.endsWith('.csv')) handleFileSelect(f);
+                else if (f) showToast('Please drop a CSV file', 'error');
+              }}
+              style={{
+                border: `2px dashed ${dragOver ? '#C4874A' : '#D9D4CC'}`,
+                borderRadius: 2,
+                padding: '28px 20px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                background: dragOver ? '#FDF0E0' : '#fff',
+                transition: 'all 0.15s ease',
+                marginBottom: 12,
+              }}
             >
-              {importing ? 'Uploading…' : 'Upload'}
-            </button>
+              <Upload size={24} style={{ color: '#9ca3af', marginBottom: 8 }} />
+              <div style={{ fontSize: '0.9rem', color: '#5C5449', fontWeight: 500, marginBottom: 4 }}>
+                Drop your alumni list here or click to browse
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>
+                Supports any CSV format — first_name, last_name, phone, email, year
+              </div>
+            </div>
+
+            <input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              onChange={e => handleFileSelect(e.target.files?.[0] || null)}
+              style={{ display: 'none' }}
+            />
+
+            {importFile && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: '0.85rem', color: '#1B2A4A', fontWeight: 500 }}>
+                    📄 {importFile.name}
+                  </div>
+                  <button
+                    onClick={resetImport}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}
+                    title="Remove file"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <button
+                  className="module-primary-btn"
+                  onClick={handlePreview}
+                  disabled={previewing}
+                  style={{ padding: '7px 18px', fontSize: '0.85rem', flexShrink: 0 }}
+                >
+                  {previewing
+                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: 6 }} />Analyzing…</>
+                    : 'Preview Import →'
+                  }
+                </button>
+              </div>
+            )}
           </div>
-          <p style={{ fontSize: '0.78rem', color: '#9ca3af', margin: 0 }}>
-            Accepted columns: <strong>first_name, last_name, phone, email, year</strong>
-          </p>
-          {importResult && (
-            <div style={{ marginTop: 12, padding: '10px 14px', background: '#d1fae5', borderRadius: 8, fontSize: '0.85rem', color: '#065f46' }}>
+        )}
+
+        {/* Import success result */}
+        {importResult && (
+          <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 18px' }}>
+            <div style={{ padding: '10px 14px', background: '#d1fae5', borderRadius: 2, fontSize: '0.85rem', color: '#065f46', marginBottom: 10 }}>
               ✓ Imported <strong>{importResult.imported}</strong>, skipped <strong>{importResult.skipped}</strong>, duplicates <strong>{importResult.duplicates}</strong>
-              {importResult.errors.length > 0 && (
+              {importResult.errors && importResult.errors.length > 0 && (
                 <div style={{ marginTop: 4, color: '#92400e' }}>
                   {importResult.errors.slice(0, 3).map(e => <div key={e.row}>Row {e.row}: {e.message}</div>)}
                 </div>
               )}
-              <button
-                className="module-cancel-btn"
-                onClick={() => { setImportResult(null); setImportFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                style={{ marginTop: 8, padding: '4px 12px', fontSize: '0.78rem' }}
-              >
-                Clear
-              </button>
             </div>
-          )}
-        </div>
+            <button
+              className="module-cancel-btn"
+              onClick={resetImport}
+              style={{ padding: '4px 12px', fontSize: '0.78rem' }}
+            >
+              Import Another File
+            </button>
+          </div>
+        )}
+
+        {/* Step 2: Preview modal */}
+        {previewData && !importResult && (
+          <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: 24,
+          }}>
+            <div style={{
+              background: '#fff', borderRadius: 2, maxWidth: 600, width: '100%',
+              maxHeight: '90vh', overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            }}>
+              {/* Modal header */}
+              <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #D9D4CC' }}>
+                <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '1.2rem', color: '#1B2A4A', marginBottom: 2 }}>
+                  Smart Import Preview
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{importFile?.name}</div>
+              </div>
+
+              <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+                {/* Column mapping */}
+                <div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: '#9ca3af', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Column Mapping
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {previewData.detected_columns.map((col, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.84rem' }}>
+                        <span style={{ color: col.mapped_to ? '#059669' : '#9ca3af', fontWeight: 700, fontSize: '0.9rem', width: 16 }}>
+                          {col.mapped_to ? '✓' : '✗'}
+                        </span>
+                        <span style={{ color: '#1B2A4A', fontFamily: 'monospace', background: '#F7F5F1', padding: '1px 6px', borderRadius: 2, fontSize: '0.8rem' }}>
+                          &ldquo;{col.raw_header}&rdquo;
+                        </span>
+                        <span style={{ color: '#9ca3af' }}>→</span>
+                        <span style={{ color: col.mapped_to ? '#1B2A4A' : '#D9D4CC', fontSize: '0.82rem' }}>
+                          {col.mapped_to || '(ignored)'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sample contacts */}
+                {previewData.sample_rows.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: '#9ca3af', textTransform: 'uppercase', marginBottom: 10 }}>
+                      Sample Contacts (first {previewData.sample_rows.length})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {previewData.sample_rows.map((row, i) => (
+                        <div key={i} style={{ fontSize: '0.84rem', color: '#1B2A4A', background: '#F7F5F1', padding: '8px 12px', borderRadius: 2 }}>
+                          <strong>{row.first_name} {row.last_name}</strong>
+                          {row.year && <span style={{ color: '#9ca3af', marginLeft: 8 }}>&lsquo;{String(row.year).slice(-2)}</span>}
+                          {row.phone_primary && <span style={{ color: '#5C5449', marginLeft: 8 }}>• {row.phone_primary}</span>}
+                          {!row.phone_primary && <span style={{ color: '#D9D4CC', marginLeft: 8 }}>• no phone</span>}
+                          {row.email && <span style={{ color: '#5C5449', marginLeft: 8 }}>• {row.email}</span>}
+                          {!row.email && <span style={{ color: '#D9D4CC', marginLeft: 8 }}>• —</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Import summary */}
+                <div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: '#9ca3af', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Import Summary
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.84rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
+                      <span>✓ Will import</span>
+                      <span>{previewData.counts.will_import.toLocaleString()} contacts</span>
+                    </div>
+                    {previewData.counts.skip_pre_1970 > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
+                        <span>— Skip pre-1970</span>
+                        <span>{previewData.counts.skip_pre_1970.toLocaleString()} contacts</span>
+                      </div>
+                    )}
+                    {previewData.counts.duplicates > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
+                        <span>— Duplicates</span>
+                        <span>{previewData.counts.duplicates.toLocaleString()} contacts</span>
+                      </div>
+                    )}
+                    {previewData.counts.skip_no_name > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
+                        <span>— Missing name</span>
+                        <span>{previewData.counts.skip_no_name.toLocaleString()} contacts</span>
+                      </div>
+                    )}
+                    {previewData.counts.skip_invalid_phone > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
+                        <span>— Invalid phone</span>
+                        <span>{previewData.counts.skip_invalid_phone.toLocaleString()} contacts</span>
+                      </div>
+                    )}
+                    <div style={{ borderTop: '1px solid #D9D4CC', paddingTop: 6, display: 'flex', justifyContent: 'space-between', color: '#9ca3af' }}>
+                      <span>Total rows</span>
+                      <span>{previewData.counts.total_rows.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Warnings */}
+                {previewData.warnings.length > 0 && (
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 2, padding: '10px 14px' }}>
+                    {previewData.warnings.map((w, i) => (
+                      <div key={i} style={{ fontSize: '0.82rem', color: '#92400e', marginBottom: i < previewData.warnings.length - 1 ? 6 : 0 }}>
+                        ⚠️ {w}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Required fields missing */}
+                {!previewData.has_required_fields && (
+                  <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 2, padding: '10px 14px', fontSize: '0.82rem', color: '#991B1B' }}>
+                    ✕ Missing required columns: need first_name + last_name (or a full name column). Cannot import.
+                  </div>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div style={{ padding: '16px 24px', borderTop: '1px solid #D9D4CC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button
+                  className="module-cancel-btn"
+                  onClick={() => setPreviewData(null)}
+                  style={{ padding: '7px 18px', fontSize: '0.85rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="module-primary-btn"
+                  onClick={handleImport}
+                  disabled={importing || !previewData.has_required_fields || previewData.counts.will_import === 0}
+                  style={{ padding: '7px 22px', fontSize: '0.85rem' }}
+                >
+                  {importing
+                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: 6 }} />Importing…</>
+                    : `Import ${previewData.counts.will_import.toLocaleString()} Contact${previewData.counts.will_import === 1 ? '' : 's'} →`
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Import Stats */}
