@@ -305,6 +305,10 @@ export function TicketBoard() {
       backlog: [], todo: [], open: [], in_progress: [], in_review: [], testing: [], done: [], canceled: [],
     };
     tickets.forEach(t => groups[t.status]?.push(t));
+    // Sort each column by priority
+    (Object.keys(groups) as TicketStatus[]).forEach(status => {
+      groups[status].sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4));
+    });
     return groups;
   }, [tickets]);
 
@@ -692,7 +696,7 @@ function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onCl
 type SortField = 'number' | 'title' | 'status' | 'priority' | 'type' | 'assignee' | 'created_at' | 'due_date';
 type SortDir = 'asc' | 'desc' | null;
 
-const PRIORITY_ORDER: Record<TicketPriority, number> = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
+const PRIORITY_ORDER: Record<TicketPriority, number> = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
 
 function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -715,7 +719,7 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
   };
 
   const sorted = useMemo(() => {
-    if (!sortField || !sortDir) return tickets;
+    if (!sortField || !sortDir) return [...tickets].sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4));
     const arr = [...tickets];
     const dir = sortDir === 'asc' ? 1 : -1;
     arr.sort((a, b) => {
@@ -763,7 +767,7 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
                 {ticket.number}
                 {ticket.external_id && <span className="tkt__external-id">{ticket.external_id}</span>}
               </span>
-              <span className="tkt__list-col tkt__list-col--title">
+              <span className="tkt__list-col tkt__list-col--title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ticket.title}
                 {ticket.labels && ticket.labels.length > 0 && (
                   <span className="tkt__labels tkt__labels--inline">
@@ -781,7 +785,7 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
               <span className="tkt__list-col tkt__list-col--status">
                 <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
               </span>
-              <span className="tkt__list-col tkt__list-col--priority">
+              <span className="tkt__list-col tkt__list-col--priority" style={{ flexShrink: 0 }}>
                 <span style={{ color: PRIORITY_CONFIG[ticket.priority].color }}>
                   {PRIORITY_CONFIG[ticket.priority].icon} {PRIORITY_CONFIG[ticket.priority].label}
                 </span>
@@ -1127,7 +1131,7 @@ function CreateTicketModal({
     try {
       const res = await fetch('/api/development/generate-spec', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h' },
         body: JSON.stringify({ description: aiDescription.trim() }),
       });
       const result = await res.json();

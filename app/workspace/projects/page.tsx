@@ -398,7 +398,26 @@ function ProjectTimeline({
 
   const todayPct = Math.max(0, Math.min(100, ((now.getTime() - timelineStart.getTime()) / totalMs) * 100));
 
-  function getBarStyle(project: Project) {
+  function getStatusColor(project: Project): string {
+    const targetDate = project.target_date ? new Date(project.target_date + 'T00:00:00') : null;
+    const startDate = project.start_date ? new Date(project.start_date + 'T00:00:00') : null;
+    const ticketCount = project.ticket_count || 0;
+    const ticketsDone = project.tickets_done || 0;
+    const pctDone = ticketCount > 0 ? ticketsDone / ticketCount : 0;
+    const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+    if (project.status === 'completed') return '#3b82f6';
+    if (project.status === 'planning') return '#6366f1';
+    if (project.status === 'paused') return '#9ca3af';
+    if (targetDate && targetDate < now && project.status !== 'completed') return '#ef4444'; // overdue
+    if (project.status === 'active') {
+      if (targetDate && targetDate < in14Days && pctDone < 0.5 && startDate && startDate < now) return '#f59e0b'; // at-risk
+      return '#10b981'; // on-track
+    }
+    return project.color || projectColor(project.name);
+  }
+
+  function getBarProps(project: Project): { left: string; width: string; color: string; fillPct: number; isPlaceholder: boolean } {
     const start = project.start_date
       ? new Date(project.start_date + 'T00:00:00')
       : now;
@@ -409,15 +428,12 @@ function ProjectTimeline({
     const leftPct = Math.max(0, ((start.getTime() - timelineStart.getTime()) / totalMs) * 100);
     const rightPct = Math.min(100, ((end.getTime() - timelineStart.getTime()) / totalMs) * 100);
     const width = Math.max(2, rightPct - leftPct);
-
     const isPlaceholder = !project.start_date && !project.target_date;
+    const ticketCount = project.ticket_count || 0;
+    const ticketsDone = project.tickets_done || 0;
+    const fillPct = ticketCount > 0 ? Math.round((ticketsDone / ticketCount) * 100) : 0;
 
-    return {
-      left: `${leftPct}%`,
-      width: `${width}%`,
-      background: projectColor(project.name),
-      opacity: isPlaceholder ? 0.4 : 1,
-    };
+    return { left: `${leftPct}%`, width: `${width}%`, color: getStatusColor(project), fillPct, isPlaceholder };
   }
 
   return (
@@ -425,7 +441,7 @@ function ProjectTimeline({
       {/* Month header */}
       <div className="sn__timeline-header">
         <div className="sn__timeline-label-col" />
-        <div className="sn__timeline-track-area">
+        <div className="sn__timeline-track-area" style={{ position: 'relative' }}>
           {months.map((m, i) => (
             <div
               key={i}
@@ -435,7 +451,16 @@ function ProjectTimeline({
               {m.label}
             </div>
           ))}
-          <div className="sn__timeline-today" style={{ left: `${todayPct}%` }} />
+          {/* Today line in header */}
+          <div style={{
+            position: 'absolute', left: `${todayPct}%`, top: 0, bottom: 0,
+            width: 2, background: '#ef4444', zIndex: 10,
+          }}>
+            <span style={{
+              position: 'absolute', top: 0, left: 3, fontSize: '0.6rem',
+              color: '#ef4444', fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1,
+            }}>Today</span>
+          </div>
         </div>
       </div>
 
@@ -444,33 +469,122 @@ function ProjectTimeline({
         {projects.length === 0 ? (
           <p className="sn__empty-text">No projects to display.</p>
         ) : (
-          projects.map(project => (
-            <div
-              key={project.id}
-              className="sn__timeline-row"
-              onClick={() => onProjectClick(project.id)}
-              title={`${project.name}${project.start_date ? ` · Start: ${project.start_date}` : ''}${project.target_date ? ` · Due: ${project.target_date}` : ''}`}
-            >
-              <div className="sn__timeline-label-col">
-                <span className="sn__timeline-project-name">{project.name}</span>
-                <span
-                  className="sn__timeline-project-platform"
-                  style={{ color: projectColor(project.name) }}
-                >
-                  {(project.platform || 'web') === 'ios' ? 'iOS' : 'Web'}
-                </span>
+          projects.map(project => {
+            const { left, width, color, fillPct, isPlaceholder } = getBarProps(project);
+            const ticketCount = project.ticket_count || 0;
+            const targetDateStr = project.target_date
+              ? new Date(project.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : 'No target date';
+            const milestones = project.milestones || [];
+            return (
+              <div
+                key={project.id}
+                className="sn__timeline-row"
+                onClick={() => onProjectClick(project.id)}
+              >
+                <div className="sn__timeline-label-col">
+                  <span className="sn__timeline-project-name">{project.name}</span>
+                  <span
+                    className="sn__timeline-project-platform"
+                    style={{ color }}
+                  >
+                    {(project.platform || 'web') === 'ios' ? 'iOS' : 'Web'}
+                  </span>
+                </div>
+                <div className="sn__timeline-track-area" style={{ position: 'relative' }}>
+                  {/* Project bar with progress fill and hover tooltip */}
+                  <div
+                    className="sn__timeline-bar"
+                    style={{
+                      position: 'absolute',
+                      left,
+                      width,
+                      opacity: isPlaceholder ? 0.4 : 1,
+                      background: color,
+                      borderRadius: 4,
+                      height: '100%',
+                      overflow: 'visible',
+                    }}
+                  >
+                    {/* Progress fill (lighter inner bar) */}
+                    {fillPct > 0 && (
+                      <div style={{
+                        position: 'absolute', left: 0, top: 0, bottom: 0,
+                        width: `${fillPct}%`,
+                        background: `${color}55`,
+                        borderRadius: 4,
+                      }} />
+                    )}
+                    {/* Hover tooltip */}
+                    <div style={{
+                      display: 'none',
+                      position: 'absolute',
+                      bottom: 'calc(100% + 8px)',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: '#1f2937',
+                      color: '#f9fafb',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      minWidth: 180,
+                      zIndex: 100,
+                      fontSize: '0.78rem',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                      pointerEvents: 'none',
+                      whiteSpace: 'nowrap',
+                    }} className="sn__bar-tooltip">
+                      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: '0.85rem' }}>{project.name}</div>
+                      <div style={{ marginBottom: 2 }}>
+                        <span style={{
+                          background: color,
+                          color: '#fff',
+                          borderRadius: 4,
+                          padding: '1px 6px',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          textTransform: 'capitalize',
+                        }}>{project.status}</span>
+                      </div>
+                      <div style={{ color: '#d1d5db', marginTop: 4 }}>
+                        {ticketCount} ticket{ticketCount !== 1 ? 's' : ''} · {fillPct}% done
+                      </div>
+                      <div style={{ color: '#9ca3af', marginTop: 2 }}>{targetDateStr}</div>
+                    </div>
+                    {/* Milestone ticks */}
+                    {milestones.filter(ms => ms.target_date).map(ms => {
+                      const msDate = new Date(ms.target_date! + 'T00:00:00');
+                      const barStart = project.start_date ? new Date(project.start_date + 'T00:00:00') : now;
+                      const barEnd = project.target_date ? new Date(project.target_date + 'T00:00:00') : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                      const barMs = barEnd.getTime() - barStart.getTime();
+                      const msPct = barMs > 0 ? Math.max(0, Math.min(100, ((msDate.getTime() - barStart.getTime()) / barMs) * 100)) : 0;
+                      return (
+                        <div key={ms.id} title={ms.name} style={{
+                          position: 'absolute',
+                          left: `${msPct}%`,
+                          top: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: 8,
+                          color: '#fff',
+                          zIndex: 5,
+                          cursor: 'default',
+                        }}>◆</div>
+                      );
+                    })}
+                  </div>
+                  {/* Today line */}
+                  <div style={{
+                    position: 'absolute', left: `${todayPct}%`, top: 0, bottom: 0,
+                    width: 2, background: '#ef4444', zIndex: 10, pointerEvents: 'none',
+                  }} />
+                </div>
               </div>
-              <div className="sn__timeline-track-area">
-                <div
-                  className="sn__timeline-bar"
-                  style={getBarStyle(project)}
-                />
-                <div className="sn__timeline-today-line" style={{ left: `${todayPct}%` }} />
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
+      <style>{`
+        .sn__timeline-bar:hover .sn__bar-tooltip { display: block !important; }
+      `}</style>
     </div>
   );
 }
@@ -692,7 +806,7 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
     try {
       const res = await fetch('/api/development/generate-spec', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h' },
         body: JSON.stringify({ description: aiDescription.trim() }),
       });
       const result = await res.json();
