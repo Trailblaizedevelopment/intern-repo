@@ -180,7 +180,7 @@ function ProjectGantt({ projects, tickets, timeScale }: ProjectGanttProps) {
 
     return (
       <React.Fragment key={p.id}>
-        <div className="flex items-center border-b border-gray-100 hover:bg-gray-50/50 transition-colors" style={{ height: 40 }}>
+        <div className="flex items-center border-b hover:bg-white/3 transition-colors" style={{ height: 40, borderColor: 'rgba(255,255,255,0.05)' }}>
           {/* Label */}
           <div
             className="flex items-center gap-2 px-3 shrink-0 cursor-pointer"
@@ -188,11 +188,11 @@ function ProjectGantt({ projects, tickets, timeScale }: ProjectGanttProps) {
             onClick={() => toggle(p.id)}
           >
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-            <span className="text-sm text-gray-800 font-medium truncate flex-1">{p.name}</span>
+            <span className="text-sm text-slate-200 font-medium truncate flex-1">{p.name}</span>
             {projTickets.length > 0 && (
               isExpanded
-                ? <ChevronDown size={13} className="text-gray-400 shrink-0" />
-                : <ChevronRight size={13} className="text-gray-400 shrink-0" />
+                ? <ChevronDown size={13} className="text-slate-500 shrink-0" />
+                : <ChevronRight size={13} className="text-slate-500 shrink-0" />
             )}
           </div>
 
@@ -244,9 +244,9 @@ function ProjectGantt({ projects, tickets, timeScale }: ProjectGanttProps) {
           const fill = statusFillPct(ticket.status);
 
           return (
-            <div key={ticket.id} className="flex items-center border-b border-gray-100 bg-indigo-50/30 hover:bg-indigo-50/50" style={{ height: 34 }}>
+            <div key={ticket.id} className="flex items-center border-b hover:bg-indigo-500/5" style={{ height: 34, borderColor: 'rgba(255,255,255,0.05)', background: 'rgba(99,102,241,0.04)' }}>
               <div className="flex items-center gap-2 px-3 shrink-0 pl-8" style={{ width: LABEL_WIDTH }}>
-                <span className="text-xs text-gray-500 truncate">#{ticket.number} {ticket.title}</span>
+                <span className="text-xs text-slate-500 truncate">#{ticket.number} {ticket.title}</span>
               </div>
               <div className="relative flex-1 overflow-hidden h-full" style={{ minWidth: totalWidth }}>
                 <div
@@ -281,14 +281,14 @@ function ProjectGantt({ projects, tickets, timeScale }: ProjectGanttProps) {
   return (
     <div className="overflow-x-auto">
       {/* Timeline header */}
-      <div className="flex sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="shrink-0 bg-white" style={{ width: LABEL_WIDTH }} />
+      <div className="flex sticky top-0 z-20 border-b" style={{ background: 'rgba(15,23,42,0.98)', borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div className="shrink-0" style={{ width: LABEL_WIDTH, background: 'rgba(15,23,42,0.98)' }} />
         <div className="flex" style={{ minWidth: totalWidth }}>
           {headers.map((h, i) => (
             <div
               key={i}
-              className="border-l border-gray-100 px-2 py-1.5 text-xs font-medium text-gray-500"
-              style={{ width: h.days * DAY_PX, minWidth: 40, flexShrink: 0 }}
+              className="border-l px-2 py-1.5 text-xs font-medium text-slate-500"
+              style={{ width: h.days * DAY_PX, minWidth: 40, flexShrink: 0, borderColor: 'rgba(255,255,255,0.06)' }}
             >
               {h.label}
             </div>
@@ -304,18 +304,18 @@ function ProjectGantt({ projects, tickets, timeScale }: ProjectGanttProps) {
       {/* Unscheduled */}
       {unscheduled.length > 0 && (
         <div>
-          <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Unscheduled</span>
+          <div className="px-3 py-2 border-b" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.06)' }}>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Unscheduled</span>
           </div>
           {unscheduled.map((p, i) => {
             const color = getProjectColor(p, scheduled.length + i);
             const projTickets = tickets.filter(t => t.project_id === p.id || t.project === p.name);
             return (
-              <div key={p.id} className="flex items-center gap-3 px-3 py-2 border-b border-gray-100 hover:bg-gray-50">
+              <div key={p.id} className="flex items-center gap-3 px-3 py-2 border-b hover:bg-white/3 transition-colors" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-                <span className="text-sm text-gray-700 flex-1">{p.name}</span>
-                <span className="text-xs text-gray-400">{projTickets.length} tickets</span>
-                <span className="text-xs text-gray-300 italic">no dates set</span>
+                <span className="text-sm text-slate-300 flex-1">{p.name}</span>
+                <span className="text-xs text-slate-500">{projTickets.length} tickets</span>
+                <span className="text-xs text-slate-600 italic">no dates set</span>
               </div>
             );
           })}
@@ -331,8 +331,8 @@ function Skeleton() {
     <div className="space-y-3 p-4 animate-pulse">
       {[...Array(8)].map((_, i) => (
         <div key={i} className="flex gap-3">
-          <div className="h-8 bg-gray-200 rounded w-48 flex-shrink-0" />
-          <div className="h-8 bg-gray-100 rounded flex-1" style={{ width: `${40 + (i % 3) * 20}%` }} />
+          <div className="h-8 bg-white/8 rounded w-48 flex-shrink-0" />
+          <div className="h-8 bg-white/4 rounded flex-1" style={{ width: `${40 + (i % 3) * 20}%` }} />
         </div>
       ))}
     </div>
@@ -355,28 +355,31 @@ function MultiSelect({ label, options, selected, onChange }: MultiSelectProps) {
   return (
     <div className="relative">
       <button
-        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:border-gray-300 bg-white transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg transition-colors text-slate-300 hover:text-white"
+        style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)' }}
         onClick={() => setOpen(o => !o)}
       >
         <span>{label}</span>
         {selected.length > 0 && (
-          <span className="bg-blue-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
+          <span className="text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none font-semibold"
+            style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff' }}>
             {selected.length}
           </span>
         )}
-        <ChevronDown size={14} className="text-gray-400" />
+        <ChevronDown size={14} className="text-slate-500" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-xl z-20 py-1 max-h-64 overflow-y-auto">
+          <div className="absolute top-full left-0 mt-1 w-52 rounded-lg shadow-2xl z-20 py-1 max-h-64 overflow-y-auto border"
+            style={{ background: 'rgba(15,23,42,0.97)', borderColor: 'rgba(255,255,255,0.1)' }}>
             {options.map(opt => (
-              <label key={opt.value} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm text-gray-700">
+              <label key={opt.value} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-sm text-slate-300">
                 <input
                   type="checkbox"
                   checked={selected.includes(opt.value)}
                   onChange={() => toggle(opt.value)}
-                  className="rounded border-gray-300 text-blue-600"
+                  className="rounded border-slate-600 text-indigo-500"
                 />
                 {opt.label}
               </label>
@@ -437,15 +440,16 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+        className="rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border"
+        style={{ background: 'rgba(15,23,42,0.98)', borderColor: 'rgba(255,255,255,0.1)' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">New Ticket</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 transition-colors" aria-label="Close">
-            <X size={18} className="text-gray-500" />
+        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <h2 className="text-base font-semibold text-white">New Ticket</h2>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors" aria-label="Close">
+            <X size={18} className="text-slate-400" />
           </button>
         </div>
 
@@ -455,72 +459,77 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-              Title <span className="text-red-500">*</span>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+              Title <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="What needs to be done?"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 transition-colors"
+              className="w-full px-3 py-2 text-sm rounded-lg focus:outline-none transition-colors text-slate-200 placeholder:text-slate-600"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
               autoFocus
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Project</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Project</label>
               <select
                 value={projectId}
                 onChange={e => setProjectId(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 transition-colors"
+                className="w-full px-2.5 py-1.5 text-sm rounded-lg focus:outline-none transition-colors text-slate-200"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <option value="">None</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <option value="" className="bg-slate-900">None</option>
+                {projects.map(p => <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Priority</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Priority</label>
               <select
                 value={priority}
                 onChange={e => setPriority(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 transition-colors"
+                className="w-full px-2.5 py-1.5 text-sm rounded-lg focus:outline-none transition-colors text-slate-200"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <option value="">—</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
+                <option value="" className="bg-slate-900">—</option>
+                <option value="critical" className="bg-slate-900">Critical</option>
+                <option value="high" className="bg-slate-900">High</option>
+                <option value="medium" className="bg-slate-900">Medium</option>
+                <option value="low" className="bg-slate-900">Low</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Sprint</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Sprint</label>
               <select
                 value={sprint}
                 onChange={e => setSprint(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 transition-colors"
+                className="w-full px-2.5 py-1.5 text-sm rounded-lg focus:outline-none transition-colors text-slate-200"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <option value="">None</option>
-                <option value="Sprint 1">Sprint 1</option>
-                <option value="Sprint 2">Sprint 2</option>
+                <option value="" className="bg-slate-900">None</option>
+                <option value="Sprint 1" className="bg-slate-900">Sprint 1</option>
+                <option value="Sprint 2" className="bg-slate-900">Sprint 2</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Status</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Status</label>
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 transition-colors"
+                className="w-full px-2.5 py-1.5 text-sm rounded-lg focus:outline-none transition-colors text-slate-200"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <option value="backlog">Backlog</option>
-                <option value="open">Open</option>
-                <option value="todo">Todo</option>
-                <option value="in_progress">In Progress</option>
-                <option value="in_review">In Review</option>
+                <option value="backlog" className="bg-slate-900">Backlog</option>
+                <option value="open" className="bg-slate-900">Open</option>
+                <option value="todo" className="bg-slate-900">Todo</option>
+                <option value="in_progress" className="bg-slate-900">In Progress</option>
+                <option value="in_review" className="bg-slate-900">In Review</option>
               </select>
             </div>
           </div>
@@ -529,14 +538,15 @@ function CreateTicketModal({ projects, onClose, onCreated }: CreateTicketModalPr
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm text-slate-400 hover:bg-white/8 rounded-lg transition-colors hover:text-white"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || !title.trim()}
-              className="px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="px-4 py-1.5 text-sm font-semibold rounded-lg disabled:opacity-50 transition-all hover:scale-105 disabled:hover:scale-100"
+              style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
             >
               {submitting ? 'Creating…' : 'Create Ticket'}
             </button>
@@ -552,10 +562,10 @@ function EmptyState({ onClear }: { onClear: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="text-4xl mb-3">🗺️</div>
-      <p className="text-gray-500 font-medium">No tickets match your filters</p>
+      <p className="text-slate-400 font-medium">No tickets match your filters</p>
       <button
         onClick={onClear}
-        className="mt-3 text-blue-600 text-sm hover:underline"
+        className="mt-3 text-indigo-400 text-sm hover:underline"
       >
         Clear filters
       </button>
@@ -724,28 +734,34 @@ function RoadmapPageInner() {
   return (
     <div className="space-y-4">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="relative flex items-center justify-between pb-1">
+        {/* Ambient gradient */}
+        <div className="absolute inset-0 -z-10 pointer-events-none">
+          <div className="absolute top-0 left-0 w-72 h-16 bg-blue-500/8 blur-2xl rounded-full" />
+        </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Map size={22} className="text-blue-600" />
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent flex items-center gap-2">
+            <Map size={22} className="text-blue-400" />
             Product Roadmap
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-slate-400 mt-0.5">
             {projects.length} projects · {tickets.length} tickets
           </p>
         </div>
         <div className="flex items-center gap-2">
           {/* View toggle */}
-          <div className="hidden md:flex items-center border border-gray-200 rounded-lg overflow-hidden">
+          <div className="hidden md:flex items-center rounded-lg overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
             <button
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${view === 'gantt' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${view === 'gantt' ? 'text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              style={view === 'gantt' ? { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' } : { background: 'rgba(255,255,255,0.03)' }}
               onClick={() => handleViewChange('gantt')}
             >
               <GanttChart size={16} />
               Gantt
             </button>
             <button
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border-l border-gray-200 transition-colors ${view === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border-l transition-colors ${view === 'list' ? 'text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              style={view === 'list' ? { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderColor: 'rgba(255,255,255,0.1)' } : { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)' }}
               onClick={() => handleViewChange('list')}
             >
               <List size={16} />
@@ -755,11 +771,12 @@ function RoadmapPageInner() {
 
           {/* Time scale toggle (gantt only) */}
           {view === 'gantt' && (
-            <div className="hidden md:flex items-center border border-gray-200 rounded-lg overflow-hidden">
+            <div className="hidden md:flex items-center rounded-lg overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
               {(['week', 'month'] as const).map(s => (
                 <button
                   key={s}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-r last:border-r-0 border-gray-200 capitalize ${timeScale === s ? 'bg-gray-100 text-gray-800' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-r last:border-r-0 capitalize ${timeScale === s ? 'text-white bg-white/12' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                  style={{ borderColor: 'rgba(255,255,255,0.1)' }}
                   onClick={() => setTimeScale(s)}
                 >
                   {s}
@@ -770,7 +787,8 @@ function RoadmapPageInner() {
 
           <button
             onClick={() => void load()}
-            className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 text-gray-500"
+            className="p-1.5 rounded border text-slate-400 hover:text-white hover:bg-white/8 transition-colors"
+            style={{ borderColor: 'rgba(255,255,255,0.1)' }}
             title="Refresh"
           >
             <RefreshCw size={16} />
@@ -780,14 +798,16 @@ function RoadmapPageInner() {
 
       {/* Filter Bar (list view only) */}
       {view === 'list' && (
-        <div className="flex flex-wrap items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg sticky top-0 z-20">
-          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg sticky top-0 z-20 border backdrop-blur-md"
+          style={{ background: 'rgba(15,23,42,0.92)', borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
             {(['all', 'sprint1', 'sprint2'] as const).map(s => {
               const labels: Record<string, string> = { all: 'All', sprint1: 'Sprint 1', sprint2: 'Sprint 2' };
               return (
                 <button
                   key={s}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-r last:border-r-0 border-gray-200 ${filters.sprint === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-r last:border-r-0 ${filters.sprint === s ? 'text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                  style={filters.sprint === s ? { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderColor: 'rgba(255,255,255,0.1)' } : { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)' }}
                   onClick={() => updateFilters({ sprint: s })}
                 >
                   {labels[s]}
@@ -817,7 +837,8 @@ function RoadmapPageInner() {
           />
 
           <select
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white hover:border-gray-300 transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg transition-colors text-slate-300"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
             value={filters.assigneeId}
             onChange={e => updateFilters({ assigneeId: e.target.value })}
           >
@@ -829,20 +850,22 @@ function RoadmapPageInner() {
 
           {hasFilters && (
             <button
-              className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+              className="flex items-center gap-1 px-2 py-1.5 text-xs text-slate-500 hover:text-white border rounded-lg hover:bg-white/8 transition-colors"
+              style={{ borderColor: 'rgba(255,255,255,0.1)' }}
               onClick={clearFilters}
             >
               <X size={12} /> Clear
             </button>
           )}
 
-          <span className="ml-auto text-xs text-gray-400">
+          <span className="ml-auto text-xs text-slate-500">
             {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
           </span>
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all hover:scale-105"
+            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
           >
             <Plus size={14} />
             New Ticket
@@ -852,15 +875,18 @@ function RoadmapPageInner() {
 
       {/* Content */}
       {loading ? (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="rounded-xl overflow-hidden border shadow-xl"
+          style={{ background: 'rgba(15,23,42,0.9)', borderColor: 'rgba(255,255,255,0.08)' }}>
           <Skeleton />
         </div>
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+        <div className="rounded-xl p-4 text-sm text-red-400 border"
+          style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)' }}>
           Error loading roadmap data: {error}
         </div>
       ) : view === 'gantt' ? (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="rounded-xl overflow-hidden border shadow-xl"
+          style={{ background: 'rgba(15,23,42,0.9)', borderColor: 'rgba(255,255,255,0.08)' }}>
           <ProjectGantt
             projects={projects}
             tickets={tickets}
@@ -868,11 +894,13 @@ function RoadmapPageInner() {
           />
         </div>
       ) : filteredTickets.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="rounded-xl overflow-hidden border"
+          style={{ background: 'rgba(15,23,42,0.9)', borderColor: 'rgba(255,255,255,0.08)' }}>
           <EmptyState onClear={clearFilters} />
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="rounded-xl overflow-hidden border shadow-xl"
+          style={{ background: 'rgba(15,23,42,0.9)', borderColor: 'rgba(255,255,255,0.08)' }}>
           <div className="md:hidden">
             <ListView
               tickets={filteredTickets}
@@ -917,7 +945,7 @@ function RoadmapPageInner() {
 
 export default function RoadmapPage() {
   return (
-    <Suspense fallback={<div className="p-4 animate-pulse text-sm text-gray-400">Loading roadmap…</div>}>
+    <Suspense fallback={<div className="p-4 animate-pulse text-sm text-slate-500">Loading roadmap…</div>}>
       <RoadmapPageInner />
     </Suspense>
   );

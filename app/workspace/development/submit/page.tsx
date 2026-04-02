@@ -32,16 +32,16 @@ interface QueueTicket {
 const AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
 const COMPLEXITY_COLOR = {
-  Small: 'bg-green-100 text-green-700 border-green-200',
-  Medium: 'bg-amber-100 text-amber-700 border-amber-200',
-  Large: 'bg-red-100 text-red-700 border-red-200',
+  Small: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  Medium: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  Large: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
 const PRIORITY_ORDER = ['high', 'medium', 'low'];
 const PRIORITY_LABEL_COLOR: Record<string, string> = {
-  high: 'text-red-600 bg-red-50',
-  medium: 'text-amber-600 bg-amber-50',
-  low: 'text-gray-500 bg-gray-50',
+  high: 'text-red-400 bg-red-500/15',
+  medium: 'text-amber-400 bg-amber-500/15',
+  low: 'text-slate-400 bg-white/5',
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -166,6 +166,22 @@ export default function SubmitRequestPage() {
       }
 
       setSubmitted(true);
+
+      // Fire review notification (non-blocking)
+      try {
+        void fetch('/api/notifications/review-assigned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ticketId: ticketId ?? '',
+            ticketTitle: spec.title,
+            priority,
+            ticketType,
+          }),
+        });
+      } catch {
+        // notification failure must not block ticket creation
+      }
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to submit ticket');
     } finally {
@@ -176,19 +192,23 @@ export default function SubmitRequestPage() {
   if (submitted) {
     return (
       <div className="max-w-xl mx-auto py-20 flex flex-col items-center text-center gap-4">
-        <CheckCircle2 size={56} className="text-green-500" strokeWidth={1.5} />
-        <h2 className="text-2xl font-bold text-gray-900">Request Submitted!</h2>
-        <p className="text-gray-500">Your ticket has been created and added to the backlog.</p>
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-2"
+          style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.1) 100%)', border: '1.5px solid rgba(16,185,129,0.3)' }}>
+          <CheckCircle2 size={32} className="text-emerald-400" strokeWidth={1.5} />
+        </div>
+        <h2 className="text-2xl font-bold text-white">Ticket Submitted!</h2>
+        <p className="text-slate-400">Your ticket has been created and added to the backlog.</p>
         <div className="flex gap-3 mt-4">
           <button
             onClick={() => { setSubmitted(false); setSpec(null); setDescription(''); }}
-            className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-sm border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-slate-300"
           >
             Submit Another
           </button>
           <button
             onClick={() => router.push('/workspace/development')}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-all hover:scale-105"
+            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
           >
             View Development Board
           </button>
@@ -200,16 +220,20 @@ export default function SubmitRequestPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="relative flex items-center gap-3">
+        {/* Ambient gradient */}
+        <div className="absolute inset-0 -z-10 pointer-events-none">
+          <div className="absolute top-0 left-0 w-72 h-16 bg-violet-500/8 blur-2xl rounded-full" />
+        </div>
         <button
           onClick={() => router.push('/workspace/development')}
-          className="p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-500"
+          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
         >
           <ChevronLeft size={18} />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Submit a Request</h1>
-          <p className="text-sm text-gray-500">Describe what you want built and we&apos;ll generate a spec</p>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Product Review</h1>
+          <p className="text-sm text-slate-400">Submit a feature, bug, or improvement for review</p>
         </div>
       </div>
 
@@ -218,8 +242,13 @@ export default function SubmitRequestPage() {
         <div className="lg:col-span-2 space-y-5">
 
           {/* Step 1: Description */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-            <label className="block text-sm font-semibold text-gray-800">
+          <div className="rounded-xl p-5 space-y-3 border"
+            style={{
+              background: 'linear-gradient(180deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.8) 100%)',
+              borderColor: 'rgba(255,255,255,0.08)',
+            }}
+          >
+            <label className="block text-sm font-semibold text-slate-200">
               What do you want built?
             </label>
             <textarea
@@ -227,12 +256,19 @@ export default function SubmitRequestPage() {
               onChange={e => setDescription(e.target.value)}
               placeholder="Describe the feature, bug fix, or improvement..."
               rows={5}
-              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:border-blue-400 transition-colors"
+              className="w-full px-3 py-2.5 text-sm rounded-lg resize-none focus:outline-none transition-colors placeholder:text-slate-600 text-slate-200"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
             />
             <button
               onClick={generateSpec}
               disabled={!description.trim() || generatingSpec}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 shadow-lg hover:shadow-indigo-500/20"
+              style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
             >
               {generatingSpec ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -242,7 +278,7 @@ export default function SubmitRequestPage() {
               {generatingSpec ? 'Generating Spec…' : 'Generate Spec'}
             </button>
             {specError && (
-              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20">
                 <AlertCircle size={14} />
                 {specError}
               </div>
@@ -251,19 +287,25 @@ export default function SubmitRequestPage() {
 
           {/* Step 2: Spec Preview */}
           {spec && (
-            <div className="bg-white border border-indigo-200 rounded-xl p-5 space-y-4 shadow-sm">
+            <div className="rounded-xl p-5 space-y-4 border"
+              style={{
+                background: 'linear-gradient(180deg, rgba(99,102,241,0.08) 0%, rgba(15,23,42,0.9) 100%)',
+                borderColor: 'rgba(99,102,241,0.25)',
+                boxShadow: '0 0 20px rgba(99,102,241,0.08)',
+              }}
+            >
               {/* Header label + Regenerate */}
-              <div className="flex items-center justify-between gap-3 pb-3 border-b border-gray-100">
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-white/8">
                 <div className="flex items-center gap-2">
-                  <Sparkles size={14} className="text-indigo-500 shrink-0" />
-                  <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
+                  <Sparkles size={14} className="text-indigo-400 shrink-0" />
+                  <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">
                     Generated Spec — review before submitting
                   </span>
                 </div>
                 <button
                   onClick={generateSpec}
                   disabled={generatingSpec || !description.trim()}
-                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-indigo-400 border border-indigo-500/30 rounded-lg hover:bg-indigo-500/10 transition-colors disabled:opacity-40"
                 >
                   {generatingSpec ? (
                     <Loader2 size={11} className="animate-spin" />
@@ -276,22 +318,22 @@ export default function SubmitRequestPage() {
 
               {/* Title + complexity badge */}
               <div className="flex items-start justify-between gap-3">
-                <h3 className="text-lg font-bold text-gray-900 leading-snug">{spec.title}</h3>
+                <h3 className="text-lg font-bold text-white leading-snug">{spec.title}</h3>
                 <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border shrink-0 ${COMPLEXITY_COLOR[spec.complexity]}`}>
                   {spec.complexity}
                 </span>
               </div>
 
               {/* Description */}
-              <p className="text-sm text-gray-600 leading-relaxed">{spec.description}</p>
+              <p className="text-sm text-slate-400 leading-relaxed">{spec.description}</p>
 
               {/* Acceptance Criteria */}
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Acceptance Criteria</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Acceptance Criteria</p>
                 <ul className="space-y-1.5">
                   {spec.acceptance_criteria.map((criterion, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                      <CheckCircle2 size={14} className="text-green-500 mt-0.5 shrink-0" />
+                    <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
+                      <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 shrink-0" />
                       {criterion}
                     </li>
                   ))}
@@ -301,10 +343,10 @@ export default function SubmitRequestPage() {
               {/* Edge Cases */}
               {spec.edge_cases.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Edge Cases</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Edge Cases</p>
                   <ul className="space-y-1.5">
                     {spec.edge_cases.map((ec, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-400">
                         <AlertCircle size={14} className="text-amber-400 mt-0.5 shrink-0" />
                         {ec}
                       </li>
@@ -316,18 +358,23 @@ export default function SubmitRequestPage() {
           )}
 
           {/* Step 3: Metadata */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-gray-800">Ticket Details</h3>
+          <div className="rounded-xl p-5 space-y-4 border"
+            style={{
+              background: 'linear-gradient(180deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.8) 100%)',
+              borderColor: 'rgba(255,255,255,0.08)',
+            }}
+          >
+            <h3 className="text-sm font-semibold text-slate-200">Ticket Details</h3>
 
             {/* Type */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Type</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Type</label>
               <div className="flex gap-3">
                 {(['web', 'ios'] as const).map(t => (
                   <label key={t} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
                     ticketType === t
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      ? 'border-indigo-500/50 bg-indigo-500/15 text-indigo-300'
+                      : 'border-white/8 text-slate-500 hover:border-white/15 hover:text-slate-300'
                   }`}>
                     <input
                       type="radio"
@@ -345,13 +392,13 @@ export default function SubmitRequestPage() {
 
             {/* Priority */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Priority</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Priority</label>
               <div className="flex gap-3">
                 {(['high', 'medium', 'low'] as const).map(p => (
                   <label key={p} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
                     priority === p
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      ? 'border-indigo-500/50 bg-indigo-500/15 text-indigo-300'
+                      : 'border-white/8 text-slate-500 hover:border-white/15 hover:text-slate-300'
                   }`}>
                     <input
                       type="radio"
@@ -369,15 +416,19 @@ export default function SubmitRequestPage() {
 
             {/* Project */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Project</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Project</label>
               <select
                 value={projectId}
                 onChange={e => setProjectId(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-blue-400 transition-colors"
+                className="w-full px-3 py-2 text-sm rounded-lg focus:outline-none transition-colors text-slate-200"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
               >
-                <option value="">No project</option>
+                <option value="" className="bg-slate-900">No project</option>
                 {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>
                 ))}
               </select>
             </div>
@@ -385,7 +436,7 @@ export default function SubmitRequestPage() {
 
           {/* Submit */}
           {submitError && (
-            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg border border-red-200">
+            <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 px-4 py-3 rounded-lg border border-red-500/20">
               <AlertCircle size={14} />
               {submitError}
             </div>
@@ -394,7 +445,8 @@ export default function SubmitRequestPage() {
           <button
             onClick={handleSubmit}
             disabled={!spec || submitting}
-            className="w-full py-3 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3 text-sm font-bold rounded-xl transition-all hover:scale-[1.01] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 shadow-lg hover:shadow-indigo-500/20"
+            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
           >
             {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
             {submitting ? 'Submitting…' : 'Submit Ticket'}
@@ -403,42 +455,53 @@ export default function SubmitRequestPage() {
 
         {/* Right column: Queue preview */}
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Current Queue</h3>
-            <p className="text-xs text-gray-400 mb-3">
+          <div className="rounded-xl p-4 border"
+            style={{
+              background: 'linear-gradient(180deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.8) 100%)',
+              borderColor: 'rgba(255,255,255,0.08)',
+            }}
+          >
+            <h3 className="text-sm font-semibold text-slate-200 mb-3">Current Queue</h3>
+            <p className="text-xs text-slate-500 mb-3">
               {ticketType === 'ios' ? 'iOS' : 'Web'} · {priority} priority
             </p>
 
             {filteredQueue.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">No active tickets — yours goes first!</p>
+              <p className="text-xs text-slate-600 italic">No active tickets — yours goes first!</p>
             ) : (
               <div className="space-y-2">
                 {/* Show where new ticket would land */}
-                <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border"
+                  style={{ background: 'rgba(99,102,241,0.1)', borderColor: 'rgba(99,102,241,0.25)' }}>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${PRIORITY_LABEL_COLOR[priority]}`}>
                     {priority}
                   </span>
-                  <span className="text-xs text-blue-700 font-medium truncate">
+                  <span className="text-xs text-indigo-300 font-medium truncate">
                     {spec?.title || 'Your new ticket'}
                   </span>
-                  <span className="ml-auto text-[10px] text-blue-500 shrink-0">← new</span>
+                  <span className="ml-auto text-[10px] text-indigo-500 shrink-0">← new</span>
                 </div>
 
                 {filteredQueue.map(t => (
-                  <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${PRIORITY_LABEL_COLOR[t.priority] || 'text-gray-400 bg-gray-50'}`}>
+                  <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${PRIORITY_LABEL_COLOR[t.priority] || 'text-slate-500 bg-white/5'}`}>
                       {t.priority}
                     </span>
-                    <span className="text-xs text-gray-600 truncate">#{t.number} {t.title}</span>
+                    <span className="text-xs text-slate-500 truncate">#{t.number} {t.title}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs text-gray-500 leading-relaxed">
-            <p className="font-semibold text-gray-600 mb-1">What happens next?</p>
-            <p>Your ticket goes into the backlog. Web tickets also create a Linear issue for the engineering team. Devin will pick it up in the next sprint.</p>
+          <div className="rounded-xl p-4 border"
+            style={{
+              background: 'linear-gradient(180deg, rgba(99,102,241,0.06) 0%, rgba(15,23,42,0.8) 100%)',
+              borderColor: 'rgba(99,102,241,0.15)',
+            }}
+          >
+            <p className="text-xs font-semibold text-slate-300 mb-1.5">What happens next?</p>
+            <p className="text-xs text-slate-500 leading-relaxed">Your ticket goes into the backlog and gets assigned for review. Web tickets also create a Linear issue. Once Devin builds it, Owen, Adam, or Ford will be assigned to test before it goes to production.</p>
           </div>
         </div>
       </div>
