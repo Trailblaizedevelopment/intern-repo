@@ -716,6 +716,65 @@ function ConvListPanel({
   );
 }
 
+// ── QuickActionModal ─────────────────────────────────────────────────────────
+interface QuickActionModalProps {
+  action: 'wrong_number' | 'opt_out';
+  contactName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}
+
+function QuickActionModal({ action, contactName, onConfirm, onCancel, loading }: QuickActionModalProps) {
+  const isWrong = action === 'wrong_number';
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, padding: 16,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 14, padding: 24,
+        maxWidth: 380, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+      }}>
+        <div style={{ fontWeight: 700, fontSize: '0.975rem', color: '#111827', marginBottom: 8 }}>
+          {isWrong ? '📵 Mark Wrong Number' : '🚫 Mark Opt Out'}
+        </div>
+        <div style={{ fontSize: '0.8375rem', color: '#6b7280', marginBottom: 20 }}>
+          {isWrong
+            ? `Mark ${contactName} as a wrong number? This will update their outreach status and close the conversation.`
+            : `Mark ${contactName} as opted out? They will not receive future messages.`}
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            style={{
+              padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb',
+              background: '#fff', color: '#374151', fontSize: '0.875rem',
+              fontWeight: 500, cursor: loading ? 'default' : 'pointer',
+            }}
+          >Cancel</button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            style={{
+              padding: '8px 18px', borderRadius: 8, border: 'none',
+              background: loading ? '#d1d5db' : (isWrong ? '#dc2626' : '#6b7280'),
+              color: '#fff', fontSize: '0.875rem', fontWeight: 600,
+              cursor: loading ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+            {isWrong ? 'Mark Wrong #' : 'Mark Opt Out'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ThreadPanel — STATE 3
 // ── PitchConfirmModal ────────────────────────────────────────────────────────
 interface PitchConfirmModalProps {
@@ -826,6 +885,8 @@ interface ThreadPanelProps {
   onMarkHandled: () => void;
   onFlag: () => void;
   onSendPitch?: () => void;
+  onWrongNumber?: () => void;
+  onOptOut?: () => void;
   onReplySent: () => void;
   onReplyError: (msg: string) => void;
   messagesEndRef: React.RefObject<HTMLDivElement>;
@@ -833,7 +894,8 @@ interface ThreadPanelProps {
 
 function ThreadPanel({
   conv, messages, loadingMsgs, handling, flagging, isMobile, joinLink,
-  onBack, onMarkHandled, onFlag, onSendPitch, onReplySent, onReplyError, messagesEndRef,
+  onBack, onMarkHandled, onFlag, onSendPitch, onWrongNumber, onOptOut,
+  onReplySent, onReplyError, messagesEndRef,
 }: ThreadPanelProps) {
   const line = lineFor(conv.line_phone);
   const outreachMeta = conv.outreach_status ? OUTREACH_META[conv.outreach_status] : null;
@@ -929,6 +991,32 @@ function ThreadPanel({
               {stage}
             </button>
           )}
+          {onWrongNumber && (
+            <button
+              onClick={onWrongNumber}
+              title="Mark as wrong number"
+              style={{
+                padding: '5px 11px', borderRadius: 7, border: '1px solid #fca5a5',
+                background: '#fff', color: '#dc2626',
+                cursor: 'pointer', fontSize: '0.73rem', fontWeight: 500,
+              }}
+            >
+              Wrong #
+            </button>
+          )}
+          {onOptOut && (
+            <button
+              onClick={onOptOut}
+              title="Mark as opted out"
+              style={{
+                padding: '5px 11px', borderRadius: 7, border: '1px solid #e5e7eb',
+                background: '#fff', color: '#6b7280',
+                cursor: 'pointer', fontSize: '0.73rem', fontWeight: 500,
+              }}
+            >
+              Opt Out
+            </button>
+          )}
           <button
             onClick={onFlag}
             disabled={flagging}
@@ -1021,9 +1109,11 @@ interface CategorySidebarProps {
   selectedCategory: ConvCategory;
   counts: Record<ConvCategory, number>;
   onSelect: (cat: ConvCategory) => void;
+  onSync?: () => void;
+  syncing?: boolean;
 }
 
-function CategorySidebar({ chapterName, selectedCategory, counts, onSelect }: CategorySidebarProps) {
+function CategorySidebar({ chapterName, selectedCategory, counts, onSelect, onSync, syncing }: CategorySidebarProps) {
   return (
     <div style={{
       width: 200, flexShrink: 0, background: '#1B2A4A',
@@ -1032,12 +1122,30 @@ function CategorySidebar({ chapterName, selectedCategory, counts, onSelect }: Ca
     }}>
       {/* Chapter header */}
       <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <div style={{
-          fontFamily: "'Instrument Serif', serif",
-          fontWeight: 700, fontSize: '0.9rem', color: '#fff',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {chapterName ?? 'Chapter'}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+          <div style={{
+            fontFamily: "'Instrument Serif', serif",
+            fontWeight: 700, fontSize: '0.9rem', color: '#fff',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+          }}>
+            {chapterName ?? 'Chapter'}
+          </div>
+          {onSync && (
+            <button
+              onClick={onSync}
+              disabled={syncing}
+              title="Sync conversations"
+              style={{
+                background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 6, padding: '3px 6px', cursor: syncing ? 'default' : 'pointer',
+                color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', flexShrink: 0,
+              }}
+            >
+              {syncing
+                ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                : <RefreshCw size={11} />}
+            </button>
+          )}
         </div>
         <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
           {counts.all} total conversation{counts.all !== 1 ? 's' : ''}
@@ -1165,6 +1273,13 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   const [pitchSending, setPitchSending] = useState(false);
   const [pitchError, setPitchError] = useState<string | null>(null);
   const [chapterJoinLink, setChapterJoinLink] = useState<string | null>(null);
+
+  // Quick action (wrong number / opt out) state
+  const [quickActionModal, setQuickActionModal] = useState<{
+    action: 'wrong_number' | 'opt_out';
+    contactName: string;
+  } | null>(null);
+  const [quickActionLoading, setQuickActionLoading] = useState(false);
 
   // UI
   const [isMobile, setIsMobile] = useState(false);
@@ -1437,6 +1552,55 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     }
   }
 
+  // Quick action handler: wrong number or opt out
+  function handleQuickAction(action: 'wrong_number' | 'opt_out') {
+    if (!selectedConv) return;
+    setQuickActionModal({
+      action,
+      contactName: selectedConv.contact_name ?? 'this contact',
+    });
+  }
+
+  async function handleQuickActionConfirm() {
+    if (!quickActionModal || !selectedConv) return;
+    setQuickActionLoading(true);
+    try {
+      const newStatus = quickActionModal.action === 'wrong_number' ? 'wrong_number' : 'opted_out';
+      // Update alumni_contacts outreach_status if we have a contact_id
+      if (selectedConv.contact_id) {
+        await fetch('/api/alumni', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: AUTH },
+          body: JSON.stringify({
+            ids: [selectedConv.contact_id],
+            updates: { outreach_status: newStatus },
+          }),
+        });
+      }
+      // Mark conversation as handled
+      await fetch(`${API}/${selectedConv.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: AUTH },
+        body: JSON.stringify({ status: 'handled' }),
+      });
+      const label = quickActionModal.action === 'wrong_number' ? 'Marked wrong number' : 'Marked opt out';
+      showToast(label, 'success');
+      setQuickActionModal(null);
+      setSelectedConv(null);
+      if (initialChapterId) {
+        fetchCategoryCounts(initialChapterId);
+        if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page, selectedCategory, categorySearch);
+      } else {
+        loadChapterSummaries();
+        if (selectedChapter !== null) loadConvs(selectedChapter.id, tab, page);
+      }
+    } catch (err) {
+      showToast(String(err), 'error');
+    } finally {
+      setQuickActionLoading(false);
+    }
+  }
+
   function handleTabChange(t: Tab) {
     setTab(t);
     setSelectedConv(null);
@@ -1703,6 +1867,8 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
         onMarkHandled={handleMarkHandled}
         onFlag={handleFlag}
         onSendPitch={handleSendPitch}
+        onWrongNumber={() => handleQuickAction('wrong_number')}
+        onOptOut={() => handleQuickAction('opt_out')}
         onReplySent={handleReplySent}
         onReplyError={msg => setError(msg)}
         messagesEndRef={messagesEndRef as React.RefObject<HTMLDivElement>}
@@ -1715,6 +1881,15 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
         return (
           <div style={containerStyle}>
             {errorBanner}
+            {quickActionModal && (
+              <QuickActionModal
+                action={quickActionModal.action}
+                contactName={quickActionModal.contactName}
+                onConfirm={handleQuickActionConfirm}
+                onCancel={() => setQuickActionModal(null)}
+                loading={quickActionLoading}
+              />
+            )}
             {threadPanelEmbedded}
           </div>
         );
@@ -1728,6 +1903,8 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
               selectedCategory={selectedCategory}
               counts={categoryCounts}
               onSelect={handleCategoryChange}
+              onSync={handleSync}
+              syncing={syncing}
             />
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {convListContent}
@@ -1741,6 +1918,15 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     return (
       <div style={containerStyle}>
         {errorBanner}
+        {quickActionModal && (
+          <QuickActionModal
+            action={quickActionModal.action}
+            contactName={quickActionModal.contactName}
+            onConfirm={handleQuickActionConfirm}
+            onCancel={() => setQuickActionModal(null)}
+            loading={quickActionLoading}
+          />
+        )}
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
           {/* Category sidebar */}
           <CategorySidebar
@@ -1748,6 +1934,8 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
             selectedCategory={selectedCategory}
             counts={categoryCounts}
             onSelect={handleCategoryChange}
+            onSync={handleSync}
+            syncing={syncing}
           />
 
           {/* Conv list — fixed width */}
@@ -1810,6 +1998,8 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       onMarkHandled={handleMarkHandled}
       onFlag={handleFlag}
       onSendPitch={handleSendPitch}
+      onWrongNumber={() => handleQuickAction('wrong_number')}
+      onOptOut={() => handleQuickAction('opt_out')}
       onReplySent={handleReplySent}
       onReplyError={msg => setError(msg)}
       messagesEndRef={messagesEndRef as React.RefObject<HTMLDivElement>}
@@ -1822,6 +2012,15 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       return (
         <div style={containerStyle}>
           {errorBanner}
+          {quickActionModal && (
+            <QuickActionModal
+              action={quickActionModal.action}
+              contactName={quickActionModal.contactName}
+              onConfirm={handleQuickActionConfirm}
+              onCancel={() => setQuickActionModal(null)}
+              loading={quickActionLoading}
+            />
+          )}
           {threadPanel}
         </div>
       );
@@ -1846,6 +2045,15 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   return (
     <div style={containerStyle}>
       {errorBanner}
+      {quickActionModal && (
+        <QuickActionModal
+          action={quickActionModal.action}
+          contactName={quickActionModal.contactName}
+          onConfirm={handleQuickActionConfirm}
+          onCancel={() => setQuickActionModal(null)}
+          loading={quickActionLoading}
+        />
+      )}
       {pitchModal && (
         <PitchConfirmModal
           {...pitchModal}
