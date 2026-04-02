@@ -34520,3 +34520,141 @@ body { background: #ffffff !important; }
 .ws-main::-webkit-scrollbar-track { background: transparent; }
 .ws-main::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
 .ws-main::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+
+/* ── Error Boundary (inline section fallback) ────────────────────── */
+.error-boundary-fallback {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  margin: 8px 0;
+}
+.error-boundary-icon {
+  color: #ef4444;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.error-boundary-body {
+  flex: 1;
+  min-width: 0;
+}
+.error-boundary-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #991b1b;
+  margin: 0 0 4px 0;
+}
+.error-boundary-message {
+  font-size: 13px;
+  color: #b91c1c;
+  margin: 0;
+  word-break: break-word;
+}
+.error-boundary-retry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.error-boundary-retry:hover {
+  background: #fee2e2;
+}
+
+/* ── Error Page (full-page route-level error) ────────────────────── */
+.error-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 40px 20px;
+}
+.error-page-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 40px;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.error-page-icon-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.error-page-icon {
+  color: #ef4444;
+}
+.error-page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+.error-page-message {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+}
+.error-page-digest {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0 0 24px 0;
+  font-family: monospace;
+}
+.error-page-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.error-page-btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: #111827;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.error-page-btn-primary:hover {
+  background: #1f2937;
+}
+.error-page-btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: #f9fafb;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.error-page-btn-secondary:hover {
+  background: #f3f4f6;
+}
