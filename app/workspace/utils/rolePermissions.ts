@@ -149,7 +149,6 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         ...baseItems,
         { name: 'Customer Success', href: '/nucleus/customer-success', icon: 'HeartHandshake' },
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
-        { name: 'Roadmap', href: '/dashboard/roadmap', icon: 'Map' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
@@ -158,7 +157,6 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       return [
         ...baseItems,
         { name: 'Tickets', href: '/workspace/tickets', icon: 'Ticket', emphasized: true },
-        { name: 'Roadmap', href: '/dashboard/roadmap', icon: 'Map' },
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },

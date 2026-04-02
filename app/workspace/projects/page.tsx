@@ -352,6 +352,7 @@ function ProjectTimeline({
   onProjectClick: (id: string) => void;
 }) {
   const now = new Date();
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
 
   // Determine timeline range from project dates
   const allDates: Date[] = [];
@@ -495,6 +496,8 @@ function ProjectTimeline({
                   {/* Project bar with progress fill and hover tooltip */}
                   <div
                     className="sn__timeline-bar"
+                    onMouseEnter={() => setHoveredProjectId(project.id)}
+                    onMouseLeave={() => setHoveredProjectId(null)}
                     style={{
                       position: 'absolute',
                       left,
@@ -504,6 +507,7 @@ function ProjectTimeline({
                       borderRadius: 4,
                       height: '100%',
                       overflow: 'visible',
+                      cursor: 'pointer',
                     }}
                   >
                     {/* Progress fill (lighter inner bar) */}
@@ -517,7 +521,7 @@ function ProjectTimeline({
                     )}
                     {/* Hover tooltip */}
                     <div style={{
-                      display: 'none',
+                      display: hoveredProjectId === project.id ? 'block' : 'none',
                       position: 'absolute',
                       bottom: 'calc(100% + 8px)',
                       left: '50%',
@@ -582,9 +586,7 @@ function ProjectTimeline({
           })
         )}
       </div>
-      <style>{`
-        .sn__timeline-bar:hover .sn__bar-tooltip { display: block !important; }
-      `}</style>
+
     </div>
   );
 }
