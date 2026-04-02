@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import GlobalSearch from '@/components/GlobalSearch';
 import { useAuth } from '@/lib/auth-context';
 import { useUserRole } from '../hooks/useUserRole';
 import { getNavigationItems } from '../utils/rolePermissions';
@@ -21,6 +22,7 @@ import {
   MessageSquare,
   LucideIcon,
   TrendingUp,
+  Search,
   HeartHandshake,
   Wallet,
   Building2,
@@ -58,6 +60,19 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const { role, roleLabel, canAccessNucleus } = useUserRole();
   const [collapsed, setCollapsed] = useState(false);
   const [openTicketCount, setOpenTicketCount] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Cmd+K / Ctrl+K global shortcut
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      setSearchOpen(open => !open);
+    }
+  }, []);
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   const navItems = getNavigationItems(role, unreadCount);
 
@@ -166,6 +181,22 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
           )}
           {inNucleus && canAccessNucleus && !collapsed && (
             <div className="ws-nav-nucleus-modules">
+              {/* Global search trigger */}
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="ws-nav-item ws-nav-sub"
+                style={{
+                  width: '100%', textAlign: 'left', background: 'none', border: 'none',
+                  cursor: 'pointer', color: '#6b7280',
+                }}
+              >
+                <Search size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+                <span style={{ flex: 1, color: '#9ca3af', fontSize: '0.8125rem' }}>Search…</span>
+                <kbd style={{
+                  fontSize: '0.6rem', background: '#f3f4f6', border: '1px solid #e5e7eb',
+                  borderRadius: 4, padding: '1px 4px', fontFamily: 'monospace', color: '#9ca3af',
+                }}>⌘K</kbd>
+              </button>
               {nucleusModules.map((m) => (
                 <Link
                   key={m.href}
@@ -204,6 +235,8 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
 
 
         </nav>
+
+        <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
 
         <div className="ws-sidebar-divider" />
 
