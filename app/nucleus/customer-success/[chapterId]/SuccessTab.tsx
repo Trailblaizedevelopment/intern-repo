@@ -126,6 +126,8 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
   // ─── Match log ───
   const [matches, setMatches] = useState<LoggedMatch[]>([]);
+  const [loadingMatches, setLoadingMatches] = useState(true);
+  const [savingMatch, setSavingMatch] = useState(false);
   const [matchForm, setMatchForm] = useState({ active_member: '', alumni_name: '', date: new Date().toISOString().split('T')[0], notes: '' });
 
   // ─── Instagram Flyer Tracker ───
@@ -189,11 +191,22 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
     }
   }, [chapter.id]);
 
+  const fetchMatches = useCallback(async () => {
+    setLoadingMatches(true);
+    try {
+      const res = await fetch(`/api/chapters/${chapter.id}/matches`);
+      const json = await res.json();
+      if (!json.error && json.data) setMatches(json.data);
+    } catch { /* silent */ }
+    finally { setLoadingMatches(false); }
+  }, [chapter.id]);
+
   useEffect(() => {
     fetchCheckIns();
     fetchMembers();
     fetchTasks();
-  }, [fetchCheckIns, fetchMembers, fetchTasks]);
+    fetchMatches();
+  }, [fetchCheckIns, fetchMembers, fetchTasks, fetchMatches]);
 
   useEffect(() => {
     setExecNotes(chapter.exec_notes || '');
@@ -338,11 +351,41 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
     finally { setSavingNotes(null); }
   }
 
-  function addMatch() {
+  async function addMatch() {
     if (!matchForm.active_member.trim() || !matchForm.alumni_name.trim()) return showToast('Both names required', 'error');
-    setMatches(p => [...p, { id: Date.now().toString(), ...matchForm }]);
+    // Optimistic update
+    const tempId = Date.now().toString();
+    const optimistic = { id: tempId, ...matchForm };
+    setMatches(p => [optimistic, ...p]);
     setMatchForm({ active_member: '', alumni_name: '', date: new Date().toISOString().split('T')[0], notes: '' });
-    showToast('Match logged', 'success');
+    setSavingMatch(true);
+    try {
+      const res = await fetch(`/api/chapters/${chapter.id}/matches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          active_member: matchForm.active_member.trim(),
+          alumni_name: matchForm.alumni_name.trim(),
+          date: matchForm.date,
+          notes: matchForm.notes || null,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        // Roll back optimistic update
+        setMatches(p => p.filter(m => m.id !== tempId));
+        showToast(json.error, 'error');
+        return;
+      }
+      // Replace temp entry with real DB record (correct ID)
+      setMatches(p => p.map(m => m.id === tempId ? json.data : m));
+      showToast('Match logged', 'success');
+    } catch {
+      setMatches(p => p.filter(m => m.id !== tempId));
+      showToast('Failed to save match', 'error');
+    } finally {
+      setSavingMatch(false);
+    }
   }
 
   async function addTask() {
@@ -721,7 +764,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
               <div className="module-form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.75rem' }}>Date</label><input type="date" value={matchForm.date} onChange={e => setMatchForm(p => ({ ...p, date: e.target.value }))} style={{ fontSize: '0.8rem', padding: '5px 8px' }} /></div>
             </div>
             <div className="module-form-group" style={{ margin: '0 0 10px' }}><label style={{ fontSize: '0.75rem' }}>Outcome Notes</label><input value={matchForm.notes} onChange={e => setMatchForm(p => ({ ...p, notes: e.target.value }))} placeholder="How did the intro go?" style={{ fontSize: '0.8rem', padding: '5px 8px' }} /></div>
-            <button onClick={addMatch} style={{ padding: '5px 14px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}>Log Match</button>
+            <button onClick={addMatch} disabled={savingMatch} style={{ padding: '5px 14px', borderRadius: 2, background: savingMatch ? '#9ca3af' : '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: savingMatch ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}>{savingMatch ? 'Saving…' : 'Log Match'}</button>
 
             {matches.length > 0 && (
               <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
