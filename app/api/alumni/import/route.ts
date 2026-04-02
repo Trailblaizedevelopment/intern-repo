@@ -156,9 +156,11 @@ export async function POST(request: NextRequest) {
     type InsertRow = { chapter_id: string; first_name: string; last_name: string; phone_primary: string | null; phone_secondary: string | null; email: string | null; year: number | null };
     const toInsert: InsertRow[] = [];
     const errors: { row: number; message: string }[] = [];
+    const warnings: { row: number; message: string }[] = [];
     let skipped = 0;
     let duplicates = 0;
     let dualPhoneCount = 0;
+    let missingYearCount = 0;
     const seenPhones = new Set<string>();
 
     for (let r = 1; r < rows.length; r++) {
@@ -228,7 +230,25 @@ export async function POST(request: NextRequest) {
       const email = rawEmail || null;
       // Handle "Fall 1995", "Spring 2003", date formats — extract 4-digit year
       const yearMatch = rawYear.match(/\b(19[7-9]\d|20[0-2]\d)\b/);
-      const year = yearMatch ? parseInt(yearMatch[1]) : (rawYear ? parseInt(rawYear) : null);
+      let year: number | null = yearMatch ? parseInt(yearMatch[1]) : (rawYear ? parseInt(rawYear) : null);
+
+      // Reject pre-1970 grads (too old to be reachable via iMessage outreach)
+      if (year !== null && year < 1970) {
+        errors.push({ row: r + 1, message: `Grad year ${year} is before 1970 — skipped (${firstName} ${lastName})` });
+        skipped++;
+        continue;
+      }
+
+      // Sanitize out-of-range years that slipped through
+      if (year !== null && (year <= 1900 || year >= 2100)) {
+        year = null;
+      }
+
+      // Warn on missing year (not a hard failure)
+      if (!rawYear || year === null) {
+        missingYearCount++;
+        warnings.push({ row: r + 1, message: `Missing graduation year for ${firstName} ${lastName}` });
+      }
 
       if (phonePrimary && existingPhones.has(phonePrimary)) { duplicates++; continue; }
       if (phonePrimary && seenPhones.has(phonePrimary)) { duplicates++; continue; }
@@ -241,7 +261,7 @@ export async function POST(request: NextRequest) {
         phone_primary: phonePrimary,
         phone_secondary: phoneSecondary,
         email,
-        year: (year && year > 1900 && year < 2100) ? year : null,
+        year,
       });
     }
 
@@ -310,7 +330,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: { imported, skipped, duplicates, dual_phone_count: dualPhoneCount, queue_assigned: queueAssigned, errors },
+      data: { imported, skipped, duplicates, dual_phone_count: dualPhoneCount, queue_assigned: queueAssigned, missing_year_count: missingYearCount, errors, warnings },
       error: null,
     });
   } catch (err) {

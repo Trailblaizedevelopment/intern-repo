@@ -47,7 +47,7 @@ interface ChapterStats {
   enriched: number;
   contacted: number;
 }
-interface ImportResult { imported: number; skipped: number; duplicates: number; dual_phone_count: number; queue_assigned: number; errors: { row: number; message: string }[]; }
+interface ImportResult { imported: number; skipped: number; duplicates: number; dual_phone_count: number; queue_assigned: number; missing_year_count?: number; errors: { row: number; message: string }[]; warnings?: { row: number; message: string }[]; }
 
 interface PlatformMember {
   id: string;
@@ -1158,11 +1158,22 @@ export default function AlumniPage() {
                     <div style={{ textAlign: 'center', padding: '12px', background: '#fee2e2', borderRadius: '8px' }}><div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#dc2626' }}>{importResult.skipped}</div><div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Skipped</div></div>
                     <div style={{ textAlign: 'center', padding: '12px', background: '#ede9fe', borderRadius: '8px' }}><div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#8b5cf6' }}>{importResult.dual_phone_count}</div><div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Dual Phone</div></div>
                   </div>
+                  {importResult.missing_year_count != null && importResult.missing_year_count > 0 && (
+                    <div style={{ padding: '10px 12px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '0.8125rem', marginBottom: '12px', color: '#92400e' }}>
+                      ⚠️ {importResult.missing_year_count} contact{importResult.missing_year_count !== 1 ? 's' : ''} imported without a graduation year — they&apos;ll still receive outreach but won&apos;t be filtered by class year.
+                    </div>
+                  )}
                   {importResult.errors.length > 0 && (
-                    <div style={{ maxHeight: '200px', overflowY: 'auto', padding: '12px', background: '#fef2f2', borderRadius: '8px', fontSize: '0.8125rem' }}>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto', padding: '12px', background: '#fef2f2', borderRadius: '8px', fontSize: '0.8125rem', marginBottom: '12px' }}>
                       <strong style={{ display: 'block', marginBottom: '8px' }}>Errors:</strong>
                       {importResult.errors.slice(0, 20).map((err, i) => <div key={i} style={{ color: '#991b1b', marginBottom: '4px' }}>{err.row > 0 ? `Row ${err.row}: ` : ''}{err.message}</div>)}
                       {importResult.errors.length > 20 && <div style={{ color: '#6b7280', marginTop: '8px' }}>...and {importResult.errors.length - 20} more</div>}
+                    </div>
+                  )}
+                  {importResult.warnings && importResult.warnings.length > 0 && importResult.warnings.length <= 10 && (
+                    <div style={{ maxHeight: '150px', overflowY: 'auto', padding: '10px 12px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '8px', fontSize: '0.8125rem' }}>
+                      <strong style={{ display: 'block', marginBottom: '6px', color: '#92400e' }}>Warnings:</strong>
+                      {importResult.warnings.map((w, i) => <div key={i} style={{ color: '#a16207', marginBottom: '3px' }}>{w.row > 0 ? `Row ${w.row}: ` : ''}{w.message}</div>)}
                     </div>
                   )}
                 </div>
