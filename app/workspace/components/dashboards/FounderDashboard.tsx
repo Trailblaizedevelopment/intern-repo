@@ -15,6 +15,7 @@ import {
   CheckSquare,
   Ticket,
   AlertTriangle,
+  FlaskConical,
 } from 'lucide-react';
 import { TaskSection } from '../TaskSection';
 import { LeadSection } from '../LeadSection';
@@ -64,6 +65,9 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
     id: string;
     status: string;
     priority: string;
+    title?: string;
+    number?: number;
+    assignee_id?: string | null;
   }
   const [ticketSummary, setTicketSummary] = useState<TicketSummaryItem[]>([]);
   const [ticketSummaryLoading, setTicketSummaryLoading] = useState(true);
@@ -83,6 +87,48 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
   useEffect(() => {
     fetchTicketSummary();
   }, [fetchTicketSummary]);
+
+  // Pending Review queue state
+  const [dismissedReviewIds, setDismissedReviewIds] = useState<Set<string>>(new Set());
+  const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
+
+  const reviewTickets = useMemo(() => {
+    return ticketSummary.filter(
+      t => (t.status === 'in_review' || t.status === 'testing') && !dismissedReviewIds.has(t.id)
+    );
+  }, [ticketSummary, dismissedReviewIds]);
+
+  const handleMarkTested = useCallback(async (ticket: TicketSummaryItem) => {
+    // Optimistic remove
+    setDismissedReviewIds(prev => new Set([...prev, ticket.id]));
+    setReviewErrors(prev => { const next = { ...prev }; delete next[ticket.id]; return next; });
+
+    // in_review → testing (advance to QA); testing → done (founder is reviewer)
+    const isInReview = ticket.status === 'in_review';
+    const payload = isInReview
+      ? { status: 'testing', actor_id: currentEmployee?.id }
+      : { status: 'done', reviewer_id: currentEmployee?.id, actor_id: currentEmployee?.id };
+
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (result.error) {
+        // Rollback optimistic update and show error
+        setDismissedReviewIds(prev => { const next = new Set(prev); next.delete(ticket.id); return next; });
+        setReviewErrors(prev => ({ ...prev, [ticket.id]: result.error.message }));
+      } else {
+        // Refresh ticket summary to get accurate stats
+        fetchTicketSummary();
+      }
+    } catch {
+      setDismissedReviewIds(prev => { const next = new Set(prev); next.delete(ticket.id); return next; });
+      setReviewErrors(prev => ({ ...prev, [ticket.id]: 'Network error — try again' }));
+    }
+  }, [currentEmployee?.id, fetchTicketSummary]);
 
   const ticketStats = useMemo(() => {
     const open = ticketSummary.filter(t => t.status !== 'done');
@@ -172,6 +218,66 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
         minutesUntilNext={meetingContext.minutesUntilNext}
         stats={suggestionStats}
       />
+
+      {/* Pending Review Queue */}
+      <section className="ws-card ws-pending-review-card">
+        <div className="ws-card-header">
+          <h3>
+            <FlaskConical size={16} />
+            Pending Review
+            {reviewTickets.length > 0 && (
+              <span className="ws-pending-review__count">{reviewTickets.length}</span>
+            )}
+          </h3>
+          <span className="ws-pending-review__tagline">
+            {reviewTickets.length > 0 ? 'Ready to test — grab one before someone else does' : ''}
+          </span>
+        </div>
+
+        {ticketSummaryLoading ? (
+          <div className="ws-pending-review__loading">Loading...</div>
+        ) : reviewTickets.length === 0 ? (
+          <div className="ws-pending-review__empty">No tickets pending review — all clear ✅</div>
+        ) : (
+          <ul className="ws-pending-review__list">
+            {reviewTickets.map(ticket => {
+              const isInReview = ticket.status === 'in_review';
+              const priorityLabel =
+                ticket.priority === 'critical' ? 'P0' :
+                ticket.priority === 'high' ? 'P1' :
+                ticket.priority === 'medium' ? 'P2' : 'P3';
+              const priorityClass = `ws-ticket-summary__badge--${
+                ticket.priority === 'critical' ? 'p0' :
+                ticket.priority === 'high' ? 'p1' :
+                ticket.priority === 'medium' ? 'p2' : 'p3'
+              }`;
+              return (
+                <li key={ticket.id} className="ws-pending-review__item">
+                  <div className="ws-pending-review__item-main">
+                    <span className={`ws-ticket-summary__badge ${priorityClass}`}>{priorityLabel}</span>
+                    <span className="ws-pending-review__item-title">
+                      {ticket.number ? `#${ticket.number} ` : ''}{ticket.title || ticket.id}
+                    </span>
+                    <span className="ws-pending-review__item-status">
+                      {isInReview ? '🔍 In Review' : '🧪 Testing'}
+                    </span>
+                  </div>
+                  {reviewErrors[ticket.id] && (
+                    <span className="ws-pending-review__error">{reviewErrors[ticket.id]}</span>
+                  )}
+                  <button
+                    className="ws-pending-review__btn"
+                    onClick={() => handleMarkTested(ticket)}
+                    title={isInReview ? 'Advance to Testing' : 'Mark as Done'}
+                  >
+                    {isInReview ? 'Move to Testing →' : 'Mark Tested ✓'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       {/* Quick Stats Bar */}
       <div className="ws-quick-stats-bar">

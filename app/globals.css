@@ -29437,6 +29437,138 @@ body { background: #FAFAFA; }
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   PENDING REVIEW QUEUE CARD
+   Prefix: .ws-pending-review*
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ws-pending-review-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 12px;
+  padding: 16px 20px;
+  backdrop-filter: blur(8px);
+  margin-bottom: 12px;
+}
+
+.ws-pending-review-card .ws-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ws-pending-review-card .ws-card-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.ws-pending-review__count {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.ws-pending-review__tagline {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.ws-pending-review__loading,
+.ws-pending-review__empty {
+  font-size: 0.82rem;
+  color: #64748b;
+  padding: 10px 0;
+  text-align: center;
+}
+
+.ws-pending-review__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ws-pending-review__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  flex-wrap: wrap;
+}
+
+.ws-pending-review__item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.ws-pending-review__item-title {
+  font-size: 0.83rem;
+  color: #cbd5e1;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ws-pending-review__item-status {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.ws-pending-review__error {
+  width: 100%;
+  font-size: 0.72rem;
+  color: #f87171;
+  margin-top: 2px;
+}
+
+.ws-pending-review__btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  white-space: nowrap;
+}
+
+.ws-pending-review__btn:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
    MOBILE — Ticket Views & Dashboard Widget Responsive Polish
    ═══════════════════════════════════════════════════════════════════════════ */
 
