@@ -37,7 +37,8 @@ export async function GET(_request: NextRequest) {
         onboarding_completed, next_action, notes,
         active_members, estimated_alumni, created_at,
         contact_name, contact_email, contact_phone,
-        mrr, payment_day
+        mrr, payment_day,
+        wizard_step, wizard_completed_at
       `)
       .order('chapter_name', { ascending: true });
 
