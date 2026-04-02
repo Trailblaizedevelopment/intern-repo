@@ -438,16 +438,36 @@ function ProjectTimeline({
   }
 
   return (
-    <div className="sn__timeline">
+    <div style={{
+      background: 'rgba(15, 23, 42, 0.95)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 12,
+      padding: 16,
+      overflow: 'hidden',
+    }}>
       {/* Month header */}
-      <div className="sn__timeline-header">
-        <div className="sn__timeline-label-col" />
-        <div className="sn__timeline-track-area" style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex',
+        background: 'rgba(255,255,255,0.05)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        marginBottom: 4,
+      }}>
+        <div style={{ width: 180, flexShrink: 0 }} />
+        <div style={{ position: 'relative', flex: 1, height: 28, overflow: 'hidden' }}>
           {months.map((m, i) => (
             <div
               key={i}
-              className="sn__timeline-month"
-              style={{ left: `${m.leftPct}%`, width: `${m.widthPct}%` }}
+              style={{
+                position: 'absolute',
+                left: `${m.leftPct}%`,
+                width: `${m.widthPct}%`,
+                color: '#94a3b8',
+                fontSize: 11,
+                padding: '4px 2px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                lineHeight: '20px',
+              }}
             >
               {m.label}
             </div>
@@ -466,9 +486,9 @@ function ProjectTimeline({
       </div>
 
       {/* Project rows */}
-      <div className="sn__timeline-body">
+      <div>
         {projects.length === 0 ? (
-          <p className="sn__empty-text">No projects to display.</p>
+          <p style={{ color: '#9ca3af', padding: '16px 0' }}>No projects to display.</p>
         ) : (
           projects.map(project => {
             const { left, width, color, fillPct, isPlaceholder } = getBarProps(project);
@@ -480,32 +500,36 @@ function ProjectTimeline({
             return (
               <div
                 key={project.id}
-                className="sn__timeline-row"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
                 onClick={() => onProjectClick(project.id)}
               >
-                <div className="sn__timeline-label-col">
-                  <span className="sn__timeline-project-name">{project.name}</span>
-                  <span
-                    className="sn__timeline-project-platform"
-                    style={{ color }}
-                  >
+                <div style={{ width: 180, flexShrink: 0, paddingRight: 12, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <span style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
+                  <span style={{ color, fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginTop: 1 }}>
                     {(project.platform || 'web') === 'ios' ? 'iOS' : 'Web'}
                   </span>
                 </div>
-                <div className="sn__timeline-track-area" style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', flex: 1, height: 28 }}>
                   {/* Project bar with progress fill and hover tooltip */}
                   <div
-                    className="sn__timeline-bar"
                     onMouseEnter={() => setHoveredProjectId(project.id)}
                     onMouseLeave={() => setHoveredProjectId(null)}
                     style={{
                       position: 'absolute',
                       left,
                       width,
+                      top: 0,
+                      bottom: 0,
                       opacity: isPlaceholder ? 0.4 : 1,
                       background: color,
                       borderRadius: 4,
-                      height: '100%',
+                      height: 28,
                       overflow: 'visible',
                       cursor: 'pointer',
                     }}
@@ -526,17 +550,18 @@ function ProjectTimeline({
                       bottom: 'calc(100% + 8px)',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      background: '#1f2937',
+                      background: 'rgba(15,23,42,0.98)',
                       color: '#f9fafb',
+                      border: '1px solid rgba(255,255,255,0.15)',
                       borderRadius: 8,
-                      padding: '8px 12px',
-                      minWidth: 180,
-                      zIndex: 100,
+                      padding: '10px 14px',
+                      minWidth: 200,
+                      zIndex: 50,
                       fontSize: '0.78rem',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
                       pointerEvents: 'none',
                       whiteSpace: 'nowrap',
-                    }} className="sn__bar-tooltip">
+                    }}>
                       <div style={{ fontWeight: 700, marginBottom: 4, fontSize: '0.85rem' }}>{project.name}</div>
                       <div style={{ marginBottom: 2 }}>
                         <span style={{
@@ -813,9 +838,14 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
       });
       const result = await res.json();
       if (result.error) throw new Error(result.error.message || String(result.error));
-      const spec = result.data || result;
+      const spec = result.spec || result.data || result;
       if (spec.title || spec.name) setName(spec.title || spec.name);
-      if (spec.description) setDescription(spec.description);
+      if (spec.description) {
+        const acLines = Array.isArray(spec.acceptance_criteria) && spec.acceptance_criteria.length > 0
+          ? '\n\nAcceptance Criteria:\n' + spec.acceptance_criteria.map((c: string) => `- ${c}`).join('\n')
+          : '';
+        setDescription(spec.description + acLines);
+      }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to generate spec');
     } finally {

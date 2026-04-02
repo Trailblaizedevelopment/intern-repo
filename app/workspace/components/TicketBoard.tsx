@@ -1136,9 +1136,14 @@ function CreateTicketModal({
       });
       const result = await res.json();
       if (result.error) throw new Error(result.error.message || String(result.error));
-      const spec = result.data || result;
+      const spec = result.spec || result.data || result;
       if (spec.title) setTitle(spec.title);
-      if (spec.description) setDescription(spec.description);
+      if (spec.description) {
+        const acLines = Array.isArray(spec.acceptance_criteria) && spec.acceptance_criteria.length > 0
+          ? '\n\n**Acceptance Criteria:**\n' + spec.acceptance_criteria.map((c: string) => `- ${c}`).join('\n')
+          : '';
+        setDescription(`<p>${spec.description}</p>${acLines ? `<p><strong>Acceptance Criteria:</strong></p><ul>${spec.acceptance_criteria.map((c: string) => `<li>${c}</li>`).join('')}</ul>` : ''}`);
+      }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to generate spec');
     } finally {
