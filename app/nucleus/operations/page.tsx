@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase, Task } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
+import { SkeletonTable } from '@/components/Skeleton';
 
 export default function OperationsModule() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -242,7 +243,7 @@ export default function OperationsModule() {
         {/* Table */}
         <div className="module-table-container">
           {loading ? (
-            <div className="module-loading">Loading...</div>
+            <SkeletonTable rows={5} cols={7} />
           ) : filteredTasks.length > 0 ? (
             <table className="module-table">
               <thead>

@@ -7,6 +7,7 @@ import { supabase, NetworkContact, Employee } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
+import { SkeletonTable } from '@/components/Skeleton';
 
 // Parsed contact type for bulk upload preview
 interface ParsedContact {
@@ -798,7 +799,7 @@ export default function FundraisingModule() {
         {/* Table */}
         <div className="module-table-container">
           {loading ? (
-            <div className="module-loading">Loading...</div>
+            <SkeletonTable rows={5} cols={6} />
           ) : filteredContacts.length > 0 ? (
             <table className="module-table">
               <thead>

@@ -13,6 +13,7 @@ import { useToast } from '@/components/Toast';
 import FollowUpPicker from './FollowUpPicker';
 import DealEditPanel from './DealEditPanel';
 import NewDealModal from './NewDealModal';
+import { SkeletonPage } from '@/components/Skeleton';
 
 /* ─── Types ─── */
 interface PipelineDeal {
@@ -1315,12 +1316,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
 
   /* ─── Render ─── */
   if (loading) {
-    return (
-      <div className="pl2__loading">
-        <div className="pl2__spinner" />
-        <p>Loading pipeline...</p>
-      </div>
-    );
+    return <SkeletonPage />;
   }
 
   return (

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase, EnterpriseContract } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
+import { SkeletonTable } from '@/components/Skeleton';
 
 export default function EnterpriseModule() {
   const [contracts, setContracts] = useState<EnterpriseContract[]>([]);
@@ -231,7 +232,7 @@ export default function EnterpriseModule() {
         {/* Table */}
         <div className="module-table-container">
           {loading ? (
-            <div className="module-loading">Loading...</div>
+            <SkeletonTable rows={5} cols={6} />
           ) : filteredContracts.length > 0 ? (
             <table className="module-table">
               <thead>
