@@ -29,6 +29,8 @@ import {
   BarChart3,
   GanttChart,
   Link2,
+  RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase, Employee } from '@/lib/supabase';
@@ -181,6 +183,22 @@ export function TicketBoard() {
   const [notifications, setNotifications] = useState<TicketNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // ── Linear state ──
+  interface LinearIssue {
+    id: string;
+    identifier: string;
+    title: string;
+    status: { name: string; color: string } | null;
+    priority: number;
+    url: string;
+    team?: { name: string } | null;
+    project?: { name: string } | null;
+  }
+  const [linearIssues, setLinearIssues] = useState<LinearIssue[]>([]);
+  const [linearLoading, setLinearLoading] = useState(false);
+  const [linearSyncing, setLinearSyncing] = useState(false);
+  const [linearError, setLinearError] = useState<string | null>(null);
+
   // ── Data fetching ──
 
   const fetchCurrentEmployee = useCallback(async () => {
@@ -251,6 +269,34 @@ export function TicketBoard() {
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
+
+  const fetchLinearIssues = useCallback(async () => {
+    setLinearLoading(true);
+    setLinearError(null);
+    try {
+      const res = await fetch('/api/linear/issues?source=cache');
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message || String(json.error));
+      setLinearIssues(json.data || json.issues || []);
+    } catch (err: unknown) {
+      setLinearError(err instanceof Error ? err.message : 'Failed to load Linear issues');
+    } finally {
+      setLinearLoading(false);
+    }
+  }, []);
+
+  const syncLinear = async () => {
+    setLinearSyncing(true);
+    setLinearError(null);
+    try {
+      await fetch('/api/linear/sync', { method: 'POST' });
+      await fetchLinearIssues();
+    } catch (err: unknown) {
+      setLinearError(err instanceof Error ? err.message : 'Sync failed');
+    } finally {
+      setLinearSyncing(false);
+    }
+  };
 
   // ── Grouped tickets for Kanban ──
 
@@ -395,12 +441,27 @@ export function TicketBoard() {
           <button
             key={tab}
             className={`tkt__project-tab ${projectTab === tab ? 'active' : ''}`}
-            onClick={() => { setProjectTab(tab); setLoading(true); }}
+            onClick={() => {
+              setProjectTab(tab);
+              setLoading(true);
+              if (tab === 'Web App' || tab === 'all') fetchLinearIssues();
+            }}
           >
             {tab === 'all' ? 'All Projects' : tab}
             <span className="tkt__project-tab-count">{projectTab === tab || tab === 'all' ? projectTabCounts[tab] : '—'}</span>
           </button>
         ))}
+        <div className="tkt__linear-sync">
+          <button
+            className="tkt__linear-sync-btn"
+            onClick={syncLinear}
+            disabled={linearSyncing}
+            title="Sync issues from Linear"
+          >
+            <RefreshCw size={14} className={linearSyncing ? 'tkt__spinner' : ''} />
+            {linearSyncing ? 'Syncing...' : 'Sync with Linear'}
+          </button>
+        </div>
       </div>
 
       {/* ── Filters ── */}
@@ -501,6 +562,17 @@ export function TicketBoard() {
         <TimelineView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : (
         <DashboardView tickets={tickets} projects={projects} />
+      )}
+
+      {/* ── Linear Issues ── */}
+      {(linearIssues.length > 0 || linearLoading || linearError) && (
+        <LinearIssuesSection
+          issues={linearIssues}
+          loading={linearLoading}
+          error={linearError}
+          onSync={syncLinear}
+          syncing={linearSyncing}
+        />
       )}
 
       {showCreateModal && (
@@ -900,6 +972,119 @@ function DashboardView({ tickets, projects }: { tickets: TicketData[]; projects:
   );
 }
 
+
+// ═══════════════════════════════════════════
+// LINEAR ISSUES SECTION
+// ═══════════════════════════════════════════
+
+const LINEAR_PRIORITY_DOT: Record<number, string> = {
+  0: '#9ca3af',
+  1: '#ef4444',
+  2: '#f59e0b',
+  3: '#3b82f6',
+  4: '#6b7280',
+};
+
+const LINEAR_PRIORITY_LABEL: Record<number, string> = {
+  0: 'No priority',
+  1: 'Urgent',
+  2: 'High',
+  3: 'Medium',
+  4: 'Low',
+};
+
+interface LinearIssue {
+  id: string;
+  identifier: string;
+  title: string;
+  status: { name: string; color: string } | null;
+  priority: number;
+  url: string;
+  team?: { name: string } | null;
+  project?: { name: string } | null;
+}
+
+function LinearIssuesSection({
+  issues,
+  loading,
+  error,
+}: {
+  issues: LinearIssue[];
+  loading: boolean;
+  error: string | null;
+  onSync: () => void;
+  syncing: boolean;
+}) {
+  const grouped = useMemo(() => {
+    const g: Record<string, LinearIssue[]> = {};
+    issues.forEach(issue => {
+      const key = issue.project?.name || issue.team?.name || 'General';
+      if (!g[key]) g[key] = [];
+      g[key].push(issue);
+    });
+    return g;
+  }, [issues]);
+
+  return (
+    <div className="tkt__linear-section">
+      <div className="tkt__linear-header">
+        <h3 className="tkt__linear-title">
+          <Zap size={16} style={{ color: '#5e6ad2' }} />
+          Linear Issues
+          {issues.length > 0 && <span className="tkt__column-count">{issues.length}</span>}
+        </h3>
+        {error && <span className="tkt__linear-error">{error}</span>}
+      </div>
+
+      {loading ? (
+        <div className="tkt__loading" style={{ padding: '1rem' }}>
+          <Loader2 size={18} className="tkt__spinner" />
+          <span>Loading Linear issues...</span>
+        </div>
+      ) : Object.keys(grouped).length === 0 ? (
+        <p className="tkt__list-empty">No Linear issues synced. Click &quot;Sync with Linear&quot; to pull issues.</p>
+      ) : (
+        Object.entries(grouped).map(([projectName, projectIssues]) => (
+          <div key={projectName} className="tkt__linear-group">
+            <div className="tkt__linear-group-label">{projectName}</div>
+            <div className="tkt__linear-rows">
+              {projectIssues.map(issue => (
+                <div key={issue.id} className="tkt__linear-row">
+                  <span
+                    className="tkt__linear-priority-dot"
+                    style={{ background: LINEAR_PRIORITY_DOT[issue.priority] ?? '#9ca3af' }}
+                    title={LINEAR_PRIORITY_LABEL[issue.priority] ?? 'Unknown priority'}
+                  />
+                  <span className="tkt__linear-identifier">{issue.identifier}</span>
+                  <span className="tkt__linear-issue-title">{issue.title}</span>
+                  {issue.status && (
+                    <span
+                      className="tkt__status-pill"
+                      style={{ color: issue.status.color || '#6b7280', background: `${issue.status.color || '#6b7280'}18` }}
+                    >
+                      {issue.status.name}
+                    </span>
+                  )}
+                  <a
+                    href={issue.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tkt__linear-ext-link"
+                    onClick={e => e.stopPropagation()}
+                    title="Open in Linear"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════
 // CREATE TICKET MODAL
 // ═══════════════════════════════════════════
@@ -933,6 +1118,29 @@ function CreateTicketModal({
   const [projectId, setProjectId] = useState('');
   const [parentTicketId, setParentTicketId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [aiDescription, setAiDescription] = useState('');
+  const [generatingSpec, setGeneratingSpec] = useState(false);
+
+  const generateSpec = async () => {
+    if (!aiDescription.trim()) return;
+    setGeneratingSpec(true);
+    try {
+      const res = await fetch('/api/development/generate-spec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: aiDescription.trim() }),
+      });
+      const result = await res.json();
+      if (result.error) throw new Error(result.error.message || String(result.error));
+      const spec = result.data || result;
+      if (spec.title) setTitle(spec.title);
+      if (spec.description) setDescription(spec.description);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to generate spec');
+    } finally {
+      setGeneratingSpec(false);
+    }
+  };
 
   const isDescriptionEmpty = !description || description === '<p></p>' || !description.replace(/<[^>]*>/g, '').trim();
 
@@ -990,6 +1198,26 @@ function CreateTicketModal({
           <button onClick={onClose}><X size={18} /></button>
         </div>
         <div className="tkt__modal-body">
+          {/* AI Spec Generation */}
+          <div className="tkt__field tkt__ai-spec-field">
+            <label>Describe in plain English <span style={{ color: '#8b5cf6', fontWeight: 400 }}>(optional)</span></label>
+            <textarea
+              placeholder="e.g. The login button doesn't work on mobile Safari when the keyboard is open..."
+              value={aiDescription}
+              onChange={e => setAiDescription(e.target.value)}
+              rows={2}
+              style={{ width: '100%', resize: 'vertical' }}
+            />
+            <button
+              type="button"
+              className="tkt__generate-spec-btn"
+              onClick={generateSpec}
+              disabled={!aiDescription.trim() || generatingSpec}
+            >
+              {generatingSpec ? <Loader2 size={13} className="tkt__spinner" /> : <Sparkles size={13} />}
+              {generatingSpec ? 'Generating...' : 'Generate Spec ✨'}
+            </button>
+          </div>
           <div className="tkt__field">
             <label>Title *</label>
             <input type="text" placeholder="Brief summary..." value={title} onChange={e => setTitle(e.target.value)} autoFocus />

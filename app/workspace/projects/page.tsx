@@ -5,6 +5,7 @@ import {
   Plus, X, ChevronLeft, FileText, Ticket, Loader2, Calendar, Target,
   Edit3, Trash2, Image, Upload, Users, MessageSquare, Send, Paperclip,
   StickyNote, MoreHorizontal, Camera, Link2, ExternalLink, Globe, Smartphone,
+  LayoutGrid, GanttChart, Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase, Employee } from '@/lib/supabase';
@@ -150,6 +151,7 @@ export default function ProjectsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterPlatform, setFilterPlatform] = useState<'all' | 'web' | 'ios'>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'timeline'>('cards');
 
   useEffect(() => {
     if (!supabase || !user) return;
@@ -238,6 +240,21 @@ export default function ProjectsPage() {
             <button className={`sn__pill ${filterStatus === 'planning' ? 'active' : ''}`} onClick={() => setFilterStatus('planning')}>Planning</button>
             <button className={`sn__pill ${filterStatus === 'completed' ? 'active' : ''}`} onClick={() => setFilterStatus('completed')}>Done</button>
           </div>
+          {/* View Toggle */}
+          <div className="sn__platform-toggle">
+            <button
+              className={`sn__platform-btn ${viewMode === 'cards' ? 'active' : ''}`}
+              onClick={() => setViewMode('cards')}
+            >
+              <LayoutGrid size={13} /> Cards
+            </button>
+            <button
+              className={`sn__platform-btn ${viewMode === 'timeline' ? 'active' : ''}`}
+              onClick={() => setViewMode('timeline')}
+            >
+              <GanttChart size={13} /> Timeline
+            </button>
+          </div>
           <button className="sn__create-btn" onClick={() => setShowCreate(true)}>
             <Plus size={16} /> New Project
           </button>
@@ -260,9 +277,11 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* Sticky Notes Grid */}
+      {/* Sticky Notes Grid / Timeline */}
       {loading ? (
         <div className="tkt__loading"><Loader2 size={24} className="tkt__spinner" /><p>Loading projects...</p></div>
+      ) : viewMode === 'timeline' ? (
+        <ProjectTimeline projects={filteredProjects} onProjectClick={id => fetchProjectDetail(id)} />
       ) : filteredProjects.length === 0 ? (
         <div className="sn__empty">
           <StickyNote size={48} strokeWidth={1} />
@@ -301,6 +320,157 @@ export default function ProjectsPage() {
           onCreated={() => { setShowCreate(false); fetchProjects(); }}
         />
       )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════
+// PROJECT COLOR (deterministic by name)
+// ═══════════════════════════════════════════
+
+const PROJECT_COLOR_PALETTE = [
+  '#6366f1', '#10b981', '#8b5cf6', '#f43f5e',
+  '#f59e0b', '#06b6d4', '#0ea5e9', '#ec4899',
+];
+
+function projectColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
+  return PROJECT_COLOR_PALETTE[hash % PROJECT_COLOR_PALETTE.length];
+}
+
+// ═══════════════════════════════════════════
+// TIMELINE VIEW
+// ═══════════════════════════════════════════
+
+function ProjectTimeline({
+  projects,
+  onProjectClick,
+}: {
+  projects: Project[];
+  onProjectClick: (id: string) => void;
+}) {
+  const now = new Date();
+
+  // Determine timeline range from project dates
+  const allDates: Date[] = [];
+  projects.forEach(p => {
+    if (p.start_date) allDates.push(new Date(p.start_date + 'T00:00:00'));
+    if (p.target_date) allDates.push(new Date(p.target_date + 'T00:00:00'));
+  });
+
+  // Default to current quarter if no dates
+  const rangeStart = allDates.length > 0
+    ? new Date(Math.min(...allDates.map(d => d.getTime())))
+    : new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+  const rangeEnd = allDates.length > 0
+    ? new Date(Math.max(...allDates.map(d => d.getTime())))
+    : new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 0);
+
+  // Ensure at least 1 month span
+  const minEnd = new Date(rangeStart);
+  minEnd.setMonth(minEnd.getMonth() + 1);
+  const effectiveEnd = rangeEnd > minEnd ? rangeEnd : minEnd;
+
+  // Snap to month boundaries
+  const timelineStart = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+  const timelineEnd = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth() + 1, 0);
+  const totalMs = timelineEnd.getTime() - timelineStart.getTime();
+
+  // Generate months for header
+  const months: { label: string; leftPct: number; widthPct: number }[] = [];
+  {
+    let cursor = new Date(timelineStart);
+    while (cursor <= timelineEnd) {
+      const mStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+      const mEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+      const leftPct = ((mStart.getTime() - timelineStart.getTime()) / totalMs) * 100;
+      const widthPct = ((Math.min(mEnd.getTime(), timelineEnd.getTime()) - mStart.getTime()) / totalMs) * 100;
+      months.push({
+        label: mStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        leftPct: Math.max(0, leftPct),
+        widthPct,
+      });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
+  const todayPct = Math.max(0, Math.min(100, ((now.getTime() - timelineStart.getTime()) / totalMs) * 100));
+
+  function getBarStyle(project: Project) {
+    const start = project.start_date
+      ? new Date(project.start_date + 'T00:00:00')
+      : now;
+    const end = project.target_date
+      ? new Date(project.target_date + 'T00:00:00')
+      : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const leftPct = Math.max(0, ((start.getTime() - timelineStart.getTime()) / totalMs) * 100);
+    const rightPct = Math.min(100, ((end.getTime() - timelineStart.getTime()) / totalMs) * 100);
+    const width = Math.max(2, rightPct - leftPct);
+
+    const isPlaceholder = !project.start_date && !project.target_date;
+
+    return {
+      left: `${leftPct}%`,
+      width: `${width}%`,
+      background: projectColor(project.name),
+      opacity: isPlaceholder ? 0.4 : 1,
+    };
+  }
+
+  return (
+    <div className="sn__timeline">
+      {/* Month header */}
+      <div className="sn__timeline-header">
+        <div className="sn__timeline-label-col" />
+        <div className="sn__timeline-track-area">
+          {months.map((m, i) => (
+            <div
+              key={i}
+              className="sn__timeline-month"
+              style={{ left: `${m.leftPct}%`, width: `${m.widthPct}%` }}
+            >
+              {m.label}
+            </div>
+          ))}
+          <div className="sn__timeline-today" style={{ left: `${todayPct}%` }} />
+        </div>
+      </div>
+
+      {/* Project rows */}
+      <div className="sn__timeline-body">
+        {projects.length === 0 ? (
+          <p className="sn__empty-text">No projects to display.</p>
+        ) : (
+          projects.map(project => (
+            <div
+              key={project.id}
+              className="sn__timeline-row"
+              onClick={() => onProjectClick(project.id)}
+              title={`${project.name}${project.start_date ? ` · Start: ${project.start_date}` : ''}${project.target_date ? ` · Due: ${project.target_date}` : ''}`}
+            >
+              <div className="sn__timeline-label-col">
+                <span className="sn__timeline-project-name">{project.name}</span>
+                <span
+                  className="sn__timeline-project-platform"
+                  style={{ color: projectColor(project.name) }}
+                >
+                  {(project.platform || 'web') === 'ios' ? 'iOS' : 'Web'}
+                </span>
+              </div>
+              <div className="sn__timeline-track-area">
+                <div
+                  className="sn__timeline-bar"
+                  style={getBarStyle(project)}
+                />
+                <div className="sn__timeline-today-line" style={{ left: `${todayPct}%` }} />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -513,6 +683,29 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
   const [platform, setPlatform] = useState<'web' | 'ios'>('web');
   const [targetDate, setTargetDate] = useState('');
   const [creating, setCreating] = useState(false);
+  const [aiDescription, setAiDescription] = useState('');
+  const [generatingSpec, setGeneratingSpec] = useState(false);
+
+  const generateSpec = async () => {
+    if (!aiDescription.trim()) return;
+    setGeneratingSpec(true);
+    try {
+      const res = await fetch('/api/development/generate-spec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: aiDescription.trim() }),
+      });
+      const result = await res.json();
+      if (result.error) throw new Error(result.error.message || String(result.error));
+      const spec = result.data || result;
+      if (spec.title || spec.name) setName(spec.title || spec.name);
+      if (spec.description) setDescription(spec.description);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to generate spec');
+    } finally {
+      setGeneratingSpec(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!name.trim()) return;
@@ -543,6 +736,26 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
       <div className="tkt__modal" onClick={e => e.stopPropagation()}>
         <div className="tkt__modal-header"><h2>New Project</h2><button onClick={onClose}><X size={18} /></button></div>
         <div className="tkt__modal-body">
+          {/* AI Spec Generation */}
+          <div className="tkt__field tkt__ai-spec-field">
+            <label>Describe in plain English <span style={{ color: '#8b5cf6', fontWeight: 400 }}>(optional)</span></label>
+            <textarea
+              placeholder="e.g. Build a new alumni profile page with photo upload and chapter history..."
+              value={aiDescription}
+              onChange={e => setAiDescription(e.target.value)}
+              rows={2}
+              style={{ width: '100%', resize: 'vertical' }}
+            />
+            <button
+              type="button"
+              className="tkt__generate-spec-btn"
+              onClick={generateSpec}
+              disabled={!aiDescription.trim() || generatingSpec}
+            >
+              {generatingSpec ? <Loader2 size={13} className="tkt__spinner" /> : <Sparkles size={13} />}
+              {generatingSpec ? 'Generating...' : 'Generate Spec ✨'}
+            </button>
+          </div>
           <div className="tkt__field">
             <label>Project Name *</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Alumni Outreach V2, Mobile App Redesign..." autoFocus />

@@ -28,11 +28,6 @@ import {
   Ticket,
   GraduationCap,
   Map,
-  Code2,
-  Smartphone,
-  Globe,
-  GanttChart,
-  PlusSquare,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -55,11 +50,6 @@ const iconMap: Record<string, LucideIcon> = {
   HeartHandshake,
   GraduationCap,
   Map,
-  Code2,
-  Smartphone,
-  Globe,
-  GanttChart,
-  PlusSquare,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
@@ -212,38 +202,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
             );
           })}
 
-          {/* Development section — founders/engineers only */}
-          {(role === 'founder' || role === 'cofounder' || role === 'engineer') && (
-            <>
-              {!collapsed && (
-                <div className="ws-nav-section-label">
-                  <Code2 size={12} />
-                  <span>Development</span>
-                </div>
-              )}
-              <Link
-                href="/workspace/development"
-                className={`ws-nav-item ${isActive('/workspace/development') && !pathname.includes('/submit') ? 'active' : ''}`}
-              >
-                <Smartphone size={20} />
-                {!collapsed && <span>iOS &amp; Web</span>}
-              </Link>
-              <Link
-                href="/dashboard/roadmap"
-                className={`ws-nav-item ${isActive('/dashboard/roadmap') ? 'active' : ''}`}
-              >
-                <GanttChart size={20} />
-                {!collapsed && <span>Gantt</span>}
-              </Link>
-              <Link
-                href="/workspace/development/submit"
-                className={`ws-nav-item ${isActive('/workspace/development/submit') ? 'active' : ''}`}
-              >
-                <PlusSquare size={20} />
-                {!collapsed && <span>Submit Request</span>}
-              </Link>
-            </>
-          )}
+
         </nav>
 
         <div className="ws-sidebar-divider" />
