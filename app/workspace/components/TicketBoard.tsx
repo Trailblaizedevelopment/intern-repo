@@ -1122,6 +1122,7 @@ function CreateTicketModal({
   const [projectId, setProjectId] = useState('');
   const [parentTicketId, setParentTicketId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [descriptionKey, setDescriptionKey] = useState(0);
   const [aiDescription, setAiDescription] = useState('');
   const [generatingSpec, setGeneratingSpec] = useState(false);
 
@@ -1142,7 +1143,9 @@ function CreateTicketModal({
         const acLines = Array.isArray(spec.acceptance_criteria) && spec.acceptance_criteria.length > 0
           ? '\n\n**Acceptance Criteria:**\n' + spec.acceptance_criteria.map((c: string) => `- ${c}`).join('\n')
           : '';
-        setDescription(`<p>${spec.description}</p>${acLines ? `<p><strong>Acceptance Criteria:</strong></p><ul>${spec.acceptance_criteria.map((c: string) => `<li>${c}</li>`).join('')}</ul>` : ''}`);
+        const html = `<p>${spec.description}</p>${acLines ? `<p><strong>Acceptance Criteria:</strong></p><ul>${spec.acceptance_criteria.map((c: string) => `<li>${c}</li>`).join('')}</ul>` : ''}`;
+        setDescription(html);
+        setDescriptionKey(k => k + 1);
       }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to generate spec');
@@ -1233,7 +1236,7 @@ function CreateTicketModal({
           </div>
           <div className="tkt__field">
             <label>Description</label>
-            <RichTextEditor content={description} onChange={setDescription} placeholder="Steps to reproduce, expected behavior..." />
+            <RichTextEditor key={descriptionKey} content={description} onChange={setDescription} placeholder="Steps to reproduce, expected behavior..." />
           </div>
           <div className="tkt__field">
             <label>App</label>
