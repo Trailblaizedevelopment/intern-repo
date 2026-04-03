@@ -22,6 +22,7 @@ import AlumniTab from './AlumniTab';
 import MergedOutreachTab from './MergedOutreachTab';
 import SuccessTab from './SuccessTab';
 import AnalyticsTab from './AnalyticsTab';
+import ActivityLogTab from './ActivityLogTab';
 import EmailOutreachTab from '../EmailOutreachTab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
-type DashTab = 'setup' | 'outreach' | 'alumni' | 'alumni_unified' | 'email' | 'success' | 'sales' | 'analytics';
+type DashTab = 'setup' | 'outreach' | 'alumni' | 'alumni_unified' | 'email' | 'success' | 'sales' | 'analytics' | 'activity';
 
 interface SubmissionData {
   chapter: {
@@ -75,6 +76,7 @@ const TABS: { id: DashTab; label: string; icon?: string }[] = [
   { id: 'success',       label: 'Success' },
   { id: 'sales',         label: 'Sales' },
   { id: 'analytics',     label: 'Analytics' },
+  { id: 'activity',      label: 'Activity' },
 ];
 
 function computeHealthScore(chapter: ChapterWithOnboarding, stats?: AlumniStats): { score: number; tier: 'red' | 'yellow' | 'green' } {
@@ -562,6 +564,9 @@ export default function ChapterDashboardPage() {
         )}
         {activeTab === 'analytics' && (
           <AnalyticsTab chapter={chapter} showToast={showToast} />
+        )}
+        {activeTab === 'activity' && (
+          <ActivityLogTab chapter={chapter} showToast={showToast} />
         )}
       </main>
 
