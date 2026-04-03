@@ -149,8 +149,11 @@ export default function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   const navigate = useCallback((item: ResultItem) => {
     if (item.kind === 'chapter') {
       router.push(`/nucleus/customer-success/${item.data.id}`);
-    } else if (item.kind === 'contact' && item.chapterId) {
-      router.push(`/nucleus/customer-success/${item.chapterId}`);
+    } else if (item.kind === 'contact') {
+      if (item.chapterId) {
+        router.push(`/nucleus/customer-success/${item.chapterId}`);
+      }
+      // Contacts without a chapter_id have no navigable destination — just close.
     } else if (item.kind === 'deal') {
       router.push(`/nucleus/pipeline?deal=${item.data.id}`);
     }
@@ -300,6 +303,7 @@ export default function GlobalSearch({ open, onClose }: GlobalSearchProps) {
                 const isFocused = focusedIdx === idx;
                 const name = [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unknown';
                 const chName = (c.chapter_name as unknown as { chapter_name: string | null } | null)?.chapter_name ?? null;
+                const hasChapter = Boolean(c.chapter_id);
                 return (
                   <ResultRow
                     key={c.id}
@@ -316,10 +320,10 @@ export default function GlobalSearch({ open, onClose }: GlobalSearchProps) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>{name}</div>
                       <div style={{ fontSize: '0.73rem', color: '#9ca3af' }}>
-                        {[c.phone_primary, chName].filter(Boolean).join(' · ')}
+                        {[c.phone_primary, chName ?? (hasChapter ? null : 'No chapter')].filter(Boolean).join(' · ')}
                       </div>
                     </div>
-                    {chName && (
+                    {chName ? (
                       <span style={{
                         fontSize: '0.65rem', fontWeight: 500, padding: '2px 7px', borderRadius: 10,
                         background: '#f3f4f6', color: '#6b7280', flexShrink: 0,
@@ -327,8 +331,15 @@ export default function GlobalSearch({ open, onClose }: GlobalSearchProps) {
                       }}>
                         {chName}
                       </span>
-                    )}
-                    <ArrowRight size={14} style={{ color: '#d1d5db', flexShrink: 0 }} />
+                    ) : !hasChapter ? (
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 500, padding: '2px 7px', borderRadius: 10,
+                        background: '#fef3c7', color: '#92400e', flexShrink: 0, whiteSpace: 'nowrap',
+                      }}>
+                        Unlinked
+                      </span>
+                    ) : null}
+                    <ArrowRight size={14} style={{ color: hasChapter ? '#d1d5db' : '#e5e7eb', flexShrink: 0 }} />
                   </ResultRow>
                 );
               })}
