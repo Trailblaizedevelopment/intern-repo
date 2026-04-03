@@ -16,6 +16,10 @@ import {
   Ticket,
   AlertTriangle,
   FlaskConical,
+  RefreshCw,
+  Plus,
+  X,
+  Sparkles,
 } from 'lucide-react';
 import { TaskSection } from '../TaskSection';
 import { LeadSection } from '../LeadSection';
@@ -84,12 +88,123 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
     }
   }, []);
 
+  const [ticketRefreshing, setTicketRefreshing] = useState(false);
+
+  const handleManualRefresh = useCallback(async () => {
+    setTicketRefreshing(true);
+    await fetchTicketSummary();
+    setTicketRefreshing(false);
+  }, [fetchTicketSummary]);
+
   useEffect(() => {
     fetchTicketSummary();
-    // Auto-refresh every 2 minutes
-    const refreshInterval = setInterval(fetchTicketSummary, 2 * 60 * 1000);
-    return () => clearInterval(refreshInterval);
   }, [fetchTicketSummary]);
+
+  // New Ticket / AI Spec Generator state
+  const [showNewTicketPanel, setShowNewTicketPanel] = useState(false);
+  const [specDescription, setSpecDescription] = useState('');
+  const [specLoading, setSpecLoading] = useState(false);
+  const [generatedSpec, setGeneratedSpec] = useState<{
+    title: string;
+    description: string;
+    complexity: string;
+  } | null>(null);
+  const [ticketPriority, setTicketPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [ticketCreating, setTicketCreating] = useState(false);
+  const [ticketToast, setTicketToast] = useState('');
+
+  const AUTH_HEADER = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      const res = await fetch('/api/projects', {
+        headers: { Authorization: AUTH_HEADER },
+      });
+      const { data: projectData } = await res.json();
+      if (projectData) {
+        setProjects(projectData);
+        if (projectData.length > 0) setSelectedProjectId(projectData[0].id);
+      }
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+    }
+  }, []);
+
+  const handleOpenNewTicket = useCallback(() => {
+    setShowNewTicketPanel(true);
+    setGeneratedSpec(null);
+    setSpecDescription('');
+    setTicketPriority('medium');
+    fetchProjects();
+  }, [fetchProjects]);
+
+  const handleGenerateSpec = useCallback(async () => {
+    if (!specDescription.trim()) return;
+    setSpecLoading(true);
+    setGeneratedSpec(null);
+    try {
+      const res = await fetch('/api/development/generate-spec', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: AUTH_HEADER,
+        },
+        body: JSON.stringify({ description: specDescription }),
+      });
+      const result = await res.json();
+      if (result.data || result.spec) {
+        const spec = result.data || result.spec;
+        setGeneratedSpec({
+          title: spec.title || 'Untitled',
+          description: spec.description || '',
+          complexity: spec.complexity || 'medium',
+        });
+      } else if (result.title) {
+        setGeneratedSpec({
+          title: result.title,
+          description: result.description || '',
+          complexity: result.complexity || 'medium',
+        });
+      }
+    } catch (err) {
+      console.error('Error generating spec:', err);
+    } finally {
+      setSpecLoading(false);
+    }
+  }, [specDescription]);
+
+  const handleCreateTicket = useCallback(async () => {
+    if (!generatedSpec) return;
+    setTicketCreating(true);
+    try {
+      const res = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: AUTH_HEADER,
+        },
+        body: JSON.stringify({
+          title: generatedSpec.title,
+          description: generatedSpec.description,
+          priority: ticketPriority,
+          project_id: selectedProjectId || undefined,
+        }),
+      });
+      const result = await res.json();
+      if (!result.error) {
+        setShowNewTicketPanel(false);
+        fetchTicketSummary();
+        setTicketToast('Ticket created');
+        setTimeout(() => setTicketToast(''), 3000);
+      }
+    } catch (err) {
+      console.error('Error creating ticket:', err);
+    } finally {
+      setTicketCreating(false);
+    }
+  }, [generatedSpec, ticketPriority, selectedProjectId, fetchTicketSummary]);
 
   // Pending Review queue state
   const [dismissedReviewIds, setDismissedReviewIds] = useState<Set<string>>(new Set());
@@ -248,6 +363,18 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
         stats={suggestionStats}
       />
 
+      {/* Toast */}
+      {ticketToast && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)',
+          color: '#10b981', padding: '10px 18px', borderRadius: 8,
+          backdropFilter: 'blur(12px)', fontSize: 14, fontWeight: 500,
+        }}>
+          ✅ {ticketToast}
+        </div>
+      )}
+
       {/* Pending Review Queue */}
       <section className="ws-card ws-pending-review-card">
         <div className="ws-card-header">
@@ -258,10 +385,184 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
               <span className="ws-pending-review__count">{reviewTickets.length}</span>
             )}
           </h3>
-          <span className="ws-pending-review__tagline">
-            {reviewTickets.length > 0 ? 'Ready to test — grab one before someone else does' : ''}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="ws-pending-review__tagline" style={{ marginRight: 4 }}>
+              {reviewTickets.length > 0 ? 'Ready to test — grab one before someone else does' : ''}
+            </span>
+            <button
+              onClick={handleManualRefresh}
+              disabled={ticketRefreshing || ticketSummaryLoading}
+              title="Refresh"
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: 'rgba(255,255,255,0.5)', padding: '2px 4px', display: 'flex',
+                alignItems: 'center', borderRadius: 4,
+              }}
+            >
+              <RefreshCw
+                size={14}
+                style={{
+                  animation: (ticketRefreshing || ticketSummaryLoading) ? 'spin 0.8s linear infinite' : 'none',
+                }}
+              />
+            </button>
+            <button
+              onClick={handleOpenNewTicket}
+              title="New Ticket"
+              style={{
+                background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.35)',
+                cursor: 'pointer', color: 'rgba(165,167,255,0.9)', padding: '3px 8px',
+                display: 'flex', alignItems: 'center', gap: 4, borderRadius: 5,
+                fontSize: 12, fontWeight: 500,
+              }}
+            >
+              <Plus size={12} />
+              New Ticket
+            </button>
+          </div>
         </div>
+
+        {/* Inline New Ticket Panel */}
+        {showNewTicketPanel && (
+          <div style={{
+            margin: '0 0 14px 0', padding: 16,
+            background: 'rgba(15,15,25,0.7)', border: '1px solid rgba(99,102,241,0.25)',
+            borderRadius: 10, backdropFilter: 'blur(16px)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>✨ Quick Ticket</span>
+              <button
+                onClick={() => setShowNewTicketPanel(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: 2 }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {!generatedSpec ? (
+              <>
+                <textarea
+                  placeholder="Describe what you want built..."
+                  value={specDescription}
+                  onChange={e => setSpecDescription(e.target.value)}
+                  rows={3}
+                  style={{
+                    width: '100%', background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
+                    color: 'rgba(255,255,255,0.9)', padding: '8px 10px', fontSize: 13,
+                    resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+                <button
+                  onClick={handleGenerateSpec}
+                  disabled={specLoading || !specDescription.trim()}
+                  style={{
+                    marginTop: 8, background: 'rgba(99,102,241,0.2)',
+                    border: '1px solid rgba(99,102,241,0.4)', color: 'rgba(165,167,255,0.95)',
+                    padding: '6px 14px', borderRadius: 6, cursor: specLoading ? 'wait' : 'pointer',
+                    fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6,
+                    opacity: !specDescription.trim() ? 0.5 : 1,
+                  }}
+                >
+                  {specLoading ? (
+                    <RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} />
+                  ) : (
+                    <Sparkles size={13} />
+                  )}
+                  {specLoading ? 'Generating...' : 'Generate Spec ✨'}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Generated Spec */}
+                <div style={{
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 7, padding: '10px 12px', marginBottom: 10,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{generatedSpec.title}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
+                      background:
+                        generatedSpec.complexity === 'high' || generatedSpec.complexity === 'complex' ? 'rgba(239,68,68,0.2)' :
+                        generatedSpec.complexity === 'low' || generatedSpec.complexity === 'simple' ? 'rgba(16,185,129,0.2)' :
+                        'rgba(245,158,11,0.2)',
+                      color:
+                        generatedSpec.complexity === 'high' || generatedSpec.complexity === 'complex' ? '#f87171' :
+                        generatedSpec.complexity === 'low' || generatedSpec.complexity === 'simple' ? '#34d399' :
+                        '#fbbf24',
+                    }}>
+                      {generatedSpec.complexity}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.5 }}>
+                    {generatedSpec.description}
+                  </p>
+                </div>
+
+                {/* Priority + Project selectors */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                  <select
+                    value={ticketPriority}
+                    onChange={e => setTicketPriority(e.target.value as 'high' | 'medium' | 'low')}
+                    style={{
+                      background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)',
+                      color: 'rgba(255,255,255,0.85)', padding: '5px 10px', borderRadius: 6,
+                      fontSize: 12, cursor: 'pointer', outline: 'none',
+                    }}
+                  >
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+
+                  {projects.length > 0 && (
+                    <select
+                      value={selectedProjectId}
+                      onChange={e => setSelectedProjectId(e.target.value)}
+                      style={{
+                        background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)',
+                        color: 'rgba(255,255,255,0.85)', padding: '5px 10px', borderRadius: 6,
+                        fontSize: 12, cursor: 'pointer', outline: 'none', flex: 1,
+                      }}
+                    >
+                      {projects.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleCreateTicket}
+                    disabled={ticketCreating}
+                    style={{
+                      background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)',
+                      color: 'rgba(165,167,255,0.95)', padding: '6px 14px', borderRadius: 6,
+                      cursor: ticketCreating ? 'wait' : 'pointer', fontSize: 13, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    {ticketCreating ? <RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> : null}
+                    {ticketCreating ? 'Creating...' : 'Create Ticket'}
+                  </button>
+                  <button
+                    onClick={() => setGeneratedSpec(null)}
+                    style={{
+                      background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                      color: 'rgba(255,255,255,0.45)', padding: '6px 12px', borderRadius: 6,
+                      cursor: 'pointer', fontSize: 12,
+                    }}
+                  >
+                    ← Back
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
 
         {ticketSummaryLoading ? (
           <div className="ws-pending-review__loading">Loading...</div>
