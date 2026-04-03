@@ -21,7 +21,7 @@ function validateStatusTransition(
     open: ['in_progress', 'backlog', 'todo', 'done', 'canceled'],
     in_progress: ['in_review', 'open', 'canceled'],
     in_review: ['testing', 'in_progress', 'canceled'],
-    testing: ['done', 'in_review', 'canceled'],
+    testing: ['done', 'in_review', 'in_progress', 'canceled'],
     done: ['open', 'backlog'],
     canceled: ['open', 'backlog'],
   };
@@ -105,7 +105,7 @@ export async function PATCH(
     }
 
     const updateData: Record<string, unknown> = {};
-    const allowedFields = ['title', 'description', 'type', 'priority', 'status', 'assignee_id', 'reviewer_id', 'due_date', 'labels', 'project_id', 'parent_ticket_id', 'milestone_id', 'sprint', 'story_points'];
+    const allowedFields = ['title', 'description', 'type', 'priority', 'status', 'assignee_id', 'reviewer_id', 'due_date', 'labels', 'project_id', 'parent_ticket_id', 'milestone_id', 'sprint', 'story_points', 'test_result'];
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
@@ -220,7 +220,7 @@ export async function PATCH(
   }
 }
 
-// DELETE - Delete ticket
+// DELETE - Soft delete ticket (sets status = 'canceled')
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -235,11 +235,11 @@ export async function DELETE(
 
     const { error } = await supabase
       .from('tickets')
-      .delete()
+      .update({ status: 'canceled', updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting ticket:', error);
+      console.error('Error soft-deleting ticket:', error);
       return NextResponse.json({ data: null, error: { message: error.message, code: error.code } }, { status: 500 });
     }
 

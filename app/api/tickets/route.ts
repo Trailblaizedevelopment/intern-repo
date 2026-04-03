@@ -36,6 +36,9 @@ export async function GET(request: NextRequest) {
       } else {
         query = query.eq('status', status);
       }
+    } else if (!status) {
+      // Default: exclude canceled (soft-deleted) tickets unless explicitly requested
+      query = query.neq('status', 'canceled');
     }
 
     if (assigneeId) query = query.eq('assignee_id', assigneeId);

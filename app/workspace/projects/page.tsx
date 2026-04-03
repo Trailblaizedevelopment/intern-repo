@@ -822,6 +822,7 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('active');
   const [platform, setPlatform] = useState<'web' | 'ios'>('web');
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [targetDate, setTargetDate] = useState('');
   const [creating, setCreating] = useState(false);
   const [aiDescription, setAiDescription] = useState('');
@@ -865,7 +866,7 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
           description: description.trim() || null,
           status,
           platform,
-          start_date: new Date().toISOString().split('T')[0],
+          start_date: startDate || new Date().toISOString().split('T')[0],
           target_date: targetDate || null,
           created_by: currentEmployeeId,
         }),
@@ -930,6 +931,10 @@ function CreateProjectModal({ currentEmployeeId, employees, onClose, onCreated }
               </select>
             </div>
             <div className="tkt__field">
+              <label>Start Date</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+            <div className="tkt__field">
               <label>Target Date</label>
               <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)} />
             </div>
@@ -964,6 +969,8 @@ function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRe
   const [editName, setEditName] = useState(project.name);
   const [editDesc, setEditDesc] = useState(project.description || '');
   const [editStatus, setEditStatus] = useState(project.status);
+  const [editStartDate, setEditStartDate] = useState(project.start_date || '');
+  const [editTargetDate, setEditTargetDate] = useState(project.target_date || '');
   const [comments, setComments] = useState<CommentData[]>([]);
   const [commentText, setCommentText] = useState('');
   const [sending, setSending] = useState(false);
@@ -1013,6 +1020,8 @@ function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRe
     setEditName(project.name);
     setEditDesc(project.description || '');
     setEditStatus(project.status);
+    setEditStartDate(project.start_date || '');
+    setEditTargetDate(project.target_date || '');
   }, [project]);
 
   const saveProject = async () => {
@@ -1020,7 +1029,7 @@ function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRe
       await fetch(`/api/projects/${project.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editName, description: editDesc, status: editStatus }),
+        body: JSON.stringify({ name: editName, description: editDesc, status: editStatus, start_date: editStartDate || null, target_date: editTargetDate || null }),
       });
       setEditingProject(false);
       onRefresh();
@@ -1250,6 +1259,16 @@ function ProjectDetailView({ project, currentEmployeeId, employees, onBack, onRe
                 <option value="completed">Completed</option>
                 <option value="archived">Archived</option>
               </select>
+            </div>
+            <div className="sn__hero-edit-row">
+              <div className="tkt__field">
+                <label style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Start Date</label>
+                <input type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+              </div>
+              <div className="tkt__field">
+                <label style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Target Date</label>
+                <input type="date" value={editTargetDate} onChange={e => setEditTargetDate(e.target.value)} />
+              </div>
               <button className="tkt__btn-primary" onClick={saveProject} style={{ padding: '6px 16px' }}>Save</button>
               <button className="tkt__btn-secondary" onClick={() => setEditingProject(false)} style={{ padding: '6px 16px' }}>Cancel</button>
             </div>

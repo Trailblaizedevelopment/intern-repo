@@ -86,6 +86,9 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
 
   useEffect(() => {
     fetchTicketSummary();
+    // Auto-refresh every 2 minutes
+    const refreshInterval = setInterval(fetchTicketSummary, 2 * 60 * 1000);
+    return () => clearInterval(refreshInterval);
   }, [fetchTicketSummary]);
 
   // Pending Review queue state
@@ -122,6 +125,32 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
         setReviewErrors(prev => ({ ...prev, [ticket.id]: result.error.message }));
       } else {
         // Refresh ticket summary to get accurate stats
+        fetchTicketSummary();
+      }
+    } catch {
+      setDismissedReviewIds(prev => { const next = new Set(prev); next.delete(ticket.id); return next; });
+      setReviewErrors(prev => ({ ...prev, [ticket.id]: 'Network error — try again' }));
+    }
+  }, [currentEmployee?.id, fetchTicketSummary]);
+
+  const handleRequestRevisions = useCallback(async (ticket: TicketSummaryItem) => {
+    // Optimistic remove
+    setDismissedReviewIds(prev => new Set([...prev, ticket.id]));
+    setReviewErrors(prev => { const next = { ...prev }; delete next[ticket.id]; return next; });
+
+    const payload = { status: 'in_progress', test_result: 'revisions', actor_id: currentEmployee?.id };
+
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (result.error) {
+        setDismissedReviewIds(prev => { const next = new Set(prev); next.delete(ticket.id); return next; });
+        setReviewErrors(prev => ({ ...prev, [ticket.id]: result.error.message }));
+      } else {
         fetchTicketSummary();
       }
     } catch {
@@ -265,13 +294,24 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
                   {reviewErrors[ticket.id] && (
                     <span className="ws-pending-review__error">{reviewErrors[ticket.id]}</span>
                   )}
-                  <button
-                    className="ws-pending-review__btn"
-                    onClick={() => handleMarkTested(ticket)}
-                    title={isInReview ? 'Advance to Testing' : 'Mark as Done'}
-                  >
-                    {isInReview ? 'Move to Testing →' : 'Mark Tested ✓'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="ws-pending-review__btn"
+                      onClick={() => handleMarkTested(ticket)}
+                      title={isInReview ? 'Advance to Testing' : 'Mark as Done'}
+                    >
+                      {isInReview ? 'Move to Testing →' : 'Mark Tested ✓'}
+                    </button>
+                    {!isInReview && (
+                      <button
+                        className="ws-pending-review__btn ws-pending-review__btn--revisions"
+                        onClick={() => handleRequestRevisions(ticket)}
+                        title="Send back to Devin for revisions"
+                      >
+                        ↩ Request Revisions
+                      </button>
+                    )}
+                  </div>
                 </li>
               );
             })}

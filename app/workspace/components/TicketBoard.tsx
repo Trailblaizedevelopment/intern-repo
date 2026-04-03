@@ -31,6 +31,7 @@ import {
   Link2,
   RefreshCw,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase, Employee } from '@/lib/supabase';
@@ -1358,6 +1359,7 @@ function TicketDetailPanel({
   const [commentText, setCommentText] = useState('');
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   // Labels editing
@@ -1414,6 +1416,29 @@ function TicketDetailPanel({
     finally { setSending(false); }
   };
 
+  const handleDelete = async () => {
+    if (!confirm(`Delete ticket #${ticket.number}? This cannot be easily undone.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.error) {
+        alert(result.error.message);
+        setDeleting(false);
+        return;
+      }
+      // Optimistic: close panel and refresh list
+      onUpdate();
+      onClose();
+    } catch (err) {
+      console.error('Error deleting ticket:', err);
+      setDeleting(false);
+    }
+  };
+
+  const isCreatorOrAdmin = currentEmployee &&
+    (ticket.creator_id === currentEmployee.id || currentEmployee.role === 'founder' || currentEmployee.role === 'cofounder');
+
   const handleFieldUpdate = async (field: string, value: unknown) => {
     setUpdating(true);
     try {
@@ -1458,7 +1483,19 @@ function TicketDetailPanel({
             {ticket.external_id && <span className="tkt__detail-external-id">{ticket.external_id}</span>}
             <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
           </div>
-          <button onClick={onClose}><X size={18} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isCreatorOrAdmin && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                title="Delete ticket"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4, display: 'flex', alignItems: 'center', opacity: deleting ? 0.5 : 1 }}
+              >
+                {deleting ? <Loader2 size={16} className="tkt__spinner" /> : <Trash2 size={16} />}
+              </button>
+            )}
+            <button onClick={onClose}><X size={18} /></button>
+          </div>
         </div>
 
         <div className="tkt__detail-body">
