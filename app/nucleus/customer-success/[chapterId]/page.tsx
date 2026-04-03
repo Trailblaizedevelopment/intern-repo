@@ -5,7 +5,7 @@ import {
   ArrowLeft, HeartHandshake, Edit2, Copy, X, Loader2,
   CreditCard, Eye, AlertTriangle, CheckCircle2, Clock,
   Activity, Instagram, TrendingUp, Users, ChevronRight,
-  Zap, BadgeCheck,
+  Zap, BadgeCheck, FileText,
 } from 'lucide-react';
 import OnboardingWizard from '../OnboardingWizard';
 import { useRouter, useParams } from 'next/navigation';
@@ -384,6 +384,27 @@ export default function ChapterDashboardPage() {
                   }}>
                     {sc.label}
                   </span>
+                  {/* Contract status badge */}
+                  {chapter.contract_status && chapter.contract_status !== 'not_sent' && (() => {
+                    const CONTRACT_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+                      sent:     { label: 'Contract Sent',    color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)'  },
+                      signed:   { label: 'Contract Signed',  color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
+                      declined: { label: 'Contract Declined',color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)'  },
+                      voided:   { label: 'Contract Voided',  color: '#6b7280', bg: 'rgba(107,114,128,0.1)',border: 'rgba(107,114,128,0.25)' },
+                    };
+                    const cfg = CONTRACT_STATUS_CONFIG[chapter.contract_status];
+                    if (!cfg) return null;
+                    return (
+                      <span style={{
+                        fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                        background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}>
+                        <FileText size={10} />
+                        {cfg.label}
+                      </span>
+                    );
+                  })()}
                   {/* Setup Complete badge */}
                   {chapter.onboarding_completed && (
                     <span style={{
