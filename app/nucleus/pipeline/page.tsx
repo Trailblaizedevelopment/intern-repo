@@ -789,6 +789,22 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
       .finally(() => setLoading(false));
   }, [loadDeals, loadSchools, loadNationals, loadContacts, loadEmployees, loadCurrentUser]);
 
+  // Auto-open a deal when navigated from global search (?deal=<id>)
+  useEffect(() => {
+    const dealId = searchParams.get('deal');
+    if (!dealId || deals.length === 0) return;
+    const match = deals.find(d => d.id === dealId);
+    if (match) {
+      openDeal(match);
+      // Clear the query param without reloading
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('deal');
+      const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+      window.history.replaceState(null, '', newUrl);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deals, searchParams]);
+
   useEffect(() => {
     if (activeTab === 'nationals') loadNationals();
   }, [activeTab, natStageFilter, natTypeFilter, loadNationals]);

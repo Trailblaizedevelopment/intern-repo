@@ -152,7 +152,7 @@ export default function GlobalSearch({ open, onClose }: GlobalSearchProps) {
     } else if (item.kind === 'contact' && item.chapterId) {
       router.push(`/nucleus/customer-success/${item.chapterId}`);
     } else if (item.kind === 'deal') {
-      router.push('/nucleus/pipeline');
+      router.push(`/nucleus/pipeline?deal=${item.data.id}`);
     }
     onClose();
   }, [router, onClose]);

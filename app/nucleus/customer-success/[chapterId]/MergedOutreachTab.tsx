@@ -121,6 +121,7 @@ function OutreachStatsSection({
   const [loadingBatchContacts, setLoadingBatchContacts] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const executingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -175,6 +176,28 @@ function OutreachStatsSection({
     fetchBatch();
     fetchBatchHistory();
   }, [fetchStats, fetchBatch, fetchBatchHistory]);
+
+  // Auto-refresh every 30s while a batch is executing
+  useEffect(() => {
+    if (batch?.status === 'executing' || batch?.status === 'sending') {
+      if (!executingIntervalRef.current) {
+        executingIntervalRef.current = setInterval(() => {
+          fetchBatch();
+        }, 30_000);
+      }
+    } else {
+      if (executingIntervalRef.current) {
+        clearInterval(executingIntervalRef.current);
+        executingIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (executingIntervalRef.current) {
+        clearInterval(executingIntervalRef.current);
+        executingIntervalRef.current = null;
+      }
+    };
+  }, [batch?.status, fetchBatch]);
 
   async function handleApproveBatch() {
     if (!batch) return;
