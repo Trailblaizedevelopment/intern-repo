@@ -33,7 +33,7 @@ import {
   ChevronRight,
   History,
 } from 'lucide-react';
-import { supabase, Chapter } from '@/lib/supabase';
+import { supabase, Chapter, Deal } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import AccountingTab from './AccountingTab';
 import ModalOverlay from '@/components/ModalOverlay';
@@ -61,7 +61,43 @@ interface Payment {
 }
 
 type TimeRange = 'week' | 'month' | 'quarter' | 'year' | 'all';
-type ActiveTab = 'payments' | 'schedule' | 'accounting';
+type ActiveTab = 'dashboard' | 'payments' | 'schedule' | 'accounting';
+
+interface StripeData {
+  payouts: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    arrival_date: number;
+    description: string | null;
+    bank_last4: string | null;
+  }>;
+  charges: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    created: number;
+    description: string;
+    customer_email: string | null;
+  }>;
+}
+
+// Temporary stub — Forge is completing this component
+function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeError, formatCurrency }: {
+  chapters: unknown[];
+  deals: unknown[];
+  stripeData: unknown;
+  stripeLoading: boolean;
+  stripeError: string | null;
+  formatCurrency: (n: number) => string;
+}) {
+  return (
+    <div className="finance-section">
+      <p style={{ color: '#94a3b8', padding: '2rem' }}>Finance dashboard loading...</p>
+    </div>
+  );
+}
 
 export default function FinanceModule() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -71,7 +107,7 @@ export default function FinanceModule() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterChapter, setFilterChapter] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
-  const [activeTab, setActiveTab] = useState<ActiveTab>('schedule');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [showModal, setShowModal] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null }>({ show: false, id: null });
@@ -105,17 +141,50 @@ export default function FinanceModule() {
     previousNextPayment: string | null;
     confirmedAt: Date;
   }>>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [stripeData, setStripeData] = useState<StripeData | null>(null);
+  const [stripeLoading, setStripeLoading] = useState(true);
+  const [stripeError, setStripeError] = useState<string | null>(null);
   const [expandedChapterId, setExpandedChapterId] = useState<string | null>(null);
   const [chapterPaymentHistory, setChapterPaymentHistory] = useState<Record<string, Payment[]>>({});
 
   useEffect(() => {
     fetchData();
+    fetchDeals();
+    fetchStripeData();
   }, []);
 
   async function fetchData() {
     setLoading(true);
     await Promise.all([fetchPayments(), fetchChapters()]);
     setLoading(false);
+  }
+
+  async function fetchDeals() {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from('deals')
+      .select('id, stage, value')
+      .not('stage', 'in', '(closed_won,closed_lost)');
+    if (!error && data) setDeals(data as Deal[]);
+  }
+
+  async function fetchStripeData() {
+    setStripeLoading(true);
+    setStripeError(null);
+    try {
+      const res = await fetch('/api/finance/stripe');
+      const json = await res.json();
+      if (json.error) {
+        setStripeError(json.error);
+      } else {
+        setStripeData(json);
+      }
+    } catch {
+      setStripeError('Failed to reach Stripe API');
+    } finally {
+      setStripeLoading(false);
+    }
   }
 
   async function fetchPayments() {
@@ -720,6 +789,13 @@ export default function FinanceModule() {
 
       {/* Tab Navigation */}
       <div className="finance-tabs">
+        <button
+          className={`finance-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <LayoutDashboard size={18} />
+          Dashboard
+        </button>
         <button 
           className={`finance-tab ${activeTab === 'schedule' ? 'active' : ''}`}
           onClick={() => setActiveTab('schedule')}
@@ -745,6 +821,18 @@ export default function FinanceModule() {
           Accounting
         </button>
       </div>
+
+      {/* Dashboard View */}
+      {activeTab === 'dashboard' && (
+        <FinanceDashboard
+          chapters={chapters}
+          deals={deals}
+          stripeData={stripeData}
+          stripeLoading={stripeLoading}
+          stripeError={stripeError}
+          formatCurrency={formatCurrency}
+        />
+      )}
 
       {/* Schedule View */}
       {activeTab === 'schedule' && (

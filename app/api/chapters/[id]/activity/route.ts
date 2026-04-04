@@ -51,7 +51,7 @@ export async function GET(
     const [batchesRes, paymentsRes, checkInsRes] = await Promise.all([
       supabase
         .from('outreach_batches')
-        .select('id, status, created_at, scheduled_date, total_contacts, touch_breakdown, notes, chapter_id, chapters')
+        .select('id, status, created_at, scheduled_date, total_contacts, touch_breakdown, notes, chapter_id')
         .eq('chapter_id', chapterId)
         .order('created_at', { ascending: false })
         .limit(50),

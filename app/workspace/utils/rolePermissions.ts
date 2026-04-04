@@ -167,7 +167,8 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       // Gets: Dashboard, My Deals (filtered pipeline), Schools (read-only pipeline view), Projects, Team
       return [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
-        { name: 'My Deals', href: '/workspace/my-deals', icon: 'HeartHandshake', emphasized: true },
+        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', emphasized: true },
+        { name: 'Leads', href: '/workspace/leads', icon: 'Target' },
         { name: 'Schools', href: '/workspace/schools', icon: 'GraduationCap' },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },

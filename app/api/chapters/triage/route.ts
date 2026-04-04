@@ -38,7 +38,8 @@ export async function GET(_request: NextRequest) {
         active_members, estimated_alumni, created_at,
         contact_name, contact_email, contact_phone,
         mrr, payment_day,
-        wizard_step, wizard_completed_at
+        wizard_step, wizard_completed_at,
+        instagram_flyer_posted
       `)
       .order('chapter_name', { ascending: true });
 
@@ -53,39 +54,51 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ data: [], error: null });
     }
 
-    // Batch alumni stats for all chapters
-    const alumniStats = await Promise.all(
-      chapters.map(async (ch) => {
-        const [
-          { count: total },
-          { count: have_phone },
-          { count: contacted_with_phone },
-          { count: signed_up },
-        ] = await Promise.all([
-          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id),
-          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).not('phone_primary', 'is', null),
-          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).not('phone_primary', 'is', null).neq('outreach_status', 'not_contacted'),
-          supabase.from('alumni_contacts').select('*', { count: 'exact', head: true }).eq('chapter_id', ch.id).eq('outreach_status', 'signed_up'),
-        ]);
+    // Bulk-fetch alumni stats for all chapters in a single query (avoids N×4 queries)
+    const chapterIds = chapters.map((ch) => ch.id);
+    const { data: allContacts, error: contactsError } = await supabase
+      .from('alumni_contacts')
+      .select('chapter_id, phone_primary, outreach_status')
+      .in('chapter_id', chapterIds);
 
-        const havePhoneNum = have_phone ?? 0;
-        const contactedNum = contacted_with_phone ?? 0;
-        const outreach_coverage_pct = havePhoneNum > 0
-          ? Math.round((contactedNum / havePhoneNum) * 100)
-          : 0;
+    if (contactsError) {
+      return NextResponse.json(
+        { data: null, error: { message: contactsError.message, code: contactsError.code } },
+        { status: 500 }
+      );
+    }
 
-        return {
-          chapter_id: ch.id,
-          total: total ?? 0,
-          have_phone: havePhoneNum,
-          contacted_with_phone: contactedNum,
-          signed_up: signed_up ?? 0,
-          outreach_coverage_pct,
-        };
-      })
-    );
+    // Compute per-chapter stats in JS (O(contacts), no extra DB round-trips)
+    const statsMap: Record<string, {
+      chapter_id: string;
+      total: number;
+      have_phone: number;
+      contacted_with_phone: number;
+      signed_up: number;
+      outreach_coverage_pct: number;
+    }> = {};
 
-    const statsMap = Object.fromEntries(alumniStats.map(s => [s.chapter_id, s]));
+    for (const chId of chapterIds) {
+      statsMap[chId] = { chapter_id: chId, total: 0, have_phone: 0, contacted_with_phone: 0, signed_up: 0, outreach_coverage_pct: 0 };
+    }
+
+    for (const c of allContacts ?? []) {
+      const s = statsMap[c.chapter_id];
+      if (!s) continue;
+      s.total++;
+      if (c.phone_primary) {
+        s.have_phone++;
+        if (c.outreach_status && c.outreach_status !== 'not_contacted') s.contacted_with_phone++;
+      }
+      if (c.outreach_status === 'signed_up') s.signed_up++;
+    }
+
+    for (const s of Object.values(statsMap)) {
+      s.outreach_coverage_pct = s.have_phone > 0
+        ? Math.round((s.contacted_with_phone / s.have_phone) * 100)
+        : 0;
+    }
+
 
     const now = Date.now();
 
@@ -126,6 +139,9 @@ export async function GET(_request: NextRequest) {
       // Signups (15 pts)
       if (stats.signed_up >= 10) score += 15;
       else if (stats.signed_up > 0) score += 10;
+
+      // Instagram flyer posted (+5 pts)
+      if (ch.instagram_flyer_posted) score += 5;
 
       // Clamp to 0–100
       score = Math.max(0, Math.min(100, score));

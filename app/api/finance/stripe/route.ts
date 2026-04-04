@@ -1,59 +1,69 @@
 import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  try {
-    const now = Math.floor(Date.now() / 1000);
-    const in30Days = now + 30 * 24 * 60 * 60;
+  const key = process.env.STRIPE_SECRET_KEY;
 
-    // Fetch open invoices, recent charges, and active subscriptions in parallel
-    const [invoicesRes, chargesRes, subsRes] = await Promise.all([
-      stripe.invoices.list({ status: 'open', limit: 50 }),
-      stripe.charges.list({ limit: 10 }),
-      stripe.subscriptions.list({ status: 'active', limit: 100 }),
+  if (!key) {
+    return NextResponse.json({ error: 'Stripe not connected' }, { status: 200 });
+  }
+
+  const auth = `Basic ${Buffer.from(`${key}:`).toString('base64')}`;
+
+  try {
+    const [payoutsRes, chargesRes] = await Promise.all([
+      fetch('https://api.stripe.com/v1/payouts?limit=5', {
+        headers: { Authorization: auth },
+        next: { revalidate: 0 },
+      }),
+      fetch('https://api.stripe.com/v1/charges?limit=10', {
+        headers: { Authorization: auth },
+        next: { revalidate: 0 },
+      }),
     ]);
 
-    const upcoming_invoices = invoicesRes.data.filter((inv) => {
-      const due = inv.due_date ?? 0;
-      return due >= now && due <= in30Days;
-    }).map((inv) => ({
-      id: inv.id,
-      customer_name: typeof inv.customer_email === 'string' ? inv.customer_email : (inv.customer as string),
-      amount: inv.amount_due,
-      currency: inv.currency,
-      due_date: inv.due_date,
-      hosted_invoice_url: inv.hosted_invoice_url,
+    if (!payoutsRes.ok || !chargesRes.ok) {
+      const errBody = await (payoutsRes.ok ? chargesRes : payoutsRes).text();
+      return NextResponse.json(
+        { error: `Stripe API error: ${errBody}` },
+        { status: 502 },
+      );
+    }
+
+    const [payoutsData, chargesData] = await Promise.all([
+      payoutsRes.json(),
+      chargesRes.json(),
+    ]);
+
+    // Shape payouts
+    const payouts = (payoutsData.data ?? []).map((p: Record<string, unknown>) => ({
+      id: p.id as string,
+      amount: p.amount as number,
+      currency: p.currency as string,
+      status: p.status as string,
+      arrival_date: p.arrival_date as number,
+      description: p.description as string | null,
+      bank_last4: (p.destination as Record<string, unknown> | null)?.last4 ?? null,
     }));
 
-    const overdue_invoices = invoicesRes.data.filter((inv) => {
-      const due = inv.due_date ?? 0;
-      return due > 0 && due < now;
-    }).map((inv) => ({
-      id: inv.id,
-      customer_name: typeof inv.customer_email === 'string' ? inv.customer_email : (inv.customer as string),
-      amount: inv.amount_due,
-      currency: inv.currency,
-      due_date: inv.due_date,
-      hosted_invoice_url: inv.hosted_invoice_url,
-    }));
-
-    const recent_payments = chargesRes.data
+    // Shape charges — successful only
+    const charges = ((chargesData.data ?? []) as Array<Record<string, unknown>>)
       .filter((ch) => ch.status === 'succeeded')
       .map((ch) => ({
-        id: ch.id,
-        amount: ch.amount,
-        currency: ch.currency,
-        created: ch.created,
-        description: ch.description ?? ch.statement_descriptor ?? 'Payment',
-        customer_email: ch.billing_details?.email ?? null,
+        id: ch.id as string,
+        amount: ch.amount as number,
+        currency: ch.currency as string,
+        created: ch.created as number,
+        description:
+          (ch.description as string | null) ??
+          (ch.statement_descriptor as string | null) ??
+          'Payment',
+        customer_email:
+          (ch.billing_details as Record<string, unknown> | null)?.email ?? null,
       }));
 
-    return NextResponse.json({
-      upcoming_invoices,
-      overdue_invoices,
-      recent_payments,
-      subscription_count: subsRes.data.length,
-    });
+    return NextResponse.json({ payouts, charges });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
