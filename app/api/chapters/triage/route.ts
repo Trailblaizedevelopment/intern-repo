@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest) {
       );
     }
 
-    // Fetch all chapters — include onboarding step keys + instagram_flyer_posted for real health/completion calcs
+    // Fetch all chapters — include onboarding step keys for real health/completion calcs
     const { data: chapters, error: chapError } = await supabase
       .from('chapters')
       .select(`
@@ -39,7 +39,6 @@ export async function GET(_request: NextRequest) {
         contact_name, contact_email, contact_phone,
         mrr, payment_day,
         wizard_step, wizard_completed_at,
-        instagram_flyer_posted,
         setup_groupchat_created, setup_chapter_on_space, setup_chapter_on_platform,
         setup_submission_form_sent, setup_submission_received,
         activate_ig_collab, activate_ig_flyer, activate_facebook_flyer,
@@ -149,7 +148,6 @@ export async function GET(_request: NextRequest) {
       else if (stats.signed_up > 0) score += 10;
 
       // Instagram flyer posted (5 pts)
-      if (ch.instagram_flyer_posted) score += 5;
 
       // Clamp to 0–100
       score = Math.max(0, Math.min(100, score));
