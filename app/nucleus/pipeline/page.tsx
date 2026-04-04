@@ -5,7 +5,7 @@ import {
   TrendingUp, Search, Filter, Phone, MessageSquare, Clock, Mail,
   ChevronRight, ChevronDown, Building2, Users, Trophy, Globe, X,
   Calendar, Flame, BarChart3, MapPin, ArrowUpRight, Plus, Edit2, Check, Download,
-  Edit3, SlidersHorizontal, Layers
+  Edit3, SlidersHorizontal, Layers, Upload
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase, STAGE_CONFIG, DealStage, OWEN_STAGE_CONFIG, OWEN_STAGE_ORDER, getOwenStage, OwenStage } from '@/lib/supabase';
@@ -13,6 +13,7 @@ import { useToast } from '@/components/Toast';
 import FollowUpPicker from './FollowUpPicker';
 import DealEditPanel from './DealEditPanel';
 import NewDealModal from './NewDealModal';
+import BulkDealImportModal from './BulkDealImportModal';
 import { SkeletonPage } from '@/components/Skeleton';
 
 /* ─── Types ─── */
@@ -703,6 +704,9 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   const [natStageFilter, setNatStageFilter] = useState<string>('all');
   const [natTypeFilter, setNatTypeFilter] = useState<string>('');
 
+  // Bulk import modal
+  const [importModalOpen, setImportModalOpen] = useState(false);
+
   // Deal edit panel
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<PipelineDeal | null>(null);
@@ -1386,6 +1390,28 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
           )}
           {(activeTab === 'my-deals' || activeTab === 'all-deals') && (
             <button
+              onClick={() => setImportModalOpen(true)}
+              title="Import deals from CSV"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                border: '1px solid var(--ws-border)',
+                borderRadius: '8px',
+                background: 'var(--ws-surface)',
+                color: 'var(--ws-text-secondary)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Upload size={14} /> Import CSV
+            </button>
+          )}
+          {(activeTab === 'my-deals' || activeTab === 'all-deals') && (
+            <button
               onClick={exportPipelineCSV}
               title="Export pipeline as CSV"
               style={{
@@ -1764,6 +1790,19 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
         {/* Leaderboard */}
         {activeTab === 'leaderboard' && <Leaderboard />}
       </div>
+
+      {/* Bulk Deal Import Modal */}
+      {importModalOpen && (
+        <BulkDealImportModal
+          onClose={() => setImportModalOpen(false)}
+          onImported={(count) => {
+            setImportModalOpen(false);
+            loadDeals();
+            loadSchools();
+            showToast(`Successfully imported ${count} deal${count !== 1 ? 's' : ''}!`, 'success');
+          }}
+        />
+      )}
 
       {/* New Deal Modal */}
       {panelOpen && isNewDeal && (
