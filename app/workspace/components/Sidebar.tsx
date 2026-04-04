@@ -127,9 +127,9 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
       ]
     : isInternRole
     ? [
-        // Interns: exactly 3 tabs — Dashboard, My Deals, Schools
+        // Interns: Dashboard, Pipeline (full), Schools
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
-        { name: 'My Deals', href: '/workspace/my-deals', icon: 'HeartHandshake', badge: 0 },
+        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
         { name: 'Schools', href: '/workspace/schools', icon: 'GraduationCap', badge: 0 },
       ]
     : [
