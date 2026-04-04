@@ -38,8 +38,7 @@ export async function GET(_request: NextRequest) {
         active_members, estimated_alumni, created_at,
         contact_name, contact_email, contact_phone,
         mrr, payment_day,
-        wizard_step, wizard_completed_at,
-        instagram_flyer_posted
+        wizard_step, wizard_completed_at
       `)
       .order('chapter_name', { ascending: true });
 
@@ -139,9 +138,6 @@ export async function GET(_request: NextRequest) {
       // Signups (15 pts)
       if (stats.signed_up >= 10) score += 15;
       else if (stats.signed_up > 0) score += 10;
-
-      // Instagram flyer posted (+5 pts)
-      if (ch.instagram_flyer_posted) score += 5;
 
       // Clamp to 0–100
       score = Math.max(0, Math.min(100, score));
