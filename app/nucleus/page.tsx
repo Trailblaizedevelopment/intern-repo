@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Activity,
+  Star,
   Zap,
   Wallet,
   LayoutDashboard
@@ -411,6 +412,16 @@ export default function Nucleus() {
         text: `${stats.employees.newThisWeek} new this week`, 
         type: 'success' 
       } : null,
+    },
+    {
+      title: 'Ambassador Tracker',
+      description: 'Track student ambassadors per school — contact, status, and notes.',
+      icon: Star,
+      href: '/nucleus/ambassadors',
+      color: '#f59e0b',
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+      stats: [],
+      highlight: null,
     },
   ];
 

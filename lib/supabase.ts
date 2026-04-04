@@ -1049,6 +1049,23 @@ export const MEMBER_STATUS_CONFIG: Record<MemberStatus, { label: string; color: 
   not_tracking: { label: 'Not Tracking',color: '#6b7280', bg: '#f3f4f6' },
 };
 
+// ============================================
+// Ambassador Types
+// ============================================
+
+export type AmbassadorStatus = 'active' | 'inactive' | 'prospect';
+
+export interface Ambassador {
+  id: string;
+  name: string;
+  school: string;
+  contact: string; // email or phone
+  status: AmbassadorStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChapterMember {
   id: string;
   chapter_id: string;
