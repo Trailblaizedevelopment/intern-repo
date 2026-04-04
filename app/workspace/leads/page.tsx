@@ -398,15 +398,7 @@ export default function LeadsPage() {
     );
   }
 
-  if (!isFounder) {
-    return (
-      <div className="leads-no-access">
-        <Target size={48} />
-        <h2>Founder Access Only</h2>
-        <p>The leads view is available to founders and co-founders.</p>
-      </div>
-    );
-  }
+  // Growth interns and above can view leads (read access)
 
   return (
     <div className="leads-page">
