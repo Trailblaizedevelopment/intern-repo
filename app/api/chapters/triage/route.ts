@@ -41,7 +41,7 @@ export async function GET(_request: NextRequest) {
         wizard_step, wizard_completed_at,
         setup_groupchat_created, setup_chapter_on_space, setup_chapter_on_platform,
         setup_submission_form_sent, setup_submission_received,
-        activate_ig_collab, activate_ig_flyer, activate_facebook_flyer,
+        activate_ig_collab, activate_facebook_flyer,
         activate_linkedin_post, activate_groupme_blast, activate_newsletter,
         data_list_uploaded, data_counts_verified, data_imessage_filtered,
         linq_touch1_sent, linq_touch2_sent, linq_touch3_sent, linq_100_signups,
@@ -167,7 +167,7 @@ export async function GET(_request: NextRequest) {
       const ONBOARDING_STEP_KEYS = [
         'setup_groupchat_created', 'setup_chapter_on_space', 'setup_chapter_on_platform',
         'setup_submission_form_sent', 'setup_submission_received',
-        'activate_ig_collab', 'activate_ig_flyer', 'activate_facebook_flyer',
+        'activate_ig_collab', 'activate_facebook_flyer',
         'activate_linkedin_post', 'activate_groupme_blast', 'activate_newsletter',
         'data_list_uploaded', 'data_counts_verified', 'data_imessage_filtered',
         'linq_touch1_sent', 'linq_touch2_sent', 'linq_touch3_sent', 'linq_100_signups',
