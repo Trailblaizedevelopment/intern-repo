@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest) {
       );
     }
 
-    // Fetch all chapters
+    // Fetch all chapters — include onboarding step keys + instagram_flyer_posted for real health/completion calcs
     const { data: chapters, error: chapError } = await supabase
       .from('chapters')
       .select(`
@@ -38,7 +38,16 @@ export async function GET(_request: NextRequest) {
         active_members, estimated_alumni, created_at,
         contact_name, contact_email, contact_phone,
         mrr, payment_day,
-        wizard_step, wizard_completed_at
+        wizard_step, wizard_completed_at,
+        instagram_flyer_posted,
+        setup_groupchat_created, setup_chapter_on_space, setup_chapter_on_platform,
+        setup_submission_form_sent, setup_submission_received,
+        activate_ig_collab, activate_ig_flyer, activate_facebook_flyer,
+        activate_linkedin_post, activate_groupme_blast, activate_newsletter,
+        data_list_uploaded, data_counts_verified, data_imessage_filtered,
+        linq_touch1_sent, linq_touch2_sent, linq_touch3_sent, linq_100_signups,
+        email_sequence_live, email_blast_sent,
+        success_first_checkin, success_actives_list, success_first_match, success_video_sent
       `)
       .order('chapter_name', { ascending: true });
 
@@ -139,6 +148,9 @@ export async function GET(_request: NextRequest) {
       if (stats.signed_up >= 10) score += 15;
       else if (stats.signed_up > 0) score += 10;
 
+      // Instagram flyer posted (5 pts)
+      if (ch.instagram_flyer_posted) score += 5;
+
       // Clamp to 0–100
       score = Math.max(0, Math.min(100, score));
 
@@ -153,9 +165,19 @@ export async function GET(_request: NextRequest) {
         ? Math.floor((now - new Date(ch.last_check_in_date).getTime()) / 86400000)
         : null;
 
-      // Onboarding completion pct — use chapter's own health field as fallback
-      // (real pct needs all step keys; approximate here from available fields)
-      const onboarding_completion_pct = ch.onboarding_completed ? 100 : null;
+      // Onboarding completion pct — compute from all 25 ONBOARDING_STEPS keys
+      const ONBOARDING_STEP_KEYS = [
+        'setup_groupchat_created', 'setup_chapter_on_space', 'setup_chapter_on_platform',
+        'setup_submission_form_sent', 'setup_submission_received',
+        'activate_ig_collab', 'activate_ig_flyer', 'activate_facebook_flyer',
+        'activate_linkedin_post', 'activate_groupme_blast', 'activate_newsletter',
+        'data_list_uploaded', 'data_counts_verified', 'data_imessage_filtered',
+        'linq_touch1_sent', 'linq_touch2_sent', 'linq_touch3_sent', 'linq_100_signups',
+        'email_sequence_live', 'email_blast_sent',
+        'success_first_checkin', 'success_actives_list', 'success_first_match', 'success_video_sent',
+      ] as const;
+      const completedSteps = ONBOARDING_STEP_KEYS.filter(k => (ch as Record<string, unknown>)[k]).length;
+      const onboarding_completion_pct = Math.round((completedSteps / ONBOARDING_STEP_KEYS.length) * 100);
 
       // Next required action (surface the most urgent)
       let next_required_action = ch.next_action || null;
