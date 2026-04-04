@@ -65,8 +65,9 @@ export const ROLE_PERMISSIONS: Record<EmployeeRole, string[]> = {
   founder: ['nucleus', 'all'],
   cofounder: ['nucleus', 'all'],
   
-  // Growth Intern - Alumni outreach, personal leads, alumni list
+  // Growth Intern - Pipeline access + alumni outreach
   growth_intern: [
+    'nucleus',             // Access to nucleus (pipeline)
     'tasks',
     'personal_leads',      // Their own leads/contacts
     'alumni_outreach',     // Alumni tracking

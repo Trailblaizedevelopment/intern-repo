@@ -163,14 +163,10 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       ];
     case 'growth_intern':
     default:
-      // Interns: no Inbox, no Tickets, no My Tasks
-      // Gets: Dashboard, My Deals (filtered pipeline), Schools (read-only pipeline view), Projects, Team
+      // Interns: Dashboard, Pipeline (same as founders), Team
       return [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
         { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', emphasized: true },
-        { name: 'Leads', href: '/workspace/leads', icon: 'Target' },
-        { name: 'Schools', href: '/workspace/schools', icon: 'GraduationCap' },
-        { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
   }
