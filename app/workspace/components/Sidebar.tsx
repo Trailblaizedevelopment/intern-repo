@@ -30,6 +30,7 @@ import {
   Ticket,
   GraduationCap,
   Map,
+  Star,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -52,6 +53,7 @@ const iconMap: Record<string, LucideIcon> = {
   HeartHandshake,
   GraduationCap,
   Map,
+  Star,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
@@ -111,6 +113,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     { name: 'Enterprise', href: '/nucleus/enterprise', icon: Building2 },
     { name: 'Fundraising', href: '/nucleus/fundraising', icon: Rocket },
     { name: 'Employees', href: '/nucleus/employees', icon: Users },
+    { name: 'Ambassadors', href: '/nucleus/ambassadors', icon: Star },
   ];
 
   // Mobile bottom tabs — role-aware

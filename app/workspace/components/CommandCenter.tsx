@@ -81,13 +81,21 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
     async function fetchData() {
       if (!supabase) return;
 
-      // Founder: fetch all deals (no assigned_to column exists)
+      // Founder: fetch all pipeline deals
       if (isFounder) {
-        const { data: d } = await supabase
-          .from('deals')
-          .select('*')
-          .order('next_followup', { ascending: true });
-        if (d) setMyDeals(d as Deal[]);
+        const res = await fetch('/api/pipeline/deals');
+        if (res.ok) {
+          const raw = await res.json();
+          const mapped = (Array.isArray(raw) ? raw : []).map((d: any) => ({
+            id: d.id,
+            stage: d.stage,
+            value: d.value,
+            next_followup: d.next_followup,
+            contact_name: d.contact?.name || d.organization?.name || '',
+            name: d.organization?.name || '',
+          }));
+          setMyDeals(mapped as unknown as Deal[]);
+        }
       }
 
       // Founders + Engineers: fetch all pipeline_deals + chapter count for company metrics

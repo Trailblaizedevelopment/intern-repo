@@ -149,14 +149,14 @@ export default function Nucleus() {
       const [
         employeesRes,
         contactsRes,
-        dealsRes,
+        dealsApiRes,
         tasksRes,
         chaptersRes,
         contractsRes
       ] = await Promise.all([
         supabase.from('employees').select('*'),
         supabase.from('network_contacts').select('*'),
-        supabase.from('deals').select('*'),
+        fetch('/api/pipeline/deals').then(r => r.ok ? r.json() : []),
         supabase.from('tasks').select('*'),
         supabase.from('chapters').select('*'),
         supabase.from('enterprise_contracts').select('*')
@@ -164,7 +164,7 @@ export default function Nucleus() {
 
       const employees = employeesRes.data || [];
       const contacts = contactsRes.data || [];
-      const deals = dealsRes.data || [];
+      const deals = Array.isArray(dealsApiRes) ? dealsApiRes : [];
       const tasks = tasksRes.data || [];
       const chapters = chaptersRes.data || [];
       const contracts = contractsRes.data || [];

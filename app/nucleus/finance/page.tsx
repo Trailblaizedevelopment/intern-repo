@@ -32,6 +32,7 @@ import {
   Undo2,
   ChevronRight,
   History,
+  Flame,
 } from 'lucide-react';
 import { supabase, Chapter, Deal } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -83,7 +84,6 @@ interface StripeData {
   }>;
 }
 
-// Temporary stub — Forge is completing this component
 function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeError, formatCurrency }: {
   chapters: unknown[];
   deals: unknown[];
@@ -92,9 +92,159 @@ function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeEr
   stripeError: string | null;
   formatCurrency: (n: number) => string;
 }) {
+  const chs = chapters as any[];
+  const dls = deals as any[];
+  const stripe = stripeData as StripeData | null;
+
+  const mrr = chs
+    .filter(c => c.payment_type === 'monthly' && c.status === 'active')
+    .reduce((sum, c) => sum + (c.payment_amount || 0), 0);
+
+  const annualCommitments = chs
+    .filter(c => c.payment_type === 'annual' && c.status === 'active')
+    .reduce((sum, c) => sum + (c.payment_amount || 0), 0);
+
+  const arr = mrr * 12 + annualCommitments;
+
+  const activePipelineValue = dls
+    .filter(d => !['closed_won', 'closed_lost', 'hold_off'].includes(d.stage))
+    .reduce((sum, d) => sum + (d.value || 0), 0);
+
+  const hotDealsCount = dls.filter(d => d.temperature === 'hot').length;
+
+  const totalPayouts = stripe?.payouts?.length ?? 0;
+  const recentChargesAmount = stripe?.charges
+    ? stripe.charges.reduce((sum, c) => sum + (c.amount || 0), 0) / 100
+    : 0;
+
+  const metricGrid: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '1rem',
+  };
+  const metricCard: React.CSSProperties = {
+    background: 'white',
+    borderRadius: '12px',
+    padding: '1rem 1.25rem',
+    border: '1px solid #e5e7eb',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+  };
+  const mkIcon = (bg: string, color: string): React.CSSProperties => ({
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    background: bg,
+    color,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  });
+  const metricContent: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
+  const metricValue: React.CSSProperties = { fontSize: '1.25rem', fontWeight: 700, color: '#111827' };
+  const metricLabel: React.CSSProperties = { fontSize: '0.75rem', color: '#6b7280' };
+  const sectionTitle: React.CSSProperties = {
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginBottom: '0.75rem',
+    marginTop: 0,
+  };
+
   return (
-    <div className="finance-section">
-      <p style={{ color: '#94a3b8', padding: '2rem' }}>Finance dashboard loading...</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem' }}>
+
+      {/* MRR / ARR */}
+      <div>
+        <h3 style={sectionTitle}>Revenue</h3>
+        <div style={metricGrid}>
+          <div style={metricCard}>
+            <div style={mkIcon('#ecfdf5', '#10b981')}><DollarSign size={20} /></div>
+            <div style={metricContent}>
+              <span style={metricValue}>{formatCurrency(mrr)}</span>
+              <span style={metricLabel}>Monthly MRR</span>
+            </div>
+          </div>
+          <div style={metricCard}>
+            <div style={mkIcon('#faf5ff', '#8b5cf6')}><TrendingUp size={20} /></div>
+            <div style={metricContent}>
+              <span style={metricValue}>{formatCurrency(arr)}</span>
+              <span style={metricLabel}>ARR (annualized)</span>
+            </div>
+          </div>
+          <div style={metricCard}>
+            <div style={mkIcon('#eff6ff', '#3b82f6')}><DollarSign size={20} /></div>
+            <div style={metricContent}>
+              <span style={metricValue}>{formatCurrency(annualCommitments)}</span>
+              <span style={metricLabel}>Annual Commitments</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pipeline */}
+      <div>
+        <h3 style={sectionTitle}>Pipeline</h3>
+        <div style={metricGrid}>
+          <div style={metricCard}>
+            <div style={mkIcon('#ecfdf5', '#10b981')}><TrendingUp size={20} /></div>
+            <div style={metricContent}>
+              <span style={metricValue}>{formatCurrency(activePipelineValue)}</span>
+              <span style={metricLabel}>Active Pipeline</span>
+            </div>
+          </div>
+          <div style={metricCard}>
+            <div style={mkIcon('#fff7ed', '#f97316')}><Flame size={20} /></div>
+            <div style={metricContent}>
+              <span style={metricValue}>{hotDealsCount}</span>
+              <span style={metricLabel}>Hot Deals</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stripe */}
+      <div>
+        <h3 style={sectionTitle}>Stripe</h3>
+        {stripeLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
+            <RefreshCw size={20} className="spin" />
+            Loading Stripe data…
+          </div>
+        ) : stripeError ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.875rem 1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', color: '#dc2626', fontSize: '0.875rem' }}>
+            <AlertCircle size={16} />
+            {stripeError}
+          </div>
+        ) : stripe ? (
+          <div style={metricGrid}>
+            <div style={metricCard}>
+              <div style={mkIcon('#eff6ff', '#3b82f6')}><CreditCard size={20} /></div>
+              <div style={metricContent}>
+                <span style={metricValue}>{totalPayouts}</span>
+                <span style={metricLabel}>Recent Payouts</span>
+              </div>
+            </div>
+            <div style={metricCard}>
+              <div style={mkIcon('#ecfdf5', '#10b981')}><DollarSign size={20} /></div>
+              <div style={metricContent}>
+                <span style={metricValue}>{formatCurrency(recentChargesAmount)}</span>
+                <span style={metricLabel}>Recent Charges</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+            <CreditCard size={32} style={{ marginBottom: '0.75rem', opacity: 0.5 }} />
+            <p style={{ margin: 0 }}>No Stripe data available</p>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
@@ -161,12 +311,15 @@ export default function FinanceModule() {
   }
 
   async function fetchDeals() {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from('deals')
-      .select('id, stage, value')
-      .not('stage', 'in', '(closed_won,closed_lost)');
-    if (!error && data) setDeals(data as Deal[]);
+    try {
+      const res = await fetch('/api/pipeline/deals');
+      if (res.ok) {
+        const data = await res.json();
+        setDeals(Array.isArray(data) ? data as unknown as Deal[] : []);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   async function fetchStripeData() {
