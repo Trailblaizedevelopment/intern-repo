@@ -21,7 +21,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  */
 
 const LINQ_BASE = 'https://api.linqapp.com/api/partner/v3';
-const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH_TOKEN = process.env.INTERNAL_API_KEY || '';
 
 // Our own Linq line phones — used to identify "outbound" vs "inbound" messages
 const OUR_LINE_PHONES = new Set(['+16462101111', '+16462178274', '+16462442696']);

@@ -20,7 +20,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 export const maxDuration = 300;
 
 const CHUNK_SIZE = 25;
-const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH_TOKEN = process.env.INTERNAL_API_KEY || '';
 
 // Vercel cron uses Authorization: Bearer <CRON_SECRET>
 function isAuthorized(req: NextRequest): boolean {

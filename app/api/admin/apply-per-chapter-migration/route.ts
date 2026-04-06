@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-const AUTH_TOKEN = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH_TOKEN = `Bearer ${process.env.INTERNAL_API_KEY || ''}`;
 
 /**
  * POST /api/admin/apply-per-chapter-migration

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH_TOKEN = process.env.INTERNAL_API_KEY || '';
 
 const SYSTEM_PROMPT =
   "You are a technical product manager for Trailblaize, an alumni relationship management SaaS for Greek life chapters. " +

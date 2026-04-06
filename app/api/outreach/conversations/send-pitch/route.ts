@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendMessage } from '@/lib/linq';
 
-const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH_TOKEN = process.env.INTERNAL_API_KEY || '';
 
 const LINE_PHONES: Record<number, string> = {
   1: '+16462101111', // Owen (new line, warming up 2026-03-17)

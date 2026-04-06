@@ -17,7 +17,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { listChats, getMessages, LinqChat } from '@/lib/linq';
 import { LINQ_LINES } from '@/lib/linq-recovery';
 
-const INTERNAL_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const INTERNAL_TOKEN = process.env.INTERNAL_API_KEY || '';
 
 function checkAuth(req: NextRequest): boolean {
   return (req.headers.get('Authorization') || '') === `Bearer ${INTERNAL_TOKEN}`;

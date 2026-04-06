@@ -27,7 +27,7 @@ async function linearGQL(query: string, variables?: Record<string, unknown>) {
  */
 export async function POST(request: NextRequest) {
   const auth = request.headers.get('authorization');
-  if (!auth?.includes('hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h')) {
+  if (!auth?.includes(process.env.INTERNAL_API_KEY || '')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
