@@ -20,7 +20,6 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  *   6. Report matched / updated / skipped
  */
 
-const LINQ_API_TOKEN = 'df4759ea-f49d-4ca8-bbc6-6c93a25ecc7d';
 const LINQ_BASE = 'https://api.linqapp.com/api/partner/v3';
 const AUTH_TOKEN = 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
@@ -116,6 +115,7 @@ function hasInboundMessages(chat: LinqChatItem): { has_inbound: boolean; last_in
 
 /** Paginate through all Linq chats */
 async function fetchAllLinqChats(): Promise<LinqChatItem[]> {
+  const linqToken = process.env.LINQ_API_TOKEN ?? '';
   const allChats: LinqChatItem[] = [];
   let cursor: string | null = null;
   let page = 0;
@@ -126,7 +126,7 @@ async function fetchAllLinqChats(): Promise<LinqChatItem[]> {
     if (cursor) params.set('cursor', cursor);
 
     const res = await fetch(`${LINQ_BASE}/chats?${params}`, {
-      headers: { 'Authorization': `Token ${LINQ_API_TOKEN}` },
+      headers: { 'Authorization': `Token ${linqToken}` },
     });
 
     if (!res.ok) {

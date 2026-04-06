@@ -10,7 +10,6 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  * If Linq API is unreachable, falls back to local DB data with linq_status: 'unknown'.
  */
 
-const LINQ_API_TOKEN = 'df4759ea-f49d-4ca8-bbc6-6c93a25ecc7d';
 const LINQ_BASE = 'https://api.linqapp.com/api/partner/v3';
 
 const OUR_LINES = [
@@ -87,8 +86,9 @@ export async function GET() {
   try {
     // Linq /lines endpoint does not exist — infer line health from recent chat activity
     // Use a no-op that always triggers the fallback to local DB data
+    const linqToken = process.env.LINQ_API_TOKEN;
     const res = await fetch(`${LINQ_BASE}/chats?limit=1`, {
-      headers: { 'Authorization': `Token ${LINQ_API_TOKEN}` },
+      headers: { 'Authorization': `Token ${linqToken ?? ''}` },
       next: { revalidate: 0 },
     });
 

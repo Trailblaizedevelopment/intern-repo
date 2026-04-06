@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  AreaChart, Area, BarChart, Bar, FunnelChart, Funnel, LabelList,
+  AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, Users, MessageSquare, BarChart3, Loader2, RefreshCw } from 'lucide-react';

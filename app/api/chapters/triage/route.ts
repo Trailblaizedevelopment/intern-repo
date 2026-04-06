@@ -46,7 +46,8 @@ export async function GET(_request: NextRequest) {
         data_list_uploaded, data_counts_verified, data_imessage_filtered,
         linq_touch1_sent, linq_touch2_sent, linq_touch3_sent, linq_100_signups,
         email_sequence_live, email_blast_sent,
-        success_first_checkin, success_actives_list, success_first_match, success_video_sent
+        success_first_checkin, success_actives_list, success_first_match, success_video_sent,
+        instagram_flyer_posted
       `)
       .order('chapter_name', { ascending: true });
 
@@ -148,6 +149,7 @@ export async function GET(_request: NextRequest) {
       else if (stats.signed_up > 0) score += 10;
 
       // Instagram flyer posted (5 pts)
+      if ((ch as Record<string, unknown>).instagram_flyer_posted) score += 5;
 
       // Clamp to 0–100
       score = Math.max(0, Math.min(100, score));
