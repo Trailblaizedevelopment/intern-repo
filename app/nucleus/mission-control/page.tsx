@@ -23,8 +23,7 @@ interface AlumniContact {
   id: string;
   first_name: string;
   last_name: string;
-  chapter_name: string | null;
-  school_name: string | null;
+  chapter_id: string | null;
   phone_primary: string | null;
   outreach_status: string;
   updated_at: string;
@@ -105,18 +104,6 @@ interface MemoryEntry {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = {
-  not_contacted: 'bg-slate-100 text-slate-600',
-  touch1_sent: 'bg-blue-100 text-blue-700',
-  touch1_confirmed: 'bg-amber-100 text-amber-700',
-  touch2_sent: 'bg-violet-100 text-violet-700',
-  touch3_sent: 'bg-indigo-100 text-indigo-700',
-  responded: 'bg-emerald-100 text-emerald-700',
-  signed_up: 'bg-emerald-100 text-emerald-800 font-semibold',
-  declined: 'bg-red-100 text-red-700',
-  unsubscribed: 'bg-red-100 text-red-600',
-};
-
 const STATUS_LABELS: Record<string, string> = {
   not_contacted: 'Not Contacted',
   touch1_sent: 'T1 Sent',
@@ -130,15 +117,15 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const AGENT_COLOR_MAP: Record<string, { bg: string; text: string }> = {
-  violet: { bg: 'bg-violet-50', text: 'text-violet-700' },
-  amber:  { bg: 'bg-amber-50',  text: 'text-amber-700' },
-  emerald:{ bg: 'bg-emerald-50',text: 'text-emerald-700' },
-  blue:   { bg: 'bg-blue-50',   text: 'text-blue-700' },
-  teal:   { bg: 'bg-teal-50',   text: 'text-teal-700' },
-  indigo: { bg: 'bg-indigo-50', text: 'text-indigo-700' },
-  pink:   { bg: 'bg-pink-50',   text: 'text-pink-700' },
-  cyan:   { bg: 'bg-cyan-50',   text: 'text-cyan-700' },
-  slate:  { bg: 'bg-slate-50',  text: 'text-slate-700' },
+  violet: { bg: '#f5f3ff', text: '#6d28d9' },
+  amber:  { bg: '#fffbeb', text: '#b45309' },
+  emerald:{ bg: '#ecfdf5', text: '#065f46' },
+  blue:   { bg: '#eff6ff', text: '#1d4ed8' },
+  teal:   { bg: '#f0fdfa', text: '#0f766e' },
+  indigo: { bg: '#eef2ff', text: '#4338ca' },
+  pink:   { bg: '#fdf2f8', text: '#be185d' },
+  cyan:   { bg: '#ecfeff', text: '#0e7490' },
+  slate:  { bg: '#f8fafc', text: '#475569' },
 };
 
 function fmtTime(iso: string | null) {
@@ -170,22 +157,58 @@ function humanSchedule(cron: string): string {
   return cron;
 }
 
+// ─── Status Badge ────────────────────────────────────────────────────────────
+
+const STATUS_STYLES: Record<string, { color: string; bg: string }> = {
+  not_contacted:   { color: '#6b7280', bg: '#f3f4f6' },
+  touch1_sent:     { color: '#1d4ed8', bg: '#dbeafe' },
+  touch1_confirmed:{ color: '#b45309', bg: '#fef3c7' },
+  touch2_sent:     { color: '#6d28d9', bg: '#ede9fe' },
+  touch3_sent:     { color: '#4338ca', bg: '#e0e7ff' },
+  responded:       { color: '#065f46', bg: '#d1fae5' },
+  signed_up:       { color: '#064e3b', bg: '#a7f3d0' },
+  declined:        { color: '#991b1b', bg: '#fee2e2' },
+  unsubscribed:    { color: '#7f1d1d', bg: '#fecaca' },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_STYLES[status] ?? { color: '#6b7280', bg: '#f3f4f6' };
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '2px 8px',
+      borderRadius: '9999px',
+      fontSize: '0.72rem',
+      fontWeight: 600,
+      color: s.color,
+      backgroundColor: s.bg,
+    }}>
+      {STATUS_LABELS[status] ?? status}
+    </span>
+  );
+}
+
 // ─── Stat Card ───────────────────────────────────────────────────────────────
 
 function StatCard({ label, value, icon, color }: {
   label: string;
   value: number | string;
   icon: React.ReactNode;
-  color: string;
+  color: string; // kept for backward compat but unused
 }) {
+  void color;
   return (
-    <div className="bg-white border border-[#E8E4DC] rounded-xl p-4 flex items-center gap-3">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
+    <div className="module-stat" style={{ flexDirection: 'row', gap: '0.75rem', alignItems: 'center' }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, background: '#F0EDE8', color: '#C4874A',
+      }}>
         {icon}
       </div>
-      <div className="min-w-0">
-        <div className="text-xs text-[#8C7B6B] font-medium truncate">{label}</div>
-        <div className="text-xl font-semibold text-[#2D2A26] tabular-nums">{value}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '0.72rem', color: '#8C7B6B', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+        <div className="module-stat-value" style={{ fontSize: '1.2rem' }}>{value}</div>
       </div>
     </div>
   );
@@ -587,111 +610,113 @@ function AlumniSection({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <div className="flex items-center gap-2 bg-white border border-[#E8E4DC] rounded-lg px-3 py-2 flex-1 min-w-[200px]">
-          <Search size={14} className="text-[#8C7B6B]" />
+      <div className="module-actions-bar">
+        <div className="module-search">
+          <Search size={14} />
           <input
-            className="flex-1 bg-transparent text-sm text-[#2D2A26] placeholder-[#B0A89A] outline-none"
             placeholder="Search by name…"
             value={search}
             onChange={(e) => onSearch(e.target.value)}
           />
-          {search && <button onClick={() => onSearch('')}><X size={12} className="text-[#8C7B6B]" /></button>}
+          {search && (
+            <button className="module-search-clear" onClick={() => onSearch('')}>
+              <X size={12} />
+            </button>
+          )}
         </div>
-        <select
-          className="bg-white border border-[#E8E4DC] rounded-lg px-3 py-2 text-sm text-[#2D2A26] outline-none"
-          value={chapter}
-          onChange={(e) => onChapter(e.target.value)}
-        >
-          <option value="">All Chapters</option>
-          {(data?.chapters ?? []).map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <select
-          className="bg-white border border-[#E8E4DC] rounded-lg px-3 py-2 text-sm text-[#2D2A26] outline-none"
-          value={status}
-          onChange={(e) => onStatus(e.target.value)}
-        >
-          <option value="">All Statuses</option>
-          {Object.keys(STATUS_LABELS).map((k) => (
-            <option key={k} value={k}>{STATUS_LABELS[k]}</option>
-          ))}
-        </select>
+        <div className="module-actions">
+          <select
+            className="applications-filter-select"
+            value={chapter}
+            onChange={(e) => onChapter(e.target.value)}
+          >
+            <option value="">All Chapters</option>
+            {(data?.chapters ?? []).map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <select
+            className="applications-filter-select"
+            value={status}
+            onChange={(e) => onStatus(e.target.value)}
+          >
+            <option value="">All Statuses</option>
+            {Object.keys(STATUS_LABELS).map((k) => (
+              <option key={k} value={k}>{STATUS_LABELS[k]}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-[#E8E4DC] rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className="module-table-container">
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#8C7B6B' }}>
+            <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 0.5rem' }} />
+            <div>Loading…</div>
+          </div>
+        ) : (data?.data ?? []).length === 0 ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#8C7B6B', fontSize: '0.875rem' }}>
+            No contacts found
+          </div>
+        ) : (
+          <table className="module-table">
             <thead>
-              <tr className="border-b border-[#E8E4DC] bg-[#FAFAF8]">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Name</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Chapter</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden md:table-cell">School</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden lg:table-cell">Phone</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden sm:table-cell">Updated</th>
+              <tr>
+                <th>Name</th>
+                <th>Chapter ID</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Updated</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-[#8C7B6B]">
-                    <Loader2 size={20} className="animate-spin mx-auto mb-2" />
-                    Loading…
+              {(data?.data ?? []).map((contact) => (
+                <tr key={contact.id}>
+                  <td className="module-table-name">
+                    {contact.first_name} {contact.last_name}
+                  </td>
+                  <td style={{ color: '#5C5245', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                    {contact.chapter_id ? contact.chapter_id.slice(0, 8) + '…' : '—'}
+                  </td>
+                  <td style={{ fontFamily: 'monospace', fontSize: '0.8125rem', color: '#5C5245' }}>
+                    {contact.phone_primary ?? '—'}
+                  </td>
+                  <td>
+                    <StatusBadge status={contact.outreach_status} />
+                  </td>
+                  <td style={{ fontSize: '0.75rem', color: '#8C7B6B' }}>
+                    {fmtTime(contact.updated_at)}
                   </td>
                 </tr>
-              ) : (data?.data ?? []).length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-[#8C7B6B] text-sm">
-                    No contacts found
-                  </td>
-                </tr>
-              ) : (
-                (data?.data ?? []).map((contact) => (
-                  <tr key={contact.id} className="border-b border-[#F0EDE8] hover:bg-[#FAFAF8] transition-colors">
-                    <td className="px-4 py-3 font-medium text-[#2D2A26]">
-                      {contact.first_name} {contact.last_name}
-                    </td>
-                    <td className="px-4 py-3 text-[#5C5245]">{contact.chapter_name ?? '—'}</td>
-                    <td className="px-4 py-3 text-[#5C5245] hidden md:table-cell">{contact.school_name ?? '—'}</td>
-                    <td className="px-4 py-3 text-[#5C5245] hidden lg:table-cell font-mono text-xs">
-                      {contact.phone_primary ?? '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLORS[contact.outreach_status] ?? 'bg-slate-100 text-slate-600'}`}>
-                        {STATUS_LABELS[contact.outreach_status] ?? contact.outreach_status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-[#8C7B6B] hidden sm:table-cell">
-                      {fmtTime(contact.updated_at)}
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
-        </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#E8E4DC] bg-[#FAFAF8]">
-            <div className="text-xs text-[#8C7B6B]">
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0.75rem 1rem', borderTop: '1px solid #E8E4DC', background: '#FAFAF8',
+          }}>
+            <div style={{ fontSize: '0.75rem', color: '#8C7B6B' }}>
               {(data?.count ?? 0).toLocaleString()} contacts · Page {page} of {totalPages}
             </div>
-            <div className="flex gap-1">
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
               <button
                 onClick={() => onPageChange(page - 1)}
                 disabled={page === 1}
-                className="p-1.5 rounded-lg border border-[#E8E4DC] text-[#8C7B6B] hover:bg-white disabled:opacity-40"
+                className="module-filter-btn"
+                style={{ padding: '0.375rem' }}
               >
                 <ChevronLeft size={14} />
               </button>
               <button
                 onClick={() => onPageChange(page + 1)}
                 disabled={page >= totalPages}
-                className="p-1.5 rounded-lg border border-[#E8E4DC] text-[#8C7B6B] hover:bg-white disabled:opacity-40"
+                className="module-filter-btn"
+                style={{ padding: '0.375rem' }}
               >
                 <ChevronRight size={14} />
               </button>
@@ -962,36 +987,57 @@ function AgentCard({ agent, onViewSoul, isMain }: {
 }) {
   const colors = AGENT_COLOR_MAP[agent.color] ?? AGENT_COLOR_MAP.slate;
   return (
-    <div className={`bg-white border rounded-xl p-4 ${isMain ? 'border-violet-200 shadow-sm' : 'border-[#E8E4DC]'}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${colors.bg}`}>
+    <div style={{
+      background: 'white',
+      border: `1px solid ${isMain ? '#c4b5fd' : '#E8E4DC'}`,
+      borderRadius: 12,
+      padding: '1rem',
+      boxShadow: isMain ? '0 1px 4px rgba(109,40,217,0.08)' : undefined,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1.25rem', background: colors.bg,
+          }}>
             {agent.emoji}
           </div>
           <div>
-            <div className="font-semibold text-[#2D2A26] text-sm">{agent.name}</div>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${agent.status === 'active' ? 'bg-emerald-400' : 'bg-slate-300'}`} />
-              <span className={`text-xs ${agent.status === 'active' ? 'text-emerald-600' : 'text-[#8C7B6B]'}`}>
+            <div style={{ fontWeight: 600, color: '#2D2A26', fontSize: '0.875rem' }}>{agent.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: agent.status === 'active' ? '#34d399' : '#cbd5e1',
+                display: 'inline-block',
+              }} />
+              <span style={{ fontSize: '0.72rem', color: agent.status === 'active' ? '#059669' : '#8C7B6B' }}>
                 {agent.status === 'active' ? 'Active' : 'Idle'}
               </span>
             </div>
           </div>
         </div>
         {isMain && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 font-medium">
+          <span style={{
+            fontSize: '0.72rem', padding: '2px 8px', borderRadius: 9999,
+            background: '#f5f3ff', color: '#6d28d9', border: '1px solid #c4b5fd', fontWeight: 600,
+          }}>
             Chief
           </span>
         )}
       </div>
-      <p className="text-xs text-[#8C7B6B] leading-relaxed mb-3 line-clamp-2">{agent.description}</p>
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-[#B0A89A]">
+      <p style={{ fontSize: '0.75rem', color: '#8C7B6B', lineHeight: 1.6, marginBottom: '0.75rem',
+        overflow: 'hidden', display: '-webkit-box', WebkitBoxOrient: 'vertical' as const, WebkitLineClamp: 2 } as React.CSSProperties}>
+        {agent.description}
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: '0.72rem', color: '#B0A89A' }}>
           {agent.lastActive ? fmtTime(agent.lastActive) : 'Never active'}
         </div>
         <button
           onClick={() => onViewSoul(agent)}
-          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#F0EDE8] text-[#5C5245] hover:bg-[#E8E4DC] transition-colors"
+          className="module-filter-btn"
+          style={{ fontSize: '0.72rem', padding: '4px 10px' }}
         >
           <BookOpen size={11} /> View Soul
         </button>

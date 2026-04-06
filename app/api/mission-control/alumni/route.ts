@@ -4,6 +4,11 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 /**
  * GET /api/mission-control/alumni
  * Global alumni view (no chapter_id required). Supports search, chapter filter, status filter, pagination.
+ *
+ * Actual alumni_contacts columns:
+ *   id, chapter_id, first_name, last_name, phone_primary, phone_secondary,
+ *   outreach_status, updated_at, created_at, year, email, …
+ * NOTE: there is NO chapter_name or school_name column on this table.
  */
 export async function GET(request: Request) {
   const supabase = getSupabaseAdmin();
@@ -26,13 +31,13 @@ export async function GET(request: Request) {
     let query = supabase
       .from('alumni_contacts')
       .select(
-        'id, first_name, last_name, chapter_id, chapter_name, school_name, phone_primary, outreach_status, updated_at',
+        'id, first_name, last_name, chapter_id, phone_primary, outreach_status, updated_at',
         { count: 'exact' }
       )
       .order('updated_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (chapter) query = query.eq('chapter_name', chapter);
+    if (chapter) query = query.eq('chapter_id', chapter);
     if (status) query = query.eq('outreach_status', status);
     if (search) {
       query = query.or(
@@ -43,15 +48,15 @@ export async function GET(request: Request) {
     const { data, error, count } = await query;
     if (error) throw error;
 
-    // Distinct chapters for filter dropdown
+    // Distinct chapter_ids for filter dropdown
     const { data: chaptersRaw } = await supabase
       .from('alumni_contacts')
-      .select('chapter_name')
-      .not('chapter_name', 'is', null)
-      .order('chapter_name');
+      .select('chapter_id')
+      .not('chapter_id', 'is', null)
+      .order('chapter_id');
 
     const distinctChapters = [
-      ...new Set((chaptersRaw ?? []).map((r: { chapter_name: string }) => r.chapter_name)),
+      ...new Set((chaptersRaw ?? []).map((r: { chapter_id: string }) => r.chapter_id)),
     ].filter(Boolean);
 
     // Status counts
