@@ -54,15 +54,16 @@ export async function POST(req: NextRequest) {
   }
 
   // Get chapter for join link
+  // NOTE: columns are `fraternity` and `school` (not `fraternity_name` / `university`)
   const { data: chapter } = await supabase
     .from('chapters')
-    .select('fraternity_name, university, alumni_join_link')
+    .select('fraternity, school, alumni_join_link')
     .eq('id', contact.chapter_id)
     .single();
 
   const joinLink = chapter?.alumni_join_link || 'https://trailblaize.net';
-  const fratName = chapter?.fraternity_name || 'your fraternity';
-  const university = chapter?.university || 'your school';
+  const fratName = chapter?.fraternity || 'your fraternity';
+  const university = chapter?.school || 'your school';
 
   // Build T1.2 message — pitch with sign-up link
   const message = buildPitchMessage(contact.first_name, fratName, university, joinLink);

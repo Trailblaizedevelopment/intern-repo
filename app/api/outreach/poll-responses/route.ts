@@ -3,7 +3,7 @@ import { messaging } from '@/lib/messaging';
 
 export async function POST(request: NextRequest) {
   try {
-    const { chapter_id, batch_size = 100 } = await request.json();
+    const { chapter_id } = await request.json();
 
     if (!chapter_id) {
       return NextResponse.json(
