@@ -152,6 +152,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
+        { name: 'Mission Control', href: '/nucleus/mission-control', icon: 'Radar' },
       ];
     case 'engineer':
       return [
