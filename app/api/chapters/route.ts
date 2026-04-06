@@ -19,28 +19,8 @@ export async function GET(_request: NextRequest) {
 
     const { data, error } = await supabase
       .from('chapters')
-      .select(`
-        id,
-        chapter_name,
-        school,
-        fraternity,
-        status,
-        health,
-        alumni_join_link,
-        payment_amount,
-        payment_type,
-        last_payment_date,
-        next_payment_date,
-        last_check_in_date,
-        next_check_in_date,
-        check_in_frequency,
-        onboarding_completed,
-        next_action,
-        notes,
-        active_members,
-        estimated_alumni
-      `)
-      .order('chapter_name', { ascending: true });
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('[GET /api/chapters] DB error:', error);

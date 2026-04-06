@@ -147,37 +147,55 @@ export default function CustomerSuccessPage() {
   }
 
   async function createChapter() {
-    if (!supabase) return showToast('DB not connected', 'error');
     if (!formData.chapter_name.trim()) return showToast('Chapter name required', 'error');
-    const { error } = await supabase.from('chapters').insert([{
-      ...formData,
-      chapter_created: true,
-      onboarding_started: new Date().toISOString().split('T')[0],
-      payment_start_date: formData.payment_start_date || null,
-      last_payment_date: formData.last_payment_date || null,
-      next_payment_date: formData.next_payment_date || null,
-    }]);
-    if (error) showToast(`Failed: ${error.message}`, 'error');
-    else { showToast('Chapter created', 'success'); resetForm(); fetchTriage(); }
+    try {
+      const res = await fetch('/api/chapters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          chapter_created: true,
+          onboarding_started: new Date().toISOString().split('T')[0],
+          payment_start_date: formData.payment_start_date || null,
+          last_payment_date: formData.last_payment_date || null,
+          next_payment_date: formData.next_payment_date || null,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) showToast(`Failed: ${json.error.message || json.error}`, 'error');
+      else { showToast('Chapter created', 'success'); resetForm(); fetchTriage(); }
+    } catch { showToast('Failed to create chapter', 'error'); }
   }
 
   async function updateChapter() {
-    if (!supabase || !editingChapter) return;
-    const { error } = await supabase.from('chapters').update({
-      ...formData,
-      payment_start_date: formData.payment_start_date || null,
-      last_payment_date: formData.last_payment_date || null,
-      next_payment_date: formData.next_payment_date || null,
-    }).eq('id', editingChapter.id);
-    if (error) showToast(`Failed: ${error.message}`, 'error');
-    else { showToast('Chapter updated', 'success'); resetForm(); fetchTriage(); }
+    if (!editingChapter) return;
+    try {
+      const res = await fetch(`/api/chapters/${editingChapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          payment_start_date: formData.payment_start_date || null,
+          last_payment_date: formData.last_payment_date || null,
+          next_payment_date: formData.next_payment_date || null,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) showToast(`Failed: ${json.error.message || json.error}`, 'error');
+      else { showToast('Chapter updated', 'success'); resetForm(); fetchTriage(); }
+    } catch { showToast('Failed to update chapter', 'error'); }
   }
 
   async function deleteChapter(id: string) {
-    if (!supabase) return;
-    const { error } = await supabase.from('chapters').delete().eq('id', id);
-    if (error) showToast('Failed to delete', 'error');
-    else { showToast('Chapter deleted', 'success'); fetchTriage(); }
+    try {
+      const res = await fetch(`/api/chapters/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-confirm-delete': 'CONFIRMED' },
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) showToast('Failed to delete', 'error');
+      else { showToast('Chapter deleted', 'success'); fetchTriage(); }
+    } catch { showToast('Failed to delete chapter', 'error'); }
     setDeleteConfirm({ show: false, id: null });
   }
 
