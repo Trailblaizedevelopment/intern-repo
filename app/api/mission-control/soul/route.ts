@@ -21,6 +21,15 @@ const SOUL_PATHS: Record<string, string> = {
   architect: path.join(HOME, '.openclaw', 'workspace-architect', 'SOUL.md'),
 };
 
+function canReadFile(filePath: string): boolean {
+  try {
+    fs.accessSync(filePath, fs.constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const agent = searchParams.get('agent')?.toLowerCase() ?? '';
@@ -28,6 +37,14 @@ export async function GET(request: Request) {
   const filePath = SOUL_PATHS[agent];
   if (!filePath) {
     return NextResponse.json({ content: '', agent });
+  }
+
+  if (!canReadFile(filePath)) {
+    return NextResponse.json({
+      content: '',
+      agent,
+      message: 'SOUL.md is only available when running locally.',
+    });
   }
 
   try {

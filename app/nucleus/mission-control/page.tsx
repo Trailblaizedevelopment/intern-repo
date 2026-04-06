@@ -88,10 +88,18 @@ interface CronJob {
   name: string;
   description?: string;
   agent?: string;
+  scheduleKind?: 'cron' | 'every' | 'at';
+  scheduleExpr?: string;
+  scheduleInterval?: number;
+  scheduleUnit?: string;
+  scheduleTime?: string;
+  scheduleTz?: string;
   schedule?: string;
-  nextRun?: string;
-  lastRun?: string;
-  lastStatus?: string;
+  nextRun?: string | null;
+  lastRun?: string | null;
+  lastStatus?: string | null;
+  lastError?: string | null;
+  consecutiveErrors?: number;
   enabled?: boolean;
 }
 
@@ -149,12 +157,66 @@ function humanSchedule(cron: string): string {
     return `${days[d] ?? dow} at ${hour}:${min.padStart(2, '0')}`;
   }
   if (min === '0' && hour !== '*' && dom === '*') {
-    return `Daily at ${hour}:00`;
+    const hours = hour.split(',').map((h) => {
+      const hNum = parseInt(h);
+      const suffix = hNum >= 12 ? 'PM' : 'AM';
+      const h12 = hNum % 12 === 0 ? 12 : hNum % 12;
+      return `${h12}:00 ${suffix}`;
+    });
+    if (hours.length === 1) return `Daily at ${hours[0]} CST`;
+    return `Daily at ${hours.join(', ')} CST`;
   }
   if (min !== '*' && hour !== '*' && dom === '*') {
-    return `Daily at ${hour}:${min.padStart(2, '0')}`;
+    const minNum = parseInt(min);
+    const hourNum = parseInt(hour);
+    const suffix = hourNum >= 12 ? 'PM' : 'AM';
+    const h12 = hourNum % 12 === 0 ? 12 : hourNum % 12;
+    return `Daily at ${h12}:${String(minNum).padStart(2, '0')} ${suffix} CST`;
+  }
+  // */N pattern for minutes
+  if (min.startsWith('*/') && hour.includes('-')) {
+    const interval = min.replace('*/', '');
+    const [startH, endH] = hour.split('-').map(Number);
+    return `Every ${interval}m (${startH}am–${endH}pm CST)`;
   }
   return cron;
+}
+
+function humanScheduleFromJob(job: CronJob): string {
+  const kind = job.scheduleKind;
+  if (kind === 'every') {
+    const unit = job.scheduleUnit ?? 'minutes';
+    const interval = job.scheduleInterval ?? 1;
+    const unitLabel = interval === 1 ? unit.replace(/s$/, '') : unit;
+    return `Every ${interval} ${unitLabel}`;
+  }
+  if (kind === 'at') {
+    const timeStr = job.scheduleTime;
+    if (!timeStr) return 'One-time';
+    const d = new Date(timeStr);
+    if (isNaN(d.getTime())) return timeStr;
+    return d.toLocaleString('en-US', {
+      month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+      hour12: true, timeZone: 'America/Chicago',
+    }) + ' CST';
+  }
+  if (kind === 'cron' && job.scheduleExpr) {
+    return humanSchedule(job.scheduleExpr);
+  }
+  if (job.schedule) return humanSchedule(job.schedule);
+  return '—';
+}
+
+function fmtNextRun(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const diff = d.getTime() - Date.now();
+  if (diff < 0) return 'overdue';
+  if (diff < 60_000) return 'in <1m';
+  if (diff < 3_600_000) return `in ${Math.floor(diff / 60_000)}m`;
+  if (diff < 86_400_000) return `in ${Math.floor(diff / 3_600_000)}h`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // ─── Status Badge ────────────────────────────────────────────────────────────
@@ -1048,6 +1110,8 @@ function AgentCard({ agent, onViewSoul, isMain }: {
 
 // ─── Crons Section ───────────────────────────────────────────────────────────
 
+type CronsView = 'list' | 'schedule';
+
 function CronsSection({
   jobs, loading, triggering, onTrigger, onRefresh,
 }: {
@@ -1057,6 +1121,9 @@ function CronsSection({
   onTrigger: (id: string) => void;
   onRefresh: () => void;
 }) {
+  const [view, setView] = React.useState<CronsView>('list');
+  const [filterAgent, setFilterAgent] = React.useState('');
+
   const AGENT_BADGE: Record<string, string> = {
     dev: 'bg-indigo-50 text-indigo-700',
     alumni: 'bg-blue-50 text-blue-700',
@@ -1064,15 +1131,66 @@ function CronsSection({
     gtm: 'bg-amber-50 text-amber-700',
     main: 'bg-violet-50 text-violet-700',
     tony: 'bg-violet-50 text-violet-700',
+    sales: 'bg-emerald-50 text-emerald-700',
   };
+
+  const KIND_BADGE: Record<string, string> = {
+    cron: 'bg-slate-50 text-slate-600',
+    every: 'bg-blue-50 text-blue-600',
+    at: 'bg-amber-50 text-amber-700',
+  };
+
+  const agents = [...new Set(jobs.map((j) => j.agent).filter(Boolean))] as string[];
+  const filtered = filterAgent ? jobs.filter((j) => j.agent === filterAgent) : jobs;
+
+  // Daily schedule: jobs sorted by nextRun, filter to those with a nextRun in the next 7 days
+  const now = Date.now();
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const upcoming = [...jobs]
+    .filter((j) => j.nextRun && new Date(j.nextRun).getTime() > now && new Date(j.nextRun).getTime() < now + weekMs)
+    .sort((a, b) => new Date(a.nextRun!).getTime() - new Date(b.nextRun!).getTime());
+
+  const enabledCount = jobs.filter((j) => j.enabled !== false).length;
+  const disabledCount = jobs.length - enabledCount;
+  const errorCount = jobs.filter((j) => j.lastStatus === 'error').length;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-[#8C7B6B]">{jobs.length} jobs · auto-refreshes every 30s</div>
-        <button onClick={onRefresh} className="p-2 rounded-lg border border-[#E8E4DC] text-[#8C7B6B] hover:bg-white">
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-        </button>
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-[#8C7B6B]">
+            {jobs.length} jobs
+            {enabledCount > 0 && <span className="ml-1 text-emerald-600">· {enabledCount} enabled</span>}
+            {disabledCount > 0 && <span className="ml-1 text-slate-500">· {disabledCount} disabled</span>}
+            {errorCount > 0 && <span className="ml-1 text-red-500">· {errorCount} errors</span>}
+            <span className="ml-1">· auto-refreshes 30s</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex gap-0.5 bg-[#F0EDE8] rounded-lg p-0.5">
+            <button
+              onClick={() => setView('list')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                view === 'list' ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B]'
+              }`}
+            >
+              <Activity size={12} /> All Jobs
+            </button>
+            <button
+              onClick={() => setView('schedule')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                view === 'schedule' ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B]'
+              }`}
+            >
+              <Calendar size={12} /> Daily Schedule
+            </button>
+          </div>
+          <button onClick={onRefresh} className="p-2 rounded-lg border border-[#E8E4DC] text-[#8C7B6B] hover:bg-white">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       {loading && jobs.length === 0 ? (
@@ -1081,82 +1199,168 @@ function CronsSection({
         </div>
       ) : jobs.length === 0 ? (
         <div className="text-center py-20 text-[#8C7B6B] text-sm">No cron jobs found</div>
-      ) : (
-        <div className="bg-white border border-[#E8E4DC] rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#E8E4DC] bg-[#FAFAF8]">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Name</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden sm:table-cell">Agent</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden md:table-cell">Schedule</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden lg:table-cell">Next Run</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden lg:table-cell">Last Run</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Status</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map((job) => (
-                  <tr key={job.id} className="border-b border-[#F0EDE8] hover:bg-[#FAFAF8]">
-                    <td className="px-4 py-3">
+      ) : view === 'schedule' ? (
+        /* Daily Schedule View */
+        <div className="space-y-3">
+          <h3 className="text-base font-semibold text-[#2D2A26]" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>
+            Coming Up — Next 7 Days
+          </h3>
+          {upcoming.length === 0 ? (
+            <div className="text-[#8C7B6B] text-sm italic py-8 text-center">No upcoming runs in the next 7 days</div>
+          ) : (
+            <div className="space-y-2">
+              {upcoming.map((job) => {
+                const nextDate = new Date(job.nextRun!);
+                const isToday = nextDate.toDateString() === new Date().toDateString();
+                const isTomorrow = nextDate.toDateString() === new Date(now + 86400000).toDateString();
+                const dayLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                const timeLabel = nextDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' });
+                return (
+                  <div key={job.id} className="flex items-center gap-3 bg-white border border-[#E8E4DC] rounded-xl px-4 py-3 hover:bg-[#FAFAF8]">
+                    <div className="w-24 flex-shrink-0">
+                      <div className={`text-xs font-semibold ${ isToday ? 'text-violet-600' : 'text-[#8C7B6B]' }`}>{dayLabel}</div>
+                      <div className="text-sm font-mono text-[#2D2A26]">{timeLabel}</div>
+                    </div>
+                    <div className="w-px h-10 bg-[#E8E4DC] flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
                       <div className="font-medium text-[#2D2A26] text-sm">{job.name}</div>
                       {job.description && (
-                        <div className="text-xs text-[#8C7B6B] mt-0.5 hidden sm:block">{job.description}</div>
+                        <div className="text-xs text-[#8C7B6B] mt-0.5 truncate">{job.description}</div>
                       )}
-                    </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {job.agent && (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium hidden sm:inline ${
                           AGENT_BADGE[job.agent.toLowerCase()] ?? 'bg-slate-50 text-slate-700'
-                        }`}>
-                          {job.agent}
-                        </span>
+                        }`}>{job.agent}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <span className="font-mono text-xs text-[#5C5245]">
-                        {job.schedule ? humanSchedule(job.schedule) : '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-xs text-[#8C7B6B]">
-                      {job.nextRun ? fmtTime(job.nextRun) : '—'}
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-xs text-[#8C7B6B]">
-                      {job.lastRun ? fmtTime(job.lastRun) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {job.lastStatus ? (
+                      {job.lastStatus && (
                         <span className={`px-2 py-0.5 rounded-full text-xs ${
                           job.lastStatus === 'success' ? 'bg-emerald-50 text-emerald-700' :
                           job.lastStatus === 'error' ? 'bg-red-50 text-red-700' :
                           job.lastStatus === 'running' ? 'bg-blue-50 text-blue-700' :
                           'bg-slate-50 text-slate-700'
-                        }`}>
-                          {job.lastStatus}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-[#B0A89A]">—</span>
+                        }`}>{job.lastStatus}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => onTrigger(job.id)}
-                        disabled={triggering === job.id}
-                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#F0EDE8] text-[#5C5245] hover:bg-[#E8E4DC] transition-colors disabled:opacity-50 ml-auto"
-                      >
-                        {triggering === job.id ? (
-                          <Loader2 size={11} className="animate-spin" />
-                        ) : (
-                          <Play size={11} />
-                        )}
-                        Run
-                      </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* All Jobs List View */
+        <div>
+          {agents.length > 1 && (
+            <div className="mb-3">
+              <select
+                className="applications-filter-select"
+                value={filterAgent}
+                onChange={(e) => setFilterAgent(e.target.value)}
+              >
+                <option value="">All Agents</option>
+                {agents.map((a) => (
+                  <option key={a} value={a}>{a}</option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            </div>
+          )}
+          <div className="bg-white border border-[#E8E4DC] rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#E8E4DC] bg-[#FAFAF8]">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Name</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden sm:table-cell">Agent</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden md:table-cell">Schedule</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden lg:table-cell">Next Run</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden lg:table-cell">Last Run</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Status</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((job) => (
+                    <tr key={job.id} className={`border-b border-[#F0EDE8] hover:bg-[#FAFAF8] ${ job.enabled === false ? 'opacity-60' : '' }`}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium text-[#2D2A26] text-sm">{job.name}</div>
+                          {job.enabled === false && (
+                            <span className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-500 font-medium">disabled</span>
+                          )}
+                          {job.scheduleKind && job.scheduleKind !== 'cron' && (
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${ KIND_BADGE[job.scheduleKind] ?? 'bg-slate-50 text-slate-600' }`}>
+                              {job.scheduleKind === 'at' ? 'one-time' : job.scheduleKind}
+                            </span>
+                          )}
+                        </div>
+                        {job.description && (
+                          <div className="text-xs text-[#8C7B6B] mt-0.5 hidden sm:block line-clamp-1">{job.description}</div>
+                        )}
+                        {job.lastError && job.lastStatus === 'error' && (
+                          <div className="text-xs text-red-500 mt-0.5 hidden sm:block truncate max-w-xs" title={job.lastError}>
+                            ↳ {job.lastError.slice(0, 80)}{job.lastError.length > 80 ? '…' : ''}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        {job.agent && (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            AGENT_BADGE[job.agent.toLowerCase()] ?? 'bg-slate-50 text-slate-700'
+                          }`}>
+                            {job.agent}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <span className="text-xs text-[#5C5245]">
+                          {humanScheduleFromJob(job)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <span className={`text-xs font-medium ${ job.nextRun && new Date(job.nextRun).getTime() - now < 3600000 ? 'text-violet-600' : 'text-[#8C7B6B]' }`}>
+                          {fmtNextRun(job.nextRun)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-[#8C7B6B]">
+                        {job.lastRun ? fmtTime(job.lastRun) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        {job.lastStatus ? (
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${
+                            job.lastStatus === 'success' ? 'bg-emerald-50 text-emerald-700' :
+                            job.lastStatus === 'error' ? 'bg-red-50 text-red-700' :
+                            job.lastStatus === 'running' ? 'bg-blue-50 text-blue-700' :
+                            job.lastStatus === 'idle' ? 'bg-slate-50 text-slate-500' :
+                            'bg-slate-50 text-slate-700'
+                          }`}>
+                            {job.lastStatus}
+                            {job.consecutiveErrors && job.consecutiveErrors > 1 ? ` ×${job.consecutiveErrors}` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[#B0A89A]">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => onTrigger(job.id)}
+                          disabled={triggering === job.id}
+                          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#F0EDE8] text-[#5C5245] hover:bg-[#E8E4DC] transition-colors disabled:opacity-50 ml-auto"
+                        >
+                          {triggering === job.id ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : (
+                            <Play size={11} />
+                          )}
+                          Run
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

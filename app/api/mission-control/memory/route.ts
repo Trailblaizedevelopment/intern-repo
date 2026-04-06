@@ -6,12 +6,27 @@ const HOME = process.env.HOME ?? '/Users/jarvis';
 const MEMORY_DIR = path.join(HOME, '.openclaw', 'workspace', 'memory');
 const LONG_TERM_PATH = path.join(HOME, '.openclaw', 'workspace', 'MEMORY.md');
 
+function canReadLocal(): boolean {
+  try {
+    fs.accessSync(MEMORY_DIR, fs.constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
 
   // Return long-term memory
   if (type === 'longterm') {
+    if (!canReadLocal()) {
+      return NextResponse.json({
+        content: '',
+        message: 'Memory files are only available when running locally.',
+      });
+    }
     try {
       const content = fs.readFileSync(LONG_TERM_PATH, 'utf-8');
       return NextResponse.json({ content });
@@ -21,6 +36,13 @@ export async function GET(request: Request) {
   }
 
   // Return daily logs list
+  if (!canReadLocal()) {
+    return NextResponse.json({
+      entries: [],
+      message: 'Memory files are only available when running locally.',
+    });
+  }
+
   try {
     let files: string[] = [];
     try {

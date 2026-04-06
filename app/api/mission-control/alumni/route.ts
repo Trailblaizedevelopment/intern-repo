@@ -25,7 +25,8 @@ export async function GET(request: Request) {
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const page = parseInt(searchParams.get('page') ?? '1');
-    const limit = parseInt(searchParams.get('limit') ?? '50');
+    const rawLimit = parseInt(searchParams.get('limit') ?? '50');
+    const limit = Math.min(rawLimit > 0 ? rawLimit : 50, 500);
     const offset = (page - 1) * limit;
 
     let query = supabase
