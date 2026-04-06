@@ -6,8 +6,10 @@ import {
   ChevronLeft, ChevronRight, LayoutGrid, Network, X, Activity,
   CheckCircle2, AlertCircle, Circle, Play, Phone, MessageSquare,
   TrendingUp, ArrowUpRight, BookOpen, FileText, Calendar,
-  ToggleLeft, ToggleRight, Loader2, ChevronDown
+  ToggleLeft, ToggleRight, Loader2, ChevronDown,
+  ArrowLeft, LayoutDashboard,
 } from 'lucide-react';
+import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -374,23 +376,33 @@ export default function MissionControlPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAF8' }}>
+    <div className="module-page">
       {/* Header */}
-      <div className="border-b border-[#E8E4DC] bg-white px-6 py-5">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-            <Radar size={18} className="text-white" />
+      <header className="module-header">
+        <div className="module-header-content">
+          <div className="module-back-links">
+            <Link href="/nucleus" className="module-back">
+              <ArrowLeft size={20} />
+              Back to Nucleus
+            </Link>
+            <Link href="/workspace" className="module-back">
+              <LayoutDashboard size={20} />
+              Back to Workspace
+            </Link>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold text-[#2D2A26]" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>
-              Mission Control
-            </h1>
-            <p className="text-xs text-[#8C7B6B] mt-0.5">Founder command center — agents, outreach, memory</p>
+          <div className="module-title-row">
+            <div className="module-icon" style={{ backgroundColor: '#7c3aed15', color: '#7c3aed' }}>
+              <Radar size={24} />
+            </div>
+            <div>
+              <h1>Mission Control</h1>
+              <p>Founder command center — agents, outreach, memory</p>
+            </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mt-5">
+        <div className="flex gap-1 mt-5 px-6 pb-1">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -406,10 +418,10 @@ export default function MissionControlPage() {
             </button>
           ))}
         </div>
-      </div>
+      </header>
 
       {/* Content */}
-      <div className="p-6">
+      <main className="module-main">
 
         {/* ═══ ALUMNI & OUTREACH TAB ═══ */}
         {activeTab === 'alumni' && (
@@ -489,7 +501,7 @@ export default function MissionControlPage() {
             loading={memoryLoading}
           />
         )}
-      </div>
+      </main>
 
       {/* Soul Drawer */}
       {soulAgent && (

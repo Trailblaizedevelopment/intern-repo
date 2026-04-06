@@ -26,7 +26,8 @@ import {
   Star,
   Zap,
   Wallet,
-  LayoutDashboard
+  LayoutDashboard,
+  Radar,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -420,6 +421,16 @@ export default function Nucleus() {
       href: '/nucleus/ambassadors',
       color: '#f59e0b',
       gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+      stats: [],
+      highlight: null,
+    },
+    {
+      title: 'Mission Control',
+      description: 'Founder command center — agents, outreach pipelines, crons, and memory.',
+      icon: Radar,
+      href: '/nucleus/mission-control',
+      color: '#7c3aed',
+      gradient: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
       stats: [],
       highlight: null,
     },
