@@ -191,6 +191,8 @@ export async function POST(request: NextRequest) {
       .eq('outreach_status', 'not_contacted')
       .not('is_imessage', 'is', false)
       .not('phone_primary', 'is', null)
+      .not('first_name', 'is', null)
+      .not('flagged', 'is', true)
       .or('phone_type.is.null,and(phone_type.neq.landline,phone_type.neq.voip)')
       .gte('year', 1970)
       .limit(t1Cap);

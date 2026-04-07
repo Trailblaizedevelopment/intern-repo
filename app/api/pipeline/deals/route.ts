@@ -33,14 +33,17 @@ export async function GET(req: NextRequest) {
   if (overdue === 'true') {
     query = query.lt('next_followup', new Date().toISOString().split('T')[0]);
   }
-  if (search) {
-    query = query.or(`notes.ilike.%${search}%,conference.ilike.%${search}%`);
-  }
+  // NOTE: Do NOT add a Supabase .or() filter for `search` here.
+  // Org name, school name, and contact name live on joined tables and cannot
+  // be filtered at the DB level without a more complex query. The post-filter
+  // below handles all search fields after the join. Adding a premature
+  // notes/conference .or() would silently exclude deals where only the org
+  // name matches the query (the most common case).
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Post-filter for search on joined fields
+  // Post-filter for search — covers org name, school, contact name, notes, conference
   let results = data || [];
   if (search) {
     const s = search.toLowerCase();
