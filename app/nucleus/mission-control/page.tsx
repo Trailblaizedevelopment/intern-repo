@@ -24,6 +24,7 @@ interface AlumniContact {
   first_name: string;
   last_name: string;
   chapter_id: string | null;
+  chapter?: { id: string; chapter_name: string; fraternity: string | null; school: string | null } | null;
   phone_primary: string | null;
   outreach_status: string;
   updated_at: string;
@@ -739,7 +740,7 @@ function AlumniSection({
                     {contact.first_name} {contact.last_name}
                   </td>
                   <td style={{ color: '#5C5245', fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                    {contact.chapter_id ? contact.chapter_id.slice(0, 8) + '…' : '—'}
+                    {contact.chapter?.chapter_name ?? (contact.chapter_id ? contact.chapter_id.slice(0, 8) + '…' : '—')}
                   </td>
                   <td style={{ fontFamily: 'monospace', fontSize: '0.8125rem', color: '#5C5245' }}>
                     {contact.phone_primary ?? '—'}

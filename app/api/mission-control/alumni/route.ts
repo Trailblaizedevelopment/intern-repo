@@ -3,12 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
  * GET /api/mission-control/alumni
- * Global alumni view (no chapter_id required). Supports search, chapter filter, status filter, pagination.
- *
- * Actual alumni_contacts columns:
- *   id, chapter_id, first_name, last_name, phone_primary, phone_secondary,
- *   outreach_status, updated_at, created_at, year, email, …
- * NOTE: there is NO chapter_name or school_name column on this table.
+ * Global alumni view with chapter name join. Supports search, chapter filter, status filter, pagination.
  */
 export async function GET(request: Request) {
   const supabase = getSupabaseAdmin();
@@ -21,18 +16,19 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const chapter = searchParams.get('chapter');
+    const chapter = searchParams.get('chapter'); // chapter_id
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const page = parseInt(searchParams.get('page') ?? '1');
     const rawLimit = parseInt(searchParams.get('limit') ?? '50');
-    const limit = Math.min(rawLimit > 0 ? rawLimit : 50, 500);
+    const limit = rawLimit > 0 ? rawLimit : 50; // no cap — caller controls
     const offset = (page - 1) * limit;
 
     let query = supabase
       .from('alumni_contacts')
       .select(
-        'id, first_name, last_name, chapter_id, phone_primary, outreach_status, updated_at',
+        `id, first_name, last_name, chapter_id, phone_primary, outreach_status, updated_at,
+         chapter:chapters!chapter_id(id, chapter_name, school, fraternity)`,
         { count: 'exact' }
       )
       .order('updated_at', { ascending: false })
@@ -41,26 +37,19 @@ export async function GET(request: Request) {
     if (chapter) query = query.eq('chapter_id', chapter);
     if (status) query = query.eq('outreach_status', status);
     if (search) {
-      query = query.or(
-        `first_name.ilike.%${search}%,last_name.ilike.%${search}%`
-      );
+      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
     }
 
     const { data, error, count } = await query;
     if (error) throw error;
 
-    // Distinct chapter_ids for filter dropdown
-    const { data: chaptersRaw } = await supabase
-      .from('alumni_contacts')
-      .select('chapter_id')
-      .not('chapter_id', 'is', null)
-      .order('chapter_id');
+    // Get chapters that have alumni for filter dropdown
+    const { data: chaptersData } = await supabase
+      .from('chapters')
+      .select('id, chapter_name, fraternity, school')
+      .order('chapter_name');
 
-    const distinctChapters = [
-      ...new Set((chaptersRaw ?? []).map((r: { chapter_id: string }) => r.chapter_id)),
-    ].filter(Boolean);
-
-    // Status counts
+    // Status counts (global, no filter)
     const { data: statusData } = await supabase
       .from('alumni_contacts')
       .select('outreach_status');
@@ -73,7 +62,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       data,
       count,
-      chapters: distinctChapters,
+      chapters: chaptersData ?? [],
       statusCounts,
       page,
       limit,
