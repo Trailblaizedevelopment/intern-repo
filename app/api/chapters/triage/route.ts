@@ -41,13 +41,14 @@ export async function GET(_request: NextRequest) {
         wizard_step, wizard_completed_at,
         setup_groupchat_created, setup_chapter_on_space, setup_chapter_on_platform,
         setup_submission_form_sent, setup_submission_received,
-        activate_ig_collab, activate_facebook_flyer,
+        activate_ig_collab, activate_ig_flyer, activate_facebook_flyer,
         activate_linkedin_post, activate_groupme_blast, activate_newsletter,
         data_list_uploaded, data_counts_verified, data_imessage_filtered,
         linq_touch1_sent, linq_touch2_sent, linq_touch3_sent, linq_100_signups,
         email_sequence_live, email_blast_sent,
         success_first_checkin, success_actives_list, success_first_match, success_video_sent,
-        member_count
+        member_count,
+        instagram_flyer_posted
       `)
       .order('chapter_name', { ascending: true });
 
@@ -149,7 +150,7 @@ export async function GET(_request: NextRequest) {
       else if (stats.signed_up > 0) score += 10;
 
       // Instagram flyer posted (5 pts)
-      if ((ch as Record<string, unknown>).activate_ig_collab) score += 5;
+      if ((ch as Record<string, unknown>).instagram_flyer_posted) score += 5;
 
       // Clamp to 0–100
       score = Math.max(0, Math.min(100, score));
@@ -170,7 +171,7 @@ export async function GET(_request: NextRequest) {
       const ONBOARDING_STEP_KEYS = [
         'setup_groupchat_created', 'setup_chapter_on_space', 'setup_chapter_on_platform',
         'setup_submission_form_sent', 'setup_submission_received',
-        'activate_ig_collab', 'activate_facebook_flyer',
+        'activate_ig_collab', 'activate_ig_flyer', 'activate_facebook_flyer',
         'activate_linkedin_post', 'activate_groupme_blast', 'activate_newsletter',
         'data_list_uploaded', 'data_counts_verified', 'data_imessage_filtered',
         'linq_touch1_sent', 'linq_touch2_sent', 'linq_touch3_sent', 'linq_100_signups',
