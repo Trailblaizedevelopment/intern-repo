@@ -10,7 +10,7 @@ import {
 import OnboardingWizard from '../OnboardingWizard';
 import { useRouter, useParams } from 'next/navigation';
 import {
-  supabase, Chapter, ChapterWithOnboarding,
+  Chapter, ChapterWithOnboarding,
   CheckInFrequency as CIF, CHECK_IN_FREQUENCY_LABELS,
   ONBOARDING_STEPS,
 } from '@/lib/supabase';
@@ -172,11 +172,17 @@ export default function ChapterDashboardPage() {
   }, []);
 
   const fetchChapter = useCallback(async () => {
-    if (!supabase || !chapterId) { setLoading(false); return; }
-    const { data, error } = await supabase.from('chapters').select('*').eq('id', chapterId).single();
-    if (error || !data) { showToast('Failed to load chapter', 'error'); setLoading(false); return; }
-    setChapter(data as ChapterWithOnboarding);
-    setLoading(false);
+    if (!chapterId) { setLoading(false); return; }
+    try {
+      const res = await fetch(`/api/chapters/${chapterId}`);
+      const json = await res.json();
+      if (!res.ok || !json.data) { showToast('Failed to load chapter', 'error'); setLoading(false); return; }
+      setChapter(json.data as ChapterWithOnboarding);
+    } catch {
+      showToast('Failed to load chapter', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, [chapterId, showToast]);
 
   const fetchAlumniStats = useCallback(async () => {
@@ -206,15 +212,26 @@ export default function ChapterDashboardPage() {
   }, [chapter]);
 
   async function updateChapter() {
-    if (!supabase || !chapter) return;
-    const { error } = await supabase.from('chapters').update({
-      ...formData,
-      payment_start_date: formData.payment_start_date || null,
-      last_payment_date: formData.last_payment_date || null,
-      next_payment_date: formData.next_payment_date || null,
-    }).eq('id', chapter.id);
-    if (error) showToast(`Failed: ${error.message}`, 'error');
-    else { showToast('Chapter updated', 'success'); setShowEditModal(false); fetchChapter(); }
+    if (!chapter) return;
+    try {
+      const res = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          payment_start_date: formData.payment_start_date || null,
+          last_payment_date: formData.last_payment_date || null,
+          next_payment_date: formData.next_payment_date || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { showToast(`Failed: ${json.error || 'Unknown error'}`, 'error'); return; }
+      showToast('Chapter updated', 'success');
+      setShowEditModal(false);
+      fetchChapter();
+    } catch (err) {
+      showToast(`Failed: ${String(err)}`, 'error');
+    }
   }
 
   async function generateOnboardingLink() {

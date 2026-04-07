@@ -2,6 +2,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
+ * GET /api/chapters/[id]
+ * Fetch a single chapter by ID using the admin client (bypasses RLS).
+ */
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: chapterId } = await params;
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
+  }
+
+  const { data, error } = await supabase
+    .from('chapters')
+    .select('*')
+    .eq('id', chapterId)
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ error: error?.message || 'Not found' }, { status: 404 });
+  }
+
+  return NextResponse.json({ data });
+}
+
+/**
  * PATCH /api/chapters/[id]
  * Update writable fields on a chapter, including onboarding_completed.
  *
