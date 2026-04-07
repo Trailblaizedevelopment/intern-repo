@@ -19,7 +19,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 const WEBHOOK_SECRET     = process.env.ALUMNI_WEBHOOK_SECRET    || '';
-const supabaseUrl        = process.env.NEXT_PUBLIC_SUPABASE_URL  || '';
 
 // Bulk-imported chapter — skip entirely
 const BULK_IMPORT_CHAPTER_ID = '404e65ab-1123-44a0-81c7-e8e75118e741';

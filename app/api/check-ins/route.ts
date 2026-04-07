@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // Get check-ins for a chapter
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
 
 // Create a new check-in
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },
@@ -139,6 +141,7 @@ export async function POST(request: NextRequest) {
 
 // Update check-in frequency for a chapter
 export async function PATCH(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },

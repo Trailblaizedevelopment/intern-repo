@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },
@@ -99,6 +100,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },
@@ -147,6 +149,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },
@@ -209,6 +212,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },

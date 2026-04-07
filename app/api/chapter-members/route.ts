@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-const supabaseUrl        = process.env.NEXT_PUBLIC_SUPABASE_URL       || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY      || '';
-
 /** True if the error is a "column X does not exist" Postgres error */
 function isColumnNotExistError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
