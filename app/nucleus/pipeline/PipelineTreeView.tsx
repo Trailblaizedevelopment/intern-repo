@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronRight, Edit2, User, AlertTriangle, Phone } from 'lucide-react';
-import { Deal, DealStage, STAGE_CONFIG, supabase } from '@/lib/supabase';
+import { Deal, DealStage, STAGE_CONFIG } from '@/lib/supabase';
 import { getConferenceForDeal } from '@/lib/conference-map';
 import { useToast } from '@/components/Toast';
 
@@ -236,14 +236,14 @@ export default function PipelineTreeView({
   }, []);
 
   async function changeStageInline(dealId: string, newStage: DealStage) {
-    if (!supabase) return;
     setStageDropdownDeal(null);
-    const { error } = await supabase
-      .from('deals')
-      .update({ stage: newStage })
-      .eq('id', dealId);
+    const res = await fetch(`/api/pipeline/deals/${dealId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: newStage }),
+    });
 
-    if (error) {
+    if (!res.ok) {
       showToast('Failed to update stage. Please try again.', 'error');
     } else {
       showToast(`Stage updated to ${STAGE_CONFIG[newStage]?.label}`, 'success');

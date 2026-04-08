@@ -119,7 +119,6 @@ function ActivityLog({ dealId }: { dealId: string }) {
   );
 }
 import { Deal, DealStage, STAGE_CONFIG } from '@/lib/supabase';
-import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/Toast';
 import ModalOverlay from '@/components/ModalOverlay';
 import FollowUpPicker from './FollowUpPicker';
@@ -198,21 +197,22 @@ export default function LeadDetailPanel({ deal, onClose, onUpdated, onDelete }: 
   }
 
   async function saveField(field: string) {
-    if (!supabase || saving) return;
+    if (saving) return;
     setSaving(true);
 
     let val: string | number | null = editValue.trim() || null;
     if (field === 'value') val = parseFloat(editValue) || 0;
 
-    const { error } = await supabase
-      .from('deals')
-      .update({ [field]: val })
-      .eq('id', deal.id);
+    const res = await fetch(`/api/pipeline/deals/${deal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: val }),
+    });
 
     setSaving(false);
     setEditingField(null);
 
-    if (error) {
+    if (!res.ok) {
       showToast('Failed to save. Please try again.', 'error');
     } else {
       setSavedField(field);
@@ -224,13 +224,13 @@ export default function LeadDetailPanel({ deal, onClose, onUpdated, onDelete }: 
 
   // ---- STAGE CHANGE ----
   async function changeStage(newStage: DealStage) {
-    if (!supabase) return;
-    const { error } = await supabase
-      .from('deals')
-      .update({ stage: newStage })
-      .eq('id', deal.id);
+    const res = await fetch(`/api/pipeline/deals/${deal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: newStage }),
+    });
 
-    if (error) {
+    if (!res.ok) {
       showToast('Failed to update stage. Please try again.', 'error');
     } else {
       showToast(`Stage updated to ${STAGE_CONFIG[newStage]?.label}`, 'success');
@@ -247,14 +247,14 @@ export default function LeadDetailPanel({ deal, onClose, onUpdated, onDelete }: 
 
   // ---- FOLLOW-UP ----
   async function setFollowUp(date: string | null) {
-    if (!supabase) return;
-    const { error } = await supabase
-      .from('deals')
-      .update({ next_followup: date })
-      .eq('id', deal.id);
+    const res = await fetch(`/api/pipeline/deals/${deal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ next_followup: date }),
+    });
 
     setShowFollowUpPicker(false);
-    if (error) {
+    if (!res.ok) {
       showToast('Failed to save. Please try again.', 'error');
     } else {
       showToast(date ? `Follow-up set for ${formatDate(date)}` : 'Follow-up cleared', date ? 'success' : 'info');
@@ -271,13 +271,13 @@ export default function LeadDetailPanel({ deal, onClose, onUpdated, onDelete }: 
   }
 
   async function saveNotes(val: string) {
-    if (!supabase) return;
-    const { error } = await supabase
-      .from('deals')
-      .update({ notes: val || null })
-      .eq('id', deal.id);
+    const res = await fetch(`/api/pipeline/deals/${deal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: val || null }),
+    });
 
-    if (!error) {
+    if (res.ok) {
       setNotesSaved(true);
       setTimeout(() => setNotesSaved(false), 2000);
     }
@@ -313,14 +313,14 @@ export default function LeadDetailPanel({ deal, onClose, onUpdated, onDelete }: 
 
   // ---- ARCHIVE ----
   async function archiveLead() {
-    if (!supabase) return;
-    const { error } = await supabase
-      .from('deals')
-      .update({ stage: 'hold_off' as DealStage })
-      .eq('id', deal.id);
+    const res = await fetch(`/api/pipeline/deals/${deal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: 'hold_off' as DealStage }),
+    });
 
     setShowArchiveConfirm(false);
-    if (error) {
+    if (!res.ok) {
       showToast('Failed to archive. Please try again.', 'error');
     } else {
       showToast('Lead archived', 'success');

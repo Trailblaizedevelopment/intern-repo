@@ -6,7 +6,7 @@ import {
   User, Mail, Phone, DollarSign, Building2, Loader2,
   AlertTriangle, CheckCircle2, Circle, Calendar,
 } from 'lucide-react';
-import { supabase, Chapter } from '@/lib/supabase';
+import { Chapter } from '@/lib/supabase';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -211,41 +211,49 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
 
   const refreshChapter = useCallback(async (id: string) => {
-    if (!supabase) return;
-    const { data } = await supabase.from('chapters').select('*').eq('id', id).single();
-    if (data) setChapterData(data as WizardChapter);
+    const res = await fetch(`/api/chapters/${id}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data) setChapterData(json.data as WizardChapter);
+    }
   }, []);
 
   // ── Step 1: Create Chapter ──────────────────────────────────────────────────
 
   async function handleCreateChapter() {
-    if (!supabase) return setError('DB not connected');
     if (!form.chapter_name.trim()) return setError('Chapter name is required');
     setSaving(true); setError(null);
 
     if (chapterId) {
       // Update existing
-      const { error: err } = await supabase.from('chapters').update({
-        ...form,
-        wizard_step: 2,
-      }).eq('id', chapterId);
-      if (err) { setError(err.message); setSaving(false); return; }
+      const res = await fetch(`/api/chapters/${chapterId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, wizard_step: 2 }),
+      });
+      if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to update'); setSaving(false); return; }
       await refreshChapter(chapterId);
     } else {
       // Create new
-      const { data, error: err } = await supabase.from('chapters').insert([{
-        ...form,
-        status: 'onboarding',
-        health: 'good',
-        chapter_created: true,
-        onboarding_started: new Date().toISOString().split('T')[0],
-        wizard_step: 2,
-        contract_status: 'not_sent',
-        invoice_status: 'not_sent',
-      }]).select().single();
-      if (err || !data) { setError(err?.message || 'Failed to create chapter'); setSaving(false); return; }
-      setChapterId(data.id);
-      setChapterData(data as WizardChapter);
+      const res = await fetch('/api/chapters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          status: 'onboarding',
+          health: 'good',
+          chapter_created: true,
+          onboarding_started: new Date().toISOString().split('T')[0],
+          wizard_step: 2,
+          contract_status: 'not_sent',
+          invoice_status: 'not_sent',
+        }),
+      });
+      if (!res.ok) { const j = await res.json(); setError(j.error?.message || 'Failed to create chapter'); setSaving(false); return; }
+      const json = await res.json();
+      if (!json.data) { setError('Failed to create chapter'); setSaving(false); return; }
+      setChapterId(json.data.id);
+      setChapterData(json.data as WizardChapter);
     }
 
     setSaving(false);
@@ -255,16 +263,15 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   // ── Step 2: Contract (external) ────────────────────────────────────────────
 
   async function handleMarkContractDone() {
-    if (!chapterId || !supabase) return;
+    if (!chapterId) return;
     setSaving(true); setError(null);
     const now = new Date().toISOString();
-    const { error: err } = await supabase.from('chapters').update({
-      contract_sent_at: now,
-      contract_signed_at: now,
-      contract_status: 'signed',
-      wizard_step: 3,
-    }).eq('id', chapterId);
-    if (err) { setError(err.message); setSaving(false); return; }
+    const res = await fetch(`/api/chapters/${chapterId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contract_sent_at: now, contract_signed_at: now, contract_status: 'signed', wizard_step: 3 }),
+    });
+    if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to update'); setSaving(false); return; }
     await refreshChapter(chapterId);
     setSaving(false);
     setCurrentStep(3);
@@ -273,16 +280,15 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   // ── Step 3: Invoice (external) ──────────────────────────────────────────────
 
   async function handleMarkInvoiceDone() {
-    if (!chapterId || !supabase) return;
+    if (!chapterId) return;
     setSaving(true); setError(null);
     const now = new Date().toISOString();
-    const { error: err } = await supabase.from('chapters').update({
-      invoice_sent_at: now,
-      invoice_paid_at: now,
-      invoice_status: 'paid',
-      wizard_step: 4,
-    }).eq('id', chapterId);
-    if (err) { setError(err.message); setSaving(false); return; }
+    const res = await fetch(`/api/chapters/${chapterId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoice_sent_at: now, invoice_paid_at: now, invoice_status: 'paid', wizard_step: 4 }),
+    });
+    if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to update'); setSaving(false); return; }
     await refreshChapter(chapterId);
     setSaving(false);
     setCurrentStep(4);
@@ -291,16 +297,16 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   // ── Step 4: Submission Form ─────────────────────────────────────────────────
 
   async function handleSaveSubmission() {
-    if (!chapterId || !supabase) return;
+    if (!chapterId) return;
     if (!submissionSent) return setError('Please confirm the submission form was sent');
     setSaving(true); setError(null);
 
-    const { error: err } = await supabase.from('chapters').update({
-      submission_sent_at: new Date().toISOString(),
-      setup_groupchat_created: groupchatMade,
-      wizard_step: 5,
-    }).eq('id', chapterId);
-    if (err) { setError(err.message); setSaving(false); return; }
+    const res = await fetch(`/api/chapters/${chapterId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submission_sent_at: new Date().toISOString(), setup_groupchat_created: groupchatMade, wizard_step: 5 }),
+    });
+    if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to update'); setSaving(false); return; }
     await refreshChapter(chapterId);
     setSaving(false);
     setCurrentStep(5);
@@ -309,7 +315,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   // ── Mark As Done (retroactive override) ────────────────────────────────────
 
   async function handleMarkAsDone(step: number) {
-    if (!chapterId || !supabase) return;
+    if (!chapterId) return;
     setMarkingDone(true); setError(null);
 
     const now = new Date().toISOString();
@@ -341,9 +347,14 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
       };
     }
 
-    const { error: err } = await supabase.from('chapters').update(updates).eq('id', chapterId);
-    if (err) {
-      setError(err.message);
+    const res = await fetch(`/api/chapters/${chapterId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) {
+      const j = await res.json();
+      setError(j.error || 'Failed to update');
       setMarkingDone(false);
       setMarkDoneStep(null);
       return;
@@ -358,18 +369,17 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   // ── Step 5: Complete ────────────────────────────────────────────────────────
 
   async function handleCompleteSetup() {
-    if (!chapterId || !supabase) return;
+    if (!chapterId) return;
     setSaving(true); setError(null);
 
     const now = new Date().toISOString();
-    const { error: err } = await supabase.from('chapters').update({
-      wizard_completed_at: now,
-      onboarding_completed: now.split('T')[0],
-      status: 'active',
-      wizard_step: 5,
-    }).eq('id', chapterId);
+    const res = await fetch(`/api/chapters/${chapterId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wizard_completed_at: now, onboarding_completed: now.split('T')[0], status: 'active', wizard_step: 5 }),
+    });
 
-    if (err) { setError(err.message); setSaving(false); return; }
+    if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to complete setup'); setSaving(false); return; }
     setSaving(false);
     onComplete();
   }
