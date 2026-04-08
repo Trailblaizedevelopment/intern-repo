@@ -34,7 +34,7 @@ import {
   History,
   Flame,
 } from 'lucide-react';
-import { supabase, Chapter, Deal } from '@/lib/supabase';
+import { Chapter, Deal } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import AccountingTab from './AccountingTab';
 import ModalOverlay from '@/components/ModalOverlay';
@@ -341,48 +341,35 @@ export default function FinanceModule() {
   }
 
   async function fetchPayments() {
-    if (!supabase) return;
-    
-    const { data, error } = await supabase
-      .from('payments')
-      .select(`
-        *,
-        chapter:chapters(id, chapter_name, school, fraternity, contact_name, contact_email)
-      `)
-      .order('payment_date', { ascending: false });
-
-    if (!error) {
-      setPayments(data || []);
+    try {
+      const res = await fetch('/api/payments');
+      const json = await res.json();
+      if (!json.error) setPayments(json.data || []);
+    } catch (err) {
+      console.error('Failed to fetch payments:', err);
     }
   }
 
   async function fetchChapters() {
-    if (!supabase) return;
-    
-    const { data, error } = await supabase
-      .from('chapters')
-      .select('*')
-      .order('chapter_name');
-
-    if (!error) {
-      setChapters(data || []);
+    try {
+      const res = await fetch('/api/chapters');
+      const json = await res.json();
+      if (!json.error) setChapters((json.data || []).sort((a: Chapter, b: Chapter) => a.chapter_name.localeCompare(b.chapter_name)));
+    } catch (err) {
+      console.error('Failed to fetch chapters:', err);
     }
   }
 
   async function createPayment() {
-    if (!supabase) {
-      alert('Database not connected');
-      return;
-    }
-
     if (!formData.chapter_id || !formData.amount) {
       alert('Chapter and amount are required');
       return;
     }
 
-    const { error } = await supabase
-      .from('payments')
-      .insert([{
+    const res = await fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         chapter_id: formData.chapter_id,
         amount: parseFloat(formData.amount),
         payment_date: formData.payment_date,
@@ -392,11 +379,12 @@ export default function FinanceModule() {
         notes: formData.notes || null,
         period_start: formData.period_start || null,
         period_end: formData.period_end || null,
-      }]);
-
-    if (error) {
-      console.error('Error creating payment:', error);
-      alert(`Failed to record payment: ${error.message}`);
+      }),
+    });
+    const json = await res.json();
+    if (json.error) {
+      console.error('Error creating payment:', json.error);
+      alert(`Failed to record payment: ${json.error.message}`);
       return;
     }
 
@@ -418,17 +406,18 @@ export default function FinanceModule() {
       };
       const nextPaymentDate = calculateNextPaymentDate(tempChapter, formData.payment_date);
 
-      await supabase
-        .from('chapters')
-        .update({
+      await fetch(`/api/chapters/${formData.chapter_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           last_payment_date: formData.payment_date,
           payment_type: subType,
           payment_amount: amount,
           payment_day: paymentDay,
           payment_start_date: formData.payment_date,
           next_payment_date: nextPaymentDate,
-        })
-        .eq('id', formData.chapter_id);
+        }),
+      });
     } else if (selectedChapterInfo && isCompleted) {
       const chapterUpdate: Record<string, string | null> = {
         last_payment_date: formData.payment_date,
@@ -443,15 +432,17 @@ export default function FinanceModule() {
         chapterUpdate.next_payment_date = null;
       }
 
-      await supabase
-        .from('chapters')
-        .update(chapterUpdate)
-        .eq('id', formData.chapter_id);
+      await fetch(`/api/chapters/${formData.chapter_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(chapterUpdate),
+      });
     } else {
-      await supabase
-        .from('chapters')
-        .update({ last_payment_date: formData.payment_date })
-        .eq('id', formData.chapter_id);
+      await fetch(`/api/chapters/${formData.chapter_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_payment_date: formData.payment_date }),
+      });
     }
 
     resetForm();
@@ -459,11 +450,12 @@ export default function FinanceModule() {
   }
 
   async function updatePayment() {
-    if (!supabase || !editingPayment) return;
+    if (!editingPayment) return;
 
-    const { error } = await supabase
-      .from('payments')
-      .update({
+    const res = await fetch(`/api/payments/${editingPayment.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         chapter_id: formData.chapter_id,
         amount: parseFloat(formData.amount),
         payment_date: formData.payment_date,
@@ -473,12 +465,12 @@ export default function FinanceModule() {
         notes: formData.notes || null,
         period_start: formData.period_start || null,
         period_end: formData.period_end || null,
-      })
-      .eq('id', editingPayment.id);
-
-    if (error) {
-      console.error('Error updating payment:', error);
-      alert(`Failed to update payment: ${error.message}`);
+      }),
+    });
+    const json = await res.json();
+    if (json.error) {
+      console.error('Error updating payment:', json.error);
+      alert(`Failed to update payment: ${json.error.message}`);
     } else {
       resetForm();
       fetchPayments();
@@ -486,15 +478,10 @@ export default function FinanceModule() {
   }
 
   async function deletePayment(id: string) {
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('payments')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting payment:', error);
+    const res = await fetch(`/api/payments/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (json.error) {
+      console.error('Error deleting payment:', json.error);
       alert('Failed to delete payment');
     } else {
       fetchPayments();
@@ -580,15 +567,16 @@ export default function FinanceModule() {
   }
 
   async function confirmPayment() {
-    if (!supabase || !confirmingChapter) return;
+    if (!confirmingChapter) return;
 
     const chapter = confirmingChapter;
     const amount = chapter.payment_amount || 0;
     const nextPayment = calculateNextPaymentDate(chapter, confirmForm.date_received);
 
-    const { data: paymentData, error: paymentError } = await supabase
-      .from('payments')
-      .insert([{
+    const createRes = await fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         chapter_id: chapter.id,
         amount,
         payment_date: confirmForm.date_received,
@@ -597,15 +585,15 @@ export default function FinanceModule() {
         notes: 'Manually confirmed payment',
         period_start: chapter.next_payment_date || confirmForm.date_received,
         period_end: nextPayment || confirmForm.date_received,
-      }])
-      .select()
-      .single();
-
-    if (paymentError) {
-      console.error('Error confirming payment:', paymentError);
-      alert(`Failed to confirm payment: ${paymentError.message}`);
+      }),
+    });
+    const createJson = await createRes.json();
+    if (createJson.error) {
+      console.error('Error confirming payment:', createJson.error);
+      alert(`Failed to confirm payment: ${createJson.error.message}`);
       return;
     }
+    const paymentData = createJson.data;
 
     const updateData: Record<string, string | null> = {
       last_payment_date: confirmForm.date_received,
@@ -616,14 +604,15 @@ export default function FinanceModule() {
       updateData.next_payment_date = null;
     }
 
-    const { error: chapterError } = await supabase
-      .from('chapters')
-      .update(updateData)
-      .eq('id', chapter.id);
-
-    if (chapterError) {
-      console.error('Error updating chapter:', chapterError);
-      alert(`Payment recorded but failed to update chapter dates: ${chapterError.message}`);
+    const chapterRes = await fetch(`/api/chapters/${chapter.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData),
+    });
+    const chapterJson = await chapterRes.json();
+    if (chapterJson.error) {
+      console.error('Error updating chapter:', chapterJson.error);
+      alert(`Payment recorded but failed to update chapter dates: ${chapterJson.error.message}`);
     }
 
     setRecentConfirmations(prev => [...prev, {
@@ -647,30 +636,26 @@ export default function FinanceModule() {
   }
 
   async function undoConfirmation(confirmation: typeof recentConfirmations[0]) {
-    if (!supabase) return;
-
-    const { error: deleteError } = await supabase
-      .from('payments')
-      .delete()
-      .eq('id', confirmation.paymentId);
-
-    if (deleteError) {
-      console.error('Error undoing confirmation:', deleteError);
-      alert(`Failed to undo confirmation: ${deleteError.message}`);
+    const deleteRes = await fetch(`/api/payments/${confirmation.paymentId}`, { method: 'DELETE' });
+    const deleteJson = await deleteRes.json();
+    if (deleteJson.error) {
+      console.error('Error undoing confirmation:', deleteJson.error);
+      alert(`Failed to undo confirmation: ${deleteJson.error.message}`);
       return;
     }
 
-    const { error: revertError } = await supabase
-      .from('chapters')
-      .update({
+    const revertRes = await fetch(`/api/chapters/${confirmation.chapterId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         last_payment_date: confirmation.previousLastPayment,
         next_payment_date: confirmation.previousNextPayment,
-      })
-      .eq('id', confirmation.chapterId);
-
-    if (revertError) {
-      console.error('Error reverting chapter dates:', revertError);
-      alert(`Payment deleted but failed to revert chapter dates: ${revertError.message}`);
+      }),
+    });
+    const revertJson = await revertRes.json();
+    if (revertJson.error) {
+      console.error('Error reverting chapter dates:', revertJson.error);
+      alert(`Payment deleted but failed to revert chapter dates: ${revertJson.error.message}`);
     }
 
     setRecentConfirmations(prev => prev.filter(c => c.paymentId !== confirmation.paymentId));
@@ -683,19 +668,16 @@ export default function FinanceModule() {
   }
 
   async function fetchChapterPayments(chapterId: string) {
-    if (!supabase) return;
     if (chapterPaymentHistory[chapterId]) return;
-
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('chapter_id', chapterId)
-      .eq('status', 'completed')
-      .order('payment_date', { ascending: false })
-      .limit(10);
-
-    if (!error && data) {
-      setChapterPaymentHistory(prev => ({ ...prev, [chapterId]: data }));
+    try {
+      const res = await fetch(`/api/payments?chapter_id=${chapterId}&status=completed`);
+      const json = await res.json();
+      if (!json.error && json.data) {
+        const limited = json.data.slice(0, 10);
+        setChapterPaymentHistory(prev => ({ ...prev, [chapterId]: limited }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch chapter payments:', err);
     }
   }
 

@@ -13,7 +13,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { supabase, ExpenseCategory, ImportBatch } from '@/lib/supabase';
+import { ExpenseCategory, ImportBatch } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 
 interface Payment {
@@ -301,34 +301,34 @@ export default function PLImportModal({
   }, [parsedRows]);
 
   async function confirmImport() {
-    if (!supabase) return;
     setImporting(true);
 
     try {
       if (replaceExisting && existingBatch) {
-        await supabase.from('expenses').delete().eq('import_batch_id', existingBatch.id);
-        await supabase.from('import_batches').delete().eq('id', existingBatch.id);
+        await fetch(`/api/finance/import-batches/${existingBatch.id}`, { method: 'DELETE' });
       }
 
-      const { data: batch, error: batchErr } = await supabase
-        .from('import_batches')
-        .insert([{
+      const batchRes = await fetch('/api/finance/import-batches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           year: selectedYear,
           month: selectedMonth,
           filename: fileName,
           total_revenue: summary.totalRevenue,
           total_expenses: summary.totalExpenses,
           line_count: summary.total,
-        }])
-        .select()
-        .single();
+        }),
+      });
+      const batchJson = await batchRes.json();
 
-      if (batchErr || !batch) {
-        alert(`Failed to create import batch: ${batchErr?.message}`);
+      if (batchJson.error || !batchJson.data) {
+        alert(`Failed to create import batch: ${batchJson.error?.message}`);
         setImporting(false);
         return;
       }
 
+      const batch = batchJson.data;
       const included = parsedRows.filter(r => r.included);
       const CHUNK = 50;
       for (let i = 0; i < included.length; i += CHUNK) {
@@ -343,9 +343,14 @@ export default function PLImportModal({
           import_batch_id: batch.id,
         }));
 
-        const { error } = await supabase.from('expenses').insert(chunk);
-        if (error) {
-          alert(`Import error on chunk ${Math.floor(i / CHUNK) + 1}: ${error.message}`);
+        const expRes = await fetch('/api/finance/expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(chunk),
+        });
+        const expJson = await expRes.json();
+        if (expJson.error) {
+          alert(`Import error on chunk ${Math.floor(i / CHUNK) + 1}: ${expJson.error.message}`);
           setImporting(false);
           return;
         }

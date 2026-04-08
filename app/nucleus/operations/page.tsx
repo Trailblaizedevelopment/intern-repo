@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CheckSquare, Plus, Search, Filter, X, Trash2, Edit2, Check, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
-import { supabase, Task } from '@/lib/supabase';
+import { Task } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
 import { SkeletonTable } from '@/components/Skeleton';
@@ -30,85 +30,100 @@ export default function OperationsModule() {
   }, []);
 
   async function fetchTasks() {
-    if (!supabase) { setLoading(false); return; }
     setLoading(true);
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching tasks:', error);
-    } else {
-      setTasks(data || []);
+    try {
+      const res = await fetch('/api/tasks');
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error fetching tasks:', json.error);
+      } else {
+        setTasks(json.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
     }
     setLoading(false);
   }
 
   // Create task
   async function createTask() {
-    if (!supabase) return;
-    const { error } = await supabase
-      .from('tasks')
-      .insert([formData]);
-
-    if (error) {
-      console.error('Error creating task:', error);
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error creating task:', json.error);
+        alert('Failed to create task');
+      } else {
+        resetForm();
+        fetchTasks();
+      }
+    } catch (err) {
+      console.error('Error creating task:', err);
       alert('Failed to create task');
-    } else {
-      resetForm();
-      fetchTasks();
     }
   }
 
   // Update task
   async function updateTask() {
-    if (!supabase || !editingTask) return;
-
-    const { error } = await supabase
-      .from('tasks')
-      .update(formData)
-      .eq('id', editingTask.id);
-
-    if (error) {
-      console.error('Error updating task:', error);
+    if (!editingTask) return;
+    try {
+      const res = await fetch(`/api/tasks/${editingTask.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error updating task:', json.error);
+        alert('Failed to update task');
+      } else {
+        resetForm();
+        fetchTasks();
+      }
+    } catch (err) {
+      console.error('Error updating task:', err);
       alert('Failed to update task');
-    } else {
-      resetForm();
-      fetchTasks();
     }
   }
 
   // Quick complete task
   async function toggleTaskComplete(task: Task) {
-    if (!supabase) return;
     const newStatus = task.status === 'done' ? 'todo' : 'done';
-    const { error } = await supabase
-      .from('tasks')
-      .update({ status: newStatus })
-      .eq('id', task.id);
-
-    if (error) {
-      console.error('Error updating task:', error);
-    } else {
-      fetchTasks();
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error updating task:', json.error);
+      } else {
+        fetchTasks();
+      }
+    } catch (err) {
+      console.error('Error updating task:', err);
     }
   }
 
   // Delete task
   async function deleteTask(id: string) {
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting task:', error);
+    try {
+      const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error deleting task:', json.error);
+        alert('Failed to delete task');
+      } else {
+        fetchTasks();
+      }
+    } catch (err) {
+      console.error('Error deleting task:', err);
       alert('Failed to delete task');
-    } else {
-      fetchTasks();
     }
     setDeleteConfirm({ show: false, id: null });
   }

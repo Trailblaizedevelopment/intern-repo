@@ -33,7 +33,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { supabase, Expense, MonthlyStatement, ImportBatch, ExpenseCategory, ExpensePaymentMethod } from '@/lib/supabase';
+import { Expense, MonthlyStatement, ImportBatch, ExpenseCategory, ExpensePaymentMethod } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import PLImportModal from './PLImportModal';
 import ModalOverlay from '@/components/ModalOverlay';
@@ -139,37 +139,42 @@ export default function AccountingTab({ payments }: AccountingTabProps) {
   }
 
   async function fetchExpenses() {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .order('date', { ascending: false });
-    if (!error) setExpenses(data || []);
+    try {
+      const res = await fetch('/api/finance/expenses');
+      const json = await res.json();
+      if (!json.error) setExpenses(json.data || []);
+    } catch (err) {
+      console.error('Error fetching expenses:', err);
+    }
   }
 
   async function fetchStatements() {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from('monthly_statements')
-      .select('*')
-      .order('year', { ascending: false })
-      .order('month', { ascending: false });
-    if (!error) setStatements(data || []);
+    try {
+      const res = await fetch('/api/finance/statements');
+      const json = await res.json();
+      if (!json.error) setStatements(json.data || []);
+    } catch (err) {
+      console.error('Error fetching statements:', err);
+    }
   }
 
   async function fetchBatches() {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from('import_batches')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error) setImportBatches(data || []);
+    try {
+      const res = await fetch('/api/finance/import-batches');
+      const json = await res.json();
+      if (!json.error) setImportBatches(json.data || []);
+    } catch (err) {
+      console.error('Error fetching import batches:', err);
+    }
   }
 
   async function deleteBatch(batch: ImportBatch) {
-    if (!supabase) return;
-    await supabase.from('expenses').delete().eq('import_batch_id', batch.id);
-    await supabase.from('import_batches').delete().eq('id', batch.id);
+    try {
+      // Delete expenses first, then the batch
+      await fetch(`/api/finance/import-batches/${batch.id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.error('Error deleting batch:', err);
+    }
     setBatchDeleteConfirm({ show: false, batch: null });
     fetchAccountingData();
   }
@@ -186,7 +191,6 @@ export default function AccountingTab({ payments }: AccountingTabProps) {
   }
 
   async function saveExpense() {
-    if (!supabase) return;
     if (!expenseForm.amount) {
       alert('Amount is required');
       return;
@@ -202,23 +206,34 @@ export default function AccountingTab({ payments }: AccountingTabProps) {
       receipt_url: expenseForm.receipt_url || null,
     };
 
-    if (editingExpense) {
-      const { error } = await supabase
-        .from('expenses')
-        .update(payload)
-        .eq('id', editingExpense.id);
-      if (error) {
-        alert(`Failed to update expense: ${error.message}`);
-        return;
+    try {
+      if (editingExpense) {
+        const res = await fetch(`/api/finance/expenses/${editingExpense.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (json.error) {
+          alert(`Failed to update expense: ${json.error.message}`);
+          return;
+        }
+      } else {
+        const res = await fetch('/api/finance/expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (json.error) {
+          alert(`Failed to log expense: ${json.error.message}`);
+          return;
+        }
       }
-    } else {
-      const { error } = await supabase
-        .from('expenses')
-        .insert([payload]);
-      if (error) {
-        alert(`Failed to log expense: ${error.message}`);
-        return;
-      }
+    } catch (err) {
+      console.error('Error saving expense:', err);
+      alert('Failed to save expense');
+      return;
     }
 
     resetExpenseForm();
@@ -226,10 +241,15 @@ export default function AccountingTab({ payments }: AccountingTabProps) {
   }
 
   async function deleteExpense(id: string) {
-    if (!supabase) return;
-    const { error } = await supabase.from('expenses').delete().eq('id', id);
-    if (error) alert(`Failed to delete expense: ${error.message}`);
-    else fetchExpenses();
+    try {
+      const res = await fetch(`/api/finance/expenses/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.error) alert(`Failed to delete expense: ${json.error.message}`);
+      else fetchExpenses();
+    } catch (err) {
+      console.error('Error deleting expense:', err);
+      alert('Failed to delete expense');
+    }
     setDeleteConfirm({ show: false, id: null });
   }
 
@@ -278,19 +298,11 @@ export default function AccountingTab({ payments }: AccountingTabProps) {
         return;
       }
 
-      if (!supabase) return;
-
-      const existing = statements.find(s => s.year === year && s.month === month);
-      if (existing) {
-        await supabase
-          .from('monthly_statements')
-          .update({ attachment_url: result.data.url, attachment_name: file.name })
-          .eq('id', existing.id);
-      } else {
-        await supabase
-          .from('monthly_statements')
-          .insert([{ year, month, attachment_url: result.data.url, attachment_name: file.name }]);
-      }
+      await fetch('/api/finance/statements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year, month, attachment_url: result.data.url, attachment_name: file.name }),
+      });
 
       fetchStatements();
     } catch {

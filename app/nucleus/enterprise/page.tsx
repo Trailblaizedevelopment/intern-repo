@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Building2, Plus, Search, Filter, X, Trash2, Edit2, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
-import { supabase, EnterpriseContract } from '@/lib/supabase';
+import { EnterpriseContract } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
 import { SkeletonTable } from '@/components/Skeleton';
@@ -31,69 +31,80 @@ export default function EnterpriseModule() {
   }, []);
 
   async function fetchContracts() {
-    if (!supabase) { setLoading(false); return; }
     setLoading(true);
-    const { data, error } = await supabase
-      .from('enterprise_contracts')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching contracts:', error);
-    } else {
-      setContracts(data || []);
+    try {
+      const res = await fetch('/api/enterprise-contracts');
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error fetching contracts:', json.error);
+      } else {
+        setContracts(json.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching contracts:', err);
     }
     setLoading(false);
   }
 
   // Create contract
   async function createContract() {
-    if (!supabase) return;
-    const { error } = await supabase
-      .from('enterprise_contracts')
-      .insert([formData]);
-
-    if (error) {
-      console.error('Error creating contract:', error);
+    try {
+      const res = await fetch('/api/enterprise-contracts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error creating contract:', json.error);
+        alert('Failed to create contract');
+      } else {
+        resetForm();
+        fetchContracts();
+      }
+    } catch (err) {
+      console.error('Error creating contract:', err);
       alert('Failed to create contract');
-    } else {
-      resetForm();
-      fetchContracts();
     }
   }
 
   // Update contract
   async function updateContract() {
-    if (!supabase || !editingContract) return;
-
-    const { error } = await supabase
-      .from('enterprise_contracts')
-      .update(formData)
-      .eq('id', editingContract.id);
-
-    if (error) {
-      console.error('Error updating contract:', error);
+    if (!editingContract) return;
+    try {
+      const res = await fetch(`/api/enterprise-contracts/${editingContract.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error updating contract:', json.error);
+        alert('Failed to update contract');
+      } else {
+        resetForm();
+        fetchContracts();
+      }
+    } catch (err) {
+      console.error('Error updating contract:', err);
       alert('Failed to update contract');
-    } else {
-      resetForm();
-      fetchContracts();
     }
   }
 
   // Delete contract
   async function deleteContract(id: string) {
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('enterprise_contracts')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting contract:', error);
+    try {
+      const res = await fetch(`/api/enterprise-contracts/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error deleting contract:', json.error);
+        alert('Failed to delete contract');
+      } else {
+        fetchContracts();
+      }
+    } catch (err) {
+      console.error('Error deleting contract:', err);
       alert('Failed to delete contract');
-    } else {
-      fetchContracts();
     }
     setDeleteConfirm({ show: false, id: null });
   }
