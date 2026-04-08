@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Check, CheckCircle2, Clock, Sparkles, Wand2 } from 'lucide-react';
-import { supabase, ChapterWithOnboarding, ONBOARDING_STEPS } from '@/lib/supabase';
+import { ChapterWithOnboarding, ONBOARDING_STEPS } from '@/lib/supabase';
 
 interface SetUpTabProps {
   chapter: ChapterWithOnboarding;
@@ -55,33 +55,35 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
   // If onboarding_completed is null but every step is already checked, mark it.
   useEffect(() => {
     if (chapter.onboarding_completed) return; // already done
-    if (!supabase) return;
 
     const allKeys = ONBOARDING_STEPS.map(s => s.key);
     const allDone = allKeys.every(k => chapter[k as keyof ChapterWithOnboarding]);
     if (!allDone) return;
 
     const completion = new Date().toISOString().split('T')[0];
-    supabase
-      .from('chapters')
-      .update({ onboarding_completed: completion, status: 'active' })
-      .eq('id', chapter.id)
-      .then(({ error }) => {
-        if (!error) {
-          onUpdate();
-        }
-      });
+    fetch(`/api/chapters/${chapter.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ onboarding_completed: completion, status: 'active' }),
+    }).then(r => r.ok && onUpdate());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter.id]);
 
   const saveOptOut = useCallback(async (field: 'email_outreach_enabled' | 'conversations_enabled', value: boolean) => {
-    if (!supabase) return;
-    const { error } = await supabase.from('chapters').update({ [field]: value }).eq('id', chapter.id);
-    if (error) {
+    try {
+      const res = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) {
+        showToast('Failed to save setting', 'error');
+      } else {
+        showToast('Setting saved', 'success');
+        onUpdate();
+      }
+    } catch {
       showToast('Failed to save setting', 'error');
-    } else {
-      showToast('Setting saved', 'success');
-      onUpdate();
     }
   }, [chapter.id, showToast, onUpdate]);
 
@@ -92,8 +94,6 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
   }
 
   async function toggleStep(stepKey: string, categoryKey: string) {
-    if (!supabase) return;
-
     const current = localChapter[stepKey as keyof ChapterWithOnboarding];
     const next = !current;
 
@@ -119,15 +119,16 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
     }
 
     try {
-      const { error } = await supabase.from('chapters').update(update).eq('id', chapter.id);
-      if (error) {
+      const res = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(update),
+      });
+      if (!res.ok) {
         // Revert optimistic update
         setLocalChapter(p => ({ ...p, [stepKey]: current }));
-        if (error.message?.includes('column') || error.code === 'PGRST204') {
-          showToast('Column missing — run migration to enable this step', 'error');
-        } else {
-          showToast('Failed to update step', 'error');
-        }
+        const json = await res.json().catch(() => ({}));
+        showToast(json.error || 'Failed to update step', 'error');
       } else {
         if (next) {
           const label = ONBOARDING_STEPS.find(s => s.key === stepKey)?.label;

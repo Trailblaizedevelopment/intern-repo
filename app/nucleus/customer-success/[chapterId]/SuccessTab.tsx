@@ -301,27 +301,27 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
   }
 
   async function saveFlyer(overrides?: Partial<{ posted: boolean; date: string; url: string; notes: string }>) {
-    if (!supabase) return;
     setSavingFlyer(true);
     const posted = overrides?.posted ?? flyerPosted;
     const date = overrides?.date ?? flyerPostDate;
     const url = overrides?.url ?? flyerPostUrl;
     const notes = overrides?.notes ?? flyerNotes;
     try {
-      const { error } = await supabase.from('chapters').update({
-        instagram_flyer_posted: posted,
-        instagram_flyer_post_date: date || null,
-        instagram_flyer_post_url: url || null,
-        instagram_flyer_notes: notes || null,
-        // Also mark the onboarding checklist step
-        activate_ig_flyer: posted,
-      }).eq('id', chapter.id);
-      if (error) {
-        if (error.message?.includes('column') || error.code === 'PGRST204') {
-          showToast('Saved locally (DB column missing — run migration)', 'info');
-        } else {
-          showToast(`Failed: ${error.message}`, 'error');
-        }
+      const res = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instagram_flyer_posted: posted,
+          instagram_flyer_post_date: date || null,
+          instagram_flyer_post_url: url || null,
+          instagram_flyer_notes: notes || null,
+          // Also mark the onboarding checklist step
+          activate_ig_flyer: posted,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast(json.error || 'Failed to save', 'error');
       } else {
         showToast('Instagram flyer status saved', 'success');
         onUpdate();
@@ -331,18 +331,18 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
   }
 
   async function saveNotes(type: 'exec' | 'bonus') {
-    if (!supabase) return;
     setSavingNotes(type);
     const field = type === 'exec' ? 'exec_notes' : 'bonus_notes';
     const value = type === 'exec' ? execNotes : bonusNotes;
     try {
-      const { error } = await supabase.from('chapters').update({ [field]: value }).eq('id', chapter.id);
-      if (error) {
-        if (error.message?.includes('column') || error.code === 'PGRST204') {
-          showToast('Saved locally (DB column missing — run migration)', 'info');
-        } else {
-          showToast(`Failed: ${error.message}`, 'error');
-        }
+      const res = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast(json.error || 'Failed to save notes', 'error');
       } else {
         showToast('Notes saved', 'success');
         onUpdate();

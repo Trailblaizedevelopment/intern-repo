@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Check, AlertTriangle } from 'lucide-react';
-import { supabase, ChapterWithOnboarding } from '@/lib/supabase';
+import { ChapterWithOnboarding } from '@/lib/supabase';
 
 interface SalesTabProps {
   chapter: ChapterWithOnboarding;
@@ -85,7 +85,6 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
   });
 
   async function saveStep(stepKey: string, step: SalesStep) {
-    if (!supabase) return;
     setSaving(stepKey);
     const edit = edits[stepKey];
 
@@ -99,14 +98,14 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
     }
 
     try {
-      const { error } = await supabase.from('chapters').update(update).eq('id', chapter.id);
-      if (error) {
-        // Gracefully handle unknown columns
-        if (error.message?.includes('column') || error.code === 'PGRST204') {
-          showToast('Saved locally (DB column missing — run migration)', 'info');
-        } else {
-          showToast(`Failed: ${error.message}`, 'error');
-        }
+      const res = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(update),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast(json.error || 'Failed to save', 'error');
       } else {
         showToast('Saved', 'success');
         onUpdate();

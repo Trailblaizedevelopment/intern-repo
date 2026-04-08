@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ExternalLink, Loader2, Users, Phone, Mail, Smartphone, Copy, Check, Upload, X } from 'lucide-react';
-import { ChapterWithOnboarding, supabase } from '@/lib/supabase';
+import { ChapterWithOnboarding } from '@/lib/supabase';
 import Link from 'next/link';
 
 interface AlumniOutreachTabProps {
@@ -141,15 +141,19 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
   }
 
   async function saveLinks() {
-    if (!supabase) return;
     setSavingLinks(true);
     try {
-      const { error } = await supabase.from('chapters').update({
-        alumni_join_link: alumniJoinLink || null,
-        actives_join_link: activesJoinLink || null,
-      }).eq('id', chapter.id);
-      if (error) {
-        showToast(`Failed: ${error.message}`, 'error');
+      const res = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          alumni_join_link: alumniJoinLink || null,
+          actives_join_link: activesJoinLink || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast(json.error || 'Failed to save links', 'error');
       } else {
         showToast('Links saved', 'success');
         onUpdate();
