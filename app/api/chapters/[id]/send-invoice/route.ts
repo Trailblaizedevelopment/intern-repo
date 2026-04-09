@@ -1,8 +1,5 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-
-const getDB = () => getSupabaseAdmin()!;
 import { createOrGetCustomer, createInvoiceLink } from '@/lib/stripe';
 
 export async function POST(
@@ -28,6 +25,8 @@ export async function POST(
     const invoiceUrl = await createInvoiceLink(customerId, memberCount, chapterId);
 
     // Update chapters table
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return NextResponse.json({ error: 'DB unavailable' }, { status: 500 });
     const { error: dbError } = await supabase
       .from('chapters')
       .update({

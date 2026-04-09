@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import Stripe from 'stripe';
@@ -62,6 +61,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) throw new Error('DB unavailable');
+
     switch (event.type) {
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
@@ -73,10 +75,14 @@ export async function POST(req: NextRequest) {
             .update({
               invoice_paid_at: new Date().toISOString(),
               invoice_status: 'paid',
+              // Promote chapter to active so Finance MRR picks it up
+              status: 'active',
+              last_payment_date: new Date().toISOString().split('T')[0],
             })
             .eq('id', chapterId);
 
           if (error) console.error('Supabase update error (invoice.paid):', error);
+          else console.log(`[stripe-webhook] Chapter ${chapterId} invoice paid — promoted to active`);
         } else {
           console.warn('invoice.paid: no chapter_id found in metadata', invoice.id);
         }
