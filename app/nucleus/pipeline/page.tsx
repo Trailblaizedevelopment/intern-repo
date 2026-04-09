@@ -793,6 +793,17 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
       .finally(() => setLoading(false));
   }, [loadDeals, loadSchools, loadNationals, loadContacts, loadEmployees, loadCurrentUser]);
 
+  // For growth_interns: default to all-deals tab so they see the full pipeline
+  const isGrowthIntern = currentUser?.role === 'growth_intern' || currentUser?.role === 'sales_intern';
+  useEffect(() => {
+    if (!currentUser) return;
+    if (isGrowthIntern && activeTab === 'my-deals' && !lockedTab) {
+      setActiveTab('all-deals');
+    }
+  // Only run once when currentUser first loads
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
+
   // Auto-open a deal when navigated from global search (?deal=<id>)
   useEffect(() => {
     const dealId = searchParams.get('deal');

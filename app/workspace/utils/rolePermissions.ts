@@ -164,11 +164,10 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       ];
     case 'growth_intern':
     default:
-      // Interns: Dashboard, Pipeline (same as founders), Team
+      // Interns: Dashboard, Pipeline (full access, same as founders), Team
       return [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
         { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', emphasized: true },
-        { name: 'Schools', href: '/workspace/schools', icon: 'GraduationCap' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
   }
