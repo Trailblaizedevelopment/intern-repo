@@ -6,8 +6,10 @@ import {
   MessageSquare, ChevronDown, ChevronRight, Zap,
   CheckCircle2, Clock, XCircle, Send, Eye, EyeOff, ChevronUp,
 } from 'lucide-react';
-import { ChapterWithOnboarding, supabase } from '@/lib/supabase';
+import { ChapterWithOnboarding } from '@/lib/supabase';
 import ConversationsTab from '../ConversationsTab';
+
+const AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -778,28 +780,27 @@ function ContactListSection({
   const PAGE_SIZE = 50;
 
   const fetchContacts = useCallback(async (reset = false) => {
-    if (!supabase) return;
     setLoading(true);
     const offset = reset ? 0 : page * PAGE_SIZE;
     try {
-      let query = supabase
-        .from('alumni_contacts')
-        .select('id, first_name, last_name, phone_primary, outreach_status, touch1_sent_at, touch2_sent_at, touch3_sent_at, last_response_at')
-        .eq('chapter_id', chapterId)
-        .order('outreach_status')
-        .order('created_at', { ascending: false })
-        .range(offset, offset + PAGE_SIZE - 1);
-
+      const params = new URLSearchParams({
+        chapter_id: chapterId,
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+        sort: 'outreach_status',
+        sort_dir: 'asc',
+      });
       if (statusFilter !== 'all') {
-        query = query.eq('outreach_status', statusFilter);
+        params.set('outreach_status', statusFilter);
       }
 
-      const { data, error } = await query;
-      if (error) {
-        showToast('Failed to load contacts: ' + error.message, 'error');
+      const res = await fetch(`/api/alumni-contacts?${params}`, { headers: { Authorization: AUTH } });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        showToast('Failed to load contacts: ' + (json.error?.message ?? 'Unknown error'), 'error');
         return;
       }
-      const results = data as AlumniContact[];
+      const results = (json.data?.contacts ?? []) as AlumniContact[];
       if (reset) {
         setContacts(results);
         setPage(0);
@@ -807,6 +808,9 @@ function ContactListSection({
         setContacts(prev => [...prev, ...results]);
       }
       setHasMore(results.length === PAGE_SIZE);
+    } catch (err) {
+      showToast('Failed to load contacts', 'error');
+      console.error(err);
     } finally {
       setLoading(false);
     }

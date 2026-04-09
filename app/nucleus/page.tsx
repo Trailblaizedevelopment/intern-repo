@@ -29,7 +29,13 @@ import {
   LayoutDashboard,
   Radar,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+// supabase anon client removed — all data fetches use admin API routes
+
+interface EmployeeRow {
+  status: string;
+  start_date: string;
+  [key: string]: unknown;
+}
 
 interface ModuleStats {
   employees: {
@@ -91,11 +97,12 @@ export default function Nucleus() {
   }, []);
 
   async function fetchOutreachOverview() {
-    if (!supabase) return;
     try {
-      // Get all chapters with alumni
-      const { data: chapters } = await supabase.from('chapters').select('id, chapter_name, school');
-      if (!chapters) return;
+      // Get all chapters with alumni via admin API
+      const chaptersRes = await fetch('/api/chapters');
+      const chaptersJson = await chaptersRes.json();
+      const chapters: { id: string; chapter_name: string; school?: string }[] = chaptersJson.data || [];
+      if (!chapters.length) return;
 
       const chapterStats = await Promise.all(
         chapters.map(async (ch) => {
@@ -120,15 +127,16 @@ export default function Nucleus() {
       const active = chapterStats.filter(Boolean) as NonNullable<typeof chapterStats[number]>[];
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
 
-      // Get today's daily log
-      const { data: todayLog } = await supabase
-        .from('outreach_daily_log')
-        .select('sends_count, responses_count, signups_count')
-        .gte('date', todayStart.toISOString().split('T')[0]);
+      // Get today's daily log via outreach dashboard API
+      let sends_today = 0, responses_today = 0, signups_today = 0;
+      try {
+        const dashRes = await fetch('/api/outreach/dashboard');
+        const dashJson = await dashRes.json();
+        sends_today = dashJson.data?.today?.sends || 0;
+        responses_today = dashJson.data?.today?.responses || 0;
+        signups_today = dashJson.data?.today?.signups || 0;
+      } catch { /* non-critical */ }
 
-      const sends_today = (todayLog || []).reduce((s, r) => s + (r.sends_count || 0), 0);
-      const responses_today = (todayLog || []).reduce((s, r) => s + (r.responses_count || 0), 0);
-      const signups_today = (todayLog || []).reduce((s, r) => s + (r.signups_count || 0), 0);
       const followups_due = active.reduce((s, ch) => s + ch.touch2_due + ch.touch3_due, 0);
 
       setOutreachStats({
@@ -141,34 +149,35 @@ export default function Nucleus() {
   }
 
   async function fetchAllStats() {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-
     try {
       const [
-        employeesRes,
-        contactsRes,
+        employeesJson,
+        contactsJson,
         dealsApiRes,
-        tasksRes,
-        chaptersRes,
-        contractsRes
+        tasksJson,
+        chaptersJson,
+        contractsJson
       ] = await Promise.all([
-        supabase.from('employees').select('*'),
-        supabase.from('network_contacts').select('*'),
+        fetch('/api/employees').then(r => r.ok ? r.json() : { data: [] }),
+        fetch('/api/network-contacts').then(r => r.ok ? r.json() : { data: [] }),
         fetch('/api/pipeline/deals').then(r => r.ok ? r.json() : []),
-        supabase.from('tasks').select('*'),
-        supabase.from('chapters').select('*'),
-        supabase.from('enterprise_contracts').select('*')
+        fetch('/api/tasks').then(r => r.ok ? r.json() : { data: [] }),
+        fetch('/api/chapters').then(r => r.ok ? r.json() : { data: [] }),
+        fetch('/api/enterprise-contracts').then(r => r.ok ? r.json() : { data: [] }),
       ]);
 
-      const employees = employeesRes.data || [];
-      const contacts = contactsRes.data || [];
-      const deals = Array.isArray(dealsApiRes) ? dealsApiRes : [];
-      const tasks = tasksRes.data || [];
-      const chapters = chaptersRes.data || [];
-      const contracts = contractsRes.data || [];
+      interface ContactRow { priority: string; next_followup_date?: string; contact_type: string; [key: string]: unknown; }
+      interface DealRow { stage: string; value?: number; created_at: string; [key: string]: unknown; }
+      interface TaskRow { status: string; due_date?: string; [key: string]: unknown; }
+      interface ChapterRow { status: string; mrr?: number; payment_day?: number; payment_start_date?: string; next_payment_date?: string; [key: string]: unknown; }
+      interface ContractRow { stage: string; value?: number; [key: string]: unknown; }
+
+      const employees: EmployeeRow[] = employeesJson.data || [];
+      const contacts: ContactRow[] = contactsJson.data || [];
+      const deals: DealRow[] = Array.isArray(dealsApiRes) ? dealsApiRes : [];
+      const tasks: TaskRow[] = tasksJson.data || [];
+      const chapters: ChapterRow[] = chaptersJson.data || [];
+      const contracts: ContractRow[] = contractsJson.data || [];
 
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -220,23 +229,23 @@ export default function Nucleus() {
         },
         finance: (() => {
           // Calculate from chapter subscription data (Stripe info)
-          const chaptersWithPayments = chapters.filter((c: { payment_day?: number; payment_start_date?: string; next_payment_date?: string }) => 
+          const chaptersWithPayments = chapters.filter(c => 
             c.payment_day || c.payment_start_date || c.next_payment_date
           );
-          const activeSubscriptions = chaptersWithPayments.filter((c: { status: string }) => c.status === 'active').length;
+          const activeSubscriptions = chaptersWithPayments.filter(c => c.status === 'active').length;
           
           // Upcoming payments this month
-          const upcomingThisMonth = chaptersWithPayments.filter((c: { next_payment_date?: string }) => {
+          const upcomingThisMonth = chaptersWithPayments.filter(c => {
             if (!c.next_payment_date) return false;
-            const nextDate = new Date(c.next_payment_date);
+            const nextDate = new Date(c.next_payment_date as string);
             return nextDate.getMonth() === now.getMonth() && nextDate.getFullYear() === now.getFullYear() && nextDate >= now;
           });
-          const expectedThisMonth = upcomingThisMonth.reduce((sum: number, c: { payment_amount?: number }) => sum + (c.payment_amount || 0), 0);
+          const expectedThisMonth = upcomingThisMonth.reduce((sum: number, c) => sum + ((c.payment_amount as number) || 0), 0);
           
           // Annual commitments
           const annualCommitments = chaptersWithPayments
-            .filter((c: { payment_type?: string; status: string }) => c.payment_type === 'annual' && c.status === 'active')
-            .reduce((sum: number, c: { payment_amount?: number }) => sum + (c.payment_amount || 0), 0);
+            .filter(c => c.payment_type === 'annual' && c.status === 'active')
+            .reduce((sum: number, c) => sum + ((c.payment_amount as number) || 0), 0);
           
           return {
             activeSubscriptions,

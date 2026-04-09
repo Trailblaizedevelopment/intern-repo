@@ -773,17 +773,23 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   }, [activeTab]); // searchQuery intentionally excluded — passed as arg to avoid re-triggering initial load effect
 
   const loadEmployees = useCallback(async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from('employees').select('id, name, role').eq('status', 'active');
-    if (data) setEmployees(data);
+    const res = await fetch('/api/employees?status=active');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data) setEmployees(json.data);
+    }
   }, []);
 
   const loadCurrentUser = useCallback(async () => {
     if (!supabase) return;
+    // auth.getUser() reads the local session — safe to call on anon client
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase.from('employees').select('*').eq('auth_user_id', user.id).single();
-      if (data) setCurrentUser(data);
+      const res = await fetch(`/api/employees?auth_user_id=${encodeURIComponent(user.id)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data?.[0]) setCurrentUser(json.data[0]);
+      }
     }
   }, []);
 

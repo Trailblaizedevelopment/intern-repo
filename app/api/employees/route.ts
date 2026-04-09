@@ -1,6 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+/**
+ * GET /api/employees
+ * Returns all employees, optionally filtered by status or email.
+ * Query params: status (active|onboarding|inactive), email, auth_user_id
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
+
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+    const email = searchParams.get('email');
+    const authUserId = searchParams.get('auth_user_id');
+
+    let query = supabaseAdmin.from('employees').select('*').order('name');
+    if (status) query = query.eq('status', status);
+    if (email) query = query.eq('email', email);
+    if (authUserId) query = query.eq('auth_user_id', authUserId);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching employees:', error);
+      return NextResponse.json({ data: null, error: { message: error.message, code: error.code } }, { status: 500 });
+    }
+    return NextResponse.json({ data, error: null });
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return NextResponse.json({ data: null, error: { message: 'Internal server error', code: 'INTERNAL_ERROR' } }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Check for required environment variables

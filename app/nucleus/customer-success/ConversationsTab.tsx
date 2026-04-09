@@ -5,7 +5,6 @@ import {
   MessageSquare, RefreshCw, CheckCheck, Flag,
   Loader2, Send, User, ArrowLeft, ChevronLeft, AlertTriangle,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -426,28 +425,26 @@ function AlumniContactsList({ chapterId, category, search }: AlumniContactsListP
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!supabase) { setLoading(false); return; }
     const statuses = getStatusesForCategory(category);
     if (!statuses) { setLoading(false); return; }
 
     setLoading(true);
-    let query = supabase
-      .from('alumni_contacts')
-      .select('id, first_name, last_name, phone_primary, outreach_status, touch1_sent_at, touch2_sent_at, touch3_sent_at, last_response_at')
-      .eq('chapter_id', chapterId)
-      .in('outreach_status', statuses)
-      .order('created_at', { ascending: false })
-      .limit(200);
-
-    // Apply search filter
-    if (search.trim()) {
-      query = query.or(`first_name.ilike.%${search.trim()}%,last_name.ilike.%${search.trim()}%,phone_primary.ilike.%${search.trim()}%`);
-    }
-
-    query.then(({ data, error }) => {
-      if (!error && data) setContacts(data as AlumniContactRow[]);
-      setLoading(false);
+    const params = new URLSearchParams({
+      chapter_id: chapterId,
+      status_in: statuses.join(','),
+      limit: '200',
+      sort: 'created_at',
+      sort_dir: 'desc',
     });
+    if (search.trim()) params.set('search', search.trim());
+
+    fetch(`/api/alumni-contacts?${params}`, { headers: { Authorization: AUTH } })
+      .then(r => r.json())
+      .then(json => {
+        if (json.data?.contacts) setContacts(json.data.contacts as AlumniContactRow[]);
+      })
+      .catch(() => { /* silently fail */ })
+      .finally(() => setLoading(false));
   }, [chapterId, category, search]);
 
   if (loading) {
@@ -1405,32 +1402,32 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
         ? json.counts
         : { needs_reply: 0, flagged: 0, touch1: 0, touch2: 0, touch3: 0, signed_up: 0, confirmed: 0, no_response: 0, handled: 0, all: 0 };
 
-      // Fetch alumni_contacts counts for status-based categories
-      if (supabase) {
-        const { data: alumniRows } = await supabase
-          .from('alumni_contacts')
-          .select('outreach_status')
-          .eq('chapter_id', chapterId);
+      // Fetch alumni_contacts counts for status-based categories via API (admin client — RLS safe)
+      const acRes = await fetch(
+        `/api/alumni-contacts?chapter_id=${chapterId}&status_in=touch1_sent,touch2_sent,touch3_sent,signed_up,touch1_confirmed,declined&export=true`,
+        { headers: { Authorization: AUTH } }
+      );
+      if (acRes.ok) {
+        const acJson = await acRes.json();
+        const alumniRows: { outreach_status: string }[] = acJson.data?.contacts ?? [];
 
-        if (alumniRows) {
-          const touch1Count  = alumniRows.filter(r => r.outreach_status === 'touch1_sent').length;
-          const touch2Count  = alumniRows.filter(r => r.outreach_status === 'touch2_sent').length;
-          const touch3Count  = alumniRows.filter(r => r.outreach_status === 'touch3_sent').length;
-          const signedUpCount = alumniRows.filter(r => r.outreach_status === 'signed_up').length;
-          const confirmedCount = alumniRows.filter(r => r.outreach_status === 'touch1_confirmed').length;
-          const handledCount = alumniRows.filter(r => r.outreach_status === 'declined').length;
+        const touch1Count    = alumniRows.filter(r => r.outreach_status === 'touch1_sent').length;
+        const touch2Count    = alumniRows.filter(r => r.outreach_status === 'touch2_sent').length;
+        const touch3Count    = alumniRows.filter(r => r.outreach_status === 'touch3_sent').length;
+        const signedUpCount  = alumniRows.filter(r => r.outreach_status === 'signed_up').length;
+        const confirmedCount = alumniRows.filter(r => r.outreach_status === 'touch1_confirmed').length;
+        const handledCount   = alumniRows.filter(r => r.outreach_status === 'declined').length;
 
-          setCategoryCounts({
-            ...linqCounts,
-            touch1: touch1Count,
-            touch2: touch2Count,
-            touch3: touch3Count,
-            signed_up: signedUpCount,
-            confirmed: confirmedCount,
-            handled: handledCount || linqCounts.handled,
-          });
-          return;
-        }
+        setCategoryCounts({
+          ...linqCounts,
+          touch1: touch1Count,
+          touch2: touch2Count,
+          touch3: touch3Count,
+          signed_up: signedUpCount,
+          confirmed: confirmedCount,
+          handled: handledCount || linqCounts.handled,
+        });
+        return;
       }
 
       setCategoryCounts(linqCounts);
