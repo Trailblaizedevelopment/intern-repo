@@ -34,7 +34,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase, Employee } from '@/lib/supabase';
+import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
 
@@ -203,15 +203,24 @@ export function TicketBoard() {
   // ── Data fetching ──
 
   const fetchCurrentEmployee = useCallback(async () => {
-    if (!supabase || !user) return;
-    const { data } = await supabase.from('employees').select('*').eq('email', user.email).single();
-    if (data) setCurrentEmployee(data);
+    if (!user?.email) return;
+    try {
+      const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email)}`);
+      const { data } = await res.json();
+      if (data && data.length > 0) setCurrentEmployee(data[0]);
+    } catch (err) {
+      console.error('Error fetching current employee:', err);
+    }
   }, [user]);
 
   const fetchEmployees = useCallback(async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from('employees').select('*').eq('status', 'active').order('name');
-    if (data) setEmployees(data);
+    try {
+      const res = await fetch('/api/employees?status=active');
+      const { data } = await res.json();
+      if (data) setEmployees(data);
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
   }, []);
 
   const fetchProjects = useCallback(async () => {

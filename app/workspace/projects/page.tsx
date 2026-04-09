@@ -8,7 +8,7 @@ import {
   LayoutGrid, GanttChart, Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase, Employee } from '@/lib/supabase';
+import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
 
@@ -154,14 +154,17 @@ export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'timeline'>('cards');
 
   useEffect(() => {
-    if (!supabase || !user) return;
-    supabase.from('employees').select('*').eq('status', 'active').order('name').then(({ data }) => {
-      if (data) {
-        setEmployees(data);
-        const me = data.find(e => e.email === user.email);
-        if (me) setCurrentEmployeeId(me.id);
-      }
-    });
+    if (!user) return;
+    fetch('/api/employees?status=active')
+      .then(res => res.json())
+      .then(({ data }) => {
+        if (data) {
+          setEmployees(data);
+          const me = data.find((e: Employee) => e.email === user.email);
+          if (me) setCurrentEmployeeId(me.id);
+        }
+      })
+      .catch(err => console.error('Error fetching employees:', err));
   }, [user]);
 
   const fetchProjects = useCallback(async () => {

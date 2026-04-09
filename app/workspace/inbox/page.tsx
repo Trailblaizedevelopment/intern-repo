@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase, Employee } from '@/lib/supabase';
+import { Employee } from '@/lib/supabase';
 import { useGoogleIntegration } from '../hooks/useGoogleIntegration';
 import { isAutomatedEmail } from '@/lib/email-classify';
 import type { GmailMessage } from '../hooks/useGoogleIntegration';
@@ -76,14 +76,23 @@ export default function InboxPage() {
   const google = useGoogleIntegration(currentEmployee?.id);
 
   const fetchEmployee = useCallback(async () => {
-    if (!supabase || !user) return;
-    const { data } = await supabase.from('employees').select('*').eq('email', user.email).single();
-    if (data) setCurrentEmployee(data);
-    else {
-      const { data: fallback } = await supabase.from('employees').select('*').eq('status', 'active').limit(1).single();
-      if (fallback) setCurrentEmployee(fallback);
+    if (!user?.email) return;
+    try {
+      const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email)}`);
+      const { data } = await res.json();
+      if (data && data.length > 0) {
+        setCurrentEmployee(data[0]);
+      } else {
+        // fallback to first active employee
+        const fallbackRes = await fetch('/api/employees?status=active');
+        const fallbackJson = await fallbackRes.json();
+        if (fallbackJson.data && fallbackJson.data.length > 0) setCurrentEmployee(fallbackJson.data[0]);
+      }
+    } catch (err) {
+      console.error('Error fetching employee:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user]);
 
   useEffect(() => {
