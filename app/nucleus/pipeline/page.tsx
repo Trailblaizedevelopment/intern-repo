@@ -797,8 +797,10 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   const isGrowthIntern = currentUser?.role === 'growth_intern' || currentUser?.role === 'sales_intern';
   useEffect(() => {
     if (!currentUser) return;
-    if (isGrowthIntern && activeTab === 'my-deals' && !lockedTab) {
-      setActiveTab('all-deals');
+    // Growth interns default to my-deals so they see their assigned deals first
+    // They can still click All Deals to see the full pipeline
+    if (isGrowthIntern && activeTab !== 'my-deals' && !lockedTab) {
+      setActiveTab('my-deals');
     }
   // Only run once when currentUser first loads
   // eslint-disable-next-line react-hooks/exhaustive-deps
