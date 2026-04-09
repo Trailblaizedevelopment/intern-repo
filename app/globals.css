@@ -34790,3 +34790,347 @@ body { background: #ffffff !important; }
 .error-page-btn-secondary:hover {
   background: #f3f4f6;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   INTERN DASHBOARD (idb-*)
+   Clean, consumer-grade. Green CTAs. No Nucleus navy/amber.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.idb-root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 32px;
+  background: #FAFAFA;
+  min-height: 100%;
+  font-family: system-ui, -apple-system, sans-serif;
+  box-sizing: border-box;
+}
+
+/* Page header */
+.idb-page-header { margin-bottom: 4px; }
+.idb-page-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+.idb-page-sub {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Card base */
+.idb-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  padding: 20px 22px;
+  box-sizing: border-box;
+}
+
+/* Widget header label */
+.idb-widget-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+/* ── Top row ── */
+.idb-top-row {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  gap: 20px;
+}
+@media (max-width: 768px) {
+  .idb-top-row { grid-template-columns: 1fr; }
+}
+
+/* ── Calendar widget ── */
+.idb-calendar-date {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+.idb-date-day {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+.idb-date-full {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+.idb-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  color: #9ca3af;
+  font-size: 13px;
+  text-align: center;
+}
+.idb-connect-btn {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.idb-connect-btn:hover { background: #dcfce7; }
+.idb-event-list { display: flex; flex-direction: column; gap: 6px; }
+.idb-event-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.12s;
+}
+.idb-event-row:hover { background: #f9fafb; }
+.idb-event-day-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.idb-event-day-tag.today { background: #f0fdf4; color: #16a34a; }
+.idb-event-day-tag.tomorrow { background: #f0f9ff; color: #2563eb; }
+.idb-event-time { font-size: 11px; color: #6b7280; flex-shrink: 0; min-width: 52px; }
+.idb-event-title { font-size: 13px; color: #111827; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Create Deal widget ── */
+.idb-create-deal-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+}
+.idb-create-deal-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 6px;
+}
+.idb-create-deal-desc {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 20px;
+}
+.idb-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  width: fit-content;
+}
+.idb-create-btn:hover { background: #15803d; transform: translateY(-1px); }
+.idb-create-btn:active { transform: translateY(0); }
+
+/* ── Pipeline widget ── */
+.idb-pipeline-card { padding: 20px 22px 0; overflow: hidden; }
+.idb-pipeline-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.idb-pipeline-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.idb-deal-count {
+  font-size: 13px;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #6b7280;
+  border-radius: 99px;
+  padding: 2px 8px;
+}
+.idb-pipeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.idb-school-filter-tag {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.idb-school-filter-tag:hover { background: #dcfce7; }
+
+/* Toggle */
+.idb-toggle-label { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.idb-toggle-input { display: none; }
+.idb-toggle-track {
+  width: 34px; height: 18px;
+  background: #d1d5db;
+  border-radius: 99px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.idb-toggle-input:checked + .idb-toggle-track { background: #16a34a; }
+.idb-toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: left 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.idb-toggle-input:checked + .idb-toggle-track .idb-toggle-thumb { left: 18px; }
+.idb-toggle-text { font-size: 13px; color: #374151; font-weight: 500; }
+
+/* Search */
+.idb-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.idb-search-icon {
+  position: absolute;
+  left: 10px;
+  color: #9ca3af;
+  pointer-events: none;
+}
+.idb-search-input {
+  padding: 7px 10px 7px 30px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #111827;
+  background: #f9fafb;
+  outline: none;
+  width: 200px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.idb-search-input:focus { border-color: #16a34a; background: #fff; }
+
+/* Table */
+.idb-table-loading, .idb-table-empty {
+  padding: 32px 0;
+  text-align: center;
+  font-size: 14px;
+  color: #9ca3af;
+}
+.idb-table-wrap {
+  overflow-x: auto;
+  margin: 0 -22px;
+  padding: 0 22px 20px;
+}
+.idb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.idb-th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #f3f4f6;
+  white-space: nowrap;
+}
+.idb-th--sortable { cursor: pointer; user-select: none; }
+.idb-th--sortable:hover { color: #111827; }
+.idb-tr { transition: background 0.1s; }
+.idb-tr:hover { background: #fafafa; }
+.idb-td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  vertical-align: middle;
+}
+.idb-td--org { font-weight: 600; color: #111827; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.idb-td--school { color: #6b7280; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.idb-td--temp { text-align: center; }
+.idb-td--followup { white-space: nowrap; }
+.idb-td--assigned { color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.idb-overdue { color: #ef4444; font-weight: 600; }
+
+/* ── Schools widget ── */
+.idb-schools-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.idb-schools-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.idb-school-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  font-size: 13px;
+}
+.idb-school-row:hover { border-color: #16a34a; background: #f0fdf4; }
+.idb-school-row--active { border-color: #16a34a; background: #f0fdf4; }
+.idb-school-name { font-weight: 600; color: #111827; }
+.idb-school-meta { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.idb-school-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 99px;
+  padding: 2px 7px;
+}

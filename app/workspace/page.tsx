@@ -5,13 +5,16 @@ import { useAuth } from '@/lib/auth-context';
 import { useUserRole } from './hooks/useUserRole';
 import { useWorkspaceData } from './hooks/useWorkspaceData';
 import { CommandCenter } from './components/CommandCenter';
+import { InternDashboard } from './components/dashboards/InternDashboard';
 
 /**
- * Main Workspace Page — Command Center Dashboard
+ * Main Workspace Page
+ * - growth_intern → focused InternDashboard (deals + pipeline)
+ * - everyone else → CommandCenter (unchanged)
  */
 export default function WorkspacePage() {
   const { profile } = useAuth();
-  const { loading: roleLoading } = useUserRole();
+  const { loading: roleLoading, isIntern } = useUserRole();
   const workspaceData = useWorkspaceData();
 
   const firstName = profile?.name?.split(' ')[0] || 'there';
@@ -35,6 +38,19 @@ export default function WorkspacePage() {
     );
   }
 
+  // Growth interns get their own focused dashboard
+  if (isIntern) {
+    return (
+      <div className="ws-page">
+        <InternDashboard
+          data={workspaceData}
+          teamMembers={workspaceData.teamMembers}
+        />
+      </div>
+    );
+  }
+
+  // Founders and engineers get the existing CommandCenter dashboard (unchanged)
   return (
     <div className="ws-page">
       <CommandCenter

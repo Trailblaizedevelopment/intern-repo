@@ -164,10 +164,9 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       ];
     case 'growth_intern':
     default:
-      // Interns: Dashboard, Pipeline (full access, same as founders), Team
+      // Interns: just Dashboard + Team. Everything else lives on the dashboard.
       return [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
-        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', emphasized: true },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
   }

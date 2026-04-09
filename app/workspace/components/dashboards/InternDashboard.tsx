@@ -1,270 +1,469 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import Link from 'next/link';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Zap,
-  Send,
-  UserPlus,
-  CheckSquare,
-  TrendingUp,
-  Target,
-  Mail,
-  Phone,
+  Calendar,
+  Plus,
+  Search,
   ChevronDown,
   ChevronUp,
-  ArrowRight,
-  Users
+  Building2,
+  Users,
+  Flame,
+  Snowflake,
+  Minus,
 } from 'lucide-react';
-import { TaskSection } from '../TaskSection';
-import { LeadSection } from '../LeadSection';
-import { FocusTimer } from '../FocusTimer';
-import { TeamList } from '../TeamView';
-import { TrailblaizeCalendar } from '../TrailblaizeCalendar';
-import { SmartSuggestions } from '../SmartSuggestions';
-import { GoogleGmailWidget } from '../GoogleGmailWidget';
-import { UseWorkspaceDataReturn } from '../../hooks/useWorkspaceData';
 import { useGoogleIntegration } from '../../hooks/useGoogleIntegration';
+import { UseWorkspaceDataReturn } from '../../hooks/useWorkspaceData';
 import { Employee } from '@/lib/supabase';
+import dynamic from 'next/dynamic';
+
+// Lazy-load NewDealModal to keep initial bundle small
+const NewDealModal = dynamic(
+  () => import('@/app/nucleus/pipeline/NewDealModal'),
+  { ssr: false }
+);
+
+/* ─── Types ─────────────────────────────────────────────────────────────── */
+
+interface PipelineDeal {
+  id: string;
+  stage: string;
+  temperature?: string | null;
+  next_followup?: string | null;
+  assigned_to?: string | null;
+  organization?: { name?: string; school?: { name?: string } } | null;
+  contact?: { name?: string } | null;
+  notes?: string | null;
+}
+
+interface SchoolEntry {
+  id: string;
+  name: string;
+  conference: string | null;
+  organizations: { pipeline_deals: { id: string }[] }[];
+}
+
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
+
+const STAGE_LABELS: Record<string, { label: string; color: string }> = {
+  lead:          { label: 'Lead',          color: '#6b7280' },
+  demo_booked:   { label: 'Demo Booked',   color: '#2563eb' },
+  first_demo:    { label: 'First Demo',    color: '#7c3aed' },
+  second_call:   { label: 'Second Call',   color: '#d97706' },
+  contract_sent: { label: 'Contract Sent', color: '#ea580c' },
+  closed_won:    { label: 'Closed Won',    color: '#16a34a' },
+  closed_lost:   { label: 'Closed Lost',   color: '#dc2626' },
+  hold_off:      { label: 'Hold Off',      color: '#9ca3af' },
+};
+
+function StageBadge({ stage }: { stage: string }) {
+  const cfg = STAGE_LABELS[stage] ?? { label: stage, color: '#6b7280' };
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '2px 8px',
+      borderRadius: 99,
+      fontSize: 11,
+      fontWeight: 600,
+      letterSpacing: 0.2,
+      background: cfg.color + '18',
+      color: cfg.color,
+      border: `1px solid ${cfg.color}30`,
+      whiteSpace: 'nowrap',
+    }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function TempIcon({ temp }: { temp?: string | null }) {
+  if (temp === 'hot')  return <Flame size={14} color="#ef4444" />;
+  if (temp === 'cold') return <Snowflake size={14} color="#3b82f6" />;
+  return <Minus size={14} color="#9ca3af" />;
+}
+
+function formatFollowup(date?: string | null): string {
+  if (!date) return '—';
+  const d = new Date(date);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.floor((d.getTime() - today.getTime()) / 86400000);
+  if (diff < -1) return `${Math.abs(diff)}d ago`;
+  if (diff === -1) return 'Yesterday';
+  if (diff === 0)  return 'Today';
+  if (diff === 1)  return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/* ─── Calendar Widget ────────────────────────────────────────────────────── */
+
+function CalendarWidget({ employeeId }: { employeeId?: string }) {
+  const google = useGoogleIntegration(employeeId);
+
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const tomorrowStr = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
+
+  const upcomingEvents = useMemo(() => {
+    if (!google.calendarEvents?.length) return [];
+    return google.calendarEvents
+      .filter(e => {
+        const start = e.start.dateTime || e.start.date || '';
+        return start.startsWith(todayStr) || start.startsWith(tomorrowStr);
+      })
+      .sort((a, b) => (a.start.dateTime || a.start.date || '').localeCompare(b.start.dateTime || b.start.date || ''))
+      .slice(0, 4);
+  }, [google.calendarEvents, todayStr, tomorrowStr]);
+
+  const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
+  const monthDay = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+
+  return (
+    <div className="idb-card idb-calendar-card">
+      <div className="idb-widget-label">CALENDAR</div>
+      <div className="idb-calendar-date">
+        <span className="idb-date-day">{dayOfWeek}</span>
+        <span className="idb-date-full">{monthDay}</span>
+      </div>
+
+      {google.calendarLoading ? (
+        <div className="idb-empty-state">Loading…</div>
+      ) : !google.status?.connected ? (
+        <div className="idb-empty-state">
+          <Calendar size={16} color="#9ca3af" />
+          <button className="idb-connect-btn" onClick={google.connect}>
+            Connect Google Calendar
+          </button>
+        </div>
+      ) : upcomingEvents.length === 0 ? (
+        <div className="idb-empty-state">
+          <Calendar size={16} color="#9ca3af" />
+          <span>No events today</span>
+        </div>
+      ) : (
+        <div className="idb-event-list">
+          {upcomingEvents.map(e => {
+            const isToday = (e.start.dateTime || e.start.date || '').startsWith(todayStr);
+            const time = e.start.dateTime
+              ? new Date(e.start.dateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+              : 'All day';
+            return (
+              <a key={e.id} href={e.htmlLink} target="_blank" rel="noopener noreferrer" className="idb-event-row">
+                <span className={`idb-event-day-tag ${isToday ? 'today' : 'tomorrow'}`}>{isToday ? 'Today' : 'Tmrw'}</span>
+                <span className="idb-event-time">{time}</span>
+                <span className="idb-event-title">{e.summary}</span>
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Create Deal Widget ─────────────────────────────────────────────────── */
+
+function CreateDealWidget({ onOpenModal }: { onOpenModal: () => void }) {
+  return (
+    <div className="idb-card idb-create-deal-card">
+      <div className="idb-widget-label">PIPELINE</div>
+      <h2 className="idb-create-deal-title">New Deal</h2>
+      <p className="idb-create-deal-desc">Add a chapter to your pipeline</p>
+      <button className="idb-create-btn" onClick={onOpenModal}>
+        <Plus size={16} />
+        Create Deal
+      </button>
+    </div>
+  );
+}
+
+/* ─── Pipeline Widget ────────────────────────────────────────────────────── */
+
+function PipelineWidget({
+  currentEmployeeId,
+  schoolFilter,
+  onClearSchoolFilter,
+}: {
+  currentEmployeeId?: string;
+  schoolFilter?: string | null;
+  onClearSchoolFilter: () => void;
+}) {
+  const [deals, setDeals] = useState<PipelineDeal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [myDealsOnly, setMyDealsOnly] = useState(false);
+  const [sortField, setSortField] = useState<'next_followup' | 'stage' | null>(null);
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const fetchDeals = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/pipeline/deals');
+      if (res.ok) {
+        const data = await res.json();
+        setDeals(Array.isArray(data) ? data : []);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchDeals(); }, [fetchDeals]);
+
+  const filtered = useMemo(() => {
+    let result = deals;
+
+    // School filter from Schools widget
+    if (schoolFilter) {
+      result = result.filter(d => d.organization?.school?.name === schoolFilter || (d.organization as any)?.school?.id === schoolFilter);
+    }
+
+    // My deals toggle
+    if (myDealsOnly && currentEmployeeId) {
+      result = result.filter(d => d.assigned_to === currentEmployeeId);
+    }
+
+    // Search
+    if (search.trim()) {
+      const s = search.trim().toLowerCase();
+      result = result.filter(d =>
+        d.organization?.name?.toLowerCase().includes(s) ||
+        d.organization?.school?.name?.toLowerCase().includes(s) ||
+        d.contact?.name?.toLowerCase().includes(s) ||
+        d.notes?.toLowerCase().includes(s)
+      );
+    }
+
+    // Sort
+    if (sortField === 'next_followup') {
+      result = [...result].sort((a, b) => {
+        const av = a.next_followup ?? '9999';
+        const bv = b.next_followup ?? '9999';
+        return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+    } else if (sortField === 'stage') {
+      const STAGE_ORDER = ['lead','demo_booked','first_demo','second_call','contract_sent','closed_won','closed_lost','hold_off'];
+      result = [...result].sort((a, b) => {
+        const ai = STAGE_ORDER.indexOf(a.stage);
+        const bi = STAGE_ORDER.indexOf(b.stage);
+        return sortAsc ? ai - bi : bi - ai;
+      });
+    }
+
+    return result;
+  }, [deals, search, myDealsOnly, currentEmployeeId, schoolFilter, sortField, sortAsc]);
+
+  function handleSort(field: 'next_followup' | 'stage') {
+    if (sortField === field) {
+      setSortAsc(a => !a);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+  }
+
+  return (
+    <div className="idb-card idb-pipeline-card">
+      <div className="idb-pipeline-header">
+        <div>
+          <div className="idb-widget-label">PIPELINE</div>
+          <h2 className="idb-pipeline-title">
+            All Deals
+            {filtered.length > 0 && (
+              <span className="idb-deal-count">{filtered.length}</span>
+            )}
+          </h2>
+        </div>
+
+        <div className="idb-pipeline-controls">
+          {schoolFilter && (
+            <button className="idb-school-filter-tag" onClick={onClearSchoolFilter}>
+              {schoolFilter} ✕
+            </button>
+          )}
+          <label className="idb-toggle-label">
+            <input
+              type="checkbox"
+              checked={myDealsOnly}
+              onChange={e => setMyDealsOnly(e.target.checked)}
+              className="idb-toggle-input"
+            />
+            <span className="idb-toggle-track">
+              <span className="idb-toggle-thumb" />
+            </span>
+            <span className="idb-toggle-text">My Deals</span>
+          </label>
+          <div className="idb-search-wrap">
+            <Search size={14} className="idb-search-icon" />
+            <input
+              className="idb-search-input"
+              placeholder="Search deals…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="idb-table-loading">Loading deals…</div>
+      ) : filtered.length === 0 ? (
+        <div className="idb-table-empty">No deals found{search ? ` for "${search}"` : ''}.</div>
+      ) : (
+        <div className="idb-table-wrap">
+          <table className="idb-table">
+            <thead>
+              <tr>
+                <th className="idb-th">Org</th>
+                <th className="idb-th">School</th>
+                <th className="idb-th idb-th--sortable" onClick={() => handleSort('stage')}>
+                  Stage {sortField === 'stage' ? (sortAsc ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : null}
+                </th>
+                <th className="idb-th">Temp</th>
+                <th className="idb-th idb-th--sortable" onClick={() => handleSort('next_followup')}>
+                  Next Followup {sortField === 'next_followup' ? (sortAsc ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : null}
+                </th>
+                <th className="idb-th">Assigned To</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(deal => (
+                <tr key={deal.id} className="idb-tr">
+                  <td className="idb-td idb-td--org">{deal.organization?.name || deal.contact?.name || '—'}</td>
+                  <td className="idb-td idb-td--school">{deal.organization?.school?.name || '—'}</td>
+                  <td className="idb-td"><StageBadge stage={deal.stage} /></td>
+                  <td className="idb-td idb-td--temp"><TempIcon temp={deal.temperature} /></td>
+                  <td className="idb-td idb-td--followup">
+                    <span className={deal.next_followup && new Date(deal.next_followup) < new Date() ? 'idb-overdue' : ''}>
+                      {formatFollowup(deal.next_followup)}
+                    </span>
+                  </td>
+                  <td className="idb-td idb-td--assigned">{deal.assigned_to || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Schools Widget ─────────────────────────────────────────────────────── */
+
+function SchoolsWidget({
+  activeSchool,
+  onSelectSchool,
+}: {
+  activeSchool?: string | null;
+  onSelectSchool: (schoolName: string | null) => void;
+}) {
+  const [schools, setSchools] = useState<SchoolEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchSchools() {
+      try {
+        const res = await fetch('/api/pipeline/schools');
+        if (res.ok) {
+          const data = await res.json();
+          setSchools(Array.isArray(data) ? data : []);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSchools();
+  }, []);
+
+  return (
+    <div className="idb-card idb-schools-card">
+      <div className="idb-widget-label">SCHOOLS</div>
+      <h2 className="idb-schools-title">
+        <Building2 size={15} />
+        Active Schools
+      </h2>
+
+      {loading ? (
+        <div className="idb-empty-state">Loading…</div>
+      ) : schools.length === 0 ? (
+        <div className="idb-empty-state">No schools yet</div>
+      ) : (
+        <div className="idb-schools-list">
+          {schools.map(school => {
+            const dealCount = school.organizations.reduce((s, o) => s + o.pipeline_deals.length, 0);
+            const chapterCount = school.organizations.length;
+            const isActive = activeSchool === school.id || activeSchool === school.name;
+            return (
+              <button
+                key={school.id}
+                className={`idb-school-row ${isActive ? 'idb-school-row--active' : ''}`}
+                onClick={() => onSelectSchool(isActive ? null : school.name)}
+              >
+                <span className="idb-school-name">{school.name}</span>
+                <div className="idb-school-meta">
+                  <span className="idb-school-pill">
+                    <Users size={11} /> {chapterCount} org{chapterCount !== 1 ? 's' : ''}
+                  </span>
+                  <span className="idb-school-pill">
+                    {dealCount} deal{dealCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Main Dashboard ─────────────────────────────────────────────────────── */
 
 interface InternDashboardProps {
   data: UseWorkspaceDataReturn;
   teamMembers: Employee[];
 }
 
-/**
- * Growth Intern Dashboard
- * Calendar-centric design with focus on outreach and lead management
- */
-export function InternDashboard({ data, teamMembers }: InternDashboardProps) {
-  const {
-    currentEmployee,
-    tasks,
-    leads,
-    stats,
-    tasksLoading,
-    leadsLoading,
-    createTask,
-    updateTask,
-    toggleTask,
-    deleteTask,
-    createLead,
-    updateLead,
-    updateLeadStatus,
-    deleteLead,
-  } = data;
-
-  const [showSecondaryWidgets, setShowSecondaryWidgets] = useState(true);
-
-  // Google Integration
-  const google = useGoogleIntegration(currentEmployee?.id);
-
-  // Calculate meeting context for smart suggestions
-  const meetingContext = useMemo(() => {
-    const now = Date.now();
-    
-    const currentEvent = google.calendarEvents.find(event => {
-      if (!event.start.dateTime || !event.end.dateTime) return false;
-      const start = new Date(event.start.dateTime).getTime();
-      const end = new Date(event.end.dateTime).getTime();
-      return now >= start && now <= end;
-    });
-
-    const nextEvent = google.calendarEvents.find(event => {
-      if (!event.start.dateTime) return false;
-      const start = new Date(event.start.dateTime).getTime();
-      return start > now;
-    });
-
-    let minutesUntilNext: number | null = null;
-    if (nextEvent?.start.dateTime) {
-      minutesUntilNext = Math.floor((new Date(nextEvent.start.dateTime).getTime() - now) / 60000);
-    }
-
-    return {
-      isInMeeting: !!currentEvent,
-      minutesUntilNext,
-    };
-  }, [google.calendarEvents]);
-
-  // Intern-specific calculations
-  const activeTasks = tasks.filter(t => t.status !== 'done');
-  const activeLeads = leads.filter(l => !['converted', 'lost'].includes(l.status));
-  
-  // Stats for smart suggestions
-  const suggestionStats = {
-    openTasks: activeTasks.length,
-    overdueItems: tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length,
-    unreadMessages: google.unreadCount,
-    activeLeads: activeLeads.length,
-    pendingFollowups: leads.filter(l => l.status === 'contacted').length,
-  };
-
-  // Calculate weekly progress
-  const thisWeekTasks = tasks.filter(t => {
-    if (t.status !== 'done') return false;
-    const completed = new Date(t.created_at);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    return completed >= weekAgo;
-  }).length;
-
-  const thisWeekContacts = leads.filter(l => {
-    const created = new Date(l.created_at);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    return created >= weekAgo;
-  }).length;
+export function InternDashboard({ data }: InternDashboardProps) {
+  const { currentEmployee } = data;
+  const [modalOpen, setModalOpen] = useState(false);
+  const [schoolFilter, setSchoolFilter] = useState<string | null>(null);
 
   return (
-    <div className="ws-dashboard ws-dashboard-awareness">
-      {/* Trailblaize Calendar - Google Calendar Style */}
-      <TrailblaizeCalendar
-        events={google.calendarEvents}
-        loading={google.calendarLoading}
-        connected={google.status?.connected || false}
-        onConnect={google.connect}
-        onRefresh={google.fetchCalendarEvents}
-      />
-
-      {/* Smart Suggestions - Contextual Actions */}
-      <SmartSuggestions
-        role="growth_intern"
-        isInMeeting={meetingContext.isInMeeting}
-        minutesUntilNext={meetingContext.minutesUntilNext}
-        stats={suggestionStats}
-      />
-
-      {/* Quick Stats Bar */}
-      <div className="ws-quick-stats-bar">
-        <div className="ws-quick-stat">
-          <CheckSquare size={16} />
-          <span className="quick-stat-value">{activeTasks.length}</span>
-          <span className="quick-stat-label">Tasks</span>
-        </div>
-        <div className="ws-quick-stat">
-          <Target size={16} />
-          <span className="quick-stat-value">{activeLeads.length}</span>
-          <span className="quick-stat-label">Leads</span>
-        </div>
-        <div className="ws-quick-stat">
-          <Phone size={16} />
-          <span className="quick-stat-value">{thisWeekContacts}</span>
-          <span className="quick-stat-label">Contacted</span>
-        </div>
-        <div className="ws-quick-stat">
-          <Mail size={16} />
-          <span className="quick-stat-value">{google.unreadCount}</span>
-          <span className="quick-stat-label">Unread</span>
-        </div>
-        <div className="ws-quick-stats-spacer" />
-        <FocusTimer compact />
+    <div className="idb-root">
+      {/* Page title */}
+      <div className="idb-page-header">
+        <h1 className="idb-page-title">Dashboard</h1>
+        <p className="idb-page-sub">Your pipeline, at a glance</p>
       </div>
 
-      {/* Secondary Widgets - Collapsible */}
-      <div className="ws-secondary-section">
-        <button 
-          className="ws-secondary-toggle"
-          onClick={() => setShowSecondaryWidgets(!showSecondaryWidgets)}
-        >
-          <span>Details & Actions</span>
-          {showSecondaryWidgets ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
-
-        {showSecondaryWidgets && (
-          <div className="ws-secondary-grid">
-            {/* Priority Tasks */}
-            <div className="ws-secondary-widget">
-              <TaskSection
-                tasks={activeTasks}
-                onToggleTask={toggleTask}
-                onCreateTask={createTask}
-                onUpdateTask={updateTask}
-                onDeleteTask={deleteTask}
-                title="Priority Tasks"
-                limit={4}
-                compact
-                loading={tasksLoading}
-              />
-            </div>
-
-            {/* Gmail */}
-            <div className="ws-secondary-widget">
-              <GoogleGmailWidget
-                emails={google.emails}
-                unreadCount={google.unreadCount}
-                loading={google.gmailLoading}
-                connected={google.status?.connected || false}
-                onConnect={google.connect}
-                onRefresh={google.fetchEmails}
-              />
-            </div>
-
-            {/* Alumni Outreach */}
-            <div className="ws-secondary-widget">
-              <LeadSection
-                leads={activeLeads}
-                onCreateLead={createLead}
-                onUpdateStatus={updateLeadStatus}
-                onUpdateLead={updateLead}
-                onDeleteLead={deleteLead}
-                title="Alumni Outreach"
-                limit={3}
-                compact
-                loading={leadsLoading}
-              />
-            </div>
-
-            {/* Weekly Progress */}
-            <div className="ws-secondary-widget">
-              <section className="ws-card ws-progress-card">
-                <div className="ws-card-header">
-                  <h3>
-                    <TrendingUp size={16} />
-                    This Week
-                  </h3>
-                </div>
-                <div className="ws-progress-stats">
-                  <div className="ws-progress-stat">
-                    <span className="ws-progress-value">{thisWeekTasks}</span>
-                    <span className="ws-progress-label">Tasks Done</span>
-                  </div>
-                  <div className="ws-progress-stat">
-                    <span className="ws-progress-value">{thisWeekContacts}</span>
-                    <span className="ws-progress-label">Contacts Made</span>
-                  </div>
-                </div>
-                
-                {/* Team Preview */}
-                <div className="ws-team-avatars" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--ws-border)' }}>
-                  {teamMembers.slice(0, 5).map((member, i) => (
-                    <div 
-                      key={member.id} 
-                      className="ws-team-avatar-small"
-                      style={{ 
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'][i % 5],
-                        zIndex: 5 - i
-                      }}
-                      title={member.name}
-                    >
-                      {member.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                    </div>
-                  ))}
-                  {teamMembers.length > 5 && (
-                    <div className="ws-team-avatar-more">
-                      +{teamMembers.length - 5}
-                    </div>
-                  )}
-                </div>
-                <Link href="/workspace/team" className="ws-card-link">
-                  View Team
-                  <ArrowRight size={14} />
-                </Link>
-              </section>
-            </div>
-          </div>
-        )}
+      {/* Top row: Calendar (1/4) + Create Deal (3/4) */}
+      <div className="idb-top-row">
+        <CalendarWidget employeeId={currentEmployee?.id} />
+        <CreateDealWidget onOpenModal={() => setModalOpen(true)} />
       </div>
+
+      {/* Middle: full-width Pipeline */}
+      <PipelineWidget
+        currentEmployeeId={currentEmployee?.id}
+        schoolFilter={schoolFilter}
+        onClearSchoolFilter={() => setSchoolFilter(null)}
+      />
+
+      {/* Bottom: Schools */}
+      <SchoolsWidget
+        activeSchool={schoolFilter}
+        onSelectSchool={setSchoolFilter}
+      />
+
+      {/* New Deal Modal */}
+      {modalOpen && (
+        <NewDealModal
+          onClose={() => setModalOpen(false)}
+          onCreated={() => setModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
