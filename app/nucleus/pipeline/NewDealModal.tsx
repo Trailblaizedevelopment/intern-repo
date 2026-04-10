@@ -97,7 +97,7 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
 
   /* Load data */
   useEffect(() => {
-    fetch('/api/pipeline/schools').then(r => r.json()).then(setSchools).catch(() => {});
+    fetch('/api/schools?limit=500').then(r => r.json()).then(setSchools).catch(() => {});
     fetch('/api/pipeline/nationals').then(r => r.json()).then(setNationalOrgs).catch(() => {});
     fetch('/api/pipeline/employees').then(r => r.json()).then(data => {
       if (Array.isArray(data)) setEmployees(data);
