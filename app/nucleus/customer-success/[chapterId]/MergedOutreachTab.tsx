@@ -114,6 +114,8 @@ function OutreachStatsSection({
   const [compiling, setCompiling] = useState(false);
   const [approving, setApproving] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [liveProgress, setLiveProgress] = useState<{ sent: number; total: number; failed: number; pct: number } | null>(null);
+  const progressPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [preview, setPreview] = useState<BatchPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -226,9 +228,28 @@ function OutreachStatsSection({
   async function handleExecuteBatch() {
     if (!batch) return;
     setExecuting(true);
+    setLiveProgress({ sent: 0, total: batch.total_contacts ?? 0, failed: 0, pct: 0 });
     showToast('Executing batch — this may take a few minutes…', 'info');
+
+    // Start polling progress every 3s
+    const batchId = batch.id;
+    if (progressPollRef.current) clearInterval(progressPollRef.current);
+    progressPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/outreach/batches/${batchId}/progress`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.progress) setLiveProgress(json.progress);
+          // Stop polling when batch is no longer executing
+          if (json.status !== 'executing' && json.status !== 'sending') {
+            if (progressPollRef.current) { clearInterval(progressPollRef.current); progressPollRef.current = null; }
+          }
+        }
+      } catch { /* non-fatal */ }
+    }, 3000);
+
     try {
-      const res = await fetch(`/api/outreach/batches/${batch.id}/execute`, {
+      const res = await fetch(`/api/outreach/batches/${batchId}/execute`, {
         method: 'POST',
       });
       const json = await res.json();
@@ -239,10 +260,15 @@ function OutreachStatsSection({
         const sms = json.data?.sent_to_sms ?? 0;
         showToast(`✓ Batch complete — ${sent} sent${sms > 0 ? `, ${sms} SMS skipped` : ''}`, 'success');
         await fetchBatch();
+        // Final progress snapshot
+        if (json.data) {
+          setLiveProgress({ sent: json.data.sent ?? 0, total: batch.total_contacts ?? json.data.sent ?? 0, failed: json.data.failed ?? 0, pct: 100 });
+        }
       }
     } catch {
       showToast('Batch execution failed', 'error');
     } finally {
+      if (progressPollRef.current) { clearInterval(progressPollRef.current); progressPollRef.current = null; }
       setExecuting(false);
     }
   }
@@ -638,20 +664,18 @@ function OutreachStatsSection({
                           : <><CheckCircle2 size={11} /> Approve</>}
                       </button>
                     )}
-                    {batch.status === 'approved' && (
+                    {batch.status === 'approved' && !executing && (
                       <button
                         onClick={handleExecuteBatch}
                         disabled={executing}
                         style={{
                           padding: '4px 12px', borderRadius: 6, border: 'none',
-                          background: executing ? '#9ca3af' : '#C4874A', color: '#fff',
-                          fontSize: '0.75rem', fontWeight: 600, cursor: executing ? 'default' : 'pointer',
+                          background: '#C4874A', color: '#fff',
+                          fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
                           display: 'flex', alignItems: 'center', gap: 4,
                         }}
                       >
-                        {executing
-                          ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</>
-                          : <><Send size={11} /> Execute</>}
+                        <Send size={11} /> Execute
                       </button>
                     )}
                     {(batch.status === 'completed' || batch.status === 'sending') && (
@@ -665,8 +689,35 @@ function OutreachStatsSection({
                   </div>
                 </div>
 
-                {/* Progress bar for executing batches */}
-                {batch.status === 'executing' && total > 0 && (
+                {/* Live progress bar while executing (shown as soon as Execute is clicked) */}
+                {executing && liveProgress && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: '#1D4ED8' }}>
+                      <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                        Sending {liveProgress.sent} / {liveProgress.total}…
+                      </span>
+                      {liveProgress.failed > 0 && (
+                        <span style={{ color: '#ef4444', fontSize: '0.7rem' }}>{liveProgress.failed} failed</span>
+                      )}
+                    </div>
+                    <div style={{ height: 6, background: '#BFDBFE', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${liveProgress.pct}%`,
+                        background: '#2563EB',
+                        borderRadius: 3,
+                        transition: 'width 0.3s ease-out',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>
+                      Live progress — updates every 3 seconds
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress bar for executing batches (not triggered from this session) */}
+                {!executing && batch.status === 'executing' && total > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: '#1D4ED8' }}>
                       <span style={{ fontWeight: 600 }}>In Progress — {batchSent} / {total} sent ({progressPct}%)</span>

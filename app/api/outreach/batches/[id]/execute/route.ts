@@ -131,6 +131,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .update({ status: 'executing', sent_at: new Date().toISOString(), notes: 'Executing chunk…' })
     .eq('id', id);
 
+  // Helper: write live progress to batch_progress column so the UI can poll it
+  const writeBatchProgress = async (sent: number, total: number, failed: number) => {
+    try {
+      await supabase
+        .from('outreach_batches')
+        .update({ batch_progress: { sent, total, failed } })
+        .eq('id', id);
+    } catch { /* non-fatal — progress is best-effort */ }
+  };
+
   const results = {
     sent: 0,
     sent_to_sms: 0,
@@ -406,6 +416,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     // 4. Load chapter info
     const allContacts: Contact[] = Object.values(byLine).flat();
+    // Write initial progress now that we know how many contacts this chunk will process
+    await writeBatchProgress(0, allContacts.length, 0);
     const chapterIds = [...new Set(allContacts.map(c => c.chapter_id).filter(Boolean))];
     const { data: chapters } = await supabase
       .from('chapters')
@@ -586,6 +598,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           results.sent++;
           if (status === 'not_contacted') results.t1_sent++;
           else results.t2t3_sent++;
+
+          // Write live progress after each successful send
+          await writeBatchProgress(results.sent, allContacts.length, results.failed);
 
           // Round-robin: update last_used_at on the line that just sent
           const lineRecord = lineConfigMap[lineNum];

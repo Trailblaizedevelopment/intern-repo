@@ -577,24 +577,9 @@ export default function AlumniPage() {
   }
 
   async function handleSendBatch() {
-    setSending(true);
-    try {
-      const res = await fetch('/api/outreach/send-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chapter_id: chapterId, touch: sendTouch, sender_name: sendSenderName, school: sendSchool, fraternity: sendFraternity, signup_link: sendSignupLink, batch_size: sendBatchSize }),
-      });
-      const json = await res.json();
-      if (json.data) {
-        setSendResult(json.data);
-        const lb = json.data.per_line.filter((l: { sent: number }) => l.sent > 0).map((l: { label: string; sent: number }) => `${l.label}: ${l.sent}`).join(', ');
-        showToast(`Sent ${json.data.sent} Touch ${sendTouch} messages${lb ? ` (${lb})` : ''}`);
-        fetchContacts(); fetchStats();
-      } else {
-        showToast(json.error?.message || 'Send failed', 'error');
-      }
-    } catch { showToast('Network error during send', 'error'); }
-    finally { setSending(false); }
+    // send-batch endpoint removed — T2 must go through the compile → approve → execute cycle
+    // in Nucleus (Outreach tab). This dashboard page is legacy and no longer supports direct sends.
+    showToast('Direct send is no longer available. Use Nucleus → Outreach to compile and execute batches.', 'error');
   }
 
   async function handlePollResponses() {
