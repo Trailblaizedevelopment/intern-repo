@@ -62,6 +62,87 @@ interface ExternalProfile {
   created_at?: string | null;
 }
 
+/**
+ * Normalize a name for fuzzy matching — lowercase, trim, collapse whitespace.
+ */
+function normalizeName(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Conservative name matching:
+ * - Exact first + last match (case-insensitive)
+ * - OR first name matches AND last name matches (handles minor nickname/suffix differences)
+ *
+ * We do NOT match if only first name OR only last name matches — too ambiguous.
+ */
+function namesMatch(firstName: string, lastName: string, storedName: string): boolean {
+  const normFirst = normalizeName(firstName);
+  const normLast  = normalizeName(lastName);
+  const normStored = normalizeName(storedName);
+
+  // Stored name is typically "First Last" (single string in chapter_members.name)
+  // Try exact full-name match
+  if (normStored === `${normFirst} ${normLast}`) return true;
+
+  // Try splitting stored name and matching parts
+  const parts = normStored.split(' ');
+  if (parts.length >= 2) {
+    const storedFirst = parts[0];
+    const storedLast  = parts[parts.length - 1];
+    // Both first and last must match
+    if (storedFirst === normFirst && storedLast === normLast) return true;
+  }
+
+  return false;
+}
+
+interface LinkChapterMemberArgs {
+  platformMemberId: string;
+  firstName: string;
+  lastName: string;
+  internalChapterId: string;
+  joinedAt: string;
+}
+
+/**
+ * Attempts to find a matching chapter_members row and set platform_member_id / platform_joined_at.
+ * Returns true if a match was found and updated.
+ */
+async function tryLinkChapterMember(
+  db: ReturnType<typeof getSupabaseAdmin>,
+  { platformMemberId, firstName, lastName, internalChapterId, joinedAt }: LinkChapterMemberArgs
+): Promise<boolean> {
+  if (!db) return false;
+
+  // Only look at members not yet linked
+  const { data: candidates, error } = await db
+    .from('chapter_members')
+    .select('id, name')
+    .eq('chapter_id', internalChapterId)
+    .is('platform_member_id', null);
+
+  if (error || !candidates?.length) return false;
+
+  const match = candidates.find(c => namesMatch(firstName, lastName, c.name));
+  if (!match) return false;
+
+  const { error: updateError } = await db
+    .from('chapter_members')
+    .update({
+      platform_member_id: platformMemberId,
+      platform_joined_at: joinedAt,
+    })
+    .eq('id', match.id);
+
+  if (updateError) {
+    console.error('[alumni-signup] Failed to link chapter_member:', updateError.message);
+    return false;
+  }
+
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   // --- Auth ---
   const secret = request.headers.get('x-webhook-secret') || '';
@@ -193,10 +274,23 @@ export async function POST(request: NextRequest) {
       .eq('external_user_id', profile.id);
   }
 
+  // --- Try to match & link chapter_members (headhunting) row ---
+  let chapterMemberLinked = false;
+  if (profile.first_name && profile.last_name && internalChapterId) {
+    chapterMemberLinked = await tryLinkChapterMember(db, {
+      platformMemberId: profile.id,
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      internalChapterId,
+      joinedAt: profile.created_at || now,
+    });
+  }
+
   return NextResponse.json({
     ok: true,
     platform_member_upserted: true,
     chapter_mapped: !!internalChapterId,
     alumni_contacts_matched: matchedContactIds.length,
+    chapter_member_linked: chapterMemberLinked,
   });
 }
