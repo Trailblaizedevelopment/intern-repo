@@ -25,6 +25,12 @@ const NewDealModal = dynamic(
   { ssr: false }
 );
 
+// Lazy-load DealEditPanel
+const DealEditPanel = dynamic(
+  () => import('@/app/nucleus/pipeline/DealEditPanel'),
+  { ssr: false }
+);
+
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 
 interface PipelineDeal {
@@ -37,6 +43,34 @@ interface PipelineDeal {
   contact?: { name?: string } | null;
   notes?: string | null;
 }
+
+interface FullDeal {
+  id: string;
+  org_id: string | null;
+  contact_id: string | null;
+  assigned_to: string | null;
+  deal_type: 'local' | 'council' | 'national';
+  stage: any;
+  value: number;
+  temperature: 'hot' | 'warm' | 'cold';
+  next_followup: string | null;
+  last_touched: string | null;
+  last_activity_at: string | null;
+  followup_count: number;
+  notes: string | null;
+  conference: string | null;
+  created_at: string;
+  organization?: {
+    id: string; name: string; type: string;
+    school?: { id: string; name: string; conference: string } | null;
+    national_org?: { id: string; name: string; abbreviation: string } | null;
+  } | null;
+  contact?: { id: string; name: string; email: string | null; phone: string | null; role: string | null } | null;
+}
+
+interface PanelEmployee { id: string; name: string; role: string; }
+interface PanelSchool { id: string; name: string; conference: string | null; }
+interface PanelNationalOrg { id: string; name: string; abbreviation: string | null; type: string; }
 
 interface SchoolEntry {
   id: string;
@@ -197,6 +231,13 @@ function PipelineWidget({
   const [sortField, setSortField] = useState<'next_followup' | 'stage' | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
 
+  // Edit panel state
+  const [editingDeal, setEditingDeal] = useState<FullDeal | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelEmployees, setPanelEmployees] = useState<PanelEmployee[]>([]);
+  const [panelSchools, setPanelSchools] = useState<PanelSchool[]>([]);
+  const [panelNationals, setPanelNationals] = useState<PanelNationalOrg[]>([]);
+
   const fetchDeals = useCallback(async () => {
     setLoading(true);
     try {
@@ -220,7 +261,61 @@ function PipelineWidget({
     }
   }, []);
 
+  // Load panel support data once
+  useEffect(() => {
+    async function loadPanelData() {
+      const [empRes, schoolsRes, natsRes] = await Promise.all([
+        fetch('/api/employees?status=active'),
+        fetch('/api/pipeline/schools'),
+        fetch('/api/pipeline/nationals'),
+      ]);
+      if (empRes.ok) {
+        const d = await empRes.json();
+        setPanelEmployees(Array.isArray(d) ? d : (d.data ?? []));
+      }
+      if (schoolsRes.ok) {
+        const d = await schoolsRes.json();
+        setPanelSchools(Array.isArray(d) ? d : []);
+      }
+      if (natsRes.ok) {
+        const d = await natsRes.json();
+        setPanelNationals(Array.isArray(d) ? d : []);
+      }
+    }
+    loadPanelData();
+  }, []);
+
   useEffect(() => { fetchDeals(); }, [fetchDeals]);
+
+  async function handleRowClick(deal: PipelineDeal) {
+    try {
+      const res = await fetch(`/api/pipeline/deals/${deal.id}`);
+      if (res.ok) {
+        const full = await res.json();
+        setEditingDeal(full);
+        setPanelOpen(true);
+      }
+    } catch {
+      // fallback: open with partial data cast
+      setEditingDeal(deal as unknown as FullDeal);
+      setPanelOpen(true);
+    }
+  }
+
+  function closePanel() {
+    setPanelOpen(false);
+    setEditingDeal(null);
+  }
+
+  function handlePanelSaved() {
+    closePanel();
+    fetchDeals();
+  }
+
+  function handlePanelDeleted() {
+    closePanel();
+    fetchDeals();
+  }
 
   const filtered = useMemo(() => {
     let result = deals;
@@ -340,7 +435,12 @@ function PipelineWidget({
             </thead>
             <tbody>
               {filtered.map(deal => (
-                <tr key={deal.id} className="idb-tr">
+                <tr
+                  key={deal.id}
+                  className="idb-tr"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => handleRowClick(deal)}
+                >
                   <td className="idb-td idb-td--org">{deal.organization?.name || deal.contact?.name || '—'}</td>
                   <td className="idb-td idb-td--school">{deal.organization?.school?.name || '—'}</td>
                   <td className="idb-td"><StageBadge stage={deal.stage} /></td>
@@ -356,6 +456,19 @@ function PipelineWidget({
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Deal Edit Panel */}
+      {panelOpen && editingDeal && (
+        <DealEditPanel
+          deal={editingDeal}
+          employees={panelEmployees}
+          schools={panelSchools}
+          nationals={panelNationals}
+          onClose={closePanel}
+          onSaved={handlePanelSaved}
+          onDeleted={handlePanelDeleted}
+        />
       )}
     </div>
   );
