@@ -444,21 +444,18 @@ export function InternDashboard({ data }: InternDashboardProps) {
   const [schoolFilter, setSchoolFilter] = useState<string | null>(null);
   const [resolvedEmployeeId, setResolvedEmployeeId] = useState<string | undefined>(currentEmployee?.id);
 
-  // If currentEmployee didn't load (RLS), resolve from employees API by name match
+  // Resolve employee ID using auth_user_id — reliable regardless of RLS
   useEffect(() => {
     if (currentEmployee?.id) { setResolvedEmployeeId(currentEmployee.id); return; }
-    if (!profile?.name) return;
-    fetch('/api/employees?status=active')
+    if (!profile?.id) return;
+    fetch(`/api/employees?auth_user_id=${profile.id}`)
       .then(r => r.json())
-      .then((list: { id: string; name: string }[]) => {
-        const arr = Array.isArray(list) ? list : (list as any).data ?? [];
-        const match = arr.find((e: { id: string; name: string }) =>
-          e.name?.toLowerCase() === profile.name?.toLowerCase()
-        );
-        if (match) setResolvedEmployeeId(match.id);
+      .then((data: unknown) => {
+        const arr = Array.isArray(data) ? data : ((data as any).data ?? []);
+        if (arr.length > 0) setResolvedEmployeeId(arr[0].id);
       })
       .catch(() => {});
-  }, [currentEmployee?.id, profile?.name]);
+  }, [currentEmployee?.id, profile?.id]);
 
   return (
     <div className="idb-root">
