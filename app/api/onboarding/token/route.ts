@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // Generate a new onboarding token for a chapter
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
 
 // Validate a token and get chapter info
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },

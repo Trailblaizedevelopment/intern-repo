@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, OnboardingFormData } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import type { OnboardingFormData } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },

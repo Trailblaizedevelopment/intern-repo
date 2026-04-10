@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase, Employee, NetworkContact } from '@/lib/supabase';
+import { Employee, NetworkContact } from '@/lib/supabase';
 import { useUserRole } from '../hooks/useUserRole';
 import { useGoogleIntegration } from '../hooks/useGoogleIntegration';
 import LeadEmailHistory from '../components/LeadEmailHistory';
@@ -165,24 +165,21 @@ export default function LeadsPage() {
   });
 
   const fetchEmployee = useCallback(async () => {
-    if (!supabase || !user) return;
+    if (!user?.email) return;
 
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('email', user.email)
-      .single();
-
-    if (data) {
-      setCurrentEmployee(data);
-    } else {
-      const { data: fallback } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('status', 'active')
-        .limit(1)
-        .single();
-      if (fallback) setCurrentEmployee(fallback);
+    const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data?.[0]) {
+        setCurrentEmployee(json.data[0]);
+        return;
+      }
+    }
+    // Fallback: first active employee
+    const fallbackRes = await fetch('/api/employees?status=active&limit=1');
+    if (fallbackRes.ok) {
+      const json = await fallbackRes.json();
+      if (json.data?.[0]) setCurrentEmployee(json.data[0]);
     }
   }, [user]);
 
@@ -197,22 +194,18 @@ export default function LeadsPage() {
   }, [currentEmployee]);
 
   async function fetchContacts() {
-    if (!supabase) return;
     setLoading(true);
-
-    const { data } = await supabase
-      .from('network_contacts')
-      .select('*')
-      .order('priority', { ascending: true })
-      .order('next_followup_date', { ascending: true });
-
-    setContacts(data || []);
+    const res = await fetch('/api/network-contacts');
+    if (res.ok) {
+      const json = await res.json();
+      setContacts(json.data || []);
+    }
     setLoading(false);
   }
 
   // CRUD Operations
   async function createContact() {
-    if (!supabase || !formData.name.trim()) return;
+    if (!formData.name.trim()) return;
     
     const cleanedData = {
       ...formData,
@@ -222,12 +215,15 @@ export default function LeadsPage() {
       next_followup_date: formData.next_followup_date || null,
     };
     
-    const { error } = await supabase
-      .from('network_contacts')
-      .insert([cleanedData]);
+    const res = await fetch('/api/network-contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cleanedData),
+    });
 
-    if (error) {
-      alert(`Failed to create contact: ${error.message}`);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      alert(`Failed to create contact: ${json.error?.message || res.statusText}`);
     } else {
       resetForm();
       fetchContacts();
@@ -235,7 +231,7 @@ export default function LeadsPage() {
   }
 
   async function updateContact() {
-    if (!supabase || !editingContact) return;
+    if (!editingContact) return;
 
     const cleanedData = {
       ...formData,
@@ -245,13 +241,15 @@ export default function LeadsPage() {
       next_followup_date: formData.next_followup_date || null,
     };
 
-    const { error } = await supabase
-      .from('network_contacts')
-      .update(cleanedData)
-      .eq('id', editingContact.id);
+    const res = await fetch(`/api/network-contacts/${editingContact.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cleanedData),
+    });
 
-    if (error) {
-      alert(`Failed to update contact: ${error.message}`);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      alert(`Failed to update contact: ${json.error?.message || res.statusText}`);
     } else {
       resetForm();
       fetchContacts();
@@ -259,14 +257,8 @@ export default function LeadsPage() {
   }
 
   async function deleteContact(id: string) {
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('network_contacts')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+    const res = await fetch(`/api/network-contacts/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
       alert('Failed to delete contact');
     } else {
       fetchContacts();
@@ -275,19 +267,19 @@ export default function LeadsPage() {
   }
 
   async function logFollowup(contact: NetworkContact) {
-    if (!supabase) return;
     const today = new Date().toISOString().split('T')[0];
     const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    await supabase
-      .from('network_contacts')
-      .update({
+    await fetch(`/api/network-contacts/${contact.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         last_contact_date: today,
         next_followup_date: nextWeek,
         followup_count: (contact.followup_count || 0) + 1,
         first_contact_date: contact.first_contact_date || today,
-      })
-      .eq('id', contact.id);
+      }),
+    });
 
     fetchContacts();
   }
