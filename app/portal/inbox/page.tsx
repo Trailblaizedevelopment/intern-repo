@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase, Employee } from '@/lib/supabase';
+import { Employee } from '@/lib/supabase';
 import { useGoogleIntegration } from '@/app/workspace/hooks/useGoogleIntegration';
 import {
   Inbox,
@@ -71,23 +71,19 @@ export default function InboxPage() {
   const [showGmailSetup, setShowGmailSetup] = useState(false);
 
   const fetchEmployee = useCallback(async () => {
-    if (!supabase || !user) return;
+    if (!user) return;
 
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('email', user.email)
-      .single();
+    const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+    const result = await res.json();
+    const data = result.data?.[0] ?? null;
 
     if (data) {
       setCurrentEmployee(data);
     } else {
-      const { data: fallback } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('status', 'active')
-        .limit(1)
-        .single();
+      // Fallback: first active employee (demo mode)
+      const fallbackRes = await fetch('/api/employees?status=active');
+      const fallbackResult = await fallbackRes.json();
+      const fallback = fallbackResult.data?.[0] ?? null;
       if (fallback) setCurrentEmployee(fallback);
     }
     setLoading(false);
@@ -105,106 +101,80 @@ export default function InboxPage() {
   }, [currentEmployee, activeTab]);
 
   async function fetchAllEmployees() {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('status', 'active')
-      .order('name');
-    setEmployees(data || []);
+    const res = await fetch('/api/employees?status=active');
+    const result = await res.json();
+    setEmployees(result.data || []);
   }
 
   async function fetchMessages() {
-    if (!supabase || !currentEmployee) return;
-    
-    let query = supabase.from('portal_messages').select(`
-      *,
-      sender:sender_id(name, email)
-    `);
+    if (!currentEmployee) return;
 
-    switch (activeTab) {
-      case 'inbox':
-        query = query
-          .eq('recipient_id', currentEmployee.id)
-          .eq('is_archived', false)
-          .eq('is_draft', false);
-        break;
-      case 'sent':
-        query = query
-          .eq('sender_id', currentEmployee.id)
-          .eq('is_draft', false);
-        break;
-      case 'starred':
-        query = query
-          .or(`sender_id.eq.${currentEmployee.id},recipient_id.eq.${currentEmployee.id}`)
-          .eq('is_starred', true);
-        break;
-      case 'drafts':
-        query = query
-          .eq('sender_id', currentEmployee.id)
-          .eq('is_draft', true);
-        break;
-    }
-
-    const { data } = await query.order('sent_at', { ascending: false });
-    
-    setMessages(data?.map(m => ({
-      ...m,
-      sender_name: (m.sender as { name: string } | null)?.name || 'Unknown',
-      sender_email: (m.sender as { email: string } | null)?.email || ''
-    })) || []);
+    const params = new URLSearchParams({
+      employee_id: currentEmployee.id,
+      tab: activeTab,
+    });
+    const res = await fetch(`/api/portal/messages?${params}`);
+    const result = await res.json();
+    setMessages(result.data || []);
   }
 
   async function toggleRead(msg: Message) {
-    if (!supabase) return;
-    await supabase
-      .from('portal_messages')
-      .update({ is_read: !msg.is_read, read_at: msg.is_read ? null : new Date().toISOString() })
-      .eq('id', msg.id);
+    await fetch('/api/portal/messages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: msg.id,
+        is_read: !msg.is_read,
+        read_at: msg.is_read ? null : new Date().toISOString(),
+      }),
+    });
     fetchMessages();
   }
 
   async function toggleStar(msg: Message, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!supabase) return;
-    await supabase
-      .from('portal_messages')
-      .update({ is_starred: !msg.is_starred })
-      .eq('id', msg.id);
+    await fetch('/api/portal/messages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: msg.id, is_starred: !msg.is_starred }),
+    });
     fetchMessages();
   }
 
   async function archiveMessage(msg: Message) {
-    if (!supabase) return;
-    await supabase
-      .from('portal_messages')
-      .update({ is_archived: true })
-      .eq('id', msg.id);
+    await fetch('/api/portal/messages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: msg.id, is_archived: true }),
+    });
     setSelectedMessage(null);
     fetchMessages();
   }
 
   async function deleteMessage(msg: Message) {
-    if (!supabase) return;
-    await supabase
-      .from('portal_messages')
-      .delete()
-      .eq('id', msg.id);
+    await fetch('/api/portal/messages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: msg.id, delete: true }),
+    });
     setSelectedMessage(null);
     fetchMessages();
   }
 
   async function sendMessage() {
-    if (!supabase || !currentEmployee || !composeTo || !composeSubject) return;
-    
-    await supabase.from('portal_messages').insert([{
-      sender_id: currentEmployee.id,
-      recipient_id: composeTo,
-      subject: composeSubject,
-      body: composeBody,
-      is_draft: false,
-      thread_id: crypto.randomUUID(),
-    }]);
+    if (!currentEmployee || !composeTo || !composeSubject) return;
+
+    await fetch('/api/portal/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender_id: currentEmployee.id,
+        recipient_id: composeTo,
+        subject: composeSubject,
+        body: composeBody,
+        is_draft: false,
+      }),
+    });
 
     setShowCompose(false);
     setComposeTo('');
@@ -214,16 +184,19 @@ export default function InboxPage() {
   }
 
   async function saveDraft() {
-    if (!supabase || !currentEmployee) return;
-    
-    await supabase.from('portal_messages').insert([{
-      sender_id: currentEmployee.id,
-      recipient_id: composeTo || null,
-      subject: composeSubject || '(No subject)',
-      body: composeBody,
-      is_draft: true,
-      thread_id: crypto.randomUUID(),
-    }]);
+    if (!currentEmployee) return;
+
+    await fetch('/api/portal/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender_id: currentEmployee.id,
+        recipient_id: composeTo || null,
+        subject: composeSubject || '(No subject)',
+        body: composeBody,
+        is_draft: true,
+      }),
+    });
 
     setShowCompose(false);
     setComposeTo('');

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase, Employee } from '@/lib/supabase';
+import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import {
   CheckCircle2,
@@ -63,23 +63,19 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const fetchEmployee = useCallback(async () => {
-    if (!supabase || !user) return;
+    if (!user) return;
 
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('email', user.email)
-      .single();
+    const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+    const result = await res.json();
+    const data = result.data?.[0] ?? null;
 
     if (data) {
       setCurrentEmployee(data);
     } else {
-      const { data: fallback } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('status', 'active')
-        .limit(1)
-        .single();
+      // Fallback: first active employee (demo mode)
+      const fallbackRes = await fetch('/api/employees?status=active&limit=1');
+      const fallbackResult = await fallbackRes.json();
+      const fallback = fallbackResult.data?.[0] ?? null;
       if (fallback) setCurrentEmployee(fallback);
     }
     setLoading(false);

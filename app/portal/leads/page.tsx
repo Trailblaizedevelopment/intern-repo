@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import ModalOverlay from '@/components/ModalOverlay';
-import { supabase, Employee, ROLE_PERMISSIONS } from '@/lib/supabase';
+import { Employee, ROLE_PERMISSIONS } from '@/lib/supabase';
 import {
   Target,
   Plus,
@@ -63,23 +63,19 @@ export default function LeadsPage() {
   });
 
   const fetchEmployee = useCallback(async () => {
-    if (!supabase || !user) return;
+    if (!user) return;
 
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('email', user.email)
-      .single();
+    const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+    const result = await res.json();
+    const data = result.data?.[0] ?? null;
 
     if (data) {
       setCurrentEmployee(data);
     } else {
-      const { data: fallback } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('status', 'active')
-        .limit(1)
-        .single();
+      // Fallback: first active employee (demo mode)
+      const fallbackRes = await fetch('/api/employees?status=active');
+      const fallbackResult = await fallbackRes.json();
+      const fallback = fallbackResult.data?.[0] ?? null;
       if (fallback) setCurrentEmployee(fallback);
     }
     setLoading(false);
@@ -96,65 +92,74 @@ export default function LeadsPage() {
   }, [currentEmployee]);
 
   async function fetchLeads() {
-    if (!supabase || !currentEmployee) return;
-    
-    const { data } = await supabase
-      .from('personal_leads')
-      .select('*')
-      .eq('employee_id', currentEmployee.id)
-      .order('created_at', { ascending: false });
-    
-    setLeads(data || []);
+    if (!currentEmployee) return;
+
+    const res = await fetch(`/api/portal/leads?employee_id=${encodeURIComponent(currentEmployee.id)}`);
+    const result = await res.json();
+    setLeads(result.data || []);
   }
 
   async function createLead() {
-    if (!supabase || !currentEmployee || !newLead.name.trim()) return;
-    
-    await supabase.from('personal_leads').insert([{
-      employee_id: currentEmployee.id,
-      ...newLead,
-      status: 'new'
-    }]);
+    if (!currentEmployee || !newLead.name.trim()) return;
 
-    setNewLead({ name: '', email: '', phone: '', organization: '', lead_type: 'alumni', notes: '' });
-    setShowNewLead(false);
-    fetchLeads();
+    const res = await fetch('/api/portal/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employee_id: currentEmployee.id,
+        ...newLead,
+        status: 'new',
+      }),
+    });
+    const result = await res.json();
+    if (!result.error) {
+      setNewLead({ name: '', email: '', phone: '', organization: '', lead_type: 'alumni', notes: '' });
+      setShowNewLead(false);
+      fetchLeads();
+    }
   }
 
   async function updateLead() {
-    if (!supabase || !editingLead) return;
-    
-    await supabase.from('personal_leads').update({
-      name: editingLead.name,
-      email: editingLead.email,
-      phone: editingLead.phone,
-      organization: editingLead.organization,
-      lead_type: editingLead.lead_type,
-      status: editingLead.status,
-      next_followup: editingLead.next_followup,
-      notes: editingLead.notes
-    }).eq('id', editingLead.id);
+    if (!editingLead) return;
 
-    setEditingLead(null);
-    fetchLeads();
+    const res = await fetch(`/api/portal/leads/${editingLead.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: editingLead.name,
+        email: editingLead.email,
+        phone: editingLead.phone,
+        organization: editingLead.organization,
+        lead_type: editingLead.lead_type,
+        status: editingLead.status,
+        next_followup: editingLead.next_followup,
+        notes: editingLead.notes,
+      }),
+    });
+    const result = await res.json();
+    if (!result.error) {
+      setEditingLead(null);
+      fetchLeads();
+    }
   }
 
   async function updateLeadStatus(lead: PersonalLead, status: PersonalLead['status']) {
-    if (!supabase) return;
-    
     const updateData: Record<string, unknown> = { status };
     if (status === 'contacted' && !lead.first_contact) {
       updateData.first_contact = new Date().toISOString().split('T')[0];
     }
     updateData.last_contact = new Date().toISOString().split('T')[0];
-    
-    await supabase.from('personal_leads').update(updateData).eq('id', lead.id);
+
+    await fetch(`/api/portal/leads/${lead.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData),
+    });
     fetchLeads();
   }
 
   async function deleteLead(lead: PersonalLead) {
-    if (!supabase) return;
-    await supabase.from('personal_leads').delete().eq('id', lead.id);
+    await fetch(`/api/portal/leads/${lead.id}`, { method: 'DELETE' });
     fetchLeads();
   }
 

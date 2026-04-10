@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase, Employee, ROLE_LABELS } from '@/lib/supabase';
+import { Employee, ROLE_LABELS } from '@/lib/supabase';
 import {
   Users,
   Search,
@@ -24,13 +24,13 @@ export default function TeamPage() {
   }, []);
 
   async function fetchTeam() {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('status', 'active')
-      .order('name');
-    setEmployees(data || []);
+    try {
+      const res = await fetch('/api/employees?status=active');
+      const result = await res.json();
+      setEmployees(result.data || []);
+    } catch (err) {
+      console.error('Error fetching team:', err);
+    }
     setLoading(false);
   }
 

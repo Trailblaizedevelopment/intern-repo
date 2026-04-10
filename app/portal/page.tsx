@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { 
-  supabase, 
   Employee, 
   ROLE_LABELS, 
   ROLE_PERMISSIONS 
@@ -132,27 +131,20 @@ export default function PortalDashboard() {
   }, [isTimerRunning, focusTime]);
 
   async function fetchEmployeeData() {
-    if (!supabase || !user) {
+    if (!user) {
       setLoading(false);
       return;
     }
 
-    // First try to find employee by auth user id
-    let { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('email', user.email)
-      .single();
+    const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+    const result = await res.json();
+    let data = result.data?.[0] ?? null;
 
     if (!data) {
-      // Fallback: get first active employee (demo mode)
-      const { data: fallback } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('status', 'active')
-        .limit(1)
-        .single();
-      data = fallback;
+      // Fallback: first active employee (demo mode)
+      const fallbackRes = await fetch('/api/employees?status=active');
+      const fallbackResult = await fallbackRes.json();
+      data = fallbackResult.data?.[0] ?? null;
     }
 
     if (data) {
@@ -162,78 +154,74 @@ export default function PortalDashboard() {
   }
 
   async function fetchTasks() {
-    if (!supabase || !currentEmployee) return;
-    const { data } = await supabase
-      .from('employee_tasks')
-      .select('*')
-      .eq('employee_id', currentEmployee.id)
-      .neq('status', 'done')
-      .order('due_date', { ascending: true })
-      .limit(5);
-    setTasks(data || []);
+    if (!currentEmployee) return;
+    const params = new URLSearchParams({
+      employee_id: currentEmployee.id,
+      exclude_done: 'true',
+      order_by: 'due_date',
+      limit: '5',
+    });
+    const res = await fetch(`/api/portal/tasks?${params}`);
+    const result = await res.json();
+    setTasks(result.data || []);
   }
 
   async function fetchLeads() {
-    if (!supabase || !currentEmployee) return;
+    if (!currentEmployee) return;
     const perms = ROLE_PERMISSIONS[currentEmployee.role] || [];
     if (!perms.includes('personal_leads') && !perms.includes('all')) return;
 
-    const { data } = await supabase
-      .from('personal_leads')
-      .select('*')
-      .eq('employee_id', currentEmployee.id)
-      .not('status', 'in', '("converted","lost")')
-      .order('last_contact', { ascending: true })
-      .limit(5);
-    setLeads(data || []);
+    const params = new URLSearchParams({
+      employee_id: currentEmployee.id,
+      exclude_statuses: 'converted,lost',
+      order_by: 'last_contact',
+      limit: '5',
+    });
+    const res = await fetch(`/api/portal/leads?${params}`);
+    const result = await res.json();
+    setLeads(result.data || []);
   }
 
   async function fetchMessages() {
-    if (!supabase || !currentEmployee) return;
-    const { data } = await supabase
-      .from('portal_messages')
-      .select('*, sender:sender_id(name)')
-      .eq('recipient_id', currentEmployee.id)
-      .eq('is_read', false)
-      .eq('is_draft', false)
-      .order('sent_at', { ascending: false })
-      .limit(3);
-    
-    setUnreadMessages(data?.map(m => ({
-      ...m,
-      sender_name: (m.sender as { name: string } | null)?.name || 'Unknown'
-    })) || []);
+    if (!currentEmployee) return;
+    const params = new URLSearchParams({
+      employee_id: currentEmployee.id,
+      tab: 'inbox',
+      is_read: 'false',
+      limit: '3',
+    });
+    const res = await fetch(`/api/portal/messages?${params}`);
+    const result = await res.json();
+    setUnreadMessages(result.data || []);
   }
 
   async function fetchDailyGoal() {
-    if (!supabase || !currentEmployee) return;
-    const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase
-      .from('portal_daily_goals')
-      .select('*')
-      .eq('employee_id', currentEmployee.id)
-      .eq('goal_date', today)
-      .single();
-    
-    if (data) {
-      setDailyGoal(data);
-    }
+    // portal_daily_goals doesn't have a dedicated API yet — skip for now
+    // This table has no RLS-sensitive data; keeping as no-op until route is added
+    setDailyGoal(null);
   }
 
   async function toggleTask(task: EmployeeTask) {
-    if (!supabase) return;
     const newStatus = task.status === 'done' ? 'todo' : 'done';
-    await supabase.from('employee_tasks').update({ status: newStatus }).eq('id', task.id);
+    await fetch(`/api/portal/tasks/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
     fetchTasks();
   }
 
   async function createQuickTask() {
-    if (!supabase || !currentEmployee || !quickTaskTitle.trim()) return;
-    await supabase.from('employee_tasks').insert([{
-      employee_id: currentEmployee.id,
-      title: quickTaskTitle,
-      priority: 'medium',
-    }]);
+    if (!currentEmployee || !quickTaskTitle.trim()) return;
+    await fetch('/api/portal/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employee_id: currentEmployee.id,
+        title: quickTaskTitle,
+        priority: 'medium',
+      }),
+    });
     setQuickTaskTitle('');
     setShowQuickTask(false);
     fetchTasks();
