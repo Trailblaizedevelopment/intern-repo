@@ -26,6 +26,24 @@ interface LoggedMatch {
   notes: string;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 30) return `${diffDays}d ago`;
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    return `${months}mo ago`;
+  }
+  const years = Math.floor(diffDays / 365);
+  return `${years}y ago`;
+}
+
 // ─── TaskRow sub-component ───────────────────────────────────────────────────
 
 interface TaskRowProps {
@@ -688,11 +706,37 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                   </div>
                 ) : (
                   <div key={m.id} className="cs-member-row">
-                    <div className="cs-member-name">
-                      {m.name}
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 7px', borderRadius: 2, background: (m.member_type || 'active') === 'alumni' ? '#F5EFE0' : '#E8EDF5', color: (m.member_type || 'active') === 'alumni' ? '#6B4A1E' : '#1B2A4A', marginLeft: 4 }}>
-                        {(m.member_type || 'active') === 'alumni' ? 'Alumni' : 'Active'}
-                      </span>
+                    <div className="cs-member-name" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {m.name}
+                        <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 7px', borderRadius: 2, background: (m.member_type || 'active') === 'alumni' ? '#F5EFE0' : '#E8EDF5', color: (m.member_type || 'active') === 'alumni' ? '#6B4A1E' : '#1B2A4A' }}>
+                          {(m.member_type || 'active') === 'alumni' ? 'Alumni' : 'Active'}
+                        </span>
+                        {m.platform_member_id && (
+                          <a
+                            href={`https://trailblaize.net/profile/${m.platform_member_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ textDecoration: 'none' }}
+                            title="View on Trailblaize platform"
+                          >
+                            <span style={{
+                              fontSize: '0.68rem', fontWeight: 700,
+                              padding: '1px 7px', borderRadius: 99,
+                              background: '#d1fae5', color: '#065f46',
+                              display: 'inline-flex', alignItems: 'center', gap: 3,
+                              whiteSpace: 'nowrap',
+                            }}>
+                              ✓ On Platform
+                            </span>
+                          </a>
+                        )}
+                      </div>
+                      {m.platform_joined_at && (
+                        <span style={{ fontSize: '0.68rem', color: '#9ca3af', marginLeft: 0 }}>
+                          Joined {formatRelativeDate(m.platform_joined_at)}
+                        </span>
+                      )}
                     </div>
                     {m.grad_year && <div className="cs-member-meta">&apos;{String(m.grad_year).slice(2)}</div>}
                     {(m.member_type || 'active') === 'alumni' ? (

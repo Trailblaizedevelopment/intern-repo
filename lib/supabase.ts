@@ -1081,4 +1081,6 @@ export interface ChapterMember {
   job_role: string | null;
   company: string | null;
   is_hiring: boolean;
+  platform_member_id?: string | null;
+  platform_joined_at?: string | null;
 }
