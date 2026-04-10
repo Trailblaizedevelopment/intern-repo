@@ -444,18 +444,18 @@ export function InternDashboard({ data }: InternDashboardProps) {
   const [schoolFilter, setSchoolFilter] = useState<string | null>(null);
   const [resolvedEmployeeId, setResolvedEmployeeId] = useState<string | undefined>(currentEmployee?.id);
 
-  // Resolve employee ID using auth_user_id — reliable regardless of RLS
+  // Always resolve employee ID by auth_user_id — don't trust currentEmployee fallback
   useEffect(() => {
-    if (currentEmployee?.id) { setResolvedEmployeeId(currentEmployee.id); return; }
     if (!profile?.id) return;
     fetch(`/api/employees?auth_user_id=${profile.id}`)
       .then(r => r.json())
       .then((data: unknown) => {
         const arr = Array.isArray(data) ? data : ((data as any).data ?? []);
         if (arr.length > 0) setResolvedEmployeeId(arr[0].id);
+        else if (currentEmployee?.id) setResolvedEmployeeId(currentEmployee.id);
       })
-      .catch(() => {});
-  }, [currentEmployee?.id, profile?.id]);
+      .catch(() => { if (currentEmployee?.id) setResolvedEmployeeId(currentEmployee.id); });
+  }, [profile?.id, currentEmployee?.id]);
 
   return (
     <div className="idb-root">
