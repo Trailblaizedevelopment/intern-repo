@@ -6,7 +6,7 @@ import {
   RefreshCw, Plus, Edit2, Trash2, Eye, X, ChevronDown, Search,
   Loader2, AlertCircle, Smartphone, Check, Inbox,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+const INTERNAL_AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 import ModalOverlay from '@/components/ModalOverlay';
 
 // ─────────────────────────── Types ────────────────────────────────────────
@@ -167,10 +167,16 @@ export default function OutreachPage() {
 
   useEffect(() => {
     async function loadChapters() {
-      if (!supabase) return;
-      const { data } = await supabase
-        .from('chapters').select('id, chapter_name').order('chapter_name');
-      if (data) setChapters(data);
+      try {
+        const res = await fetch('/api/chapters', { headers: { Authorization: INTERNAL_AUTH } });
+        const json = await res.json();
+        if (json.data) {
+          const sorted = [...json.data].sort((a: Chapter, b: Chapter) =>
+            (a.chapter_name || '').localeCompare(b.chapter_name || '')
+          );
+          setChapters(sorted);
+        }
+      } catch { /* silently swallow — chapters list is best-effort */ }
     }
     loadChapters();
   }, []);

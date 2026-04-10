@@ -10,13 +10,13 @@ import {
   Activity,
 } from 'lucide-react';
 import {
-  supabase,
   AlumniContact,
   OutreachStatus,
   OUTREACH_STATUS_CONFIG,
   ChapterWithOnboarding,
   SENDING_LINES,
 } from '@/lib/supabase';
+const INTERNAL_AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
 import ConversationViewer from '@/components/ConversationViewer';
@@ -474,9 +474,11 @@ export default function AlumniPage() {
   // ── Data Fetching ──
 
   const fetchChapter = useCallback(async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from('chapters').select('*').eq('id', chapterId).single();
-    if (data) setChapter(data);
+    try {
+      const res = await fetch(`/api/chapters/${chapterId}`, { headers: { Authorization: INTERNAL_AUTH } });
+      const json = await res.json();
+      if (json.data && !json.error) setChapter(json.data);
+    } catch { /* silently swallow */ }
   }, [chapterId]);
 
   const fetchStats = useCallback(async () => {
@@ -518,15 +520,18 @@ export default function AlumniPage() {
   }, [chapterId, page, search, filterStatus, imessageFilter, lineFilter, touchFilter, sortBy, sortDir]);
 
   const fetchActivity = useCallback(async () => {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from('alumni_contacts')
-      .select('*')
-      .eq('chapter_id', chapterId)
-      .or('touch1_sent_at.not.is.null,touch2_sent_at.not.is.null,touch3_sent_at.not.is.null,last_response_at.not.is.null')
-      .order('updated_at', { ascending: false })
-      .limit(20);
-    if (data) setActivityItems(data);
+    try {
+      const params = new URLSearchParams({
+        chapter_id: chapterId,
+        sort: 'updated_at',
+        sort_dir: 'desc',
+        limit: '20',
+        status_in: 'touch1_sent,touch2_sent,touch3_sent,confirmed,interested,signed_up,not_interested,opted_out,wrong_number',
+      });
+      const res = await fetch(`/api/alumni-contacts?${params}`, { headers: { Authorization: INTERNAL_AUTH } });
+      const json = await res.json();
+      if (json.data) setActivityItems(json.data);
+    } catch { /* silently swallow */ }
   }, [chapterId]);
 
   // Prefetch platform member count for tab badge
