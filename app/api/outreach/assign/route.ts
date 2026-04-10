@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+// supabase admin client is used via lib/outreach.ts → autoAssignQueue (getSupabaseAdmin)
 import { autoAssignQueue } from '@/lib/outreach';
 
 export async function POST(request: NextRequest) {
-  if (!supabase) {
-    return NextResponse.json({ data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } }, { status: 500 });
-  }
   try {
     const { chapter_id } = await request.json();
     if (!chapter_id) {

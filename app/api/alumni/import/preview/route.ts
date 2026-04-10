@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // ── Header aliases (extended for real-world fraternity lists) ─────────────────
 const HEADER_ALIASES: Record<string, string[]> = {
@@ -121,6 +121,7 @@ interface PreviewCounts {
 
 // ── POST handler ──────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected' } },

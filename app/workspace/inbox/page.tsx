@@ -78,7 +78,7 @@ export default function InboxPage() {
   const fetchEmployee = useCallback(async () => {
     if (!user?.email) return;
     try {
-      const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email)}`);
+      const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
       const { data } = await res.json();
       if (data && data.length > 0) {
         setCurrentEmployee(data[0]);

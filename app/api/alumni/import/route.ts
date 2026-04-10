@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { autoAssignQueue } from '@/lib/outreach';
 import { batchLookupPhoneTypes } from '@/lib/telnyx';
 
@@ -97,6 +97,7 @@ function parseCSV(text: string): string[][] {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json(
       { data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } },

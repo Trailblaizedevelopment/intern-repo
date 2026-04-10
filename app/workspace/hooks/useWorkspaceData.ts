@@ -101,28 +101,22 @@ export function useWorkspaceData(): UseWorkspaceDataReturn {
 
   // Fetch employee data
   const fetchEmployeeData = useCallback(async () => {
-    if (!supabase || !user) {
+    if (!user) {
       setLoading(false);
       return;
     }
 
     try {
       // Find employee by auth user email
-      let { data } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('email', user.email)
-        .single();
+      const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+      const result = await res.json();
+      let data = result.data?.[0] ?? null;
 
       if (!data) {
         // Fallback: get first active employee (demo mode)
-        const { data: fallback } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('status', 'active')
-          .limit(1)
-          .single();
-        data = fallback;
+        const fallbackRes = await fetch('/api/employees?status=active');
+        const fallbackResult = await fallbackRes.json();
+        data = fallbackResult.data?.[0] ?? null;
       }
 
       if (data && isMounted.current) {
@@ -141,16 +135,12 @@ export function useWorkspaceData(): UseWorkspaceDataReturn {
 
   // Fetch team members (for founders to switch views)
   const fetchTeamMembers = useCallback(async () => {
-    if (!supabase || (profile?.role !== 'founder' && profile?.role !== 'cofounder')) return;
+    if (profile?.role !== 'founder' && profile?.role !== 'cofounder') return;
 
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('status', 'active')
-      .order('name');
-    
+    const res = await fetch('/api/employees?status=active');
+    const result = await res.json();
     if (isMounted.current) {
-      setTeamMembers(data || []);
+      setTeamMembers(result.data || []);
     }
   }, [profile?.role]);
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Users, Plus, Search, Filter, X, Trash2, Edit2, ExternalLink, RefreshCw, Copy, Check, Eye, EyeOff, FileText, UserPlus, Clock, CheckCircle, XCircle, Star, ChevronDown, ChevronUp, Mail, Phone, Linkedin, Globe, Play, Image, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
-import { supabase, Employee, EmployeeRole, ROLE_LABELS } from '@/lib/supabase';
+import { Employee, EmployeeRole, ROLE_LABELS } from '@/lib/supabase';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
 
@@ -107,17 +107,17 @@ export default function EmployeesModule() {
   }, [activeTab, statusFilter, positionFilter]);
 
   async function fetchEmployees() {
-    if (!supabase) { setLoading(false); return; }
     setLoading(true);
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching employees:', error);
-    } else {
-      setEmployees(data || []);
+    try {
+      const res = await fetch('/api/employees');
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error fetching employees:', json.error);
+      } else {
+        setEmployees(json.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching employees:', err);
     }
     setLoading(false);
   }
@@ -255,40 +255,45 @@ export default function EmployeesModule() {
 
   // Update employee
   async function updateEmployee() {
-    if (!supabase || !editingEmployee) return;
-
-    const { error } = await supabase
-      .from('employees')
-      .update(formData)
-      .eq('id', editingEmployee.id);
-
-    if (error) {
-      console.error('Error updating employee:', error);
-      if (error.code === '23505') {
-        alert('An employee with this email already exists');
+    if (!editingEmployee) return;
+    try {
+      const res = await fetch(`/api/employees/${editingEmployee.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error updating employee:', json.error);
+        if (json.error.code === '23505') {
+          alert('An employee with this email already exists');
+        } else {
+          alert(`Failed to update employee: ${json.error.message}`);
+        }
       } else {
-        alert(`Failed to update employee: ${error.message}`);
+        resetForm();
+        fetchEmployees();
       }
-    } else {
-      resetForm();
-      fetchEmployees();
+    } catch (err) {
+      console.error('Error updating employee:', err);
+      alert('Failed to update employee. Please try again.');
     }
   }
 
   // Delete employee
   async function deleteEmployee(id: string) {
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('employees')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting employee:', error);
+    try {
+      const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.error) {
+        console.error('Error deleting employee:', json.error);
+        alert('Failed to delete employee');
+      } else {
+        fetchEmployees();
+      }
+    } catch (err) {
+      console.error('Error deleting employee:', err);
       alert('Failed to delete employee');
-    } else {
-      fetchEmployees();
     }
     setDeleteConfirm({ show: false, id: null });
   }

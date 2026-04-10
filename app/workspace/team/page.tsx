@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase, Employee, ROLE_LABELS } from '@/lib/supabase';
+import { Employee, ROLE_LABELS } from '@/lib/supabase';
 import { useUserRole } from '../hooks/useUserRole';
 import {
   Users,
@@ -25,15 +25,9 @@ export default function TeamPage() {
   const [filterRole, setFilterRole] = useState<string>('all');
 
   const fetchTeamMembers = useCallback(async () => {
-    if (!supabase) return;
-
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('status', 'active')
-      .order('name');
-    
-    setTeamMembers(data || []);
+    const res = await fetch('/api/employees?status=active');
+    const result = await res.json();
+    setTeamMembers(result.data || []);
     setLoading(false);
   }, []);
 

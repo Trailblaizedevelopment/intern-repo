@@ -1,4 +1,5 @@
-import { supabase, SENDING_LINES } from './supabase';
+import { SENDING_LINES } from './supabase';
+import { getSupabaseAdmin } from './supabase-admin';
 
 const PAGE_SIZE = 1000;
 
@@ -8,6 +9,7 @@ const PAGE_SIZE = 1000;
  * across lines; subsequent runs append to the shortest lines.
  */
 export async function autoAssignQueue(chapterId: string): Promise<{ assigned: number; total_in_queue: number }> {
+  const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error('Database not connected');
 
   // Fetch ALL contacts with phone (paginated past 1000-row limit)

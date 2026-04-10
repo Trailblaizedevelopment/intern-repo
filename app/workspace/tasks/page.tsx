@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase, Employee } from '@/lib/supabase';
+import { Employee } from '@/lib/supabase';
 import { useUserRole } from '../hooks/useUserRole';
 import {
   CheckCircle2,
@@ -85,24 +85,18 @@ export default function TasksPage() {
   const [tickets, setTickets] = useState<TicketOption[]>([]);
 
   const fetchEmployee = useCallback(async () => {
-    if (!supabase || !user) return;
+    if (!user) return;
 
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('email', user.email)
-      .single();
+    const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+    const result = await res.json();
+    const data = result.data?.[0] ?? null;
 
     if (data) {
       setCurrentEmployee(data);
     } else {
-      const { data: fallback } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('status', 'active')
-        .limit(1)
-        .single();
-      if (fallback) setCurrentEmployee(fallback);
+      const fallbackRes = await fetch('/api/employees?status=active');
+      const fallbackResult = await fallbackRes.json();
+      if (fallbackResult.data?.[0]) setCurrentEmployee(fallbackResult.data[0]);
     }
     setLoading(false);
   }, [user]);

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, SENDING_LINES } from '@/lib/supabase';
+import { SENDING_LINES } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
  * GET /api/outreach/queue?chapter_id=xxx&line_number=1
  * Returns the next daily_limit pending contacts for that line.
  */
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json({ data: null, error: { message: 'Database not connected', code: 'DB_ERROR' } }, { status: 500 });
   }

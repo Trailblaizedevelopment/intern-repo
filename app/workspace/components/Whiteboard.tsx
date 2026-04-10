@@ -80,9 +80,10 @@ export function Whiteboard() {
   /* ─── Fetch employee ─── */
   useEffect(() => {
     async function fetchEmployee() {
-      if (!supabase || !user) { setLoading(false); return; }
-      const { data } = await supabase
-        .from('employees').select('*').eq('email', user.email).single();
+      if (!user) { setLoading(false); return; }
+      const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+      const result = await res.json();
+      const data = result.data?.[0] ?? null;
       if (data) setCurrentEmployee(data);
       setLoading(false);
     }

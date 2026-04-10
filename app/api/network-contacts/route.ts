@@ -33,7 +33,8 @@ export async function GET(_request: NextRequest) {
 
 /**
  * POST /api/network-contacts
- * Create a new network contact.
+ * Create one or many network contacts.
+ * Body: single contact object OR { items: contact[] } for bulk.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -44,6 +45,28 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // ── Bulk insert path ──────────────────────────────────────────────
+    if (Array.isArray(body.items)) {
+      const items = body.items as Record<string, unknown>[];
+      if (items.length === 0) {
+        return NextResponse.json({ data: null, error: { message: 'items array is empty', code: 'VALIDATION_ERROR' } }, { status: 400 });
+      }
+      const toInsert = items.map(({ id: _id, created_at: _ca, updated_at: _ua, ...f }) => ({
+        ...f,
+        name: typeof f.name === 'string' ? f.name.trim() : f.name,
+      }));
+      const { data, error } = await supabase
+        .from('network_contacts')
+        .insert(toInsert)
+        .select();
+      if (error) {
+        console.error('[POST /api/network-contacts bulk] DB error:', error);
+        return NextResponse.json({ data: null, error: { message: error.message, code: error.code || 'DB_ERROR' } }, { status: 500 });
+      }
+      return NextResponse.json({ data, error: null }, { status: 201 });
+    }
+
+    // ── Single insert path ────────────────────────────────────────────
     if (!body.name?.trim()) {
       return NextResponse.json({ data: null, error: { message: 'name is required', code: 'VALIDATION_ERROR' } }, { status: 400 });
     }

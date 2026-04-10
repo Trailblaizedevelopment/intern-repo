@@ -14,12 +14,14 @@ import {
   Ticket,
   CheckSquare,
 } from 'lucide-react';
-import { supabase, Deal } from '@/lib/supabase';
+import { Deal } from '@/lib/supabase';
 import { TrailblaizeCalendar } from './TrailblaizeCalendar';
 import { useGoogleIntegration } from '../hooks/useGoogleIntegration';
 import { UseWorkspaceDataReturn } from '../hooks/useWorkspaceData';
 import { Employee } from '@/lib/supabase';
 import { useUserRole } from '../hooks/useUserRole';
+
+const INTERNAL_AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -76,11 +78,7 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
   const todayStr = now.toISOString().split('T')[0];
 
   useEffect(() => {
-    if (!supabase) return;
-
     async function fetchData() {
-      if (!supabase) return;
-
       // Founder: fetch all pipeline deals
       if (isFounder) {
         const res = await fetch('/api/pipeline/deals');
@@ -100,17 +98,20 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
 
       // Founders + Engineers: fetch all pipeline_deals + chapter count for company metrics
       if (isFounder || isEngineer) {
-        const res = await fetch('/api/pipeline/deals');
-        if (res.ok) {
-          const d = await res.json();
+        const dealsRes = await fetch('/api/pipeline/deals');
+        if (dealsRes.ok) {
+          const d = await dealsRes.json();
           setAllDeals(d);
         }
 
-        const { data: chapterData } = await supabase
-          .from('chapters')
-          .select('status, payment_amount, payment_type')
-          .in('status', ['active', 'onboarding']);
-        setChapters(chapterData ?? []);
+        // Use admin-client API route instead of anon client (RLS-safe)
+        const chaptersRes = await fetch('/api/chapters', { headers: { Authorization: INTERNAL_AUTH } });
+        if (chaptersRes.ok) {
+          const chapJson = await chaptersRes.json();
+          const allChapters: { status: string; payment_amount: number | null; payment_type: string | null }[] =
+            chapJson.data ?? [];
+          setChapters(allChapters.filter(c => c.status === 'active' || c.status === 'onboarding'));
+        }
       }
     }
 
