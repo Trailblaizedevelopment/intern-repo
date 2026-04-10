@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Network, Plus, Search, Filter, X, Trash2, Edit2, Phone, Mail, Linkedin, Calendar, Clock, Upload, FileText, Image, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Loader2, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
-import { supabase, NetworkContact, Employee } from '@/lib/supabase';
+import { NetworkContact, Employee } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
@@ -102,16 +102,15 @@ export default function FundraisingModule() {
 
   // Fetch current employee
   const fetchEmployee = useCallback(async () => {
-    if (!supabase || !user) return;
-
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('email', user.email)
-      .single();
-
-    if (data) {
-      setCurrentEmployee(data);
+    if (!user?.email) return;
+    try {
+      const res = await fetch(`/api/employees?email=${encodeURIComponent(user.email ?? '')}`);
+      const result = await res.json();
+      if (result.data?.length) {
+        setCurrentEmployee(result.data[0]);
+      }
+    } catch (err) {
+      console.error('Error fetching employee:', err);
     }
   }, [user]);
 
@@ -182,29 +181,23 @@ export default function FundraisingModule() {
   }, []);
 
   async function fetchContacts() {
-    if (!supabase) { setLoading(false); return; }
     setLoading(true);
-    const { data, error } = await supabase
-      .from('network_contacts')
-      .select('*')
-      .order('priority', { ascending: true })
-      .order('next_followup_date', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching contacts:', error);
-    } else {
-      setContacts(data || []);
+    try {
+      const res = await fetch('/api/network-contacts');
+      const result = await res.json();
+      if (result.data) {
+        setContacts(result.data);
+      } else {
+        console.error('Error fetching contacts:', result.error);
+      }
+    } catch (err) {
+      console.error('Error fetching contacts:', err);
     }
     setLoading(false);
   }
 
   // Create contact
   async function createContact() {
-    if (!supabase) {
-      alert('Database not connected. Check your Supabase credentials in .env.local');
-      return;
-    }
-    
     // Validate required field
     if (!formData.name.trim()) {
       alert('Name is required');
@@ -220,22 +213,29 @@ export default function FundraisingModule() {
       next_followup_date: formData.next_followup_date || null,
     };
     
-    const { error } = await supabase
-      .from('network_contacts')
-      .insert([cleanedData]);
-
-    if (error) {
-      console.error('Error creating contact:', error);
-      alert(`Failed to create contact: ${error.message}`);
-    } else {
-      resetForm();
-      fetchContacts();
+    try {
+      const res = await fetch('/api/network-contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanedData),
+      });
+      const result = await res.json();
+      if (result.error) {
+        console.error('Error creating contact:', result.error);
+        alert(`Failed to create contact: ${result.error.message}`);
+      } else {
+        resetForm();
+        fetchContacts();
+      }
+    } catch (err) {
+      console.error('Error creating contact:', err);
+      alert('Failed to create contact');
     }
   }
 
   // Update contact
   async function updateContact() {
-    if (!supabase || !editingContact) return;
+    if (!editingContact) return;
 
     // Clean up data - convert empty strings to null for optional date fields
     const cleanedData = {
@@ -246,57 +246,67 @@ export default function FundraisingModule() {
       next_followup_date: formData.next_followup_date || null,
     };
 
-    const { error } = await supabase
-      .from('network_contacts')
-      .update(cleanedData)
-      .eq('id', editingContact.id);
-
-    if (error) {
-      console.error('Error updating contact:', error);
-      alert(`Failed to update contact: ${error.message}`);
-    } else {
-      resetForm();
-      fetchContacts();
+    try {
+      const res = await fetch(`/api/network-contacts/${editingContact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanedData),
+      });
+      const result = await res.json();
+      if (result.error) {
+        console.error('Error updating contact:', result.error);
+        alert(`Failed to update contact: ${result.error.message}`);
+      } else {
+        resetForm();
+        fetchContacts();
+      }
+    } catch (err) {
+      console.error('Error updating contact:', err);
+      alert('Failed to update contact');
     }
   }
 
   // Log followup (quick action)
   async function logFollowup(contact: NetworkContact) {
-    if (!supabase) return;
     const today = new Date().toISOString().split('T')[0];
     const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    const { error } = await supabase
-      .from('network_contacts')
-      .update({
-        last_contact_date: today,
-        next_followup_date: nextWeek,
-        followup_count: (contact.followup_count || 0) + 1,
-        first_contact_date: contact.first_contact_date || today,
-      })
-      .eq('id', contact.id);
-
-    if (error) {
-      console.error('Error logging followup:', error);
-    } else {
-      fetchContacts();
+    try {
+      const res = await fetch(`/api/network-contacts/${contact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          last_contact_date: today,
+          next_followup_date: nextWeek,
+          followup_count: (contact.followup_count || 0) + 1,
+          first_contact_date: contact.first_contact_date || today,
+        }),
+      });
+      const result = await res.json();
+      if (result.error) {
+        console.error('Error logging followup:', result.error);
+      } else {
+        fetchContacts();
+      }
+    } catch (err) {
+      console.error('Error logging followup:', err);
     }
   }
 
   // Delete contact
   async function deleteContact(id: string) {
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('network_contacts')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting contact:', error);
+    try {
+      const res = await fetch(`/api/network-contacts/${id}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.error) {
+        console.error('Error deleting contact:', result.error);
+        alert('Failed to delete contact');
+      } else {
+        fetchContacts();
+      }
+    } catch (err) {
+      console.error('Error deleting contact:', err);
       alert('Failed to delete contact');
-    } else {
-      fetchContacts();
     }
     setDeleteConfirm({ show: false, id: null });
   }
@@ -643,11 +653,6 @@ export default function FundraisingModule() {
   
   // Import parsed contacts to database
   async function importBulkContacts() {
-    if (!supabase) {
-      setBulkError('Database not connected');
-      return;
-    }
-    
     const validContacts = parsedContacts.filter(c => c.valid);
     if (validContacts.length === 0) {
       setBulkError('No valid contacts to import');
@@ -678,11 +683,13 @@ export default function FundraisingModule() {
         referred_by: '',
       }));
       
-      const { error } = await supabase
-        .from('network_contacts')
-        .insert(contactsToInsert);
-      
-      if (error) throw error;
+      const res = await fetch('/api/network-contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: contactsToInsert }),
+      });
+      const result = await res.json();
+      if (result.error) throw new Error(result.error.message);
       
       // Success - reset and refresh
       resetBulkUpload();
