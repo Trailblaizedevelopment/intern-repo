@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useGoogleIntegration } from '../../hooks/useGoogleIntegration';
 import { UseWorkspaceDataReturn } from '../../hooks/useWorkspaceData';
+import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
 
@@ -189,6 +190,7 @@ function PipelineWidget({
   onClearSchoolFilter: () => void;
 }) {
   const [deals, setDeals] = useState<PipelineDeal[]>([]);
+  const [employees, setEmployees] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [myDealsOnly, setMyDealsOnly] = useState(false);
@@ -198,10 +200,20 @@ function PipelineWidget({
   const fetchDeals = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/pipeline/deals');
-      if (res.ok) {
-        const data = await res.json();
+      const [dealsRes, empRes] = await Promise.all([
+        fetch('/api/pipeline/deals'),
+        fetch('/api/employees?status=active'),
+      ]);
+      if (dealsRes.ok) {
+        const data = await dealsRes.json();
         setDeals(Array.isArray(data) ? data : []);
+      }
+      if (empRes.ok) {
+        const empData = await empRes.json();
+        const list = Array.isArray(empData) ? empData : (empData.data ?? []);
+        const map: Record<string, string> = {};
+        list.forEach((e: { id: string; name: string }) => { map[e.id] = e.name; });
+        setEmployees(map);
       }
     } finally {
       setLoading(false);
@@ -338,7 +350,7 @@ function PipelineWidget({
                       {formatFollowup(deal.next_followup)}
                     </span>
                   </td>
-                  <td className="idb-td idb-td--assigned">{deal.assigned_to || '—'}</td>
+                  <td className="idb-td idb-td--assigned">{deal.assigned_to ? (employees[deal.assigned_to] || deal.assigned_to.slice(0, 8) + '…') : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -427,8 +439,26 @@ interface InternDashboardProps {
 
 export function InternDashboard({ data }: InternDashboardProps) {
   const { currentEmployee } = data;
+  const { profile } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [schoolFilter, setSchoolFilter] = useState<string | null>(null);
+  const [resolvedEmployeeId, setResolvedEmployeeId] = useState<string | undefined>(currentEmployee?.id);
+
+  // If currentEmployee didn't load (RLS), resolve from employees API by name match
+  useEffect(() => {
+    if (currentEmployee?.id) { setResolvedEmployeeId(currentEmployee.id); return; }
+    if (!profile?.name) return;
+    fetch('/api/employees?status=active')
+      .then(r => r.json())
+      .then((list: { id: string; name: string }[]) => {
+        const arr = Array.isArray(list) ? list : (list as any).data ?? [];
+        const match = arr.find((e: { id: string; name: string }) =>
+          e.name?.toLowerCase() === profile.name?.toLowerCase()
+        );
+        if (match) setResolvedEmployeeId(match.id);
+      })
+      .catch(() => {});
+  }, [currentEmployee?.id, profile?.name]);
 
   return (
     <div className="idb-root">
@@ -446,7 +476,7 @@ export function InternDashboard({ data }: InternDashboardProps) {
 
       {/* Middle: full-width Pipeline */}
       <PipelineWidget
-        currentEmployeeId={currentEmployee?.id}
+        currentEmployeeId={resolvedEmployeeId}
         schoolFilter={schoolFilter}
         onClearSchoolFilter={() => setSchoolFilter(null)}
       />
