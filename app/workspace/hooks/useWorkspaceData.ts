@@ -475,25 +475,22 @@ export function useWorkspaceData(): UseWorkspaceDataReturn {
   // MESSAGES
   // ============================================
 
-  // Fetch messages for active employee (using existing portal_messages table)
+  // Fetch messages for active employee (via admin API — anon client is RLS-blocked)
   const fetchMessages = useCallback(async () => {
-    if (!supabase || !activeEmployee) return;
+    if (!activeEmployee) return;
 
     try {
-      const { data } = await supabase
-        .from('portal_messages')
-        .select('*, sender:sender_id(name)')
-        .eq('recipient_id', activeEmployee.id)
-        .eq('is_read', false)
-        .eq('is_draft', false)
-        .order('sent_at', { ascending: false })
-        .limit(10);
-      
+      // tab=unread hits the default branch: recipient_id + is_read=false + is_draft=false
+      const res = await fetch(
+        `/api/portal/messages?employee_id=${encodeURIComponent(activeEmployee.id)}&tab=unread&limit=10`
+      );
+      if (!res.ok) return;
+      const json = await res.json();
       if (isMounted.current) {
-        setMessages(data?.map(m => ({
+        setMessages((json.data ?? []).map((m: Record<string, unknown>) => ({
           ...m,
           sender_name: (m.sender as { name: string } | null)?.name || 'Unknown'
-        })) || []);
+        })));
       }
     } catch (err) {
       console.error('Error fetching messages:', err);
