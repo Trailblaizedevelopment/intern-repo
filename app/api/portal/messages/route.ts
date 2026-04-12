@@ -1,6 +1,21 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+
+interface PortalMessageRow {
+  id: string;
+  sender_id: string;
+  recipient_id: string | null;
+  subject: string;
+  body: string | null;
+  is_draft: boolean;
+  is_read: boolean;
+  is_starred: boolean | null;
+  is_archived: boolean | null;
+  sent_at: string;
+  thread_id?: string | null;
+  sender?: { name: string; email: string } | null;
+  [key: string]: unknown;
+}
 
 /**
  * GET /api/portal/messages
@@ -26,7 +41,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let query = getSupabaseAdmin()
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json(
+        { data: null, error: { message: 'Database not configured', code: 'DB_ERROR' } },
+        { status: 500 }
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query: any = supabase
       .from('portal_messages')
       .select(`*, sender:sender_id(name, email)`);
 
@@ -82,7 +106,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Normalize sender join
-    const normalized = (data || []).map((m: any) => ({
+    const normalized = (data as PortalMessageRow[] || []).map((m) => ({
       ...m,
       sender_name: m.sender?.name || 'Unknown',
       sender_email: m.sender?.email || '',
@@ -122,7 +146,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await getSupabaseAdmin()
+    const supabasePost = getSupabaseAdmin();
+    if (!supabasePost) {
+      return NextResponse.json(
+        { data: null, error: { message: 'Database not configured', code: 'DB_ERROR' } },
+        { status: 500 }
+      );
+    }
+
+    const { data, error } = await supabasePost
       .from('portal_messages')
       .insert({
         sender_id,
@@ -170,9 +202,17 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const supabasePatch = getSupabaseAdmin();
+    if (!supabasePatch) {
+      return NextResponse.json(
+        { data: null, error: { message: 'Database not configured', code: 'DB_ERROR' } },
+        { status: 500 }
+      );
+    }
+
     // Handle delete
     if (rest.delete === true) {
-      const { error } = await getSupabaseAdmin()
+      const { error } = await supabasePatch
         .from('portal_messages')
         .delete()
         .eq('id', id);
@@ -199,7 +239,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await supabasePatch
       .from('portal_messages')
       .update(updates)
       .eq('id', id)
