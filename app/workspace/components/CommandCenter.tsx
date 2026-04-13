@@ -20,8 +20,7 @@ import { useGoogleIntegration } from '../hooks/useGoogleIntegration';
 import { UseWorkspaceDataReturn } from '../hooks/useWorkspaceData';
 import { Employee } from '@/lib/supabase';
 import { useUserRole } from '../hooks/useUserRole';
-
-const INTERNAL_AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+import { INTERNAL_AUTH_HEADER as INTERNAL_AUTH } from '@/lib/internal-auth';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {

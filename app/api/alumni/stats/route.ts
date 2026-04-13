@@ -184,14 +184,15 @@ export async function GET(request: NextRequest) {
 
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Touch 2 due: touch1 sent, touch2 not sent, and either confirmed or 2+ days since touch1
+    // Touch 2 due: touch1 sent, touch2 not sent, not terminal status, and either confirmed or 2+ days since touch1
     const { data: touch2Candidates } = await supabase
       .from('alumni_contacts')
       .select('id, response_classification, touch1_sent_at', { count: 'exact' })
       .eq('chapter_id', chapterId)
       .eq('is_imessage', true)
       .not('touch1_sent_at', 'is', null)
-      .is('touch2_sent_at', null);
+      .is('touch2_sent_at', null)
+      .not('outreach_status', 'in', '("signed_up","wrong_number","opted_out")');
 
     const touch2Due = (touch2Candidates || []).filter(c =>
       c.response_classification === 'confirmed' || (c.touch1_sent_at && c.touch1_sent_at < twoDaysAgo)
