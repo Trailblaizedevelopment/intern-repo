@@ -6,7 +6,7 @@ import {
   Linkedin, Loader2, CheckSquare, Square, ClipboardList, Instagram,
 } from 'lucide-react';
 import {
-  supabase, ChapterWithOnboarding, ChapterCheckIn, CheckInFrequency,
+  ChapterWithOnboarding, ChapterCheckIn, CheckInFrequency,
   CHECK_IN_FREQUENCY_LABELS, HealthScore, HEALTH_SCORE_LABELS, HEALTH_SCORE_COLORS,
   ChapterMember, MemberStatus, MEMBER_STATUS_CONFIG,
 } from '@/lib/supabase';
@@ -187,15 +187,12 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
   }, [chapter.id]);
 
   const fetchCheckIns = useCallback(async () => {
-    if (!supabase) { setLoadingCheckIns(false); return; }
-    const { data } = await supabase
-      .from('chapter_check_ins')
-      .select('*, action_items:check_in_action_items(*)')
-      .eq('chapter_id', chapter.id)
-      .order('check_in_date', { ascending: false })
-      .limit(5);
-    if (data) setCheckIns(data);
-    setLoadingCheckIns(false);
+    try {
+      const res = await fetch(`/api/check-ins?chapter_id=${chapter.id}&limit=5`);
+      const json = await res.json();
+      if (json.data) setCheckIns(json.data);
+    } catch { /* silent */ }
+    finally { setLoadingCheckIns(false); }
   }, [chapter.id]);
 
   const fetchMembers = useCallback(async () => {
