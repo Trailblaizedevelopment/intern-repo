@@ -16,6 +16,7 @@ interface PipelineDeal {
   temperature: 'hot' | 'warm' | 'cold';
   next_followup: string | null;
   last_touched: string | null;
+  last_activity_at: string | null;
   followup_count: number;
   notes: string | null;
   conference: string | null;
@@ -213,6 +214,7 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
             notes: notes.trim() || null,
             next_followup: nextFollowup || null,
             last_touched: new Date().toISOString(),
+            last_activity_at: new Date().toISOString(),
           }),
         });
         if (!dRes.ok) throw new Error('Failed to create deal');
@@ -231,6 +233,7 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
             notes: notes.trim() || null,
             next_followup: nextFollowup || null,
             last_touched: new Date().toISOString(),
+            last_activity_at: new Date().toISOString(),
           }),
         });
         if (!dRes.ok) throw new Error('Failed to update deal');

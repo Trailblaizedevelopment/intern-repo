@@ -6,9 +6,9 @@ import { messaging } from '@/lib/messaging';
  * POST /api/outreach/poll-all
  *
  * Polls Linq for new responses across ALL active chapters.
- * For any confirmed contacts found, immediately fires T2.
  * Lightweight — designed to run on a cron every 15 minutes.
- * Never calls Linq directly for sends — T2 fires via send-batch.
+ * T2 goes out ONLY through the manual compile → approve → execute cycle.
+ * This endpoint never auto-fires T2.
  */
 export async function POST(_req: NextRequest) {
   const supabase = getSupabaseAdmin();
@@ -51,31 +51,8 @@ export async function POST(_req: NextRequest) {
           .eq('id', flagged.contact_id);
       }
 
-      // 3. If any confirmed contacts found, fire T2 immediately via send-batch
-      const confirmedCount = pollResult.classifications['confirmed'] || 0;
-      if (confirmedCount > 0 && chapter.alumni_join_link) {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trailblaize.space';
-        const t2Response = await fetch(`${baseUrl}/api/outreach/send-batch`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.INTERNAL_API_KEY}`,
-          },
-          body: JSON.stringify({
-            chapter_id: chapter.id,
-            touch: 2,
-            school: chapter.school,
-            fraternity: chapter.fraternity,
-            signup_link: chapter.alumni_join_link,
-            batch_size: confirmedCount + 10,
-          }),
-        });
-
-        if (t2Response.ok) {
-          const t2Data = await t2Response.json();
-          summary.t2_fired += t2Data.data?.sent || 0;
-        }
-      }
+      // Note: T2 is intentionally NOT auto-fired here.
+      // Confirmed contacts will be picked up on the next manual compile → approve → execute cycle.
     } catch (err) {
       summary.errors.push(`${chapter.chapter_name}: ${String(err)}`);
     }

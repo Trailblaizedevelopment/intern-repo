@@ -28,6 +28,7 @@ interface PipelineDeal {
   temperature: 'hot' | 'warm' | 'cold';
   next_followup: string | null;
   last_touched: string | null;
+  last_activity_at: string | null;
   followup_count: number;
   notes: string | null;
   conference: string | null;
@@ -841,7 +842,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     const res = await fetch(`/api/pipeline/deals/${dealId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ last_touched: new Date().toISOString(), followup_count: (deals.find(d => d.id === dealId)?.followup_count || 0) + 1 }),
+      body: JSON.stringify({ last_touched: new Date().toISOString(), last_activity_at: new Date().toISOString(), followup_count: (deals.find(d => d.id === dealId)?.followup_count || 0) + 1 }),
     });
     if (res.ok) {
       showToast('Call logged!', 'success');
@@ -857,7 +858,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     const res = await fetch(`/api/pipeline/deals/${deal.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stage: next, last_touched: new Date().toISOString() }),
+      body: JSON.stringify({ stage: next, last_touched: new Date().toISOString(), last_activity_at: new Date().toISOString() }),
     });
     if (res.ok) {
       showToast(`Advanced to ${STAGE_CONFIG[next].label}!`, 'success');
@@ -1038,7 +1039,19 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
         <div className="pl2__deal-header">
           <div className="pl2__deal-org">
             <span style={{ fontSize: '1rem', lineHeight: 1 }}>{orgIcon}</span>
-            <span className="pl2__deal-name">{deal.organization?.name || 'Unknown'}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span className="pl2__deal-name">{deal.organization?.name || 'Unknown'}</span>
+              {(() => {
+                if (!deal.last_activity_at) return null;
+                const daysSinceActivity = Math.floor((Date.now() - new Date(deal.last_activity_at).getTime()) / (1000 * 60 * 60 * 24));
+                const color = daysSinceActivity > 14 ? '#ef4444' : daysSinceActivity >= 7 ? '#f59e0b' : '#9ca3af';
+                return (
+                  <span style={{ fontSize: '0.67rem', color, fontWeight: 500, lineHeight: 1 }}>
+                    {daysSinceActivity === 0 ? 'Active today' : `${daysSinceActivity}d since last contact`}
+                  </span>
+                );
+              })()}
+            </div>
           </div>
           <span className="pl2__stage-pill" style={{ background: stageConf?.color + '22', color: stageConf?.color }}>
             {stageConf?.emoji} {stageConf?.label}
