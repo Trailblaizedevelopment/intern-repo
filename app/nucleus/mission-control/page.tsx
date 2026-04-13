@@ -12,7 +12,47 @@ import {
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Error Boundary ────────────────────────────────────────────────────────
+
+interface ErrorBoundaryState { hasError: boolean; error: string | null }
+
+class MissionControlErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(err: unknown): ErrorBoundaryState {
+    return { hasError: true, error: err instanceof Error ? err.message : String(err) };
+  }
+  componentDidCatch(err: unknown, info: unknown) {
+    console.error('[MissionControl] runtime crash:', err, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#991b1b' }}>
+          <AlertCircle size={32} style={{ margin: '0 auto 1rem' }} />
+          <h2 style={{ fontFamily: 'Instrument Serif, Georgia, serif', marginBottom: '0.5rem' }}>Mission Control crashed</h2>
+          <pre style={{ fontSize: '0.8rem', background: '#fee2e2', padding: '1rem', borderRadius: 8, textAlign: 'left', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {this.state.error}
+          </pre>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', borderRadius: 8, background: '#991b1b', color: 'white', border: 'none', cursor: 'pointer' }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type MainTab = 'alumni' | 'agents' | 'crons' | 'memory';
 type OutreachSubTab = 'alumni' | 'outreach';
@@ -279,7 +319,7 @@ function StatCard({ label, value, icon, color }: {
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
-export default function MissionControlPage() {
+function MissionControlInner() {
   const [activeTab, setActiveTab] = useState<MainTab>('alumni');
   const [outreachSub, setOutreachSub] = useState<OutreachSubTab>('alumni');
 
@@ -628,6 +668,14 @@ export default function MissionControlPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function MissionControlPage() {
+  return (
+    <MissionControlErrorBoundary>
+      <MissionControlInner />
+    </MissionControlErrorBoundary>
   );
 }
 
@@ -1457,7 +1505,7 @@ function MemorySection({
                   </button>
                 </div>
                 <div className="prose prose-sm max-w-none text-[#2D2A26]">
-                  <ReactMarkdown>{selected.content}</ReactMarkdown>
+                  <ReactMarkdown>{selected.content ?? ''}</ReactMarkdown>
                 </div>
               </div>
             ) : (

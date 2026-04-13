@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // react-markdown v10+ and its deps are ESM-only — Next.js needs to transpile them
+  transpilePackages: [
+    'react-markdown',
+    'remark-parse',
+    'remark-rehype',
+    'unified',
+    'unist-util-visit',
+    'vfile',
+    'hast-util-to-jsx-runtime',
+    'html-url-attributes',
+    'mdast-util-to-hast',
+    'devlop',
+  ],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'ssqpfkiesxwnmphwyezb.supabase.co' },
