@@ -37,6 +37,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
+import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -1142,7 +1143,7 @@ function CreateTicketModal({
     try {
       const res = await fetch('/api/development/generate-spec', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': INTERNAL_AUTH_HEADER },
         body: JSON.stringify({ description: aiDescription.trim() }),
       });
       const result = await res.json();

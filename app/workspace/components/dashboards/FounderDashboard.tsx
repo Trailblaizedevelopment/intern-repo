@@ -31,6 +31,7 @@ import { GoogleGmailWidget } from '../GoogleGmailWidget';
 import { UseWorkspaceDataReturn } from '../../hooks/useWorkspaceData';
 import { useGoogleIntegration } from '../../hooks/useGoogleIntegration';
 import { Employee } from '@/lib/supabase';
+import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 
 interface FounderDashboardProps {
   data: UseWorkspaceDataReturn;
@@ -115,7 +116,7 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
   const [ticketCreating, setTicketCreating] = useState(false);
   const [ticketToast, setTicketToast] = useState('');
 
-  const AUTH_HEADER = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+  const AUTH_HEADER = INTERNAL_AUTH_HEADER;
 
   const fetchProjects = useCallback(async () => {
     try {

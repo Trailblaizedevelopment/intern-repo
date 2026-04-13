@@ -16,7 +16,7 @@ import {
   ChapterWithOnboarding,
   SENDING_LINES,
 } from '@/lib/supabase';
-const INTERNAL_AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+import { INTERNAL_AUTH_HEADER as INTERNAL_AUTH } from '@/lib/internal-auth';
 import ConfirmModal from '@/components/ConfirmModal';
 import ModalOverlay from '@/components/ModalOverlay';
 import ConversationViewer from '@/components/ConversationViewer';

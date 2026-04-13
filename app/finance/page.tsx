@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 import {
   TrendingUp,
   DollarSign,
@@ -67,7 +68,7 @@ interface StripeData {
 
 const VALID_KEY = 'tb_finance_2026';
 const LOCAL_STORAGE_KEY = 'tb_finance_key';
-const AUTH_HEADER = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH_HEADER = INTERNAL_AUTH_HEADER;
 const HOT_STAGES = ['Negotiation', 'Contract Out', 'Contract Sent', 'Demo Done'];
 const STAGE_WEIGHTS: Record<string, number> = {
   'Demo Done': 0.25,

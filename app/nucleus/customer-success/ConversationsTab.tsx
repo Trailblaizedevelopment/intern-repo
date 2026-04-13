@@ -6,9 +6,11 @@ import {
   Loader2, Send, User, ArrowLeft, ChevronLeft, AlertTriangle,
 } from 'lucide-react';
 
+import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
+
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const AUTH = 'Bearer hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h';
+const AUTH = INTERNAL_AUTH_HEADER;
 const API = '/api/conversations';
 const LIMIT = 50;
 
