@@ -8,6 +8,7 @@ import {
   TrendingUp, Copy, Check,
 } from 'lucide-react';
 import EmailTemplatesTab from './EmailTemplatesTab';
+import { EmailCampaignEditor } from './EmailCampaignEditor';
 /* ─── Types ─── */
 
 interface Campaign {
@@ -56,53 +57,6 @@ interface EmailOutreachTabProps {
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
-/* ─── Email preview builder ─── */
-
-/** Detects whether the input contains HTML tags */
-function isHtml(content: string): boolean {
-  return /<[a-z][\s\S]*>/i.test(content);
-}
-
-/** Converts plain text to basic HTML paragraphs */
-function plainTextToHtml(text: string): string {
-  return text
-    .split(/\n\n+/)
-    .map(para => `<p>${para.replace(/\n/g, '<br />')}</p>`)
-    .join('\n');
-}
-
-function buildPreviewHtml(body: string): string {
-  const bodyHtml = isHtml(body) ? body : plainTextToHtml(body);
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; color: #111827; }
-    .email-wrap { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    .email-header { background: linear-gradient(135deg, #6d28d9, #8b5cf6); padding: 24px 32px; }
-    .email-header span { color: #fff; font-weight: 700; font-size: 1.125rem; letter-spacing: -0.01em; }
-    .email-body { padding: 32px; font-size: 0.9375rem; line-height: 1.65; color: #374151; }
-    .email-body p { margin: 0 0 16px; }
-    .email-body a { color: #7c3aed; text-decoration: underline; }
-    .email-footer { padding: 20px 32px; background: #f9fafb; border-top: 1px solid #e5e7eb; font-size: 0.75rem; color: #9ca3af; text-align: center; }
-    .email-footer a { color: #9ca3af; }
-  </style>
-</head>
-<body>
-  <div class="email-wrap">
-    <div class="email-header"><span>Trailblaize</span></div>
-    <div class="email-body">${bodyHtml}</div>
-    <div class="email-footer">
-      <p>You received this because you're listed as an alumni of your chapter.<br/>
-      <a href="#">Unsubscribe</a> &nbsp;·&nbsp; Trailblaize, Inc.</p>
-    </div>
-  </div>
-</body>
-</html>`;
-}
-
 /* ─── Constants ─── */
 
 const TOUCH_CONFIG = {
@@ -146,7 +100,7 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendsFilter, setSendsFilter] = useState('');
-  const [previewMode, setPreviewMode] = useState(false);
+
 
   // Create form state
   const [form, setForm] = useState({ touch_number: 1, subject_line: '', template_html: '', scheduled_at: '' });
@@ -434,41 +388,18 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
               <p style={{ margin: '4px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>Variables: {'{first_name}'}, {'{last_name}'}, {'{chapter}'}</p>
             </div>
 
-            {/* Body */}
+            {/* Body — dual-mode editor */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#374151' }}>Email Body *</label>
-                  <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#9ca3af', fontWeight: 400 }}>
-                    Plain text or HTML — both work
-                  </span>
-                </div>
-                <button onClick={() => setPreviewMode(!previewMode)} style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid #e5e7eb', background: previewMode ? '#111827' : '#fff', color: previewMode ? '#fff' : '#374151', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Eye size={12} /> {previewMode ? 'Edit' : 'Preview Email'}
-                </button>
-              </div>
-              {previewMode ? (
-                <iframe
-                  key={form.template_html}
-                  srcDoc={buildPreviewHtml(form.template_html || '')}
-                  style={{ width: '100%', height: 580, border: '1px solid #e5e7eb', borderRadius: 8, background: '#f9fafb' }}
-                  title="Email Preview"
-                />
-              ) : (
-                <>
-                  <textarea
-                    value={form.template_html}
-                    onChange={e => setForm(f => ({ ...f, template_html: e.target.value }))}
-                    placeholder={`Write your email body here.\n\nYou can write plain text (paragraphs auto-formatted) or paste HTML for full control.\n\nVariables: {first_name} {last_name} {chapter}`}
-                    rows={12}
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: '0.875rem', fontFamily: form.template_html && isHtml(form.template_html) ? 'monospace' : 'inherit', boxSizing: 'border-box', resize: 'vertical', outline: 'none', lineHeight: 1.65 }}
-                  />
-                  <p style={{ margin: '4px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
-                    {form.template_html && isHtml(form.template_html) ? '✦ HTML mode detected' : '✦ Plain text — click Preview to see how it looks'}
-                    {' · '}Variables: {'{first_name}'}, {'{last_name}'}, {'{chapter}'}
-                  </p>
-                </>
-              )}
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#374151', marginBottom: 8 }}>Email Body *</label>
+              <EmailCampaignEditor
+                value={form.template_html}
+                onChange={html => setForm(f => ({ ...f, template_html: html }))}
+                placeholder={`Write your email here.\n\nVariables: {first_name} {last_name} {chapter}`}
+              />
+              <p style={{ margin: '6px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
+                Visual mode for easy editing · HTML mode for full control with live preview
+                {' · '}Variables: {'{first_name}'}, {'{last_name}'}, {'{chapter}'}
+              </p>
             </div>
 
             {/* Schedule (optional) */}
