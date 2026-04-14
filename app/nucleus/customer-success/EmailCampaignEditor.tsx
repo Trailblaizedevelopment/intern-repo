@@ -153,6 +153,7 @@ export function EmailCampaignEditor({
 
   /* ── Tiptap editor ── */
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [2, 3] } }),
       Link.configure({
