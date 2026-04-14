@@ -11,13 +11,16 @@ export async function GET() {
 
   const auth = `Basic ${Buffer.from(`${key}:`).toString('base64')}`;
 
+  // Last 30 days
+  const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
+
   try {
     const [payoutsRes, chargesRes] = await Promise.all([
-      fetch('https://api.stripe.com/v1/payouts?limit=5', {
+      fetch('https://api.stripe.com/v1/payouts?limit=10', {
         headers: { Authorization: auth },
         next: { revalidate: 0 },
       }),
-      fetch('https://api.stripe.com/v1/charges?limit=10', {
+      fetch(`https://api.stripe.com/v1/charges?limit=100&created[gte]=${since}`, {
         headers: { Authorization: auth },
         next: { revalidate: 0 },
       }),

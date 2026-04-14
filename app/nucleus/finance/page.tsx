@@ -84,6 +84,29 @@ interface StripeData {
   }>;
 }
 
+// Stage weights for pipeline ARR calculation
+const STAGE_WEIGHTS: Record<string, number> = {
+  lead: 0.10,
+  demo_booked: 0.20,
+  outreach: 0.20,
+  first_demo: 0.35,
+  second_call: 0.55,
+  contract_sent: 0.85,
+  closed_won: 1.00,
+};
+
+const STAGE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  lead:          { label: 'Lead',          color: '#6b7280', bg: '#f3f4f6' },
+  demo_booked:   { label: 'Demo Booked',   color: '#3b82f6', bg: '#eff6ff' },
+  outreach:      { label: 'Outreach',      color: '#3b82f6', bg: '#eff6ff' },
+  first_demo:    { label: 'First Demo',    color: '#8b5cf6', bg: '#faf5ff' },
+  second_call:   { label: 'Second Call',   color: '#f59e0b', bg: '#fffbeb' },
+  contract_sent: { label: 'Contract Sent', color: '#ec4899', bg: '#fdf2f8' },
+  closed_won:    { label: 'Closed Won',    color: '#10b981', bg: '#ecfdf5' },
+  closed_lost:   { label: 'Closed Lost',   color: '#ef4444', bg: '#fef2f2' },
+  hold_off:      { label: 'Hold Off',      color: '#9ca3af', bg: '#f3f4f6' },
+};
+
 function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeError, formatCurrency }: {
   chapters: unknown[];
   deals: unknown[];
@@ -96,27 +119,34 @@ function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeEr
   const dls = deals as any[];
   const stripe = stripeData as StripeData | null;
 
-  const mrr = chs
-    .filter(c => c.payment_type === 'monthly' && c.status === 'active')
-    .reduce((sum, c) => sum + (c.payment_amount || 0), 0);
+  // ── Section 1: MRR / ARR ──
+  const activeChapters = chs.filter(c => c.status === 'active' && c.payment_amount > 0);
+  const monthlyChapters = activeChapters.filter(c => c.payment_type === 'monthly');
+  const annualChapters = activeChapters.filter(c => c.payment_type === 'annual');
+  const oneTimeChapters = activeChapters.filter(c => c.payment_type === 'one_time');
 
-  const annualCommitments = chs
-    .filter(c => c.payment_type === 'annual' && c.status === 'active')
-    .reduce((sum, c) => sum + (c.payment_amount || 0), 0);
+  const mrr = monthlyChapters.reduce((sum, c) => sum + (c.payment_amount || 0), 0);
+  const annualCommitmentsSum = annualChapters.reduce((sum, c) => sum + (c.payment_amount || 0), 0);
+  const oneTimeSum = oneTimeChapters.reduce((sum, c) => sum + (c.payment_amount || 0), 0);
+  const arr = mrr * 12 + annualCommitmentsSum + oneTimeSum;
 
-  const arr = mrr * 12 + annualCommitments;
+  // ── Section 2: Pipeline ARR ──
+  const activeDeals = dls.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
+  const pipelineTotal = activeDeals.reduce((sum, d) => sum + (d.value || 0), 0);
+  const weightedPipeline = activeDeals.reduce((sum, d) => {
+    const weight = STAGE_WEIGHTS[d.stage] ?? 0;
+    return sum + (d.value || 0) * weight;
+  }, 0);
+  const top10Deals = [...activeDeals]
+    .sort((a, b) => (b.value || 0) - (a.value || 0))
+    .slice(0, 10);
 
-  const activePipelineValue = dls
-    .filter(d => !['closed_won', 'closed_lost', 'hold_off'].includes(d.stage))
-    .reduce((sum, d) => sum + (d.value || 0), 0);
+  // ── Section 3: Stripe ──
+  const stripeCharges = stripe?.charges ?? [];
+  const totalCollected = stripeCharges.reduce((sum, c) => sum + (c.amount || 0), 0) / 100;
+  const paymentCount = stripeCharges.length;
 
-  const hotDealsCount = dls.filter(d => d.temperature === 'hot').length;
-
-  const totalPayouts = stripe?.payouts?.length ?? 0;
-  const recentChargesAmount = stripe?.charges
-    ? stripe.charges.reduce((sum, c) => sum + (c.amount || 0), 0) / 100
-    : 0;
-
+  // Helpers
   const metricGrid: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -131,6 +161,10 @@ function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeEr
     alignItems: 'center',
     gap: '1rem',
   };
+  const bigMetricCard: React.CSSProperties = {
+    ...metricCard,
+    padding: '1.25rem 1.5rem',
+  };
   const mkIcon = (bg: string, color: string): React.CSSProperties => ({
     width: 40,
     height: 40,
@@ -143,8 +177,9 @@ function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeEr
     flexShrink: 0,
   });
   const metricContent: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
-  const metricValue: React.CSSProperties = { fontSize: '1.25rem', fontWeight: 700, color: '#111827' };
-  const metricLabel: React.CSSProperties = { fontSize: '0.75rem', color: '#6b7280' };
+  const metricValueSm: React.CSSProperties = { fontSize: '1.25rem', fontWeight: 700, color: '#111827' };
+  const metricValueLg: React.CSSProperties = { fontSize: '1.75rem', fontWeight: 800, color: '#111827' };
+  const metricLabel: React.CSSProperties = { fontSize: '0.75rem', color: '#6b7280', marginTop: 2 };
   const sectionTitle: React.CSSProperties = {
     fontSize: '0.875rem',
     fontWeight: 600,
@@ -154,66 +189,260 @@ function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeEr
     marginBottom: '0.75rem',
     marginTop: 0,
   };
+  const card: React.CSSProperties = {
+    background: 'white',
+    borderRadius: '12px',
+    border: '1px solid #e5e7eb',
+    overflow: 'hidden',
+  };
+  const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' };
+  const th: React.CSSProperties = {
+    textAlign: 'left',
+    padding: '0.75rem 1rem',
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+    color: '#9ca3af',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    borderBottom: '1px solid #f3f4f6',
+    background: '#fafafa',
+  };
+  const td: React.CSSProperties = {
+    padding: '0.75rem 1rem',
+    fontSize: '0.8125rem',
+    color: '#374151',
+    borderBottom: '1px solid #f9fafb',
+  };
+
+  function fmtDate(ts: number) {
+    return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function fmtDateStr(s: string | null | undefined) {
+    if (!s) return '—';
+    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function StageBadge({ stage }: { stage: string }) {
+    const cfg = STAGE_LABELS[stage] ?? { label: stage, color: '#6b7280', bg: '#f3f4f6' };
+    return (
+      <span style={{
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: 6,
+        fontSize: '0.6875rem',
+        fontWeight: 600,
+        color: cfg.color,
+        background: cfg.bg,
+        whiteSpace: 'nowrap',
+      }}>{cfg.label}</span>
+    );
+  }
+
+  function StatusBadge({ status, paymentType }: { status: string; paymentType: string }) {
+    const color = status === 'active' ? '#10b981' : status === 'onboarding' ? '#3b82f6' : status === 'at_risk' ? '#f59e0b' : '#9ca3af';
+    const bg = status === 'active' ? '#ecfdf5' : status === 'onboarding' ? '#eff6ff' : status === 'at_risk' ? '#fffbeb' : '#f3f4f6';
+    const ptColor = paymentType === 'monthly' ? '#3b82f6' : paymentType === 'annual' ? '#8b5cf6' : '#6b7280';
+    const ptBg = paymentType === 'monthly' ? '#eff6ff' : paymentType === 'annual' ? '#faf5ff' : '#f3f4f6';
+    const ptLabel = paymentType === 'monthly' ? 'Monthly' : paymentType === 'annual' ? 'Annual' : 'One-time';
+    return (
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: '0.6875rem', fontWeight: 600, color, background: bg, textTransform: 'capitalize' }}>{status}</span>
+        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: '0.6875rem', fontWeight: 600, color: ptColor, background: ptBg }}>{ptLabel}</span>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '1.5rem' }}>
 
-      {/* MRR / ARR */}
-      <div>
-        <h3 style={sectionTitle}>Revenue</h3>
-        <div style={metricGrid}>
-          <div style={metricCard}>
-            <div style={mkIcon('#ecfdf5', '#10b981')}><DollarSign size={20} /></div>
+      {/* ── Section 1: MRR / ARR ── */}
+      <section>
+        <h3 style={sectionTitle}>💰 Revenue — MRR &amp; ARR</h3>
+
+        {/* Big numbers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div style={{ ...bigMetricCard, border: '1px solid #d1fae5', background: 'linear-gradient(135deg,#f0fdf4,#ecfdf5)' }}>
+            <div style={mkIcon('#bbf7d0', '#059669')}><TrendingUp size={22} /></div>
             <div style={metricContent}>
-              <span style={metricValue}>{formatCurrency(mrr)}</span>
-              <span style={metricLabel}>Monthly MRR</span>
+              <span style={metricValueLg}>{formatCurrency(arr)}</span>
+              <span style={metricLabel}>Annual Recurring Revenue</span>
+            </div>
+          </div>
+          <div style={{ ...bigMetricCard, border: '1px solid #dbeafe', background: 'linear-gradient(135deg,#eff6ff,#dbeafe)' }}>
+            <div style={mkIcon('#bfdbfe', '#2563eb')}><DollarSign size={22} /></div>
+            <div style={metricContent}>
+              <span style={metricValueLg}>{formatCurrency(mrr)}</span>
+              <span style={metricLabel}>Monthly Recurring Revenue</span>
             </div>
           </div>
           <div style={metricCard}>
-            <div style={mkIcon('#faf5ff', '#8b5cf6')}><TrendingUp size={20} /></div>
+            <div style={mkIcon('#faf5ff', '#8b5cf6')}><Building2 size={20} /></div>
             <div style={metricContent}>
-              <span style={metricValue}>{formatCurrency(arr)}</span>
-              <span style={metricLabel}>ARR (annualized)</span>
+              <span style={metricValueSm}>{activeChapters.length}</span>
+              <span style={metricLabel}>Active Paying Chapters</span>
             </div>
           </div>
           <div style={metricCard}>
-            <div style={mkIcon('#eff6ff', '#3b82f6')}><DollarSign size={20} /></div>
+            <div style={mkIcon('#fffbeb', '#f59e0b')}><Receipt size={20} /></div>
             <div style={metricContent}>
-              <span style={metricValue}>{formatCurrency(annualCommitments)}</span>
+              <span style={metricValueSm}>{formatCurrency(annualCommitmentsSum)}</span>
               <span style={metricLabel}>Annual Commitments</span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Pipeline */}
-      <div>
-        <h3 style={sectionTitle}>Pipeline</h3>
-        <div style={metricGrid}>
-          <div style={metricCard}>
-            <div style={mkIcon('#ecfdf5', '#10b981')}><TrendingUp size={20} /></div>
+        {/* Per-chapter breakdown */}
+        {activeChapters.length > 0 && (
+          <div style={card}>
+            <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>Chapter Breakdown</span>
+              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{activeChapters.length} chapters</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={th}>Chapter</th>
+                    <th style={th}>Type &amp; Status</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Amount</th>
+                    <th style={th}>Last Payment</th>
+                    <th style={th}>Next Payment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeChapters
+                    .sort((a, b) => (b.payment_amount || 0) - (a.payment_amount || 0))
+                    .map((c: any) => (
+                      <tr key={c.id} style={{ ':hover': { background: '#f9fafb' } } as any}>
+                        <td style={td}>
+                          <div style={{ fontWeight: 500, color: '#111827' }}>{c.chapter_name}</div>
+                          {c.school && <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{c.school}</div>}
+                        </td>
+                        <td style={td}>
+                          <StatusBadge status={c.status} paymentType={c.payment_type} />
+                        </td>
+                        <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                          {formatCurrency(c.payment_amount || 0)}
+                          {c.payment_type === 'monthly' && <span style={{ fontSize: '0.65rem', color: '#9ca3af', display: 'block' }}>/mo → {formatCurrency((c.payment_amount || 0) * 12)}/yr</span>}
+                        </td>
+                        <td style={{ ...td, color: '#6b7280' }}>{fmtDateStr(c.last_payment_date)}</td>
+                        <td style={{ ...td, color: c.next_payment_date && new Date(c.next_payment_date) < new Date() ? '#ef4444' : '#6b7280' }}>
+                          {c.payment_type === 'one_time' && !c.next_payment_date
+                            ? <span style={{ color: '#10b981', fontWeight: 500 }}>Paid ✓</span>
+                            : fmtDateStr(c.next_payment_date)
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeChapters.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+            No active paying chapters yet.
+          </div>
+        )}
+      </section>
+
+      {/* ── Section 2: Pipeline ARR ── */}
+      <section>
+        <h3 style={sectionTitle}>📊 Pipeline ARR</h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div style={{ ...bigMetricCard, border: '1px solid #fde68a', background: 'linear-gradient(135deg,#fffbeb,#fef3c7)' }}>
+            <div style={mkIcon('#fde68a', '#d97706')}><TrendingUp size={22} /></div>
             <div style={metricContent}>
-              <span style={metricValue}>{formatCurrency(activePipelineValue)}</span>
-              <span style={metricLabel}>Active Pipeline</span>
+              <span style={metricValueLg}>{formatCurrency(weightedPipeline)}</span>
+              <span style={metricLabel}>Weighted Pipeline ARR</span>
+            </div>
+          </div>
+          <div style={metricCard}>
+            <div style={mkIcon('#f3f4f6', '#6b7280')}><DollarSign size={20} /></div>
+            <div style={metricContent}>
+              <span style={metricValueSm}>{formatCurrency(pipelineTotal)}</span>
+              <span style={metricLabel}>Total Pipeline Value</span>
             </div>
           </div>
           <div style={metricCard}>
             <div style={mkIcon('#fff7ed', '#f97316')}><Flame size={20} /></div>
             <div style={metricContent}>
-              <span style={metricValue}>{hotDealsCount}</span>
-              <span style={metricLabel}>Hot Deals</span>
+              <span style={metricValueSm}>{activeDeals.length}</span>
+              <span style={metricLabel}>Active Deals</span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Stripe */}
-      <div>
-        <h3 style={sectionTitle}>Stripe</h3>
+        {/* Top 10 deals */}
+        {top10Deals.length > 0 && (
+          <div style={card}>
+            <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>Top 10 Deals by Value</span>
+              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>excluding closed lost &amp; hold off</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={{ ...th, width: 32 }}>#</th>
+                    <th style={th}>Organization</th>
+                    <th style={th}>Contact</th>
+                    <th style={th}>Stage</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Value</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Weighted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {top10Deals.map((d: any, i: number) => {
+                    const orgName = d.organization?.name ?? d.organization ?? d.org_name ?? '—';
+                    const contactName = d.contact?.name ?? d.contact_name ?? '—';
+                    const weight = STAGE_WEIGHTS[d.stage] ?? 0;
+                    const weighted = (d.value || 0) * weight;
+                    return (
+                      <tr key={d.id}>
+                        <td style={{ ...td, color: '#9ca3af', fontSize: '0.75rem' }}>{i + 1}</td>
+                        <td style={td}>
+                          <div style={{ fontWeight: 500, color: '#111827' }}>{orgName}</div>
+                        </td>
+                        <td style={{ ...td, color: '#6b7280' }}>{contactName}</td>
+                        <td style={td}><StageBadge stage={d.stage} /></td>
+                        <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: '#111827' }}>{formatCurrency(d.value || 0)}</td>
+                        <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                          {formatCurrency(weighted)}
+                          <span style={{ fontSize: '0.65rem', color: '#9ca3af', display: 'block' }}>{(weight * 100).toFixed(0)}%</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {top10Deals.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+            No active pipeline deals.
+          </div>
+        )}
+      </section>
+
+      {/* ── Section 3: Stripe Payouts ── */}
+      <section>
+        <h3 style={sectionTitle}>💳 Stripe Payouts</h3>
         {stripeLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1.5rem', background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', color: '#6b7280', fontSize: '0.875rem' }}>
             <RefreshCw size={20} className="spin" />
             Loading Stripe data…
+          </div>
+        ) : stripeError === 'Stripe not connected' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2.5rem 2rem', background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', textAlign: 'center' }}>
+            <CreditCard size={36} style={{ marginBottom: '0.75rem', color: '#d1d5db' }} />
+            <p style={{ margin: '0 0 0.25rem', fontWeight: 600, color: '#374151' }}>Connect Stripe</p>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: '#9ca3af' }}>Set <code style={{ background: '#f3f4f6', padding: '1px 6px', borderRadius: 4 }}>STRIPE_SECRET_KEY</code> in your Vercel environment variables to see payout data.</p>
           </div>
         ) : stripeError ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.875rem 1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', color: '#dc2626', fontSize: '0.875rem' }}>
@@ -221,29 +450,72 @@ function FinanceDashboard({ chapters, deals, stripeData, stripeLoading, stripeEr
             {stripeError}
           </div>
         ) : stripe ? (
-          <div style={metricGrid}>
-            <div style={metricCard}>
-              <div style={mkIcon('#eff6ff', '#3b82f6')}><CreditCard size={20} /></div>
-              <div style={metricContent}>
-                <span style={metricValue}>{totalPayouts}</span>
-                <span style={metricLabel}>Recent Payouts</span>
+          <>
+            {/* Stripe summary metrics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ ...bigMetricCard, border: '1px solid #dbeafe', background: 'linear-gradient(135deg,#eff6ff,#dbeafe)' }}>
+                <div style={mkIcon('#bfdbfe', '#3b82f6')}><DollarSign size={22} /></div>
+                <div style={metricContent}>
+                  <span style={metricValueLg}>{formatCurrency(totalCollected)}</span>
+                  <span style={metricLabel}>Total Collected (Last 10 Charges)</span>
+                </div>
+              </div>
+              <div style={metricCard}>
+                <div style={mkIcon('#ecfdf5', '#10b981')}><CreditCard size={20} /></div>
+                <div style={metricContent}>
+                  <span style={metricValueSm}>{paymentCount}</span>
+                  <span style={metricLabel}>Successful Payments</span>
+                </div>
+              </div>
+              <div style={metricCard}>
+                <div style={mkIcon('#eff6ff', '#3b82f6')}><ArrowUpRight size={20} /></div>
+                <div style={metricContent}>
+                  <span style={metricValueSm}>{stripe.payouts.length}</span>
+                  <span style={metricLabel}>Recent Payouts</span>
+                </div>
               </div>
             </div>
-            <div style={metricCard}>
-              <div style={mkIcon('#ecfdf5', '#10b981')}><DollarSign size={20} /></div>
-              <div style={metricContent}>
-                <span style={metricValue}>{formatCurrency(recentChargesAmount)}</span>
-                <span style={metricLabel}>Recent Charges</span>
+
+            {/* Recent transactions */}
+            {stripeCharges.length > 0 && (
+              <div style={card}>
+                <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f3f4f6' }}>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>Recent Transactions</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={th}>Date</th>
+                        <th style={th}>Description</th>
+                        <th style={th}>Customer</th>
+                        <th style={{ ...th, textAlign: 'right' }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stripeCharges.map((ch) => (
+                        <tr key={ch.id}>
+                          <td style={{ ...td, color: '#6b7280', whiteSpace: 'nowrap' }}>{fmtDate(ch.created)}</td>
+                          <td style={td}>{ch.description || 'Payment'}</td>
+                          <td style={{ ...td, color: '#6b7280' }}>{ch.customer_email || '—'}</td>
+                          <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                            {formatCurrency((ch.amount || 0) / 100)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem', background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', color: '#9ca3af', fontSize: '0.875rem' }}>
             <CreditCard size={32} style={{ marginBottom: '0.75rem', opacity: 0.5 }} />
             <p style={{ margin: 0 }}>No Stripe data available</p>
           </div>
         )}
-      </div>
+      </section>
 
     </div>
   );
