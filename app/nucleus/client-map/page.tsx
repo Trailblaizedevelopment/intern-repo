@@ -23,6 +23,7 @@ import {
   Zap,
   ChevronDown,
   Edit3,
+  MapPin,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -150,17 +151,17 @@ function KpiCard({ icon, label, value, sub, color }: {
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3 min-w-0">
+    <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4 min-w-0">
       <div
-        className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
+        className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
         style={{ backgroundColor: `${color}18`, color }}
       >
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-gray-500 font-medium truncate">{label}</p>
-        <p className="text-xl font-bold text-gray-900 leading-tight">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide truncate">{label}</p>
+        <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{value}</p>
+        {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
       </div>
     </div>
   );
@@ -200,7 +201,7 @@ function ChapterRow({
   const primaryDeal = org.deals[0];
 
   return (
-    <div className="flex items-center gap-3 py-3 px-4 border-b border-gray-50 hover:bg-gray-50/60 transition-colors group">
+    <div className="flex items-center gap-3 py-4 px-5 border-b border-gray-100 hover:bg-gray-50/60 transition-colors group">
       {/* Type badge */}
       <span className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
         type === 'fraternity'
@@ -1113,20 +1114,24 @@ export default function ClientMapCommandCenter() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-6 py-7">
+        <div className="max-w-7xl mx-auto flex items-start justify-between">
           <div>
-            <h1 className="text-xl font-bold text-[#1B2A4A] flex items-center gap-2">
-              <Target size={20} className="text-[#C4874A]" />
-              Client Map
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Outreach command center — pick a school, blast every chapter
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 rounded-xl bg-[#C4874A]/10 flex items-center justify-center">
+                <Target size={20} className="text-[#C4874A]" />
+              </div>
+              <h1 className="text-2xl font-bold text-[#1B2A4A] tracking-tight">
+                School Outreach Command Center
+              </h1>
+            </div>
+            <p className="text-base text-gray-500 ml-12">
+              Pick a school below. Blast every chapter in 30 minutes.
             </p>
           </div>
           <button
             onClick={load}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-2 bg-white hover:bg-gray-50 transition-colors flex-shrink-0 mt-1"
           >
             <RefreshCw size={14} />
             Refresh
@@ -1134,9 +1139,11 @@ export default function ClientMapCommandCenter() {
         </div>
       </div>
 
-      <div className="px-6 py-5 space-y-5 max-w-7xl mx-auto">
+      <div className="px-6 py-8 space-y-8 max-w-7xl mx-auto">
         {/* ── KPI Bar ───────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Performance</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <KpiCard
             icon={<Users size={16} />}
             label="Active Chapters"
@@ -1173,36 +1180,38 @@ export default function ClientMapCommandCenter() {
             color="#0ea5e9"
           />
         </div>
+        </div>
 
         {/* ── School Search ──────────────────────────────────────────────── */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Find a School</p>
         <div ref={searchContainerRef} className="relative">
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-visible">
-            <div className="px-5 py-4">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                Pick a school to blast
-              </label>
+            <div className="px-6 py-6">
+              <div className="max-w-2xl mx-auto">
               <div className="relative">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Search size={22} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search schools... (e.g. University of Texas)"
+                  placeholder="Search for a school to start outbound..."
                   value={schoolSearch}
                   onChange={(e) => {
                     setSchoolSearch(e.target.value);
                     setShowSearchResults(true);
                   }}
                   onFocus={() => setShowSearchResults(true)}
-                  className="w-full pl-11 pr-4 py-3 text-base border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 transition-colors"
+                  className="w-full pl-14 pr-5 py-4 text-lg border-2 border-gray-200 rounded-2xl bg-white focus:outline-none focus:ring-4 focus:ring-[#1B2A4A]/10 focus:border-[#1B2A4A]/50 transition-all shadow-sm"
                 />
                 {schoolSearch && (
                   <button
                     onClick={() => { setSchoolSearch(''); setShowSearchResults(false); }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    <X size={16} />
+                    <X size={18} />
                   </button>
                 )}
+              </div>
               </div>
             </div>
 
@@ -1235,7 +1244,7 @@ export default function ClientMapCommandCenter() {
 
           {/* Search dropdown */}
           {showSearchResults && (
-            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+            <div className="absolute z-30 top-full mt-2 left-0 right-0 bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden">
               {searchResults.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">No schools found</div>
               ) : (
@@ -1275,8 +1284,11 @@ export default function ClientMapCommandCenter() {
             </div>
           )}
         </div>
+        </div>
 
         {/* ── Chapter List ──────────────────────────────────────────────── */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Chapters</p>
         {selectedSchool ? (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Chapter list header */}
@@ -1333,16 +1345,21 @@ export default function ClientMapCommandCenter() {
           </div>
         ) : (
           /* Empty state */
-          <div className="bg-white rounded-xl border border-gray-200 flex flex-col items-center justify-center py-20 text-gray-400">
-            <Search size={40} className="mb-3 opacity-20" />
-            <p className="text-base font-semibold text-gray-500">Search for a school to start outreach</p>
-            <p className="text-sm mt-1 text-gray-400">
-              {schools.length} schools loaded — type above to find yours
+          <div className="bg-white rounded-2xl border border-gray-200 flex flex-col items-center justify-center py-28 text-gray-400">
+            <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-5">
+              <MapPin size={32} className="text-gray-300" />
+            </div>
+            <p className="text-lg font-semibold text-gray-600">Select a school to see all chapters</p>
+            <p className="text-sm mt-2 text-gray-400 max-w-sm text-center leading-relaxed">
+              Pick a school, then contact every frat and sorority in 30–45 minutes
             </p>
           </div>
         )}
+        </div>
 
         {/* ── Founder Target Board ───────────────────────────────────────── */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Today&apos;s Targets</p>
         <FounderTargetBoard
           schools={schools}
           outreachLog={outreachLog}
@@ -1354,6 +1371,7 @@ export default function ClientMapCommandCenter() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
         />
+        </div>
       </div>
 
       {/* ── Log Contact Drawer ─────────────────────────────────────────────── */}
