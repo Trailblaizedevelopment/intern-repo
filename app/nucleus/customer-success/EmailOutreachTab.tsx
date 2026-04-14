@@ -8,7 +8,7 @@ import {
   TrendingUp, Copy, Check,
 } from 'lucide-react';
 import EmailTemplatesTab from './EmailTemplatesTab';
-import { EmailCampaignEditor } from './EmailCampaignEditor';
+import { EmailCampaignEditorV2 } from './EmailCampaignEditorV2';
 /* ─── Types ─── */
 
 interface Campaign {
@@ -391,10 +391,10 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
             {/* Body — dual-mode editor */}
             <div>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#374151', marginBottom: 8 }}>Email Body *</label>
-              <EmailCampaignEditor
+              <EmailCampaignEditorV2
                 value={form.template_html}
                 onChange={html => setForm(f => ({ ...f, template_html: html }))}
-                placeholder={`Write your email here.\n\nVariables: {first_name} {last_name} {chapter}`}
+                chapterName={chapterName}
               />
               <p style={{ margin: '6px 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
                 Visual mode for easy editing · HTML mode for full control with live preview

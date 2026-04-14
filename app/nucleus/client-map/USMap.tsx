@@ -9,7 +9,20 @@ import {
   Marker,
 } from 'react-simple-maps';
 import { X } from 'lucide-react';
-import type { ChapterWithGeo } from './page';
+// ChapterWithGeo — defined locally to decouple from page exports
+export interface ChapterWithGeo {
+  id: string;
+  chapter_name: string;
+  school: string;
+  state: string;
+  status: string;
+  mrr: number | null;
+  arr: number;
+  onboarding_completed: string | null;
+  lat: number;
+  lng: number;
+  region: string;
+}
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json';
 
