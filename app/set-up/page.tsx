@@ -527,100 +527,57 @@ function SetUpPage() {
           <h2 style={S.h2}>Here&apos;s what you&apos;re agreeing to</h2>
           <p style={S.sub}>Plain language, no surprises.</p>
 
-          <div className="space-y-4 mb-8">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
             {[
-              {
-                icon: <Zap size={20} className="text-[#0F172A]" />,
-                title: "What you're getting",
-                desc: "Access to the full Trailblaize platform for your organization — alumni directory, message board, engagement tools, and ongoing support.",
-              },
-              {
-                icon: <Calendar size={20} className="text-[#0F172A]" />,
-                title: 'Your commitment',
-                desc: "This is a 12-month commitment starting today. After your first year, you can cancel anytime with 30 days notice. No hidden fees, no penalties.",
-              },
-              {
-                icon: <DollarSign size={20} className="text-emerald-600" />,
-                title: 'What it costs',
-                desc: price
-                  ? `$${price}/month · Billed monthly · Based on ${form.memberCount} members. Pricing may be updated at renewal with mutual agreement.`
-                  : 'Pricing based on your member count.',
-              },
-              {
-                icon: <Shield size={20} className="text-blue-500" />,
-                title: 'Your data',
-                desc: "Your data belongs to you. We use it only to run the platform. We never sell it. You can export or delete it anytime.",
-              },
-              {
-                icon: <X size={20} className="text-gray-500" />,
-                title: 'Cancellation',
-                desc: "Cancel after year one with 30 days written notice. No penalty. Outstanding fees are still due at time of cancellation.",
-              },
+              { icon: <Zap size={18} color="#0F172A" />, title: "What you're getting", desc: "Access to the full Trailblaize platform — alumni directory, message board, engagement tools, and ongoing support." },
+              { icon: <Calendar size={18} color="#0F172A" />, title: 'Your commitment', desc: "12-month commitment starting today. After year one, cancel anytime with 30 days notice. No hidden fees." },
+              { icon: <DollarSign size={18} color="#0F172A" />, title: 'What it costs', desc: price ? `$${price}/month · Billed monthly · Based on ${form.memberCount} members. Pricing reviewed at renewal.` : 'Pricing based on your member count.' },
+              { icon: <Shield size={18} color="#0F172A" />, title: 'Your data', desc: "Your data belongs to you. We use it only to run the platform. Never sold. Export or delete anytime." },
+              { icon: <X size={18} color="#6B7280" />, title: 'Cancellation', desc: "Cancel after year one with 30 days written notice. Outstanding fees due at cancellation." },
             ].map((card) => (
-              <div key={card.title} className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex gap-4">
-                <div className="mt-0.5 shrink-0">{card.icon}</div>
+              <div key={card.title} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px 20px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                <div style={{ flexShrink: 0, marginTop: '1px' }}>{card.icon}</div>
                 <div>
-                  <h3 className="font-semibold text-[#0F172A] mb-1">{card.title}</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">{card.desc}</p>
+                  <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: '0 0 4px 0' }}>{card.title}</p>
+                  <p style={{ fontSize: '0.8125rem', color: '#6B7280', lineHeight: 1.5, margin: 0 }}>{card.desc}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Full agreement toggle */}
-          <button
-            type="button"
-            onClick={() => setShowFullAgreement((v) => !v)}
-            className="flex items-center gap-2 text-sm text-[#0F172A] font-medium mb-3 hover:underline"
-          >
+          <button type="button" onClick={() => setShowFullAgreement(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A', background: 'none', border: 'none', cursor: 'pointer', marginBottom: '12px', fontFamily: 'inherit' }}>
             {showFullAgreement ? 'Hide full agreement ↑' : 'Read full agreement ↓'}
-            <ChevronDown size={14} className={`transition-transform ${showFullAgreement ? 'rotate-180' : ''}`} />
           </button>
 
           {showFullAgreement && (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 max-h-60 overflow-y-auto">
-              <pre className="text-xs text-gray-500 whitespace-pre-wrap font-sans leading-relaxed">
-                {FULL_AGREEMENT}
-              </pre>
+            <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', marginBottom: '20px', maxHeight: '240px', overflowY: 'auto' }}>
+              <pre style={{ fontSize: '0.6875rem', color: '#6B7280', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>{FULL_AGREEMENT}</pre>
             </div>
           )}
 
           {/* Signature section */}
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 space-y-4">
-            <p className="text-sm text-gray-600 font-medium">
-              I agree to these terms on behalf of <span className="text-[#0F172A] font-semibold">{form.orgName || 'my organization'}</span>
+          <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <p style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500, margin: 0 }}>
+              I agree to these terms on behalf of <span style={{ color: '#111827', fontWeight: 700 }}>{form.orgName || 'my organization'}</span>
             </p>
-
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
-                Type your full name to sign *
-              </label>
-              <input
-                type="text"
-                value={agreedName}
-                onChange={(e) => setAgreedName(e.target.value)}
+              <label style={S.label}>Type your full name to sign *</label>
+              <input type="text" value={agreedName} onChange={e => setAgreedName(e.target.value)}
                 placeholder="Your full name"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/20 focus:border-[#0F172A]"
-                style={{ fontFamily: 'cursive' }}
-              />
+                style={{ ...S.input(false), fontFamily: 'cursive, Georgia, serif', fontSize: '1rem', color: '#111827' }} />
             </div>
-
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Date</label>
-              <p className="text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2.5">{agreedAt}</p>
+              <label style={S.label}>Date</label>
+              <p style={{ ...S.input(false), display: 'block', color: '#6B7280', lineHeight: '1.5', padding: '10px 12px' }}>{agreedAt}</p>
             </div>
-
-            <label className="flex items-start gap-3 cursor-pointer">
-              <div
-                onClick={() => setAgreedAuthorized((v) => !v)}
-                className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all cursor-pointer
-                  ${agreedAuthorized ? 'bg-[#0F172A] border-[#0F172A]' : 'border-gray-300 bg-white'}`}
-              >
-                {agreedAuthorized && <Check size={12} className="text-white" />}
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+              <div onClick={() => setAgreedAuthorized(v => !v)}
+                style={{ width: '20px', height: '20px', borderRadius: '4px', border: `2px solid ${agreedAuthorized ? '#0F172A' : '#D1D5DB'}`, background: agreedAuthorized ? '#0F172A' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px', cursor: 'pointer' }}>
+                {agreedAuthorized && <Check size={12} color="white" />}
               </div>
-              <span className="text-sm text-gray-600 leading-relaxed">
-                I confirm I am authorized to enter into this agreement on behalf of my organization
-              </span>
+              <span style={{ fontSize: '0.875rem', color: '#374151', lineHeight: 1.5 }}>I confirm I am authorized to enter into this agreement on behalf of my organization</span>
             </label>
           </div>
 
