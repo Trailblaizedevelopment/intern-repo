@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Check,
@@ -132,7 +132,7 @@ By completing the signup process and providing a typed signature, Client acknowl
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
-export default function SetUpPage() {
+function SetUpPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -852,4 +852,13 @@ function inputCls(hasError: boolean) {
     ${hasError
       ? 'border-red-400 focus:ring-red-200 focus:border-red-400'
       : 'border-gray-200 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]'}`;
+}
+
+// Wrap in Suspense so useSearchParams() works with Next.js static export
+export default function SetUpPageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAFAF8] flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B2A4A]" /></div>}>
+      <SetUpPage />
+    </Suspense>
+  );
 }
