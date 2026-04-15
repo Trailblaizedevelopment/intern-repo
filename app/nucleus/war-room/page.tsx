@@ -3,6 +3,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const DealEditPanel = dynamic(() => import('@/app/nucleus/pipeline/DealEditPanel'), { ssr: false });
 import { ComposableMap, Geographies, Geography as GeographyBase } from 'react-simple-maps';
 const Geography = GeographyBase as any;
 import {
@@ -500,14 +503,14 @@ function groupDealsByUrgency(deals: Deal[]): PipelineGroup[] {
   ].filter(g => g.deals.length > 0);
 }
 
-function PipelineDealRow({ deal }: { deal: Deal }) {
+function PipelineDealRow({ deal, onOpen }: { deal: Deal; onOpen: (deal: Deal) => void }) {
   const org = deal.organization;
   const chapterName = org?.name || '—';
   const schoolName = org?.school?.name || deal.conference || '—';
   return (
     <tr
       style={{ cursor: 'pointer' }}
-      onClick={() => { window.location.href = `/nucleus/pipeline?deal=${deal.id}`; }}
+      onClick={() => onOpen(deal)}
     >
       <td className="module-table-name">{chapterName}</td>
       <td style={{ color: '#6b7280', fontSize: '0.8125rem' }}>{schoolName}</td>
@@ -524,7 +527,7 @@ function PipelineDealRow({ deal }: { deal: Deal }) {
   );
 }
 
-function CollapsiblePipelineGroup({ group }: { group: PipelineGroup }) {
+function CollapsiblePipelineGroup({ group, onOpen }: { group: PipelineGroup; onOpen: (deal: Deal) => void }) {
   const [open, setOpen] = useState(true);
   return (
     <>
@@ -545,12 +548,12 @@ function CollapsiblePipelineGroup({ group }: { group: PipelineGroup }) {
           </button>
         </td>
       </tr>
-      {open && group.deals.map(deal => <PipelineDealRow key={deal.id} deal={deal} />)}
+      {open && group.deals.map(deal => <PipelineDealRow key={deal.id} deal={deal} onOpen={onOpen} />)}
     </>
   );
 }
 
-function DashboardTab({ stats }: { stats: PipelineStats | null }) {
+function DashboardTab({ stats, onOpenDeal }: { stats: PipelineStats | null; onOpenDeal: (deal: Deal) => void }) {
   if (!stats) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '16rem', color: '#9ca3af' }}>
@@ -675,8 +678,8 @@ function DashboardTab({ stats }: { stats: PipelineStats | null }) {
               </thead>
               <tbody>
                 {pipelineGroups.length > 0
-                  ? pipelineGroups.map(group => <CollapsiblePipelineGroup key={group.label} group={group} />)
-                  : stats.recentDeals.map(deal => <PipelineDealRow key={deal.id} deal={deal} />)
+                  ? pipelineGroups.map(group => <CollapsiblePipelineGroup key={group.label} group={group} onOpen={onOpenDeal} />)
+                  : stats.recentDeals.map(deal => <PipelineDealRow key={deal.id} deal={deal} onOpen={onOpenDeal} />)
                 }
               </tbody>
             </table>
@@ -2411,6 +2414,37 @@ export default function WarRoomPage() {
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Deal panel state
+  const [panelDeal, setPanelDeal] = useState<any>(null);
+  const [panelEmployees, setPanelEmployees] = useState<any[]>([]);
+  const [panelSchools, setPanelSchools] = useState<any[]>([]);
+  const [panelNationals, setPanelNationals] = useState<any[]>([]);
+  const [supportLoaded, setSupportLoaded] = useState(false);
+
+  // Load support data for DealEditPanel once
+  const loadSupportData = useCallback(async () => {
+    if (supportLoaded) return;
+    const [empRes, schoolRes, natRes] = await Promise.all([
+      fetch('/api/employees?status=active'),
+      fetch('/api/pipeline/schools'),
+      fetch('/api/pipeline/nationals'),
+    ]);
+    if (empRes.ok) { const d = await empRes.json(); setPanelEmployees(Array.isArray(d) ? d : d.data ?? []); }
+    if (schoolRes.ok) { const d = await schoolRes.json(); setPanelSchools(Array.isArray(d) ? d : []); }
+    if (natRes.ok) { const d = await natRes.json(); setPanelNationals(Array.isArray(d) ? d : []); }
+    setSupportLoaded(true);
+  }, [supportLoaded]);
+
+  async function openDeal(deal: Deal) {
+    loadSupportData();
+    // Fetch full deal detail
+    try {
+      const res = await fetch(`/api/pipeline/deals/${deal.id}`);
+      if (res.ok) setPanelDeal(await res.json());
+      else setPanelDeal(deal);
+    } catch { setPanelDeal(deal); }
+  }
+
   const fetchStats = useCallback(async () => {
     try {
       const res = await fetch('/api/pipeline/stats');
@@ -2461,11 +2495,24 @@ export default function WarRoomPage() {
 
       {/* Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
-        {tab === 'dashboard'  && <DashboardTab stats={stats} />}
+        {tab === 'dashboard'  && <DashboardTab stats={stats} onOpenDeal={openDeal} />}
         {tab === 'campaigns'  && <CampaignsTab stats={stats} />}
         {tab === 'notes'      && <NextStepsTab />}
         {tab === 'map'        && <ClientMapTab statsDeals={stats?.recentDeals ?? []} />}
       </div>
+
+      {/* Deal Edit Panel — slide-in from right */}
+      {panelDeal && (
+        <DealEditPanel
+          deal={panelDeal}
+          employees={panelEmployees}
+          schools={panelSchools}
+          nationals={panelNationals}
+          onClose={() => setPanelDeal(null)}
+          onSaved={() => { setPanelDeal(null); fetchStats(); }}
+          onDeleted={() => { setPanelDeal(null); fetchStats(); }}
+        />
+      )}
     </div>
   );
 }
