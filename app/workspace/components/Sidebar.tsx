@@ -32,6 +32,7 @@ import {
   Map,
   Star,
   Radar,
+  Tv,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -107,6 +108,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const inNucleus = pathname.startsWith('/nucleus');
   const nucleusModules = [
     { name: 'Dashboard', href: '/nucleus', icon: Zap },
+    { name: 'War Room', href: '/nucleus/war-room', icon: Tv },
     { name: 'Sales Pipeline', href: '/nucleus/pipeline', icon: TrendingUp },
     { name: 'Customer Success', href: '/nucleus/customer-success', icon: HeartHandshake },
     { name: 'Client Map', href: '/nucleus/client-map', icon: Map },
