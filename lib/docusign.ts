@@ -3,8 +3,12 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 const DOCUSIGN_ACCOUNT_ID = process.env.DOCUSIGN_ACCOUNT_ID!;
 const DOCUSIGN_INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY!;
 const DOCUSIGN_CLIENT_SECRET = process.env.DOCUSIGN_CLIENT_SECRET!;
-const DOCUSIGN_BASE_URL = 'https://na4.docusign.net';
-const DOCUSIGN_AUTH_URL = 'https://account.docusign.com';
+const DOCUSIGN_BASE_URL = process.env.DOCUSIGN_USE_PRODUCTION === 'true'
+  ? 'https://na4.docusign.net'
+  : 'https://demo.docusign.net';
+const DOCUSIGN_AUTH_URL = process.env.DOCUSIGN_USE_PRODUCTION === 'true'
+  ? 'https://account.docusign.com'
+  : 'https://account-d.docusign.com';
 
 /**
  * Returns a valid DocuSign access token.

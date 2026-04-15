@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DOCUSIGN_INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY!;
 const DOCUSIGN_REDIRECT_URI = process.env.DOCUSIGN_REDIRECT_URI?.trim() || 'https://trailblaize.space/api/auth/docusign/callback';
-const DOCUSIGN_AUTH_URL = 'https://account.docusign.com';
+// Use demo/sandbox URL — switch to account.docusign.com once app is approved for production
+const DOCUSIGN_AUTH_URL = process.env.DOCUSIGN_USE_PRODUCTION === 'true'
+  ? 'https://account.docusign.com'
+  : 'https://account-d.docusign.com';
 
 /**
  * GET /api/auth/docusign?chapter_id=<id>
