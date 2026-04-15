@@ -283,7 +283,7 @@ function SetUpPage() {
           memberCount: Number(form.memberCount),
           agreedName,
           agreedAt: agreedAtISO,
-          discountCode: discountCode.trim() || undefined,
+          // Promo codes handled natively by Stripe checkout
         }),
       });
       const data = await res.json();
@@ -625,18 +625,6 @@ function SetUpPage() {
               />
             </div>
             <p className="text-xs text-gray-400 pt-1">Annual commitment, then month-to-month · Cancel after year one with 30 days notice</p>
-          </div>
-
-          {/* Discount code */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={S.label}>Discount / Promo Code <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span></label>
-            <input
-              type="text"
-              value={discountCode}
-              onChange={e => setDiscountCode(e.target.value.toUpperCase())}
-              placeholder="e.g. TRAILBLAIZE100"
-              style={S.input(false)}
-            />
           </div>
 
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">

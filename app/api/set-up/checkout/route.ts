@@ -95,10 +95,8 @@ export async function POST(req: NextRequest) {
       cancel_url: `https://trailblaize.space/set-up?step=3`,
     };
 
-    // If a discount code was entered, enable promo codes on the checkout
-    if (codeUpper) {
-      (sessionParams as any).allow_promotion_codes = true;
-    }
+    // Always enable Stripe's native promo code field on checkout
+    sessionParams.allow_promotion_codes = true;
 
     const session = await stripe.checkout.sessions.create(sessionParams);
     return NextResponse.json({ url: session.url });
