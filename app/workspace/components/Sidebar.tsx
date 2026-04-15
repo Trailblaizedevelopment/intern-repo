@@ -57,6 +57,7 @@ const iconMap: Record<string, LucideIcon> = {
   Map,
   Star,
   Radar,
+  Tv,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
@@ -135,10 +136,10 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
       ]
     : isInternRole
     ? [
-        // Interns: Dashboard, Pipeline (full), Schools
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
+        { name: 'War Room', href: '/nucleus/war-room', icon: 'Tv', badge: 0 },
         { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
-        { name: 'Schools', href: '/workspace/schools', icon: 'GraduationCap', badge: 0 },
+        { name: 'Team', href: '/workspace/team', icon: 'Users', badge: 0 },
       ]
     : [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },

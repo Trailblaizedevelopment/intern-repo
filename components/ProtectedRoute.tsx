@@ -22,12 +22,16 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     
     const isNucleusRoute = pathname.startsWith('/nucleus');
     
-    // Growth interns are allowed through to /nucleus/pipeline specifically
+    // Growth interns are allowed through to specific nucleus routes
     const isGrowthIntern = profile.role === 'growth_intern';
-    const isInternAllowedNucleusRoute = isGrowthIntern && pathname.startsWith('/nucleus/pipeline');
+    const internAllowedRoutes = [
+      '/nucleus/pipeline',
+      '/nucleus/war-room',
+    ];
+    const isInternAllowedNucleusRoute = isGrowthIntern && internAllowedRoutes.some(r => pathname.startsWith(r));
     
     // Non-admins trying to access /nucleus get redirected to /workspace
-    // Exception: growth_intern can access /nucleus/pipeline
+    // Exception: growth_intern can access pipeline + war room
     if (isNucleusRoute && !isAdmin && !isInternAllowedNucleusRoute) {
       console.log('Redirecting non-admin to workspace. Role:', profile.role);
       router.replace('/workspace');

@@ -164,9 +164,11 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       ];
     case 'growth_intern':
     default:
-      // Interns: just Dashboard + Team. Everything else lives on the dashboard.
+      // Interns: Dashboard, War Room, Pipeline, Team
       return [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
+        { name: 'War Room', href: '/nucleus/war-room', icon: 'Tv' },
+        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
   }
