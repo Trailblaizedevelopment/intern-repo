@@ -244,7 +244,28 @@ const CAMPAIGN_TYPE_BADGE_COLORS: Record<CampaignType, string> = {
 
 const REP_COLORS: Record<string, string> = {
   Owen: '#C4874A', Ford: '#2563eb', Adam: '#10b981', Hyatt: '#7c3aed',
+  'Owen Ridgeway': '#C4874A', 'Hyatt Williams': '#7c3aed',
 };
+
+// UUID → display name map (from employees table)
+const UUID_TO_NAME: Record<string, string> = {
+  '33ab5810-4d9f-485e-babb-a99b650a09e1': 'Owen',
+  '3853cd9d-0773-4d04-b23f-20eb51717e0f': 'Ford',
+  '66952c26-316d-4e9c-8fe1-4dd5743926ef': 'Adam',
+  '904e6a81-8046-44a5-9710-db893be0a094': 'Hyatt',
+  '6622b57d-1a17-49ae-b492-85906612954f': 'Ally',
+  'b51b7314-fbdc-496f-ae08-3af8aff29a39': 'Devin',
+  'eadecbba-91da-41da-adc5-9a5b1cb82d4c': 'Parker',
+  '5a848006-7f96-4c86-aa8d-3032ac0636ef': 'Riley',
+  '6b7763bb-9bc7-46fb-b677-3e39d0a5d927': 'Worth',
+};
+
+function resolveRep(val?: string | null): string | null {
+  if (!val) return null;
+  // If it looks like a UUID, resolve it
+  if (val.includes('-') && val.length > 20) return UUID_TO_NAME[val] ?? null;
+  return val;
+}
 
 const OUTREACH_STATUS_CONFIG: Record<OutreachStatus, { label: string; color: string; bg: string; border: string }> = {
   not_contacted: { label: 'Not Contacted', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
@@ -321,12 +342,14 @@ function followupColor(dateStr?: string | null): string {
 
 function getRepColor(name?: string | null): string {
   if (!name) return '#6b7280';
-  return REP_COLORS[name] ?? '#6b7280';
+  const resolved = resolveRep(name) ?? name;
+  return REP_COLORS[resolved] ?? '#6b7280';
 }
 
 function getRepInitials(name?: string | null): string {
   if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
+  const resolved = resolveRep(name) ?? name;
+  const parts = resolved.trim().split(/\s+/);
   return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2);
 }
 
@@ -398,16 +421,17 @@ function StageBadge({ stage }: { stage: string }) {
 
 function RepChip({ name, size = 'sm' }: { name?: string | null; size?: 'sm' | 'lg' }) {
   if (!name) return null;
-  const color = getRepColor(name);
+  const displayName = resolveRep(name) ?? name;
+  const color = getRepColor(displayName);
   return (
     <span
       className="inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-full text-white text-xs font-semibold flex-shrink-0"
       style={{ backgroundColor: color }}
     >
       <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-        {getRepInitials(name)}
+        {getRepInitials(displayName)}
       </span>
-      <span className="hidden sm:inline">{name}</span>
+      <span className="hidden sm:inline">{displayName}</span>
     </span>
   );
 }
@@ -542,7 +566,7 @@ function DashboardTab({ stats }: { stats: PipelineStats | null }) {
                 Monthly Recurring Revenue
               </p>
               <p
-                className="text-6xl lg:text-7xl font-bold text-[#1B2A4A] leading-none"
+                className="text-4xl lg:text-5xl font-bold text-[#1B2A4A] leading-none"
                 style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
               >
                 {fmt$(stats.mrr)}
