@@ -364,17 +364,17 @@ function SetUpPage() {
       <PageShell testMode={testMode}>
         <StepIndicator current={1} />
         <Card>
-          <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Tell us about your organization</h2>
-          <p className="text-gray-400 text-sm mb-8">We&apos;ll use this to set up your account.</p>
+          <h2 style={S.h2}>Tell us about your organization</h2>
+          <p style={S.sub}>We&apos;ll use this to set up your account.</p>
 
-          <div className="space-y-5">
+          <div style={S.fieldWrap}>
             <Field label="Organization Name *" error={errors.orgName}>
               <input
                 type="text"
                 value={form.orgName}
                 onChange={(e) => updateForm('orgName', e.target.value)}
                 placeholder="e.g. Sigma Chi, Campus Cycling Club"
-                className={inputCls(!!errors.orgName)}
+                style={S.input(!!errors.orgName)}
               />
             </Field>
 
@@ -384,7 +384,7 @@ function SetUpPage() {
                 value={form.school}
                 onChange={(e) => updateForm('school', e.target.value)}
                 placeholder="e.g. University of Alabama"
-                className={inputCls(!!errors.school)}
+                style={S.input(!!errors.school)}
               />
             </Field>
 
@@ -412,7 +412,7 @@ function SetUpPage() {
                 value={form.designation}
                 onChange={(e) => updateForm('designation', e.target.value)}
                 placeholder="Optional"
-                className={inputCls(false)}
+                style={S.input(false)}
               />
             </Field>
 
@@ -423,13 +423,13 @@ function SetUpPage() {
                 value={form.memberCount}
                 onChange={(e) => updateForm('memberCount', e.target.value)}
                 placeholder="e.g. 250"
-                className={inputCls(!!errors.memberCount)}
+                style={S.input(!!errors.memberCount)}
               />
             </Field>
 
             {/* Live pricing display */}
             {price !== null && Number(form.memberCount) > 0 && (
-              <div className="rounded-xl border-2 border-[#0F172A]/30 bg-amber-50 p-4">
+              <div style={{ background: "#F9FAFB", border: "1px solid #0F172A", borderRadius: "12px", padding: "16px" }}>
                 <div className="flex items-center gap-2 mb-1">
                   <DollarSign size={18} className="text-[#0F172A]" />
                   <span className="font-semibold text-[#0F172A]">Your plan: ${price}/month</span>
@@ -444,7 +444,7 @@ function SetUpPage() {
                 value={form.leaderName}
                 onChange={(e) => updateForm('leaderName', e.target.value)}
                 placeholder="Full name"
-                className={inputCls(!!errors.leaderName)}
+                style={S.input(!!errors.leaderName)}
               />
             </Field>
 
@@ -454,7 +454,7 @@ function SetUpPage() {
                 value={form.leaderEmail}
                 onChange={(e) => updateForm('leaderEmail', e.target.value)}
                 placeholder="you@email.com"
-                className={inputCls(!!errors.leaderEmail)}
+                style={S.input(!!errors.leaderEmail)}
               />
             </Field>
 
@@ -464,7 +464,7 @@ function SetUpPage() {
                 value={form.leaderPhone}
                 onChange={(e) => updateForm('leaderPhone', e.target.value)}
                 placeholder="+1 (555) 000-0000"
-                className={inputCls(!!errors.leaderPhone)}
+                style={S.input(!!errors.leaderPhone)}
               />
             </Field>
 
@@ -482,10 +482,10 @@ function SetUpPage() {
             </Field>
           </div>
 
-          <div className="mt-8 flex justify-between">
+          <div style={S.actions}>
             <button
               onClick={() => goToStep(0)}
-              className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1"
+              style={S.backBtn}
             >
               ← Back
             </button>
@@ -511,8 +511,8 @@ function SetUpPage() {
       <PageShell testMode={testMode}>
         <StepIndicator current={2} />
         <Card>
-          <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Here&apos;s what you&apos;re agreeing to</h2>
-          <p className="text-gray-400 text-sm mb-8">Plain language, no surprises.</p>
+          <h2 style={S.h2}>Here&apos;s what you&apos;re agreeing to</h2>
+          <p style={S.sub}>Plain language, no surprises.</p>
 
           <div className="space-y-4 mb-8">
             {[
@@ -611,10 +611,10 @@ function SetUpPage() {
             </label>
           </div>
 
-          <div className="mt-8 flex justify-between">
+          <div style={S.actions}>
             <button
               onClick={() => goToStep(1)}
-              className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1"
+              style={S.backBtn}
             >
               ← Back
             </button>
@@ -637,8 +637,8 @@ function SetUpPage() {
       <PageShell testMode={testMode}>
         <StepIndicator current={3} />
         <Card>
-          <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Complete your payment</h2>
-          <p className="text-gray-400 text-sm mb-8">You&apos;ll be redirected to Stripe&apos;s secure checkout.</p>
+          <h2 style={S.h2}>Complete your payment</h2>
+          <p style={S.sub}>You&apos;ll be redirected to Stripe&apos;s secure checkout.</p>
 
           {/* Summary */}
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-6 space-y-3">
@@ -671,7 +671,7 @@ function SetUpPage() {
           <div className="flex justify-between">
             <button
               onClick={() => goToStep(2)}
-              className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1"
+              style={S.backBtn}
             >
               ← Back
             </button>
@@ -788,73 +788,68 @@ function PageShell({ children, testMode }: { children: React.ReactNode; testMode
   );
 }
 
+const S = {
+  card: { background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '28px' },
+  h2: { fontSize: '1.375rem', fontWeight: 700, color: '#111827', margin: '0 0 6px 0', fontFamily: 'Inter, system-ui, sans-serif' },
+  sub: { fontSize: '0.875rem', color: '#6B7280', margin: '0 0 28px 0' },
+  fieldWrap: { display: 'flex', flexDirection: 'column' as const, gap: '20px' },
+  label: { display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px', fontFamily: 'Inter, system-ui, sans-serif' },
+  hint: { fontSize: '0.75rem', color: '#9ca3af', marginTop: '4px' },
+  error: { fontSize: '0.75rem', color: '#ef4444', marginTop: '4px' },
+  input: (hasError: boolean) => ({
+    width: '100%', padding: '10px 12px', fontSize: '0.875rem',
+    border: `1px solid ${hasError ? '#ef4444' : '#E5E7EB'}`,
+    borderRadius: '10px', outline: 'none', fontFamily: 'Inter, system-ui, sans-serif',
+    boxSizing: 'border-box' as const, color: '#111827', background: 'white',
+  }),
+  row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' } as const,
+  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '28px' },
+  backBtn: { fontSize: '0.875rem', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', gap: '4px' },
+  primaryBtn: (disabled?: boolean) => ({
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    padding: '10px 24px', borderRadius: '10px',
+    background: disabled ? '#D1D5DB' : '#0F172A',
+    color: 'white', fontWeight: 600, fontSize: '0.875rem',
+    border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: 'Inter, system-ui, sans-serif',
+  }),
+};
+
 function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '24px' }}>
-      {children}
-    </div>
-  );
+  return <div style={S.card}>{children}</div>;
 }
 
-function Field({
-  label,
-  hint,
-  error,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-[#0F172A] mb-1.5">{label}</label>
+      <label style={S.label}>{label}</label>
       {children}
-      {hint && !error && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {hint && !error && <p style={S.hint}>{hint}</p>}
+      {error && <p style={S.error}>{error}</p>}
     </div>
   );
 }
 
 function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className={valueClass || 'font-medium text-[#0F172A]'}>{value}</span>
+    <div style={S.row}>
+      <span style={{ color: '#6B7280' }}>{label}</span>
+      <span style={valueClass === 'font-bold text-emerald-600' ? { fontWeight: 700, color: '#10b981' } : { fontWeight: 600, color: '#111827' }}>{value}</span>
     </div>
   );
 }
 
-function NavButton({
-  onClick,
-  disabled,
-  children,
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
+function NavButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-white font-semibold text-sm transition-all
-        ${disabled
-          ? 'bg-gray-300 cursor-not-allowed'
-          : 'bg-[#0F172A] hover:opacity-90 active:scale-95'}`}
-    >
+    <button type="button" onClick={onClick} disabled={disabled} style={S.primaryBtn(disabled)}>
       {children}
     </button>
   );
 }
 
-function inputCls(hasError: boolean) {
-  return `w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all
-    ${hasError
-      ? 'border-red-400 focus:ring-red-200 focus:border-red-400'
-      : 'border-gray-200 focus:ring-[#0F172A]/20 focus:border-[#0F172A]'}`;
+function inputCls(_hasError: boolean) {
+  // Legacy — kept for any remaining uses; new code uses S.input()
+  return '';
 }
 
 // Wrap in Suspense so useSearchParams() works with Next.js static export
