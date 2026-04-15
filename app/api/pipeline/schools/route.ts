@@ -28,16 +28,27 @@ export async function GET(req: NextRequest) {
   const activeOrgIds = [...dealsByOrg.keys()];
   if (activeOrgIds.length === 0) return NextResponse.json([]);
 
-  // Step 2: Get orgs that have active deals, with their school
+  // Step 2: Get orgs that have active deals, with their school (including state)
   const { data: orgs, error: orgsError } = await admin
     .from('organizations')
-    .select('id, name, type, status, school_id, schools(id, name, conference)')
+    .select('id, name, type, status, school_id, schools(id, name, conference, state)')
     .in('id', activeOrgIds);
 
   if (orgsError) return NextResponse.json({ error: orgsError.message }, { status: 500 });
 
-  // Step 3: Group orgs by school
-  const schoolMap = new Map<string, { id: string; name: string; conference: string | null; organizations: any[] }>();
+  // Step 3: Also get active chapters (closed_won deals)
+  const { data: activeDeals } = await admin
+    .from('pipeline_deals')
+    .select('id, org_id, stage, value')
+    .eq('stage', 'closed_won');
+  const activeOrgIdSet = new Set((activeDeals || []).map((d: any) => d.org_id));
+
+  // Step 4: Group orgs by school, build rich response
+  const schoolMap = new Map<string, {
+    id: string; name: string; conference: string | null; state: string | null;
+    fraternities: any[]; sororities: any[];
+    activeChapters: any[]; pipelineValue: number; dealCount: number;
+  }>();
 
   for (const org of orgs || []) {
     const school = (org as any).schools;
@@ -47,22 +58,55 @@ export async function GET(req: NextRequest) {
       schoolMap.set(school.id, {
         id: school.id,
         name: school.name,
-        conference: school.conference,
-        organizations: [],
+        conference: school.conference ?? null,
+        state: school.state ?? null,
+        fraternities: [],
+        sororities: [],
+        activeChapters: [],
+        pipelineValue: 0,
+        dealCount: 0,
       });
     }
 
-    schoolMap.get(school.id)!.organizations.push({
+    const entry = schoolMap.get(school.id)!;
+    const orgDeals = dealsByOrg.get(org.id) || [];
+    const orgEntry = {
       id: org.id,
       name: org.name,
-      type: org.type,
-      status: org.status,
-      pipeline_deals: dealsByOrg.get(org.id) || [],
-    });
+      deals: orgDeals.map(d => ({ id: d.id, stage: d.stage, value: d.value, assigned_to: (d as any).assigned_to ?? null })),
+    };
+
+    // Split into fraternities/sororities by type field
+    const orgType = (org.type ?? '').toLowerCase();
+    if (orgType === 'sorority' || orgType === 'panhellenic') {
+      entry.sororities.push(orgEntry);
+    } else {
+      entry.fraternities.push(orgEntry);
+    }
+
+    // Active chapters = orgs with a closed_won deal
+    if (activeOrgIdSet.has(org.id)) {
+      entry.activeChapters.push({ id: org.id, chapter_name: org.name, mrr: 0 });
+    }
+
+    // Pipeline value + deal count
+    for (const d of orgDeals) {
+      entry.pipelineValue += d.value ?? 0;
+      entry.dealCount++;
+    }
   }
 
-  let result = [...schoolMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  // Compute status per school
+  const enriched = [...schoolMap.values()].map(s => ({
+    ...s,
+    status: s.activeChapters.length > 0
+      ? 'active_client'
+      : s.dealCount > 0
+        ? 'in_pipeline'
+        : 'not_contacted',
+  })).sort((a, b) => a.name.localeCompare(b.name));
 
+  let result = enriched;
   if (conference) result = result.filter(s => s.conference === conference);
   if (search) result = result.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
 
