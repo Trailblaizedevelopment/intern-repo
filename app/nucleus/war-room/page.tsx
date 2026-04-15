@@ -1136,7 +1136,7 @@ function ExpandedCampaign({
 }
 
 function CampaignCard({
-  campaign, expanded, onToggle, onUpdate, onDelete, onAddRow, onUpdateCampaign, onDeleteCampaign, onUpdateCampaignMeta,
+  campaign, expanded, onToggle, onUpdate, onDelete, onAddRow, onUpdateCampaign, onDeleteCampaign, onUpdateCampaignMeta, pipelineDeals,
 }: {
   campaign: Campaign;
   expanded: boolean;
@@ -1147,10 +1147,38 @@ function CampaignCard({
   onUpdateCampaign: (id: string, updates: Partial<Campaign>) => void;
   onDeleteCampaign: (id: string) => void;
   onUpdateCampaignMeta: (id: string, rows: CampaignRow[], schoolId?: string) => void;
+  pipelineDeals: Deal[];
 }) {
   const contacted = campaign.rows.filter(r => r.status !== 'not_contacted').length;
   const total = campaign.rows.length;
   const pct = total > 0 ? Math.round((contacted / total) * 100) : 0;
+
+  // Build a map of dealId → pipeline stage for quick lookup
+  const dealStageMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const d of pipelineDeals) map[d.id] = d.stage;
+    return map;
+  }, [pipelineDeals]);
+
+  // Determine the best pipeline stage across all rows in this campaign
+  const stages = campaign.rows.map(r => r.dealId ? dealStageMap[r.dealId] : null).filter(Boolean) as string[];
+  const hasClosedWon = stages.some(s => s === 'closed_won');
+  const hasDemoBooked = stages.some(s => s === 'demo_booked' || s === 'first_demo');
+  const hasSecondCall = stages.some(s => s === 'second_call');
+  const hasContractSent = stages.some(s => s === 'contract_sent');
+
+  // Pipeline status badge — derived from actual deal data, not just campaign.status
+  const pipelineBadge = hasClosedWon
+    ? { label: 'Active Client', color: '#065f46', bg: '#d1fae5' }
+    : hasContractSent
+    ? { label: 'Contract Sent', color: '#b45309', bg: '#fef3c7' }
+    : hasSecondCall
+    ? { label: 'Decision Call', color: '#5b21b6', bg: '#ede9fe' }
+    : hasDemoBooked
+    ? { label: 'Demo Booked', color: '#1d4ed8', bg: '#dbeafe' }
+    : stages.length > 0
+    ? { label: 'In Pipeline', color: '#374151', bg: '#f3f4f6' }
+    : null;
 
   const statusBadge = {
     active:    { label: 'Active',    color: '#065f46', bg: '#d1fae5' },
@@ -1196,7 +1224,12 @@ function CampaignCard({
         )}
 
         {/* Status + actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {pipelineBadge && (
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '9999px', color: pipelineBadge.color, background: pipelineBadge.bg, border: `1px solid ${pipelineBadge.color}30` }}>
+              {pipelineBadge.label}
+            </span>
+          )}
           <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: '9999px', color: statusBadge.color, background: statusBadge.bg }}>
             {statusBadge.label}
           </span>
@@ -1431,6 +1464,7 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
               onUpdateCampaign={handleUpdateCampaign}
               onDeleteCampaign={handleDeleteCampaign}
               onUpdateCampaignMeta={handleUpdateCampaignMeta}
+              pipelineDeals={stats?.recentDeals ?? []}
             />
           ))}
         </div>
@@ -1599,7 +1633,7 @@ function NextStepsTab() {
         )}
 
         {addingForNote && (
-          <div style={{ borderTop: '1px solid #E5E7EB', padding: '16px 20px', background: '#FFFBF5', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ borderTop: '2px solid #0F172A', padding: '16px 20px', background: '#F9FAFB', display: 'flex', flexDirection: 'column', gap: '12px', position: 'sticky', top: 0, zIndex: 10 }}>
             <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', margin: 0 }}>
               Adding next steps for: <span style={{ color: '#111827' }}>{addingForNote.title || 'Untitled'}</span>
             </p>
