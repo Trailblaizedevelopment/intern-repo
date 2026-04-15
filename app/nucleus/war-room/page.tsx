@@ -11,8 +11,9 @@ import {
   AlertCircle, Clock, Users, Building2, DollarSign,
   TrendingUp, ChevronRight, Mail, MessageSquare,
   Instagram, Upload, CheckCircle2, Link2,
-  Target, ExternalLink, Zap,
+  Target, ExternalLink, Zap, BarChart3,
 } from 'lucide-react';
+import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -364,6 +365,18 @@ function KpiChip({
 }
 
 function StageBadge({ stage }: { stage: string }) {
+  const sc = STAGE_CONFIG[stage as DealStage];
+  if (sc) {
+    return (
+      <span
+        className="text-xs font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap"
+        style={{ color: sc.color, backgroundColor: sc.color + '22', borderColor: sc.color + '40' }}
+      >
+        {sc.emoji} {sc.label}
+      </span>
+    );
+  }
+  // fallback for non-standard stages
   const conf = STAGE_CONF[stage];
   if (conf) {
     return (
@@ -450,48 +463,54 @@ function PipelineDealRow({ deal }: { deal: Deal }) {
   const fuCls = followupColor(deal.next_followup);
 
   return (
-    <Link
-      href="/nucleus/pipeline"
-      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/80 hover:shadow-sm transition-all rounded-xl group"
+    <tr
+      className="hover:bg-gray-50/80 transition-colors border-b border-gray-50 cursor-pointer"
+      onClick={() => { window.location.href = '/nucleus/pipeline'; }}
     >
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-[#1B2A4A] truncate group-hover:text-[#C4874A] transition-colors">{chapterName}</p>
+      <td className="px-4 py-3">
+        <p className="text-sm font-semibold text-[#1B2A4A] truncate hover:text-[#C4874A] transition-colors">{chapterName}</p>
+      </td>
+      <td className="px-4 py-3 hidden sm:table-cell">
         <p className="text-xs text-gray-400 truncate">{schoolName}</p>
-      </div>
-      <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+      </td>
+      <td className="px-4 py-3">
         <StageBadge stage={deal.stage} />
+      </td>
+      <td className="px-4 py-3 text-center">
         {deal.temperature && <span className="text-sm">{TEMP_EMOJI[deal.temperature] || ''}</span>}
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+      </td>
+      <td className={`px-4 py-3 text-right hidden sm:table-cell text-xs ${fuCls}`}>
+        {fmtDate(deal.next_followup)}
+      </td>
+      <td className="px-4 py-3 hidden sm:table-cell">
         <RepChip name={deal.assigned_to} />
-        <span className={`text-xs w-14 text-right ${fuCls}`}>{fmtDate(deal.next_followup)}</span>
-        <span className="text-xs font-semibold text-gray-600 w-14 text-right">
-          {deal.value ? fmt$(deal.value) : '—'}
-        </span>
-      </div>
-    </Link>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <span className="text-xs font-semibold text-gray-600">{deal.value ? fmt$(deal.value) : '—'}</span>
+      </td>
+    </tr>
   );
 }
 
 function CollapsiblePipelineGroup({ group }: { group: PipelineGroup }) {
   const [open, setOpen] = useState(true);
   return (
-    <div>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-y border-gray-100 hover:bg-gray-100 transition-colors"
-      >
-        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }} />
-        <span className="text-xs font-bold uppercase tracking-wider text-gray-600 flex-1 text-left">{group.label}</span>
-        <span className="text-xs text-gray-400 font-medium">{group.deals.length} deal{group.deals.length !== 1 ? 's' : ''}</span>
-        {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
-      </button>
-      {open && (
-        <div className="divide-y divide-gray-50 px-1">
-          {group.deals.map(deal => <PipelineDealRow key={deal.id} deal={deal} />)}
-        </div>
-      )}
-    </div>
+    <>
+      <tr className="bg-gray-50 border-y border-gray-100">
+        <td colSpan={7} className="px-4 py-2">
+          <button
+            onClick={() => setOpen(o => !o)}
+            className="flex items-center gap-2 w-full text-left hover:opacity-80 transition-opacity"
+          >
+            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }} />
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 flex-1">{group.label}</span>
+            <span className="text-xs text-gray-400 font-medium">{group.deals.length} deal{group.deals.length !== 1 ? 's' : ''}</span>
+            {open ? <ChevronUp size={13} className="text-gray-400" /> : <ChevronDown size={13} className="text-gray-400" />}
+          </button>
+        </td>
+      </tr>
+      {open && group.deals.map(deal => <PipelineDealRow key={deal.id} deal={deal} />)}
+    </>
   );
 }
 
@@ -577,38 +596,26 @@ function DashboardTab({ stats }: { stats: PipelineStats | null }) {
       {/* Conference Tracker */}
       {stats.byConference.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
-          <h2
-            className="text-lg font-semibold text-[#1B2A4A] mb-4"
-            style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
-          >
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4">
             Conference Tracker
-          </h2>
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {stats.byConference.map(c => {
-              const borderColor = CONF_BORDER_COLORS[c.conference] || '#9ca3af';
-              const bgColor = CONF_BG_COLORS[c.conference] || '#f9fafb';
-              const textColor = CONF_TEXT_COLORS[c.conference] || '#374151';
-              return (
-                <div
-                  key={c.conference}
-                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col gap-1.5"
-                  style={{ borderLeftWidth: 4, borderLeftColor: borderColor, backgroundColor: bgColor }}
-                >
-                  <span className="text-[11px] font-bold uppercase tracking-wider leading-tight" style={{ color: textColor }}>
-                    {c.conference}
-                  </span>
-                  <span
-                    className="text-3xl font-bold leading-none text-[#1B2A4A] mt-0.5"
-                    style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
-                  >
-                    {c.dealCount}
-                  </span>
-                  <span className="text-xs font-semibold" style={{ color: textColor, opacity: 0.75 }}>
-                    {fmt$(c.pipelineValue)}
-                  </span>
-                </div>
-              );
-            })}
+            {stats.byConference.map(c => (
+              <div
+                key={c.conference}
+                className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col gap-1.5"
+              >
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  {c.conference}
+                </span>
+                <span className="text-2xl font-bold leading-none text-[#1B2A4A] mt-0.5">
+                  {c.dealCount}
+                </span>
+                <span className="text-sm text-gray-500">
+                  {fmt$(c.pipelineValue)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -621,12 +628,9 @@ function DashboardTab({ stats }: { stats: PipelineStats | null }) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
             </span>
-            <h2
-              className="text-lg font-semibold text-[#1B2A4A]"
-              style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
-            >
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
               Pipeline
-            </h2>
+            </p>
             <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
               {stats.recentDeals.length}
             </span>
@@ -641,15 +645,27 @@ function DashboardTab({ stats }: { stats: PipelineStats | null }) {
 
         {stats.recentDeals.length === 0 ? (
           <div className="text-center py-12 text-gray-400 text-sm">No active deals</div>
-        ) : pipelineGroups.length === 0 ? (
-          <div className="p-4 divide-y divide-gray-50">
-            {stats.recentDeals.map(deal => <PipelineDealRow key={deal.id} deal={deal} />)}
-          </div>
         ) : (
           <div className="overflow-y-auto max-h-[560px]">
-            {pipelineGroups.map(group => (
-              <CollapsiblePipelineGroup key={group.label} group={group} />
-            ))}
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Org</th>
+                  <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">School</th>
+                  <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Stage</th>
+                  <th className="text-center px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Temp</th>
+                  <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Followup</th>
+                  <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Assigned</th>
+                  <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pipelineGroups.length > 0
+                  ? pipelineGroups.map(group => <CollapsiblePipelineGroup key={group.label} group={group} />)
+                  : stats.recentDeals.map(deal => <PipelineDealRow key={deal.id} deal={deal} />)
+                }
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -980,7 +996,7 @@ function CampaignCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="font-semibold text-sm text-[#1B2A4A] truncate">{campaign.name}</p>
-            {campaign.school && (
+            {campaign.school && campaign.school !== campaign.name && (
               <span className="text-xs text-gray-400 hidden sm:block flex-shrink-0">{campaign.school}</span>
             )}
           </div>
@@ -1162,19 +1178,21 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
 
   return (
     <div className="space-y-4">
-      {/* Auto-association banner */}
+      {/* Auto-association callout */}
       {unlinkedDealsCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-amber-800">
-            <AlertCircle size={16} className="flex-shrink-0" />
-            <span><strong>{unlinkedDealsCount}</strong> deal{unlinkedDealsCount !== 1 ? 's' : ''} not associated with a campaign.</span>
+        <div className="bg-white border border-amber-100 rounded-xl p-4" style={{ borderLeftWidth: 4, borderLeftColor: '#f59e0b' }}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-amber-800">
+              <AlertCircle size={16} className="flex-shrink-0 text-amber-500" />
+              <span><strong>{unlinkedDealsCount}</strong> deal{unlinkedDealsCount !== 1 ? 's' : ''} not associated with a campaign.</span>
+            </div>
+            <button
+              onClick={() => setShowCreateDrawer(true)}
+              className="text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+            >
+              Create Campaign →
+            </button>
           </div>
-          <button
-            onClick={() => setShowCreateDrawer(true)}
-            className="text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-          >
-            Create Campaign →
-          </button>
         </div>
       )}
 
@@ -1343,9 +1361,7 @@ function NextStepsTab() {
       {/* Section A: Granola Meetings */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-[#1B2A4A]" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>
-            Recent Meetings
-          </h2>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Recent Meetings</p>
           <div className="relative flex-1 max-w-xs">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input type="text" placeholder="Search meetings…" value={granolaSearch}
@@ -1451,9 +1467,7 @@ function NextStepsTab() {
       {/* Section B: Next Steps Board */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="text-lg font-semibold text-[#1B2A4A]" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>
-            Next Steps Board
-          </h2>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Next Steps</p>
           <div className="flex gap-1.5 flex-wrap">
             {['all', 'pending', 'done', 'Owen', 'Ford', 'Adam'].map(f => (
               <button key={f} onClick={() => setStepsFilter(f)}
@@ -1473,46 +1487,56 @@ function NextStepsTab() {
             No next steps yet. Add them from meetings above.
           </div>
         ) : (
-          <div className="divide-y divide-gray-50 p-4 space-y-2">
-            {filteredSteps.map(step => (
-              <div key={step.id}
-                className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
-                  step.done ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-white border-gray-200'
-                }`}>
-                <button onClick={() => toggleDone(step.id)}
-                  className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                    step.done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 hover:border-emerald-400'
-                  }`}>
-                  {step.done && <Check size={11} className="text-white" />}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold text-[#1B2A4A] ${step.done ? 'line-through' : ''}`}>
-                    {step.text}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="text-[10px] text-gray-400 font-semibold">{step.noteTitle}</span>
-                    <span className="text-[10px] text-gray-300">·</span>
-                    <span className="text-[10px] text-gray-400">{fmtDateLong(step.noteDate)}</span>
-                    {step.dueDate && (
-                      <>
-                        <span className="text-[10px] text-gray-300">·</span>
-                        <span className="text-[10px] text-gray-500">Due: {fmtDate(step.dueDate)}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
-                    style={{ backgroundColor: assigneeColors[step.assignedTo] }}>
-                    {step.assignedTo}
-                  </span>
-                  <button onClick={() => deleteStep(step.id)}
-                    className="text-gray-200 hover:text-red-400 transition-colors">
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Meeting</th>
+                  <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Next Step</th>
+                  <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Assigned To</th>
+                  <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Due Date</th>
+                  <th className="text-center px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Done ✓</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredSteps.map(step => (
+                  <tr key={step.id} className={`hover:bg-gray-50 transition-colors ${step.done ? 'opacity-60' : ''}`}>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <p className="text-xs text-gray-400 truncate max-w-[140px]">{step.noteTitle}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className={`text-sm font-semibold text-[#1B2A4A] ${step.done ? 'line-through' : ''}`}>{step.text}</p>
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                        style={{ backgroundColor: assigneeColors[step.assignedTo] }}
+                      >
+                        {step.assignedTo}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right hidden sm:table-cell">
+                      <span className="text-xs text-gray-500">{step.dueDate ? fmtDate(step.dueDate) : '—'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => toggleDone(step.id)}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            step.done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 hover:border-emerald-400'
+                          }`}
+                        >
+                          {step.done && <Check size={11} className="text-white" />}
+                        </button>
+                        <button onClick={() => deleteStep(step.id)} className="text-gray-200 hover:text-red-400 transition-colors">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -1594,7 +1618,7 @@ function USPipelineMap({ schools, selectedState, onStateClick }: {
             <MapPin size={15} className="text-emerald-600" />
           </div>
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-sm" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>US Pipeline Map</h2>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">US Pipeline Map</p>
             <p className="text-xs text-gray-400">{selectedState ? `${selectedState} selected · click to clear` : 'Click a state to filter'}</p>
           </div>
         </div>
@@ -2183,7 +2207,7 @@ function ClientMapTab({ statsDeals }: { statsDeals: Deal[] }) {
               <Building2 size={15} className="text-blue-600" />
             </div>
             <div>
-              <h2 className="font-bold text-[#1B2A4A] text-sm" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>School Outreach</h2>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">School Outreach</p>
               <p className="text-xs text-gray-400">Search a school to contact every chapter</p>
             </div>
           </div>
@@ -2308,11 +2332,11 @@ function ClientMapTab({ statsDeals }: { statsDeals: Deal[] }) {
 
 type Tab = 'dashboard' | 'campaigns' | 'notes' | 'map';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'campaigns', label: 'Campaigns' },
-  { id: 'notes',     label: 'Next Steps' },
-  { id: 'map',       label: 'Client Map' },
+const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: 'dashboard', label: 'Dashboard',  icon: TrendingUp },
+  { id: 'campaigns', label: 'Campaigns',  icon: Zap },
+  { id: 'notes',     label: 'Next Steps', icon: Clock },
+  { id: 'map',       label: 'Client Map', icon: MapPin },
 ];
 
 export default function WarRoomPage() {
@@ -2351,10 +2375,7 @@ export default function WarRoomPage() {
           <div className="flex items-center justify-between h-14">
             {/* Title */}
             <div className="flex items-center gap-2.5">
-              <h1
-                className="text-xl font-bold text-[#1B2A4A]"
-                style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
-              >
+              <h1 className="text-xl font-semibold text-[#1B2A4A]">
                 War Room
               </h1>
               <span className="text-sm text-gray-400 hidden sm:block">Live sales intelligence</span>
@@ -2380,19 +2401,23 @@ export default function WarRoomPage() {
 
           {/* Tabs */}
           <div className="flex gap-1 overflow-x-auto scrollbar-none -mb-px mt-1">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex-shrink-0 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
-                  tab === t.id
-                    ? 'border-[#1B2A4A] text-[#1B2A4A]'
-                    : 'border-transparent text-gray-400 hover:text-[#1B2A4A] hover:border-gray-200'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+            {TABS.map(t => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+                    tab === t.id
+                      ? 'border-[#1B2A4A] text-[#1B2A4A]'
+                      : 'border-transparent text-gray-400 hover:text-[#1B2A4A] hover:border-gray-200'
+                  }`}
+                >
+                  <Icon size={15} />
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
