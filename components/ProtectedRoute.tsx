@@ -71,10 +71,11 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
   }
 
   // Non-admin on nucleus routes - show brief redirect message
-  // Exception: growth_intern can access /nucleus/pipeline
+  // Exception: growth_intern can access pipeline + war room
   const isNucleusRoute = pathname.startsWith('/nucleus');
   const isGrowthIntern = profile.role === 'growth_intern';
-  const isInternAllowedNucleusRoute = isGrowthIntern && pathname.startsWith('/nucleus/pipeline');
+  const internNucleusAllowed = ['/nucleus/pipeline', '/nucleus/war-room'];
+  const isInternAllowedNucleusRoute = isGrowthIntern && internNucleusAllowed.some(r => pathname.startsWith(r));
   if (isNucleusRoute && !isAdmin && !isInternAllowedNucleusRoute) {
     return (
       <div className="nucleus-loading-screen">
