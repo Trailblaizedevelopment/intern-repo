@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const DOCUSIGN_INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY!;
-const DOCUSIGN_REDIRECT_URI = process.env.DOCUSIGN_REDIRECT_URI!;
+const DOCUSIGN_REDIRECT_URI = process.env.DOCUSIGN_REDIRECT_URI?.trim() || 'https://trailblaize.space/api/auth/docusign/callback';
 const DOCUSIGN_AUTH_URL = 'https://account.docusign.com';
 
 /**
