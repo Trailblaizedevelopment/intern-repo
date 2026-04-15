@@ -85,8 +85,8 @@ export async function POST(req: NextRequest) {
         chapter_designation: designation,
         contract_status: 'signed',
         contract_signed_at: agreedAt,
-        contract_signed: true,
-        contract_signed_notes: `Signed digitally by ${agreedName} at ${agreedAt}`,
+        // Store signature info in notes field since contract_signed column doesn't exist in DB
+        notes: `Signed digitally by ${agreedName} at ${agreedAt}. Org type: ${orgType}.`,
         chapter_created: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -103,27 +103,30 @@ export async function POST(req: NextRequest) {
 
     // 3. Update pipeline deal to closed_won if a match exists
     try {
+      // Search pipeline_deals joined with organizations for a name match
       const { data: deals } = await supabase
-        .from('deals')
-        .select('id, name, organization')
-        .or(`name.ilike.%${orgName}%,organization.ilike.%${school}%`)
+        .from('pipeline_deals')
+        .select('id, organization:organizations(name, school:schools(name))')
         .neq('stage', 'closed_won')
-        .limit(5);
+        .neq('stage', 'closed_lost')
+        .limit(50);
 
       if (deals && deals.length > 0) {
-        // Find the best match (org name match preferred)
-        const best = deals.find(
-          (d) =>
-            d.name?.toLowerCase().includes(orgName.toLowerCase()) ||
-            d.organization?.toLowerCase().includes(orgName.toLowerCase()),
-        ) ?? deals[0];
+        const orgNameLower = orgName.toLowerCase();
+        const schoolLower = school.toLowerCase();
+        const best = deals.find((d: any) => {
+          const oName = d.organization?.name?.toLowerCase() ?? '';
+          const sName = d.organization?.school?.name?.toLowerCase() ?? '';
+          return oName.includes(orgNameLower) || sName.includes(schoolLower);
+        });
 
-        await supabase
-          .from('deals')
-          .update({ stage: 'closed_won', updated_at: new Date().toISOString() })
-          .eq('id', best.id);
-
-        console.log(`[set-up/complete] Deal ${best.id} updated to closed_won`);
+        if (best) {
+          await supabase
+            .from('pipeline_deals')
+            .update({ stage: 'closed_won', updated_at: new Date().toISOString() })
+            .eq('id', best.id);
+          console.log(`[set-up/complete] Deal ${best.id} updated to closed_won`);
+        }
       }
     } catch (dealErr) {
       // Non-fatal — log but continue

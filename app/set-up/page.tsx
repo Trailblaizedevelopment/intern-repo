@@ -77,16 +77,16 @@ function StepIndicator({ current }: { current: number }) {
             <div className="flex flex-col items-center gap-1">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all
-                  ${done ? 'bg-[#1B2A4A] text-white' : active ? 'bg-[#1B2A4A] text-white ring-4 ring-[#1B2A4A]/20' : 'bg-gray-200 text-gray-500'}`}
+                  ${done ? 'bg-[#0F172A] text-white' : active ? 'bg-[#0F172A] text-white ring-4 ring-[#0F172A]/20' : 'bg-gray-200 text-gray-500'}`}
               >
                 {done ? <Check size={14} /> : i + 1}
               </div>
-              <span className={`text-xs font-medium hidden sm:block ${active ? 'text-[#1B2A4A]' : done ? 'text-[#1B2A4A]' : 'text-gray-400'}`}>
+              <span className={`text-xs font-medium hidden sm:block ${active ? 'text-[#0F172A]' : done ? 'text-[#0F172A]' : 'text-gray-400'}`}>
                 {label}
               </span>
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`flex-1 h-0.5 min-w-4 max-w-16 mx-1 mt-[-12px] rounded-full transition-all ${i < current ? 'bg-[#1B2A4A]' : 'bg-gray-200'}`} />
+              <div className={`flex-1 h-0.5 min-w-4 max-w-16 mx-1 mt-[-12px] rounded-full transition-all ${i < current ? 'bg-[#0F172A]' : 'bg-gray-200'}`} />
             )}
           </React.Fragment>
         );
@@ -279,13 +279,13 @@ function SetUpPage() {
 
   if (step === 0) {
     return (
-      <div style={{ background: '#FAFAF8', minHeight: '100vh' }}>
+      <div style={{ background: '#F9FAFB', minHeight: '100vh' }}>
         {/* Nav */}
         <nav className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto">
           <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" className="h-7" />
           <button
             onClick={() => goToStep(1)}
-            className="text-sm font-medium text-[#1B2A4A] hover:underline"
+            className="text-sm font-medium text-[#0F172A] hover:underline"
           >
             Sign up →
           </button>
@@ -295,7 +295,7 @@ function SetUpPage() {
         <section className="max-w-4xl mx-auto px-6 pt-16 pb-12 text-center">
           <h1
             className="text-5xl sm:text-6xl font-bold leading-tight mb-5"
-            style={{ fontFamily: 'Instrument Serif, Georgia, serif', color: '#1B2A4A' }}
+            style={{ fontFamily: 'Instrument Serif, Georgia, serif', color: '#0F172A' }}
           >
             Activate your alumni network.
           </h1>
@@ -305,13 +305,13 @@ function SetUpPage() {
           <button
             onClick={() => goToStep(1)}
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-white font-semibold text-lg transition-all hover:opacity-90 active:scale-95"
-            style={{ background: '#1B2A4A' }}
+            style={{ background: '#0F172A' }}
           >
             Get Started <ArrowRight size={20} />
           </button>
           {activeChapterCount !== null && activeChapterCount > 0 && (
             <p className="mt-5 text-sm text-gray-400">
-              Join <span className="font-semibold text-[#1B2A4A]">{activeChapterCount} chapters</span> already on Trailblaize
+              Join <span className="font-semibold text-[#0F172A]">{activeChapterCount} chapters</span> already on Trailblaize
             </p>
           )}
         </section>
@@ -321,13 +321,13 @@ function SetUpPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
-                icon: <Users size={28} className="text-[#C4874A]" />,
+                icon: <Users size={28} className="text-[#0F172A]" />,
                 title: 'Alumni Pipeline',
                 desc: 'See every alumni, their industry, location, and how to reach them.',
                 bg: 'from-amber-50 to-orange-50',
               },
               {
-                icon: <MessageSquare size={28} className="text-[#1B2A4A]" />,
+                icon: <MessageSquare size={28} className="text-[#0F172A]" />,
                 title: 'Message Board',
                 desc: 'Post announcements, opportunities, and updates your alumni actually see.',
                 bg: 'from-blue-50 to-indigo-50',
@@ -344,7 +344,7 @@ function SetUpPage() {
                 className={`bg-gradient-to-br ${card.bg} border border-gray-200 rounded-2xl shadow-sm p-6`}
               >
                 <div className="mb-3">{card.icon}</div>
-                <h3 className="font-bold text-[#1B2A4A] text-lg mb-2">{card.title}</h3>
+                <h3 className="font-bold text-[#0F172A] text-lg mb-2">{card.title}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{card.desc}</p>
               </div>
             ))}
@@ -352,7 +352,7 @@ function SetUpPage() {
 
           {/* Pricing teaser */}
           <div className="mt-10 text-center">
-            <p className="text-sm text-gray-400">Plans start at <span className="font-semibold text-[#1B2A4A]">$99/month</span> based on your chapter size.</p>
+            <p className="text-sm text-gray-400">Plans start at <span className="font-semibold text-[#0F172A]">$99/month</span> based on your chapter size.</p>
           </div>
         </section>
       </div>
@@ -366,7 +366,7 @@ function SetUpPage() {
       <PageShell>
         <StepIndicator current={1} />
         <Card>
-          <h2 className="text-2xl font-bold text-[#1B2A4A] mb-1">Tell us about your organization</h2>
+          <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Tell us about your organization</h2>
           <p className="text-gray-400 text-sm mb-8">We&apos;ll use this to set up your account.</p>
 
           <div className="space-y-5">
@@ -399,8 +399,8 @@ function SetUpPage() {
                     onClick={() => updateForm('orgType', type)}
                     className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all
                       ${form.orgType === type
-                        ? 'bg-[#1B2A4A] text-white border-[#1B2A4A]'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-[#1B2A4A]/40'}`}
+                        ? 'bg-[#0F172A] text-white border-[#0F172A]'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-[#0F172A]/40'}`}
                   >
                     {type}
                   </button>
@@ -431,10 +431,10 @@ function SetUpPage() {
 
             {/* Live pricing display */}
             {price !== null && Number(form.memberCount) > 0 && (
-              <div className="rounded-xl border-2 border-[#C4874A]/30 bg-amber-50 p-4">
+              <div className="rounded-xl border-2 border-[#0F172A]/30 bg-amber-50 p-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <DollarSign size={18} className="text-[#C4874A]" />
-                  <span className="font-semibold text-[#1B2A4A]">Your plan: ${price}/month</span>
+                  <DollarSign size={18} className="text-[#0F172A]" />
+                  <span className="font-semibold text-[#0F172A]">Your plan: ${price}/month</span>
                 </div>
                 <p className="text-sm text-gray-500">Based on {form.memberCount} members · Annual commitment, then month-to-month</p>
               </div>
@@ -478,7 +478,7 @@ function SetUpPage() {
                   value={form.instagramHandle}
                   onChange={(e) => updateForm('instagramHandle', e.target.value.replace('@', ''))}
                   placeholder="yourchapter"
-                  className="flex-1 px-3 py-2.5 border border-gray-200 rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]"
+                  className="flex-1 px-3 py-2.5 border border-gray-200 rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/20 focus:border-[#0F172A]"
                 />
               </div>
             </Field>
@@ -513,18 +513,18 @@ function SetUpPage() {
       <PageShell>
         <StepIndicator current={2} />
         <Card>
-          <h2 className="text-2xl font-bold text-[#1B2A4A] mb-1">Here&apos;s what you&apos;re agreeing to</h2>
+          <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Here&apos;s what you&apos;re agreeing to</h2>
           <p className="text-gray-400 text-sm mb-8">Plain language, no surprises.</p>
 
           <div className="space-y-4 mb-8">
             {[
               {
-                icon: <Zap size={20} className="text-[#C4874A]" />,
+                icon: <Zap size={20} className="text-[#0F172A]" />,
                 title: "What you're getting",
                 desc: "Access to the full Trailblaize platform for your organization — alumni directory, message board, engagement tools, and ongoing support.",
               },
               {
-                icon: <Calendar size={20} className="text-[#1B2A4A]" />,
+                icon: <Calendar size={20} className="text-[#0F172A]" />,
                 title: 'Your commitment',
                 desc: "This is a 12-month commitment starting today. After your first year, you can cancel anytime with 30 days notice. No hidden fees, no penalties.",
               },
@@ -549,7 +549,7 @@ function SetUpPage() {
               <div key={card.title} className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex gap-4">
                 <div className="mt-0.5 shrink-0">{card.icon}</div>
                 <div>
-                  <h3 className="font-semibold text-[#1B2A4A] mb-1">{card.title}</h3>
+                  <h3 className="font-semibold text-[#0F172A] mb-1">{card.title}</h3>
                   <p className="text-sm text-gray-500 leading-relaxed">{card.desc}</p>
                 </div>
               </div>
@@ -560,7 +560,7 @@ function SetUpPage() {
           <button
             type="button"
             onClick={() => setShowFullAgreement((v) => !v)}
-            className="flex items-center gap-2 text-sm text-[#1B2A4A] font-medium mb-3 hover:underline"
+            className="flex items-center gap-2 text-sm text-[#0F172A] font-medium mb-3 hover:underline"
           >
             {showFullAgreement ? 'Hide full agreement ↑' : 'Read full agreement ↓'}
             <ChevronDown size={14} className={`transition-transform ${showFullAgreement ? 'rotate-180' : ''}`} />
@@ -577,7 +577,7 @@ function SetUpPage() {
           {/* Signature section */}
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 space-y-4">
             <p className="text-sm text-gray-600 font-medium">
-              I agree to these terms on behalf of <span className="text-[#1B2A4A] font-semibold">{form.orgName || 'my organization'}</span>
+              I agree to these terms on behalf of <span className="text-[#0F172A] font-semibold">{form.orgName || 'my organization'}</span>
             </p>
 
             <div>
@@ -589,7 +589,7 @@ function SetUpPage() {
                 value={agreedName}
                 onChange={(e) => setAgreedName(e.target.value)}
                 placeholder="Your full name"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/20 focus:border-[#0F172A]"
                 style={{ fontFamily: 'cursive' }}
               />
             </div>
@@ -603,7 +603,7 @@ function SetUpPage() {
               <div
                 onClick={() => setAgreedAuthorized((v) => !v)}
                 className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all cursor-pointer
-                  ${agreedAuthorized ? 'bg-[#1B2A4A] border-[#1B2A4A]' : 'border-gray-300 bg-white'}`}
+                  ${agreedAuthorized ? 'bg-[#0F172A] border-[#0F172A]' : 'border-gray-300 bg-white'}`}
               >
                 {agreedAuthorized && <Check size={12} className="text-white" />}
               </div>
@@ -639,12 +639,12 @@ function SetUpPage() {
       <PageShell>
         <StepIndicator current={3} />
         <Card>
-          <h2 className="text-2xl font-bold text-[#1B2A4A] mb-1">Complete your payment</h2>
+          <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Complete your payment</h2>
           <p className="text-gray-400 text-sm mb-8">You&apos;ll be redirected to Stripe&apos;s secure checkout.</p>
 
           {/* Summary */}
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-6 space-y-3">
-            <h3 className="font-semibold text-[#1B2A4A] mb-3">Order Summary</h3>
+            <h3 className="font-semibold text-[#0F172A] mb-3">Order Summary</h3>
             <Row label="Organization" value={form.orgName} />
             <Row label="School" value={form.school} />
             <Row label="Type" value={form.orgType} />
@@ -653,7 +653,7 @@ function SetUpPage() {
               <Row
                 label="Monthly Price"
                 value={price ? `$${price}/month` : '—'}
-                valueClass="text-[#C4874A] font-bold text-lg"
+                valueClass="text-[#0F172A] font-bold text-lg"
               />
             </div>
             <p className="text-xs text-gray-400 pt-1">Annual commitment, then month-to-month · Cancel after year one with 30 days notice</p>
@@ -698,14 +698,14 @@ function SetUpPage() {
       <Card>
         {confirmLoading ? (
           <div className="py-16 flex flex-col items-center gap-4 text-center">
-            <Loader2 size={40} className="animate-spin text-[#1B2A4A]" />
+            <Loader2 size={40} className="animate-spin text-[#0F172A]" />
             <p className="text-gray-500">Setting up your account…</p>
           </div>
         ) : confirmError ? (
           <div className="py-12 text-center">
             <p className="text-red-600 font-medium mb-2">Something went wrong</p>
             <p className="text-gray-500 text-sm mb-6">{confirmError}</p>
-            <a href="mailto:support@trailblaize.net" className="text-[#1B2A4A] underline text-sm">
+            <a href="mailto:support@trailblaize.net" className="text-[#0F172A] underline text-sm">
               Contact support
             </a>
           </div>
@@ -717,7 +717,7 @@ function SetUpPage() {
                 <Check size={40} className="text-emerald-600" strokeWidth={3} />
               </div>
               <h2
-                className="text-4xl font-bold text-[#1B2A4A]"
+                className="text-4xl font-bold text-[#0F172A]"
                 style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
               >
                 You&apos;re in.
@@ -731,7 +731,7 @@ function SetUpPage() {
 
             {/* What happens next */}
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-8">
-              <h3 className="font-semibold text-[#1B2A4A] mb-4">What happens next</h3>
+              <h3 className="font-semibold text-[#0F172A] mb-4">What happens next</h3>
               <ul className="space-y-4">
                 {[
                   { emoji: '✅', text: 'Your account is being created' },
@@ -752,13 +752,13 @@ function SetUpPage() {
                 href="https://calendly.com/trailblaize"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 text-center px-6 py-3 border-2 border-[#1B2A4A] text-[#1B2A4A] rounded-xl font-semibold text-sm hover:bg-[#1B2A4A] hover:text-white transition-all"
+                className="flex-1 text-center px-6 py-3 border-2 border-[#0F172A] text-[#0F172A] rounded-xl font-semibold text-sm hover:bg-[#0F172A] hover:text-white transition-all"
               >
                 Book Onboarding Call
               </a>
               <a
                 href="https://trailblaize.space/login"
-                className="flex-1 text-center px-6 py-3 bg-[#1B2A4A] text-white rounded-xl font-semibold text-sm hover:opacity-90 transition-all"
+                className="flex-1 text-center px-6 py-3 bg-[#0F172A] text-white rounded-xl font-semibold text-sm hover:opacity-90 transition-all"
               >
                 Log In →
               </a>
@@ -774,11 +774,11 @@ function SetUpPage() {
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ background: '#FAFAF8', minHeight: '100vh' }}>
-      <nav className="flex items-center px-6 py-4 max-w-3xl mx-auto">
+    <div style={{ background: '#F9FAFB', minHeight: '100vh' }}>
+      <nav className="flex items-center px-4 sm:px-8 py-4 border-b border-gray-100" style={{ background: 'white' }}>
         <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" className="h-7" />
       </nav>
-      <main className="max-w-xl mx-auto px-4 pb-16">
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-16">
         {children}
       </main>
     </div>
@@ -787,7 +787,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8">
+    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '24px' }}>
       {children}
     </div>
   );
@@ -806,7 +806,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-[#1B2A4A] mb-1.5">{label}</label>
+      <label className="block text-sm font-medium text-[#0F172A] mb-1.5">{label}</label>
       {children}
       {hint && !error && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
@@ -818,7 +818,7 @@ function Row({ label, value, valueClass }: { label: string; value: string; value
   return (
     <div className="flex justify-between items-center text-sm">
       <span className="text-gray-500">{label}</span>
-      <span className={valueClass || 'font-medium text-[#1B2A4A]'}>{value}</span>
+      <span className={valueClass || 'font-medium text-[#0F172A]'}>{value}</span>
     </div>
   );
 }
@@ -840,7 +840,7 @@ function NavButton({
       className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-white font-semibold text-sm transition-all
         ${disabled
           ? 'bg-gray-300 cursor-not-allowed'
-          : 'bg-[#1B2A4A] hover:opacity-90 active:scale-95'}`}
+          : 'bg-[#0F172A] hover:opacity-90 active:scale-95'}`}
     >
       {children}
     </button>
@@ -851,13 +851,13 @@ function inputCls(hasError: boolean) {
   return `w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all
     ${hasError
       ? 'border-red-400 focus:ring-red-200 focus:border-red-400'
-      : 'border-gray-200 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]'}`;
+      : 'border-gray-200 focus:ring-[#0F172A]/20 focus:border-[#0F172A]'}`;
 }
 
 // Wrap in Suspense so useSearchParams() works with Next.js static export
 export default function SetUpPageWrapper() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#FAFAF8] flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B2A4A]" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0F172A]" /></div>}>
       <SetUpPage />
     </Suspense>
   );
