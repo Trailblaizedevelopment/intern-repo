@@ -633,12 +633,12 @@ function SetUpPage() {
           </div>
 
           {checkoutError && (
-            <div className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm mb-4">
+            <div style={{ background: '#fef2f2', color: '#dc2626', borderRadius: '10px', padding: '12px 16px', fontSize: '0.875rem', marginBottom: '16px' }}>
               {checkoutError}
             </div>
           )}
 
-          <div className="flex justify-between">
+          <div style={S.actions}>
             <button
               onClick={() => goToStep(2)}
               style={S.backBtn}
@@ -665,69 +665,54 @@ function SetUpPage() {
       <StepIndicator current={4} />
       <Card>
         {confirmLoading ? (
-          <div className="py-16 flex flex-col items-center gap-4 text-center">
-            <Loader2 size={40} className="animate-spin text-[#0F172A]" />
-            <p className="text-gray-500">Setting up your account…</p>
+          <div style={{ padding: '64px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
+            <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: '#0F172A' }} />
+            <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: 0 }}>Setting up your account…</p>
           </div>
         ) : confirmError ? (
-          <div className="py-12 text-center">
-            <p className="text-red-600 font-medium mb-2">Something went wrong</p>
-            <p className="text-gray-500 text-sm mb-6">{confirmError}</p>
-            <a href="mailto:support@trailblaize.net" className="text-[#0F172A] underline text-sm">
-              Contact support
-            </a>
+          <div style={{ padding: '48px 0', textAlign: 'center' }}>
+            <p style={{ color: '#dc2626', fontWeight: 600, marginBottom: '8px', fontSize: '0.9375rem' }}>Something went wrong</p>
+            <p style={{ color: '#6B7280', fontSize: '0.875rem', marginBottom: '20px' }}>{confirmError}</p>
+            <a href="mailto:support@trailblaize.net" style={{ color: '#0F172A', fontSize: '0.875rem', fontWeight: 600 }}>Contact support</a>
           </div>
         ) : (
           <>
-            {/* Big checkmark */}
-            <div className="flex flex-col items-center text-center mb-8">
-              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
-                <Check size={40} className="text-emerald-600" strokeWidth={3} />
+            {/* Checkmark */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '28px' }}>
+              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', border: '1px solid #bbf7d0' }}>
+                <Check size={36} color="#16a34a" strokeWidth={2.5} />
               </div>
-              <h2
-                className="text-4xl font-bold text-[#0F172A]"
-                style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
-              >
-                You&apos;re in.
-              </h2>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', margin: '0 0 6px 0' }}>You&apos;re in.</h2>
               {(form.orgName || form.school) && (
-                <p className="text-gray-500 mt-2 text-sm">
-                  {form.orgName}{form.school ? ` · ${form.school}` : ''}
-                </p>
+                <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: 0 }}>{form.orgName}{form.school ? ` · ${form.school}` : ''}</p>
               )}
             </div>
 
             {/* What happens next */}
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-8">
-              <h3 className="font-semibold text-[#0F172A] mb-4">What happens next</h3>
-              <ul className="space-y-4">
+            <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+              <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 16px 0' }}>What happens next</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {[
                   { emoji: '✅', text: 'Your account is being created' },
-                  { emoji: '📱', text: "We'll reach out within 24 hours to help you make your launch post" },
+                  { emoji: '📱', text: "We'll reach out within 24 hours to help with your launch post" },
                   { emoji: '📅', text: 'Book your onboarding call to get set up for success' },
-                  { emoji: '🔑', text: 'Log in to your new platform' },
-                ].map((item) => (
-                  <li key={item.text} className="flex items-start gap-3 text-sm text-gray-600">
-                    <span className="text-base shrink-0">{item.emoji}</span>
-                    <span>{item.text}</span>
-                  </li>
+                  { emoji: '🔑', text: 'Log in and start activating your alumni network' },
+                ].map(item => (
+                  <div key={item.text} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={{ fontSize: '1rem', flexShrink: 0 }}>{item.emoji}</span>
+                    <span style={{ fontSize: '0.875rem', color: '#374151', lineHeight: 1.5 }}>{item.text}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <a
-                href="https://calendly.com/trailblaize"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 text-center px-6 py-3 border-2 border-[#0F172A] text-[#0F172A] rounded-xl font-semibold text-sm hover:bg-[#0F172A] hover:text-white transition-all"
-              >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <a href="https://calendly.com/trailblaize" target="_blank" rel="noopener noreferrer"
+                style={{ display: 'block', textAlign: 'center', padding: '12px 24px', borderRadius: '10px', border: '1.5px solid #0F172A', color: '#0F172A', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}>
                 Book Onboarding Call
               </a>
-              <a
-                href="https://trailblaize.space/login"
-                className="flex-1 text-center px-6 py-3 bg-[#0F172A] text-white rounded-xl font-semibold text-sm hover:opacity-90 transition-all"
-              >
+              <a href="https://www.trailblaize.net/sign-in"
+                style={{ display: 'block', textAlign: 'center', padding: '12px 24px', borderRadius: '10px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}>
                 Log In →
               </a>
             </div>
@@ -748,10 +733,10 @@ function PageShell({ children, testMode }: { children: React.ReactNode; testMode
           🧪 TEST MODE — Use card 4242 4242 4242 4242 · No real charges will be made
         </div>
       )}
-      <nav className="flex items-center px-4 sm:px-8 py-4 border-b border-gray-100" style={{ background: 'white' }}>
-        <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" className="h-7" />
+      <nav style={{ background: 'white', borderBottom: '1px solid #F3F4F6', padding: '12px 24px', display: 'flex', alignItems: 'center' }}>
+        <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '28px' }} />
       </nav>
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-16">
+      <main style={{ maxWidth: '640px', margin: '0 auto', padding: '32px 24px 64px' }}>
         {children}
       </main>
     </div>
