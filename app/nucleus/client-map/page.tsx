@@ -12,8 +12,6 @@ import {
   Building2,
   RefreshCw,
   CheckCircle2,
-  Clock,
-  Circle,
   Mail,
   MessageSquare,
   Instagram,
@@ -104,30 +102,30 @@ interface DealDetail {
 const FOUNDERS = ['Owen', 'Ford', 'Adam'] as const;
 type Founder = (typeof FOUNDERS)[number];
 
-const FOUNDER_COLORS: Record<Founder, { bg: string; text: string; border: string; dot: string }> = {
-  Owen: { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' },
-  Ford: { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-200', dot: 'bg-blue-500' },
-  Adam: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+const FOUNDER_COLORS: Record<Founder, { bg: string; text: string; border: string; dot: string; accent: string }> = {
+  Owen: { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500', accent: '#C4874A' },
+  Ford: { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-200', dot: 'bg-blue-500', accent: '#2563eb' },
+  Adam: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500', accent: '#059669' },
 };
 
-const OUTREACH_STATUS_CONFIG: Record<OutreachStatus, { label: string; color: string; bg: string }> = {
-  not_contacted: { label: 'Not Contacted', color: '#9ca3af', bg: '#f3f4f6' },
-  contacted: { label: 'Contacted', color: '#d97706', bg: '#fef3c7' },
-  demo_booked: { label: 'Demo Booked', color: '#2563eb', bg: '#dbeafe' },
-  signed: { label: 'Signed', color: '#059669', bg: '#d1fae5' },
+const OUTREACH_STATUS_CONFIG: Record<OutreachStatus, { label: string; color: string; bg: string; border: string }> = {
+  not_contacted: { label: 'Not Contacted', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
+  contacted:     { label: 'Contacted',     color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  demo_booked:   { label: 'Demo Booked',   color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+  signed:        { label: 'Signed',        color: '#065f46', bg: '#ecfdf5', border: '#6ee7b7' },
 };
 
 const STAGE_OPTIONS = [
-  { value: 'lead', label: 'New Lead' },
-  { value: 'demo_booked', label: 'Demo Booked' },
-  { value: 'first_demo', label: 'First Demo' },
-  { value: 'second_call', label: 'Second Call' },
+  { value: 'lead',          label: 'New Lead' },
+  { value: 'demo_booked',   label: 'Demo Booked' },
+  { value: 'first_demo',    label: 'First Demo' },
+  { value: 'second_call',   label: 'Second Call' },
   { value: 'contract_sent', label: 'Contract Sent' },
-  { value: 'closed_won', label: 'Closed Won' },
+  { value: 'closed_won',    label: 'Closed Won' },
 ];
 
 const TEMP_OPTIONS = [
-  { value: 'hot', label: '🔥 Hot' },
+  { value: 'hot',  label: '🔥 Hot' },
   { value: 'warm', label: '🟡 Warm' },
   { value: 'cold', label: '🧊 Cold' },
 ];
@@ -142,26 +140,24 @@ function todayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-// ── KPI Card ───────────────────────────────────────────────────────────────
-function KpiCard({ icon, label, value, sub, color }: {
+// ── KPI Chip ───────────────────────────────────────────────────────────────
+function KpiChip({ icon, label, value, color }: {
   icon: React.ReactNode;
   label: string;
   value: string;
-  sub?: string;
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4 min-w-0">
+    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm min-w-0">
       <div
-        className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
+        className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center"
         style={{ backgroundColor: `${color}18`, color }}
       >
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide truncate">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 leading-tight mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide leading-none truncate">{label}</p>
+        <p className="text-base font-bold text-[#1B2A4A] leading-tight mt-0.5">{value}</p>
       </div>
     </div>
   );
@@ -170,9 +166,9 @@ function KpiCard({ icon, label, value, sub, color }: {
 // ── Method Pill ────────────────────────────────────────────────────────────
 function MethodPill({ method }: { method: OutreachMethod }) {
   const cfg = {
-    email: { label: 'Email', icon: <Mail size={10} />, color: 'text-blue-700 bg-blue-50 border-blue-200' },
-    text: { label: 'Text', icon: <MessageSquare size={10} />, color: 'text-green-700 bg-green-50 border-green-200' },
-    instagram_dm: { label: 'IG DM', icon: <Instagram size={10} />, color: 'text-pink-700 bg-pink-50 border-pink-200' },
+    email:        { label: 'Email',  icon: <Mail size={10} />,        color: 'text-blue-700 bg-blue-50 border-blue-200' },
+    text:         { label: 'Text',   icon: <MessageSquare size={10} />, color: 'text-green-700 bg-green-50 border-green-200' },
+    instagram_dm: { label: 'IG DM', icon: <Instagram size={10} />,    color: 'text-pink-700 bg-pink-50 border-pink-200' },
   }[method];
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border font-medium ${cfg.color}`}>
@@ -199,25 +195,17 @@ function ChapterRow({
   const status: OutreachStatus = outreachEntry?.status ?? 'not_contacted';
   const statusCfg = OUTREACH_STATUS_CONFIG[status];
   const primaryDeal = org.deals[0];
+  const contactName = primaryDeal?.assigned_to ?? null;
 
   return (
-    <div className="flex items-center gap-3 py-4 px-5 border-b border-gray-100 hover:bg-gray-50/60 transition-colors group">
-      {/* Type badge */}
-      <span className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
-        type === 'fraternity'
-          ? 'bg-blue-50 text-blue-700 border border-blue-100'
-          : 'bg-pink-50 text-pink-700 border border-pink-100'
-      }`}>
-        {type === 'fraternity' ? 'Frat' : 'Sor'}
-      </span>
-
+    <div className="flex items-center gap-3 py-3.5 px-5 border-b border-gray-100 hover:bg-[#FAFAF8] transition-colors last:border-0">
       {/* Name */}
-      <span className="flex-1 text-sm font-medium text-gray-800 truncate min-w-0">{org.name}</span>
+      <span className="flex-1 text-sm font-semibold text-[#1B2A4A] truncate min-w-0">{org.name}</span>
 
-      {/* Outreach status */}
+      {/* Status pill */}
       <span
-        className="flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full"
-        style={{ color: statusCfg.color, backgroundColor: statusCfg.bg }}
+        className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full border"
+        style={{ color: statusCfg.color, backgroundColor: statusCfg.bg, borderColor: statusCfg.border }}
       >
         {statusCfg.label}
       </span>
@@ -227,38 +215,39 @@ function ChapterRow({
         <MethodPill method={outreachEntry.method} />
       )}
 
+      {/* Contact name */}
+      <span className="flex-shrink-0 text-xs text-gray-400 hidden md:block w-28 truncate">
+        {contactName ?? 'No contact logged'}
+      </span>
+
       {/* Last contacted date */}
-      {outreachEntry?.contactedAt && (
-        <span className="flex-shrink-0 text-xs text-gray-400 hidden sm:block">
+      {outreachEntry?.contactedAt ? (
+        <span className="flex-shrink-0 text-xs text-gray-400 hidden lg:block w-16">
           {new Date(outreachEntry.contactedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
+      ) : (
+        <span className="flex-shrink-0 text-xs text-gray-300 hidden lg:block w-16">—</span>
       )}
 
-      {/* Actions */}
-      <div className="flex-shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions — always visible */}
+      <div className="flex-shrink-0 flex items-center gap-1.5">
         <button
           onClick={() => onLogContact(org, type)}
-          className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-[#1B2A4A] text-white hover:bg-[#243560] transition-colors whitespace-nowrap"
+          className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#1B2A4A] text-white hover:bg-[#243560] transition-colors whitespace-nowrap"
         >
           <Plus size={11} />
           Log Contact
         </button>
-        {primaryDeal && (
-          <button
-            onClick={() => onViewDeal(org)}
-            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors whitespace-nowrap"
-          >
-            View Deal
-          </button>
-        )}
-        {!primaryDeal && (
-          <button
-            onClick={() => onLogContact(org, type)}
-            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors whitespace-nowrap"
-          >
-            View Deal
-          </button>
-        )}
+        <button
+          onClick={() => onViewDeal(org)}
+          className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
+            primaryDeal
+              ? 'bg-[#C4874A] text-white hover:bg-[#b07640]'
+              : 'border border-gray-200 text-gray-400 hover:bg-gray-50'
+          }`}
+        >
+          View Deal
+        </button>
       </div>
     </div>
   );
@@ -328,44 +317,40 @@ function LogContactDrawer({
   }
 
   const methodOptions: { value: OutreachMethod; label: string; icon: React.ReactNode }[] = [
-    { value: 'email', label: 'Email', icon: <Mail size={14} /> },
-    { value: 'text', label: 'Text', icon: <MessageSquare size={14} /> },
+    { value: 'email',        label: 'Email',        icon: <Mail size={14} /> },
+    { value: 'text',         label: 'Text',         icon: <MessageSquare size={14} /> },
     { value: 'instagram_dm', label: 'Instagram DM', icon: <Instagram size={14} /> },
   ];
 
   const contactOptions: { value: ContactType; label: string }[] = [
-    { value: 'president', label: 'President' },
+    { value: 'president',    label: 'President' },
     { value: 'alumni_chair', label: 'Alumni Chair' },
-    { value: 'rush_chair', label: 'Rush Chair' },
-    { value: 'other', label: 'Other' },
+    { value: 'rush_chair',   label: 'Rush Chair' },
+    { value: 'other',        label: 'Other' },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="w-[420px] bg-white shadow-2xl flex flex-col h-full">
+      <div className="w-[420px] bg-white shadow-2xl flex flex-col h-full border-l border-gray-100">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-[#FAFAF8]">
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-base">Log Contact</h2>
-            <p className="text-sm text-gray-500 mt-0.5">{org.name}</p>
+            <h2 className="font-bold text-[#1B2A4A] text-base" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+              Log Contact
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">{org.name} · {schoolName}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
-            <X size={20} />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+            <X size={18} />
           </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {/* School context */}
-          <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-500">
-            <span className="font-medium text-gray-700">{org.name}</span>
-            {' '}&mdash; {schoolName}
-          </div>
-
           {/* Who did you reach? */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Who did you reach?
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -387,7 +372,7 @@ function LogContactDrawer({
 
           {/* Method */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Contact Method
             </label>
             <div className="flex gap-2">
@@ -410,7 +395,7 @@ function LogContactDrawer({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Notes
             </label>
             <textarea
@@ -418,12 +403,12 @@ function LogContactDrawer({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="What happened? Key details from the conversation..."
               rows={4}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 resize-none"
+              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 resize-none bg-white"
             />
           </div>
 
           {/* Create deal checkbox */}
-          <label className="flex items-start gap-3 cursor-pointer">
+          <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
             <div className="relative mt-0.5">
               <input
                 type="checkbox"
@@ -440,7 +425,7 @@ function LogContactDrawer({
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-800">Create pipeline deal</p>
+              <p className="text-sm font-semibold text-gray-800">Create pipeline deal</p>
               <p className="text-xs text-gray-500 mt-0.5">Add this chapter as a new lead in the pipeline</p>
             </div>
           </label>
@@ -450,14 +435,14 @@ function LogContactDrawer({
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-lg hover:bg-[#243560] transition-colors disabled:opacity-60"
+            className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-xl hover:bg-[#243560] transition-colors disabled:opacity-60"
           >
             {saving ? 'Saving...' : 'Save Contact'}
           </button>
@@ -527,15 +512,17 @@ function ViewDealDrawer({
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="w-[420px] bg-white shadow-2xl flex flex-col h-full">
+      <div className="w-[420px] bg-white shadow-2xl flex flex-col h-full border-l border-gray-100">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-[#FAFAF8]">
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-base">Pipeline Deal</h2>
+            <h2 className="font-bold text-[#1B2A4A] text-base" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+              Pipeline Deal
+            </h2>
             <p className="text-sm text-gray-500 mt-0.5">{org.name}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
-            <X size={20} />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+            <X size={18} />
           </button>
         </div>
 
@@ -546,19 +533,25 @@ function ViewDealDrawer({
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1B2A4A]" />
             </div>
           ) : !deal ? (
-            <p className="text-sm text-gray-500 text-center py-8">No deal found</p>
+            <div className="text-center py-12">
+              <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                <Building2 size={22} className="text-gray-300" />
+              </div>
+              <p className="text-sm font-medium text-gray-500">No deal found</p>
+              <p className="text-xs text-gray-400 mt-1">Log a contact first to create a pipeline deal</p>
+            </div>
           ) : (
             <>
               {/* Stage */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                   Stage
                 </label>
                 <div className="relative">
                   <select
                     value={stage}
                     onChange={(e) => setStage(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 appearance-none bg-white"
+                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 appearance-none bg-white"
                   >
                     {STAGE_OPTIONS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -570,7 +563,7 @@ function ViewDealDrawer({
 
               {/* Temperature */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                   Temperature
                 </label>
                 <div className="flex gap-2">
@@ -578,7 +571,7 @@ function ViewDealDrawer({
                     <button
                       key={opt.value}
                       onClick={() => setTemperature(opt.value === temperature ? '' : opt.value)}
-                      className={`flex-1 py-2 text-sm rounded-lg border font-medium transition-colors ${
+                      className={`flex-1 py-2 text-sm rounded-xl border font-medium transition-colors ${
                         temperature === opt.value
                           ? 'bg-[#C4874A] text-white border-[#C4874A]'
                           : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
@@ -592,7 +585,7 @@ function ViewDealDrawer({
 
               {/* Next follow-up */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                   Next Follow-up
                 </label>
                 <div className="relative">
@@ -601,14 +594,14 @@ function ViewDealDrawer({
                     type="date"
                     value={nextFollowup}
                     onChange={(e) => setNextFollowup(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40"
+                    className="w-full text-sm border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40"
                   />
                 </div>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                   Notes
                 </label>
                 <textarea
@@ -616,7 +609,7 @@ function ViewDealDrawer({
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Deal notes, context, next steps..."
                   rows={4}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 resize-none"
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 resize-none"
                 />
               </div>
             </>
@@ -628,14 +621,14 @@ function ViewDealDrawer({
           <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-lg hover:bg-[#243560] transition-colors disabled:opacity-60"
+              className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-xl hover:bg-[#243560] transition-colors disabled:opacity-60"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
@@ -687,7 +680,7 @@ function ImportChaptersModal({
           body: JSON.stringify({
             name,
             school_id: school.id,
-            type: 'fraternity', // default; founders can change
+            type: 'fraternity',
             status: 'prospect',
           }),
         });
@@ -713,13 +706,15 @@ function ImportChaptersModal({
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-[#FAFAF8] rounded-t-2xl">
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-base">Import Chapters</h2>
+            <h2 className="font-bold text-[#1B2A4A] text-base" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+              Import Chapters
+            </h2>
             <p className="text-sm text-gray-500 mt-0.5">{school.name}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
-            <X size={20} />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+            <X size={18} />
           </button>
         </div>
 
@@ -734,19 +729,19 @@ function ImportChaptersModal({
                 onChange={(e) => setText(e.target.value)}
                 placeholder={'Alpha Phi Alpha\nKappa Alpha Psi\nPhi Beta Sigma'}
                 rows={8}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 resize-none font-mono"
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 resize-none font-mono"
               />
               <div className="flex gap-3">
                 <button
                   onClick={onClose}
-                  className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleImport}
                   disabled={importing || !text.trim()}
-                  className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-lg hover:bg-[#243560] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-xl hover:bg-[#243560] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {importing ? (
                     <>
@@ -766,7 +761,7 @@ function ImportChaptersModal({
             <>
               <div className="space-y-3">
                 {result.added.length > 0 && (
-                  <div className="bg-green-50 border border-green-100 rounded-lg p-4">
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-4">
                     <p className="text-sm font-semibold text-green-800 mb-2">
                       ✅ Added {result.added.length} chapter{result.added.length !== 1 ? 's' : ''}
                     </p>
@@ -778,7 +773,7 @@ function ImportChaptersModal({
                   </div>
                 )}
                 {result.skipped.length > 0 && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                     <p className="text-sm font-semibold text-gray-600 mb-2">
                       ⏭ Skipped {result.skipped.length} (already exist or failed)
                     </p>
@@ -792,7 +787,7 @@ function ImportChaptersModal({
               </div>
               <button
                 onClick={onClose}
-                className="w-full py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-lg hover:bg-[#243560] transition-colors"
+                className="w-full py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-xl hover:bg-[#243560] transition-colors"
               >
                 Done
               </button>
@@ -848,11 +843,18 @@ function FounderTargetBoard({
   }, [editingFounder]);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-        <Zap size={16} className="text-amber-500" />
-        <h2 className="font-semibold text-[#1B2A4A]">Founder Target Board</h2>
-        <span className="text-xs text-gray-400 ml-1">— Today&apos;s school targets</span>
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Board header */}
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#C4874A18' }}>
+          <Zap size={15} className="text-[#C4874A]" />
+        </div>
+        <div>
+          <h2 className="font-bold text-[#1B2A4A] text-sm" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+            Founder Target Board
+          </h2>
+          <p className="text-xs text-gray-400">Today&apos;s school targets</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 divide-x divide-gray-100">
@@ -861,14 +863,20 @@ function FounderTargetBoard({
           const fc = FOUNDER_COLORS[founder];
           const progress = getProgress(target);
           const isEditing = editingFounder === founder;
+          const pct = progress.total > 0 ? Math.round((progress.contacted / progress.total) * 100) : 0;
 
           return (
             <div key={founder} className="p-5 relative">
-              {/* Founder name */}
+              {/* Founder header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${fc.dot}`} />
-                  <span className="font-bold text-gray-900 text-sm">{founder}</span>
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                    style={{ backgroundColor: fc.accent }}
+                  >
+                    {founder[0]}
+                  </span>
+                  <span className="font-bold text-[#1B2A4A] text-sm">{founder}</span>
                 </div>
                 <button
                   onClick={() => {
@@ -880,10 +888,10 @@ function FounderTargetBoard({
                       setSearchQuery('');
                     }
                   }}
-                  className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-200"
                 >
-                  <Edit3 size={11} />
-                  {target ? 'Change' : 'Set target'}
+                  <Edit3 size={10} />
+                  {target ? 'Change' : 'Set'}
                 </button>
               </div>
 
@@ -901,7 +909,7 @@ function FounderTargetBoard({
                       className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300/50 focus:border-amber-300"
                     />
                   </div>
-                  <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                  <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-30">
                     {searchResults.map((school) => (
                       <button
                         key={school.id}
@@ -910,7 +918,7 @@ function FounderTargetBoard({
                           setEditingFounder(null);
                           setSearchQuery('');
                         }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 transition-colors flex items-center justify-between"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0"
                       >
                         <span className="font-medium text-gray-800 truncate">{school.name}</span>
                         <span className="flex-shrink-0 text-gray-400 ml-2">
@@ -925,35 +933,27 @@ function FounderTargetBoard({
               {/* Target card */}
               {target ? (
                 <div
-                  className={`rounded-xl border p-4 cursor-pointer hover:shadow-sm transition-shadow ${fc.border} ${fc.bg}`}
+                  className={`rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${fc.border} ${fc.bg}`}
                   onClick={() => {
                     const school = schools.find((s) => s.id === target.schoolId);
                     if (school) onSelectSchool(school);
                   }}
                 >
-                  <p className={`font-semibold text-sm truncate ${fc.text} mb-2`}>{target.schoolName}</p>
+                  <p className={`font-bold text-sm truncate ${fc.text} mb-3`}>{target.schoolName}</p>
 
                   {/* Progress bar */}
-                  <div className="mb-2">
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-gray-500 font-medium">
+                  <div className="mb-1">
+                    <div className="h-1.5 bg-white/80 rounded-full overflow-hidden mb-1.5">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: fc.accent }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">
                         {progress.contacted}/{progress.total} contacted
                       </span>
-                      {progress.total > 0 && (
-                        <span className={`font-bold ${fc.text}`}>
-                          {Math.round((progress.contacted / progress.total) * 100)}%
-                        </span>
-                      )}
-                    </div>
-                    <div className="h-1.5 bg-white/70 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${fc.dot}`}
-                        style={{
-                          width: progress.total > 0
-                            ? `${(progress.contacted / progress.total) * 100}%`
-                            : '0%',
-                        }}
-                      />
+                      <span className="text-xs font-bold" style={{ color: fc.accent }}>{pct}%</span>
                     </div>
                   </div>
 
@@ -962,24 +962,91 @@ function FounderTargetBoard({
                       e.stopPropagation();
                       onTargetChange(founder, null);
                     }}
-                    className="text-xs text-gray-400 hover:text-red-400 transition-colors"
+                    className="mt-2 text-[10px] text-gray-400 hover:text-red-400 transition-colors"
                   >
-                    Clear
+                    Clear target
                   </button>
                 </div>
               ) : (
                 <div
-                  className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-gray-300 transition-colors"
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-[#C4874A]/40 hover:bg-amber-50/30 transition-all"
                   onClick={() => { setEditingFounder(founder); setSearchQuery(''); }}
                 >
-                  <p className="text-xs text-gray-400">No target set</p>
-                  <p className="text-xs text-gray-300 mt-0.5">Click to assign a school</p>
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-2">
+                    <MapPin size={14} className="text-gray-300" />
+                  </div>
+                  <p className="text-xs font-medium text-gray-400">No target set</p>
+                  <p className="text-[10px] text-gray-300 mt-0.5">Click to assign a school</p>
                 </div>
               )}
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ── Chapter Section ────────────────────────────────────────────────────────
+function ChapterSection({
+  label,
+  orgs,
+  type,
+  outreachLog,
+  onLogContact,
+  onViewDeal,
+}: {
+  label: string;
+  orgs: OrgEntry[];
+  type: 'fraternity' | 'sorority';
+  outreachLog: OutreachLog;
+  onLogContact: (org: OrgEntry, type: 'fraternity' | 'sorority') => void;
+  onViewDeal: (org: OrgEntry) => void;
+}) {
+  const contactedCount = orgs.filter((o) => {
+    const e = outreachLog[o.id];
+    return e && e.status !== 'not_contacted';
+  }).length;
+
+  const labelColor = type === 'fraternity' ? '#1d4ed8' : '#be185d';
+  const labelBg   = type === 'fraternity' ? '#eff6ff' : '#fdf2f8';
+
+  return (
+    <div>
+      {/* Section label */}
+      <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/70 border-b border-gray-100">
+        <span
+          className="text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-md"
+          style={{ color: labelColor, backgroundColor: labelBg }}
+        >
+          {label}
+        </span>
+        <span className="text-xs text-gray-400">
+          {contactedCount}/{orgs.length} contacted
+        </span>
+        {contactedCount === orgs.length && orgs.length > 0 && (
+          <span className="text-xs text-green-600 font-semibold">✓ All done!</span>
+        )}
+      </div>
+
+      {orgs.length === 0 ? (
+        <div className="px-5 py-6 text-center">
+          <p className="text-xs text-gray-400">No {label.toLowerCase()} linked yet</p>
+        </div>
+      ) : (
+        <div>
+          {orgs.map((org) => (
+            <ChapterRow
+              key={org.id}
+              org={org}
+              type={type}
+              outreachEntry={outreachLog[org.id]}
+              onLogContact={onLogContact}
+              onViewDeal={onViewDeal}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1016,7 +1083,6 @@ export default function ClientMapCommandCenter() {
       const data = await res.json();
       setSchools(data.schools ?? []);
       setKpis(data.kpis ?? null);
-      // Refresh selected school data
       if (selectedSchool) {
         const updated = (data.schools ?? []).find((s: School) => s.id === selectedSchool.id);
         if (updated) setSelectedSchool(updated);
@@ -1067,9 +1133,6 @@ export default function ClientMapCommandCenter() {
     return Object.values(outreachLog).filter((e) => e.contactedAt?.startsWith(today)).length;
   }, [outreachLog]);
 
-  // Schools covered (from KPIs)
-  const schoolsCovered = kpis?.statesCovered ?? 0;
-
   // Close search on outside click
   useEffect(() => {
     function handle(e: MouseEvent) {
@@ -1095,148 +1158,160 @@ export default function ClientMapCommandCenter() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-[#FAFAF8]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B2A4A] mx-auto mb-3" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C4874A] mx-auto mb-3" />
           <p className="text-sm text-gray-500">Loading command center...</p>
         </div>
       </div>
     );
   }
 
-  const allChapters = selectedSchool
-    ? [
-        ...selectedSchool.fraternities.map((o) => ({ org: o, type: 'fraternity' as const })),
-        ...selectedSchool.sororities.map((o) => ({ org: o, type: 'sorority' as const })),
-      ]
-    : [];
+  const totalChaptersInSchool = selectedSchool
+    ? selectedSchool.fraternities.length + selectedSchool.sororities.length
+    : 0;
+  const contactedInSchool = selectedSchool
+    ? [...selectedSchool.fraternities, ...selectedSchool.sororities].filter((o) => {
+        const e = outreachLog[o.id];
+        return e && e.status !== 'not_contacted';
+      }).length
+    : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 px-6 py-7">
-        <div className="max-w-7xl mx-auto flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-xl bg-[#C4874A]/10 flex items-center justify-center">
-                <Target size={20} className="text-[#C4874A]" />
+    <div className="min-h-screen bg-[#FAFAF8]">
+
+      {/* ── Module Header ──────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-200 px-6 py-6 shadow-sm">
+        <div className="max-w-[1400px] mx-auto">
+          {/* Top row: title + refresh */}
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: '#C4874A18' }}
+              >
+                <Target size={20} style={{ color: '#C4874A' }} />
               </div>
-              <h1 className="text-2xl font-bold text-[#1B2A4A] tracking-tight">
-                School Outreach Command Center
-              </h1>
+              <div>
+                <h1
+                  className="text-2xl text-[#1B2A4A] leading-tight"
+                  style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400 }}
+                >
+                  School Outreach Command Center
+                </h1>
+                <p className="text-sm text-gray-400 mt-0.5 font-medium">
+                  Daily Tactics &middot; Blast every chapter in 30 minutes
+                </p>
+              </div>
             </div>
-            <p className="text-base text-gray-500 ml-12">
-              Pick a school below. Blast every chapter in 30 minutes.
-            </p>
+            <button
+              onClick={load}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-2 bg-white hover:bg-gray-50 transition-colors flex-shrink-0 mt-1"
+            >
+              <RefreshCw size={13} />
+              Refresh
+            </button>
           </div>
-          <button
-            onClick={load}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-2 bg-white hover:bg-gray-50 transition-colors flex-shrink-0 mt-1"
-          >
-            <RefreshCw size={14} />
-            Refresh
-          </button>
+
+          {/* KPI chips row */}
+          <div className="flex flex-wrap gap-3">
+            <KpiChip
+              icon={<Users size={14} />}
+              label="Active Chapters"
+              value={String(kpis?.totalActiveChapters ?? 0)}
+              color="#059669"
+            />
+            <KpiChip
+              icon={<Building2 size={14} />}
+              label="In Pipeline Schools"
+              value={String(kpis?.schoolsInPipeline ?? 0)}
+              color="#1B2A4A"
+            />
+            <KpiChip
+              icon={<DollarSign size={14} />}
+              label="Pipeline Value"
+              value={fmt$(kpis?.totalPipelineValue ?? 0)}
+              color="#7c3aed"
+            />
+            <KpiChip
+              icon={<Zap size={14} />}
+              label="Contacted Today"
+              value={String(chaptersContactedToday)}
+              color="#C4874A"
+            />
+            <KpiChip
+              icon={<TrendingUp size={14} />}
+              label="States Covered"
+              value={String(kpis?.statesCovered ?? 0)}
+              color="#0ea5e9"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="px-6 py-8 space-y-8 max-w-7xl mx-auto">
-        {/* ── KPI Bar ───────────────────────────────────────────────────── */}
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Performance</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <KpiCard
-            icon={<Users size={16} />}
-            label="Active Chapters"
-            value={String(kpis?.totalActiveChapters ?? 0)}
-            sub="paying clients"
-            color="#059669"
-          />
-          <KpiCard
-            icon={<Building2 size={16} />}
-            label="In Pipeline Schools"
-            value={String(kpis?.schoolsInPipeline ?? 0)}
-            sub="active deals"
-            color="#1B2A4A"
-          />
-          <KpiCard
-            icon={<DollarSign size={16} />}
-            label="Pipeline Value"
-            value={fmt$(kpis?.totalPipelineValue ?? 0)}
-            sub="open deals"
-            color="#7c3aed"
-          />
-          <KpiCard
-            icon={<Zap size={16} />}
-            label="Contacted Today"
-            value={String(chaptersContactedToday)}
-            sub="chapters reached"
-            color="#C4874A"
-          />
-          <KpiCard
-            icon={<TrendingUp size={16} />}
-            label="States Covered"
-            value={String(schoolsCovered)}
-            sub="with active chapters"
-            color="#0ea5e9"
-          />
-        </div>
-        </div>
+      <div className="px-6 py-6 space-y-6 max-w-[1400px] mx-auto">
 
-        {/* ── School Search ──────────────────────────────────────────────── */}
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Find a School</p>
+        {/* ── Founder Target Board ─────────────────────────────────────────── */}
+        <FounderTargetBoard
+          schools={schools}
+          outreachLog={outreachLog}
+          founderTargets={founderTargets}
+          onTargetChange={handleFounderTargetChange}
+          onSelectSchool={(school) => {
+            setSelectedSchool(school);
+            setSchoolSearch('');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+
+        {/* ── School Search ────────────────────────────────────────────────── */}
         <div ref={searchContainerRef} className="relative">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-visible">
-            <div className="px-6 py-6">
-              <div className="max-w-2xl mx-auto">
-              <div className="relative">
-                <Search size={22} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search for a school to start outbound..."
-                  value={schoolSearch}
-                  onChange={(e) => {
-                    setSchoolSearch(e.target.value);
-                    setShowSearchResults(true);
-                  }}
-                  onFocus={() => setShowSearchResults(true)}
-                  className="w-full pl-14 pr-5 py-4 text-lg border-2 border-gray-200 rounded-2xl bg-white focus:outline-none focus:ring-4 focus:ring-[#1B2A4A]/10 focus:border-[#1B2A4A]/50 transition-all shadow-sm"
-                />
-                {schoolSearch && (
-                  <button
-                    onClick={() => { setSchoolSearch(''); setShowSearchResults(false); }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <X size={18} />
-                  </button>
-                )}
-              </div>
-              </div>
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-5">
+            {/* Search input */}
+            <div className="relative">
+              <Search
+                size={20}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search for a school to launch outbound..."
+                value={schoolSearch}
+                onChange={(e) => {
+                  setSchoolSearch(e.target.value);
+                  setShowSearchResults(true);
+                }}
+                onFocus={() => setShowSearchResults(true)}
+                className="w-full pl-12 pr-12 py-4 text-base border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-4 focus:ring-[#C4874A]/10 focus:border-[#C4874A]/50 transition-all font-medium placeholder:font-normal placeholder:text-gray-400"
+              />
+              {schoolSearch && (
+                <button
+                  onClick={() => { setSchoolSearch(''); setShowSearchResults(false); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
 
             {/* Selected school badge */}
-            {selectedSchool && (
-              <div className="px-5 pb-4 flex items-center gap-3">
+            {selectedSchool && !showSearchResults && (
+              <div className="flex items-center gap-2 mt-3">
                 <div className="flex items-center gap-2 bg-[#1B2A4A]/5 border border-[#1B2A4A]/15 rounded-lg px-3 py-2 flex-1 min-w-0">
-                  <Building2 size={14} className="text-[#1B2A4A] flex-shrink-0" />
+                  <Building2 size={13} className="text-[#1B2A4A] flex-shrink-0" />
                   <span className="font-semibold text-[#1B2A4A] text-sm truncate">{selectedSchool.name}</span>
-                  <span className="text-xs text-gray-400 flex-shrink-0">
-                    {selectedSchool.fraternities.length + selectedSchool.sororities.length} chapters
-                  </span>
+                  {selectedSchool.conference && (
+                    <span className="text-xs text-gray-400 flex-shrink-0">{selectedSchool.conference}</span>
+                  )}
+                  <span className="text-xs text-gray-400 flex-shrink-0">·</span>
+                  <span className="text-xs text-gray-400 flex-shrink-0">{totalChaptersInSchool} chapters</span>
                 </div>
                 <button
-                  onClick={() => setShowImport(true)}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  <Upload size={13} />
-                  Import
-                </button>
-                <button
                   onClick={() => { setSelectedSchool(null); setSchoolSearch(''); }}
-                  className="flex-shrink-0 text-gray-400 hover:text-gray-600 p-1"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
             )}
@@ -1246,7 +1321,10 @@ export default function ClientMapCommandCenter() {
           {showSearchResults && (
             <div className="absolute z-30 top-full mt-2 left-0 right-0 bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden">
               {searchResults.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-gray-400">No schools found</div>
+                <div className="px-4 py-8 text-center">
+                  <Search size={24} className="text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">No schools found</p>
+                </div>
               ) : (
                 <div className="max-h-72 overflow-y-auto">
                   {searchResults.map((school) => (
@@ -1257,21 +1335,23 @@ export default function ClientMapCommandCenter() {
                         setSchoolSearch('');
                         setShowSearchResults(false);
                       }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0"
+                      className="w-full text-left px-4 py-3.5 hover:bg-[#FAFAF8] transition-colors flex items-center justify-between border-b border-gray-50 last:border-0"
                     >
                       <div className="min-w-0">
-                        <p className="font-semibold text-gray-900 text-sm truncate">{school.name}</p>
+                        <p className="font-semibold text-[#1B2A4A] text-sm truncate">{school.name}</p>
                         <p className="text-xs text-gray-400 mt-0.5">
-                          {school.state} &middot; {school.conference ?? 'Independent'} &middot;{' '}
+                          {school.state}
+                          {school.conference ? ` · ${school.conference}` : ''}
+                          {' · '}
                           {school.fraternities.length + school.sororities.length} chapters
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-3">
                         {school.status === 'active_client' && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">Active</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 font-semibold">Active</span>
                         )}
                         {school.status === 'in_pipeline' && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">Pipeline</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 font-semibold">Pipeline</span>
                         )}
                         {school.dealCount > 0 && (
                           <span className="text-xs text-gray-400">{school.dealCount} deals</span>
@@ -1284,45 +1364,73 @@ export default function ClientMapCommandCenter() {
             </div>
           )}
         </div>
-        </div>
 
-        {/* ── Chapter List ──────────────────────────────────────────────── */}
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Chapters</p>
+        {/* ── Chapter Panel ────────────────────────────────────────────────── */}
         {selectedSchool ? (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {/* Chapter list header */}
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold text-[#1B2A4A]">{selectedSchool.name}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {allChapters.length} chapters · click a row to log contact or view deal
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* Panel header */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2
+                    className="font-semibold text-[#1B2A4A] text-lg truncate"
+                    style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}
+                  >
+                    {selectedSchool.name}
+                  </h2>
+                  {selectedSchool.conference && (
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 font-medium flex-shrink-0">
+                      {selectedSchool.conference}
+                    </span>
+                  )}
+                  {selectedSchool.status === 'active_client' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 font-semibold flex-shrink-0">Active Client</span>
+                  )}
+                  {selectedSchool.status === 'in_pipeline' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 font-semibold flex-shrink-0">In Pipeline</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  {totalChaptersInSchool} chapters · {contactedInSchool}/{totalChaptersInSchool} contacted
+                  {totalChaptersInSchool > 0 && (
+                    <span className="ml-2 font-semibold text-[#C4874A]">
+                      {Math.round((contactedInSchool / totalChaptersInSchool) * 100)}% complete
+                    </span>
+                  )}
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                {/* Progress summary */}
-                {(() => {
-                  const contacted = allChapters.filter(({ org }) => {
-                    const e = outreachLog[org.id];
-                    return e && e.status !== 'not_contacted';
-                  }).length;
-                  return (
-                    <span className="font-medium">
-                      {contacted}/{allChapters.length} contacted
-                    </span>
-                  );
-                })()}
-              </div>
+              {/* Import button */}
+              <button
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors flex-shrink-0"
+              >
+                <Upload size={13} />
+                Import Chapters
+              </button>
             </div>
 
-            {allChapters.length === 0 ? (
+            {/* Column headers */}
+            {totalChaptersInSchool > 0 && (
+              <div className="hidden md:flex items-center gap-3 px-5 py-2 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                <span className="flex-1">Chapter</span>
+                <span className="w-28 flex-shrink-0">Status</span>
+                <span className="w-16 flex-shrink-0">Method</span>
+                <span className="w-28 flex-shrink-0 hidden md:block">Contact</span>
+                <span className="w-16 flex-shrink-0 hidden lg:block">Date</span>
+                <span className="w-36 flex-shrink-0">Actions</span>
+              </div>
+            )}
+
+            {totalChaptersInSchool === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                <Building2 size={36} className="mb-3 opacity-30" />
-                <p className="text-sm font-medium">No chapters linked yet</p>
-                <p className="text-xs mt-1 text-gray-300">Use Import to add chapters to this school</p>
+                <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-4">
+                  <Building2 size={26} className="text-gray-300" />
+                </div>
+                <p className="text-sm font-semibold text-gray-500">No chapters linked yet</p>
+                <p className="text-xs mt-1 text-gray-400">Use Import to add chapters to this school</p>
                 <button
                   onClick={() => setShowImport(true)}
-                  className="mt-4 flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg bg-[#1B2A4A] text-white hover:bg-[#243560] transition-colors"
+                  className="mt-4 flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-[#1B2A4A] text-white hover:bg-[#243560] transition-colors"
                 >
                   <Upload size={14} />
                   Import Chapters
@@ -1330,51 +1438,47 @@ export default function ClientMapCommandCenter() {
               </div>
             ) : (
               <div>
-                {allChapters.map(({ org, type }) => (
-                  <ChapterRow
-                    key={org.id}
-                    org={org}
-                    type={type}
-                    outreachEntry={outreachLog[org.id]}
-                    onLogContact={(o, t) => setLogContactOrg({ org: o, type: t })}
-                    onViewDeal={(o) => setViewDealOrg(o)}
-                  />
-                ))}
+                {/* Fraternities */}
+                <ChapterSection
+                  label="Fraternities"
+                  orgs={selectedSchool.fraternities}
+                  type="fraternity"
+                  outreachLog={outreachLog}
+                  onLogContact={(o, t) => setLogContactOrg({ org: o, type: t })}
+                  onViewDeal={(o) => setViewDealOrg(o)}
+                />
+                {/* Sororities */}
+                <ChapterSection
+                  label="Sororities"
+                  orgs={selectedSchool.sororities}
+                  type="sorority"
+                  outreachLog={outreachLog}
+                  onLogContact={(o, t) => setLogContactOrg({ org: o, type: t })}
+                  onViewDeal={(o) => setViewDealOrg(o)}
+                />
               </div>
             )}
           </div>
         ) : (
           /* Empty state */
-          <div className="bg-white rounded-2xl border border-gray-200 flex flex-col items-center justify-center py-28 text-gray-400">
-            <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-5">
-              <MapPin size={32} className="text-gray-300" />
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center justify-center py-24">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+              style={{ backgroundColor: '#C4874A12', border: '1.5px solid #C4874A30' }}
+            >
+              <Target size={30} style={{ color: '#C4874A' }} />
             </div>
-            <p className="text-lg font-semibold text-gray-600">Select a school to see all chapters</p>
-            <p className="text-sm mt-2 text-gray-400 max-w-sm text-center leading-relaxed">
+            <p className="text-lg font-semibold text-[#1B2A4A]" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+              Select a school to see all chapters
+            </p>
+            <p className="text-sm mt-2 text-gray-400 max-w-xs text-center leading-relaxed">
               Pick a school, then contact every frat and sorority in 30–45 minutes
             </p>
           </div>
         )}
-        </div>
-
-        {/* ── Founder Target Board ───────────────────────────────────────── */}
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Today&apos;s Targets</p>
-        <FounderTargetBoard
-          schools={schools}
-          outreachLog={outreachLog}
-          founderTargets={founderTargets}
-          onTargetChange={handleFounderTargetChange}
-          onSelectSchool={(school) => {
-            setSelectedSchool(school);
-            setSchoolSearch('');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        />
-        </div>
       </div>
 
-      {/* ── Log Contact Drawer ─────────────────────────────────────────────── */}
+      {/* ── Drawers & Modals ─────────────────────────────────────────────────── */}
       {logContactOrg && selectedSchool && (
         <LogContactDrawer
           org={logContactOrg.org}
@@ -1386,7 +1490,6 @@ export default function ClientMapCommandCenter() {
         />
       )}
 
-      {/* ── View Deal Drawer ───────────────────────────────────────────────── */}
       {viewDealOrg && (
         <ViewDealDrawer
           org={viewDealOrg}
@@ -1395,7 +1498,6 @@ export default function ClientMapCommandCenter() {
         />
       )}
 
-      {/* ── Import Chapters Modal ──────────────────────────────────────────── */}
       {showImport && selectedSchool && (
         <ImportChaptersModal
           school={selectedSchool}
