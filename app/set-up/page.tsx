@@ -449,16 +449,7 @@ function SetUpPage() {
               />
             </Field>
 
-            {/* Live pricing display */}
-            {price !== null && Number(form.memberCount) > 0 && (
-              <div style={{ background: "#F9FAFB", border: "1px solid #0F172A", borderRadius: "12px", padding: "16px" }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <DollarSign size={18} className="text-[#0F172A]" />
-                  <span className="font-semibold text-[#0F172A]">Your plan: ${price}/month</span>
-                </div>
-                <p className="text-sm text-gray-500">Based on {form.memberCount} members · Annual commitment, then month-to-month</p>
-              </div>
-            )}
+            {/* Pricing shown on payment page, not here */}
 
             <Field label="Leader Name *" hint="President / Captain / Director" error={errors.leaderName}>
               <input
