@@ -163,6 +163,7 @@ function SetUpPage() {
   // Payment state
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [discountCode, setDiscountCode] = useState('');
 
   // Confirmation state
   const [confirmLoading, setConfirmLoading] = useState(false);
@@ -180,7 +181,14 @@ function SetUpPage() {
     const sessionId = searchParams.get('session_id');
     const stepParam = searchParams.get('step');
 
-    if (success === 'true' && sessionId) {
+    const bypassParam = searchParams.get('bypass');
+    if (success === 'true' && bypassParam === '1') {
+      // Internal bypass — extract all params from URL
+      setStep(4);
+      const bypassData: Record<string, string> = {};
+      searchParams.forEach((v, k) => { bypassData[k] = v; });
+      handleBypassConfirmation(bypassData);
+    } else if (success === 'true' && sessionId) {
       setStep(4);
       handleConfirmation(sessionId);
     } else if (stepParam) {
@@ -201,6 +209,20 @@ function SetUpPage() {
         setActiveChapterCount(active);
       })
       .catch(() => setActiveChapterCount(null));
+  }, []);
+
+  const handleBypassConfirmation = useCallback(async (params: Record<string, string>) => {
+    setConfirmLoading(true); setConfirmError('');
+    try {
+      const res = await fetch('/api/set-up/complete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bypass: true, ...params }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) setConfirmError(data.error || 'Something went wrong.');
+      else setConfirmDone(true);
+    } catch { setConfirmError('Network error. Please contact support@trailblaize.net.'); }
+    finally { setConfirmLoading(false); }
   }, []);
 
   const handleConfirmation = useCallback(async (sessionId: string) => {
@@ -261,7 +283,7 @@ function SetUpPage() {
           memberCount: Number(form.memberCount),
           agreedName,
           agreedAt: agreedAtISO,
-          testMode,
+          discountCode: discountCode.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -655,6 +677,18 @@ function SetUpPage() {
               />
             </div>
             <p className="text-xs text-gray-400 pt-1">Annual commitment, then month-to-month · Cancel after year one with 30 days notice</p>
+          </div>
+
+          {/* Discount code */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={S.label}>Discount / Promo Code <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span></label>
+            <input
+              type="text"
+              value={discountCode}
+              onChange={e => setDiscountCode(e.target.value.toUpperCase())}
+              placeholder="e.g. TRAILBLAIZE100"
+              style={S.input(false)}
+            />
           </div>
 
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
