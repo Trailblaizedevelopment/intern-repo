@@ -97,9 +97,13 @@ export async function GET() {
     .map(([conference, stats]) => ({ conference, ...stats }))
     .sort((a, b) => b.dealCount - a.dealCount);
 
+  // Closed deal count (visible to all roles)
+  const closedDealCount = closedWon.length;
+
   return NextResponse.json({
     mrr,
     mrrGoal: 10000,
+    closedDealCount,
     schoolsInConversation,
     demosNext7,
     demosNext14,

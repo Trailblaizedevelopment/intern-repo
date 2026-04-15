@@ -63,6 +63,7 @@ interface ConferenceStats {
 interface PipelineStats {
   mrr: number;
   mrrGoal: number;
+  closedDealCount?: number;
   schoolsInConversation: number;
   demosNext7: number;
   demosNext14: number;
@@ -559,44 +560,38 @@ function DashboardTab({ stats }: { stats: PipelineStats | null }) {
     );
   }
 
-  const mrrPct = Math.min(100, Math.round((stats.mrr / stats.mrrGoal) * 100));
-  const mrrAway = stats.mrrGoal - stats.mrr;
+  const closedCount = stats.closedDealCount ?? 0;
+  const closedGoal = 20; // internal milestone
+  const closedPct = Math.min(100, Math.round((closedCount / closedGoal) * 100));
   const pipelineGroups = groupDealsByUrgency(stats.recentDeals);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* MRR Hero Card */}
+      {/* Closed Deals Hero Card */}
       <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '24px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '16px' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6B7280', marginBottom: '4px' }}>
-            Monthly Recurring Revenue
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ fontSize: '2rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>
-                {fmt$(stats.mrr)}
-              </p>
-              <p style={{ fontSize: '0.875rem', color: '#6B7280', marginTop: '8px' }}>
-                {mrrAway > 0 ? (
-                  <span style={{ color: '#0F172A', fontWeight: 600 }}>{fmt$(mrrAway)} away</span>
-                ) : (
-                  <span style={{ color: '#10b981', fontWeight: 600 }}>Goal reached!</span>
-                )}{' '}
-                from {fmt$(stats.mrrGoal)} goal
-              </p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Progress</p>
-              <p style={{ fontSize: '2rem', fontWeight: 700, color: '#111827' }}>{mrrPct}%</p>
-            </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <div>
+            <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6B7280', margin: '0 0 8px 0' }}>
+              Closed Deals
+            </p>
+            <p style={{ fontSize: '2.5rem', fontWeight: 700, color: '#111827', lineHeight: 1.1, margin: 0 }}>
+              {closedCount}
+            </p>
+            <p style={{ fontSize: '0.875rem', color: '#6B7280', marginTop: '6px' }}>
+              <span style={{ color: '#0F172A', fontWeight: 600 }}>{closedGoal - closedCount} to go</span>{' '}to next milestone
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Progress</p>
+            <p style={{ fontSize: '2rem', fontWeight: 700, color: '#111827' }}>{closedPct}%</p>
           </div>
         </div>
         <div style={{ background: '#F3F4F6', borderRadius: '9999px', height: '8px', overflow: 'hidden' }}>
-          <div style={{ height: '8px', borderRadius: '9999px', background: '#0F172A', width: `${mrrPct}%`, transition: 'width 0.7s ease' }} />
+          <div style={{ height: '8px', borderRadius: '9999px', background: '#0F172A', width: `${closedPct}%`, transition: 'width 0.7s ease' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0F172A' }}>{fmt$(stats.mrr)}</span>
-          <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Goal: {fmt$(stats.mrrGoal)}</span>
+          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0F172A' }}>{closedCount} closed</span>
+          <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Milestone: {closedGoal}</span>
         </div>
       </div>
 
@@ -844,15 +839,16 @@ function CreateCampaignDrawer({ schools, onClose, onCreate }: CreateCampaignDraw
 }
 
 function CampaignRowItem({
-  row, campaignId, onUpdate, onDelete,
+  row, campaignId, onUpdate, onDelete, signed,
 }: {
   row: CampaignRow;
   campaignId: string;
   onUpdate: (campaignId: string, rowId: string, updates: Partial<CampaignRow>) => void;
   onDelete: (campaignId: string, rowId: string) => void;
+  signed?: boolean;
 }) {
   return (
-    <tr>
+    <tr style={signed ? { background: '#f0fdf4', opacity: 0.85 } : {}}>
       <td>
         <input type="text" value={row.chapterName}
           onChange={e => onUpdate(campaignId, row.id, { chapterName: e.target.value })}
@@ -1086,9 +1082,15 @@ function ExpandedCampaign({
             </tr>
           </thead>
           <tbody>
-            {campaign.rows.map(row => (
+            {/* Open deals first */}
+            {campaign.rows.filter(r => r.status !== 'signed').map(row => (
               <CampaignRowItem key={row.id} row={row} campaignId={campaign.id}
                 onUpdate={onUpdate} onDelete={onDelete} />
+            ))}
+            {/* Signed/closed deals at bottom in light green */}
+            {campaign.rows.filter(r => r.status === 'signed').map(row => (
+              <CampaignRowItem key={row.id} row={row} campaignId={campaign.id}
+                onUpdate={onUpdate} onDelete={onDelete} signed />
             ))}
           </tbody>
         </table>
@@ -1266,12 +1268,21 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
+  // Track whether we've already attempted seeding to avoid wiping campaigns on re-render
+  const seededRef = useRef(false);
+
   useEffect(() => {
+    // Always load from storage first
     const existing = loadCampaigns();
-    if (existing.length > 0 || !stats?.recentDeals?.length) {
+    if (existing.length > 0) {
       setCampaigns(existing);
+      seededRef.current = true;
       return;
     }
+    // Only auto-seed once, and only when stats are available
+    if (seededRef.current || !stats?.recentDeals?.length) return;
+    seededRef.current = true;
+
     const seenSchools = new Map<string, { id: string; name: string }>();
     for (const d of stats.recentDeals) {
       const school = d.organization?.school;
