@@ -133,6 +133,32 @@ export async function POST(req: NextRequest) {
       console.warn('[set-up/complete] deal update failed:', dealErr);
     }
 
+    // 3b. Send DocuSign contract envelope to the leader
+    try {
+      const contractRes = await fetch(
+        `${process.env.NEXT_PUBLIC_APP_URL || 'https://trailblaize.space'}/api/chapters/${chapterId}/send-contract`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.INTERNAL_API_KEY || ''}` },
+          body: JSON.stringify({
+            recipientEmail: leaderEmail,
+            recipientName: leaderName,
+            memberCount,
+            chapterLegalName: designation ? `${orgName} ${designation}` : orgName,
+          }),
+        }
+      );
+      if (!contractRes.ok) {
+        const err = await contractRes.text();
+        console.warn('[set-up/complete] DocuSign send failed (non-fatal):', err);
+      } else {
+        console.log('[set-up/complete] DocuSign envelope sent successfully');
+      }
+    } catch (docuErr) {
+      // Non-fatal — log but don't block completion
+      console.warn('[set-up/complete] DocuSign error (non-fatal):', docuErr);
+    }
+
     // 4. Send email notifications to Owen, Ford, Adam
     const notificationMessage = `🎉 ${orgName} at ${school} just signed up — ${memberCount} members — $${pricePerMonth}/mo. Make the launch post!`;
 

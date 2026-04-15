@@ -1,14 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { stripe, getPriceTier } from '@/lib/stripe';
-
-// Returns test-mode Stripe client if STRIPE_SECRET_KEY_TEST is set and testMode=true
-function getStripeClient(testMode: boolean): Stripe {
-  if (testMode && process.env.STRIPE_SECRET_KEY_TEST) {
-    return new Stripe(process.env.STRIPE_SECRET_KEY_TEST);
-  }
-  return stripe;
-}
 
 export const runtime = 'nodejs';
 
@@ -45,8 +36,6 @@ export async function POST(req: NextRequest) {
       agreedName,
       agreedAt,
     } = body;
-    const testMode = Boolean((body as any).testMode);
-    const stripeClient = getStripeClient(testMode);
 
     if (!orgName || !school || !orgType || !memberCount || !leaderName || !leaderEmail || !leaderPhone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -55,7 +44,7 @@ export async function POST(req: NextRequest) {
     const priceInDollars = getPriceTier(Number(memberCount));
     const priceInCents = priceInDollars * 100;
 
-    const session = await stripeClient.checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer_email: leaderEmail,
       line_items: [

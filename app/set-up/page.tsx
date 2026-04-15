@@ -281,80 +281,76 @@ function SetUpPage() {
 
   if (step === 0) {
     return (
-      <div style={{ background: '#F9FAFB', minHeight: '100vh' }}>
+      <div style={{ background: '#F9FAFB', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' }}>
+        {testMode && (
+          <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '8px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#92400e' }}>
+            🧪 TEST MODE — No real charges will be made
+          </div>
+        )}
         {/* Nav */}
-        <nav className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto">
-          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" className="h-7" />
+        <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 24px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '28px' }} />
           <button
             onClick={() => goToStep(1)}
-            className="text-sm font-medium text-[#0F172A] hover:underline"
+            style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
           >
-            Sign up →
+            Get started →
           </button>
         </nav>
 
         {/* Hero */}
-        <section className="max-w-4xl mx-auto px-6 pt-16 pb-12 text-center">
-          <h1
-            className="text-5xl sm:text-6xl font-bold leading-tight mb-5"
-            style={{ fontFamily: 'Instrument Serif, Georgia, serif', color: '#0F172A' }}
-          >
+        <section style={{ maxWidth: '720px', margin: '0 auto', padding: '64px 24px 48px', textAlign: 'center' }}>
+          <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', fontWeight: 700, lineHeight: 1.15, color: '#111827', marginBottom: '16px', fontFamily: 'Inter, system-ui, sans-serif' }}>
             Activate your alumni network.
           </h1>
-          <p className="text-xl text-gray-500 mb-8 max-w-xl mx-auto">
-            The platform that keeps your chapter connected long after graduation.
+          <p style={{ fontSize: '1.125rem', color: '#6B7280', marginBottom: '32px', lineHeight: 1.6 }}>
+            The platform that keeps your organization connected long after graduation.
           </p>
           <button
             onClick={() => goToStep(1)}
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-white font-semibold text-lg transition-all hover:opacity-90 active:scale-95"
-            style={{ background: '#0F172A' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 28px', borderRadius: '10px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
           >
-            Get Started <ArrowRight size={20} />
+            Get Started <ArrowRight size={18} />
           </button>
           {activeChapterCount !== null && activeChapterCount > 0 && (
-            <p className="mt-5 text-sm text-gray-400">
-              Join <span className="font-semibold text-[#0F172A]">{activeChapterCount} chapters</span> already on Trailblaize
+            <p style={{ marginTop: '16px', fontSize: '0.875rem', color: '#9ca3af' }}>
+              Join <span style={{ fontWeight: 600, color: '#111827' }}>{activeChapterCount} organizations</span> already on Trailblaize
             </p>
           )}
         </section>
 
         {/* Feature Cards */}
-        <section className="max-w-5xl mx-auto px-6 pb-16">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '0 24px 64px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
             {[
               {
-                icon: <Users size={28} className="text-[#0F172A]" />,
+                icon: <Users size={22} color="#0F172A" />,
                 title: 'Alumni Pipeline',
                 desc: 'See every alumni, their industry, location, and how to reach them.',
-                bg: 'from-amber-50 to-orange-50',
               },
               {
-                icon: <MessageSquare size={28} className="text-[#0F172A]" />,
+                icon: <MessageSquare size={22} color="#0F172A" />,
                 title: 'Message Board',
                 desc: 'Post announcements, opportunities, and updates your alumni actually see.',
-                bg: 'from-blue-50 to-indigo-50',
               },
               {
-                icon: <User size={28} className="text-emerald-600" />,
+                icon: <User size={22} color="#0F172A" />,
                 title: 'Alumni Profiles',
-                desc: 'Every member gets a profile card with their chapter, graduation year, industry, and location tags.',
-                bg: 'from-emerald-50 to-teal-50',
+                desc: 'Every member gets a profile card with chapter, graduation year, industry, and location.',
               },
             ].map((card) => (
               <div
                 key={card.title}
-                className={`bg-gradient-to-br ${card.bg} border border-gray-200 rounded-2xl shadow-sm p-6`}
+                style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px' }}
               >
-                <div className="mb-3">{card.icon}</div>
-                <h3 className="font-bold text-[#0F172A] text-lg mb-2">{card.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{card.desc}</p>
+                <div style={{ marginBottom: '10px' }}>{card.icon}</div>
+                <h3 style={{ fontWeight: 700, color: '#111827', fontSize: '0.9375rem', marginBottom: '6px', margin: '0 0 6px 0' }}>{card.title}</h3>
+                <p style={{ color: '#6B7280', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>{card.desc}</p>
               </div>
             ))}
           </div>
-
-          {/* Pricing teaser */}
-          <div className="mt-10 text-center">
-            <p className="text-sm text-gray-400">Plans start at <span className="font-semibold text-[#0F172A]">$99/month</span> based on your chapter size.</p>
+          <div style={{ marginTop: '32px', textAlign: 'center' }}>
+            <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>Plans start at <span style={{ fontWeight: 600, color: '#111827' }}>$99/month</span> based on your member count.</p>
           </div>
         </section>
       </div>
