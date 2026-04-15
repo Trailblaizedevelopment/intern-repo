@@ -135,6 +135,7 @@ By completing the signup process and providing a typed signature, Client acknowl
 function SetUpPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const testMode = searchParams.get('test') === '1';
 
   const [step, setStep] = useState(0);
   const [activeChapterCount, setActiveChapterCount] = useState<number | null>(null);
@@ -260,6 +261,7 @@ function SetUpPage() {
           memberCount: Number(form.memberCount),
           agreedName,
           agreedAt: agreedAtISO,
+          testMode,
         }),
       });
       const data = await res.json();
@@ -363,7 +365,7 @@ function SetUpPage() {
 
   if (step === 1) {
     return (
-      <PageShell>
+      <PageShell testMode={testMode}>
         <StepIndicator current={1} />
         <Card>
           <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Tell us about your organization</h2>
@@ -510,7 +512,7 @@ function SetUpPage() {
     const canProceed = agreedName.trim().length > 0 && agreedAuthorized;
 
     return (
-      <PageShell>
+      <PageShell testMode={testMode}>
         <StepIndicator current={2} />
         <Card>
           <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Here&apos;s what you&apos;re agreeing to</h2>
@@ -636,7 +638,7 @@ function SetUpPage() {
 
   if (step === 3) {
     return (
-      <PageShell>
+      <PageShell testMode={testMode}>
         <StepIndicator current={3} />
         <Card>
           <h2 className="text-2xl font-bold text-[#0F172A] mb-1">Complete your payment</h2>
@@ -693,7 +695,7 @@ function SetUpPage() {
   // ─── Step 4: Confirmation ─────────────────────────────────────────────────
 
   return (
-    <PageShell>
+    <PageShell testMode={testMode}>
       <StepIndicator current={4} />
       <Card>
         {confirmLoading ? (
@@ -772,9 +774,14 @@ function SetUpPage() {
 
 // ─── Helper Components ───────────────────────────────────────────────────────
 
-function PageShell({ children }: { children: React.ReactNode }) {
+function PageShell({ children, testMode }: { children: React.ReactNode; testMode?: boolean }) {
   return (
     <div style={{ background: '#F9FAFB', minHeight: '100vh' }}>
+      {testMode && (
+        <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '8px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#92400e' }}>
+          🧪 TEST MODE — Use card 4242 4242 4242 4242 · No real charges will be made
+        </div>
+      )}
       <nav className="flex items-center px-4 sm:px-8 py-4 border-b border-gray-100" style={{ background: 'white' }}>
         <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" className="h-7" />
       </nav>
