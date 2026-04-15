@@ -2,7 +2,7 @@
 // Merged view: internal alumni_contacts + external platform profiles
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { createClient } from '@supabase/supabase-js';
+import { getPlatformAdmin } from '@/lib/supabase-platform';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -153,11 +153,10 @@ export async function GET(
   // ── Step 3: Fetch external platform profiles ──────────────────────────────
   let externalProfiles: ExternalProfile[] = [];
 
-  const platformUrl = process.env.PLATFORM_SUPABASE_URL;
-  const platformKey = process.env.PLATFORM_SUPABASE_SERVICE_ROLE_KEY;
+  const platformClient = getPlatformAdmin();
 
-  if (externalChapterId && platformUrl && platformKey) {
-    const platform = createClient(platformUrl, platformKey);
+  if (externalChapterId && platformClient) {
+    const platform = platformClient;
     const { data: profiles } = await platform
       .from('profiles')
       .select(

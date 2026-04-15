@@ -2,7 +2,7 @@
 // Returns active members from external Trailblaize platform for the given internal chapter ID
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { createClient } from '@supabase/supabase-js';
+import { getPlatformAdmin } from '@/lib/supabase-platform';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,14 +22,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ members: [], platform_chapter_id: null });
   }
 
-  // Fetch from external platform
-  const platformUrl = process.env.PLATFORM_SUPABASE_URL;
-  const platformKey = process.env.PLATFORM_SUPABASE_SERVICE_ROLE_KEY;
-  if (!platformUrl || !platformKey) {
+  // Fetch from external platform using singleton client
+  const platform = getPlatformAdmin();
+  if (!platform) {
     return NextResponse.json({ error: 'Platform not configured' }, { status: 500 });
   }
 
-  const platform = createClient(platformUrl, platformKey);
   const { data: members, error } = await platform
     .from('chapter_members_view')
     .select('id, full_name, first_name, last_name, role, grad_year, major, gpa, hometown, bio, phone, email, pledge_class, avatar_url')
