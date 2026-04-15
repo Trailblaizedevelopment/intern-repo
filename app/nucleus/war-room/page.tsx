@@ -12,7 +12,7 @@ import {
   TrendingUp, ChevronRight, Mail, MessageSquare,
   Instagram, Upload, CheckCircle2, Link2,
   Target, ExternalLink, Zap, BarChart3,
-  ArrowLeft, LayoutDashboard, FileUp,
+  ArrowLeft, LayoutDashboard, FileUp, Edit3,
 } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
@@ -507,7 +507,7 @@ function PipelineDealRow({ deal }: { deal: Deal }) {
   return (
     <tr
       style={{ cursor: 'pointer' }}
-      onClick={() => { window.location.href = '/nucleus/pipeline'; }}
+      onClick={() => { window.location.href = `/nucleus/pipeline?deal=${deal.id}`; }}
     >
       <td className="module-table-name">{chapterName}</td>
       <td style={{ color: '#6b7280', fontSize: '0.8125rem' }}>{schoolName}</td>
@@ -906,11 +906,22 @@ function CampaignRowItem({
           {row.meetingBooked && <Check size={12} color="#fff" />}
         </button>
       </td>
-      <td>
-        <button onClick={() => onDelete(campaignId, row.id)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: '2px' }}>
-          <Trash2 size={13} />
-        </button>
+      <td style={{ whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {row.dealId && (
+            <a
+              href={`/nucleus/pipeline?deal=${row.dealId}`}
+              title="Edit in Pipeline"
+              style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, color: '#0F172A', border: '1px solid #E5E7EB', textDecoration: 'none', background: 'white', whiteSpace: 'nowrap' }}
+            >
+              <Edit3 size={10} style={{ marginRight: '3px' }} /> Edit
+            </a>
+          )}
+          <button onClick={() => onDelete(campaignId, row.id)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: '2px' }}>
+            <Trash2 size={13} />
+          </button>
+        </div>
       </td>
     </tr>
   );
@@ -1924,7 +1935,7 @@ function StateDealPanel({ stateAbbr, deals, onClose }: {
                     <p style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{deal.organization?.name || '—'}</p>
                     <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '2px 0 0 0' }}>{deal.organization?.school?.name || '—'}</p>
                   </div>
-                  <Link href="/nucleus/pipeline" style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 600, padding: '6px 12px', borderRadius: '8px', background: '#0F172A', color: '#ffffff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  <Link href={`/nucleus/pipeline?deal=${deal.id}`} style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 600, padding: '6px 12px', borderRadius: '8px', background: '#0F172A', color: '#ffffff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                     View Deal
                   </Link>
                 </div>
