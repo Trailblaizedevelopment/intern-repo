@@ -76,7 +76,12 @@ interface SchoolEntry {
   id: string;
   name: string;
   conference: string | null;
-  organizations: { pipeline_deals: { id: string }[] }[];
+  // New API shape — fraternities/sororities instead of organizations
+  fraternities?: { pipeline_deals?: { id: string }[] }[];
+  sororities?: { pipeline_deals?: { id: string }[] }[];
+  // Legacy shape fallback
+  organizations?: { pipeline_deals?: { id: string }[] }[];
+  dealCount?: number;
 }
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -516,8 +521,13 @@ function SchoolsWidget({
       ) : (
         <div className="idb-schools-list">
           {schools.map(school => {
-            const dealCount = school.organizations.reduce((s, o) => s + o.pipeline_deals.length, 0);
-            const chapterCount = school.organizations.length;
+            // Support both old (organizations) and new (fraternities/sororities) API shapes
+            const allOrgs = school.organizations ?? [
+              ...(school.fraternities ?? []),
+              ...(school.sororities ?? []),
+            ];
+            const dealCount = school.dealCount ?? allOrgs.reduce((s, o) => s + (o.pipeline_deals?.length ?? 0), 0);
+            const chapterCount = allOrgs.length;
             const isActive = activeSchool === school.id || activeSchool === school.name;
             return (
               <button
