@@ -386,14 +386,15 @@ function StageBadge({ stage }: { stage: string }) {
 function RepChip({ name, size = 'sm' }: { name?: string | null; size?: 'sm' | 'lg' }) {
   if (!name) return null;
   const color = getRepColor(name);
-  const dim = size === 'lg' ? 'w-7 h-7 text-xs' : 'w-6 h-6 text-[10px]';
   return (
     <span
-      title={name}
-      className={`inline-flex items-center justify-center rounded-full font-bold text-white flex-shrink-0 ${dim}`}
+      className="inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-full text-white text-xs font-semibold flex-shrink-0"
       style={{ backgroundColor: color }}
     >
-      {getRepInitials(name)}
+      <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+        {getRepInitials(name)}
+      </span>
+      <span className="hidden sm:inline">{name}</span>
     </span>
   );
 }
@@ -509,11 +510,11 @@ function DashboardTab({ stats }: { stats: PipelineStats | null }) {
   const pipelineGroups = groupDealsByUrgency(stats.recentDeals);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* MRR Hero Card */}
       <div
         className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #ffffff 60%, #fdf8f4 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #ffffff 55%, #fdf6ef 100%)' }}
       >
         <div className="p-6 lg:p-8">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-6">
@@ -590,19 +591,19 @@ function DashboardTab({ stats }: { stats: PipelineStats | null }) {
               return (
                 <div
                   key={c.conference}
-                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex flex-col gap-1 overflow-hidden"
+                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col gap-1.5"
                   style={{ borderLeftWidth: 4, borderLeftColor: borderColor, backgroundColor: bgColor }}
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textColor }}>
+                  <span className="text-[11px] font-bold uppercase tracking-wider leading-tight" style={{ color: textColor }}>
                     {c.conference}
                   </span>
                   <span
-                    className="text-2xl font-bold leading-none text-[#1B2A4A]"
+                    className="text-3xl font-bold leading-none text-[#1B2A4A] mt-0.5"
                     style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}
                   >
                     {c.dealCount}
                   </span>
-                  <span className="text-xs" style={{ color: textColor, opacity: 0.7 }}>
+                  <span className="text-xs font-semibold" style={{ color: textColor, opacity: 0.75 }}>
                     {fmt$(c.pipelineValue)}
                   </span>
                 </div>
@@ -1040,7 +1041,45 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
-  useEffect(() => { setCampaigns(loadCampaigns()); }, []);
+  // Load campaigns and auto-seed one per school from pipeline if none exist yet
+  useEffect(() => {
+    const existing = loadCampaigns();
+    if (existing.length > 0 || !stats?.recentDeals?.length) {
+      setCampaigns(existing);
+      return;
+    }
+    // Auto-seed: create one founder_led campaign per unique school
+    const seenSchools = new Map<string, { id: string; name: string }>();
+    for (const d of stats.recentDeals) {
+      const school = d.organization?.school;
+      if (school && !seenSchools.has(school.id)) seenSchools.set(school.id, school);
+    }
+    const seeded: Campaign[] = Array.from(seenSchools.values()).map(school => ({
+      id: uid(),
+      name: school.name,
+      type: 'founder_led' as CampaignType,
+      school: school.name,
+      status: 'active' as CampaignStatus,
+      rows: stats.recentDeals
+        .filter(d => d.organization?.school?.id === school.id)
+        .map(d => ({
+          id: uid(),
+          chapterName: d.organization?.name || '',
+          orgId: d.organization?.id,
+          status: (d.stage === 'closed_won' ? 'signed' : d.stage === 'demo_booked' || d.stage === 'first_demo' ? 'demo_booked' : 'contacted') as CampaignRow['status'],
+          method: 'email' as OutreachMethod,
+          contactName: d.contact?.name || '',
+          contactInfo: '',
+          sourceUrl: '',
+          meetingBooked: d.stage === 'demo_booked' || d.stage === 'first_demo',
+          dealId: d.id,
+        })),
+      updatedAt: new Date().toISOString(),
+    }));
+    seeded.sort((a, b) => b.rows.length - a.rows.length);
+    saveCampaigns(seeded);
+    setCampaigns(seeded);
+  }, [stats]);
 
   const persist = useCallback((updated: Campaign[]) => {
     setCampaigns(updated); saveCampaigns(updated);
@@ -1213,7 +1252,7 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
   );
 }
 
-// ─── Tab 3: Notes ─────────────────────────────────────────────────────────────
+// ─── Tab 3: Next Steps ───────────────────────────────────────────────────────
 
 // TODO: migrate to meeting_notes table in Supabase
 const NOTES_STORAGE_KEY = 'tb_meeting_notes';
@@ -1231,7 +1270,7 @@ function saveNextSteps(steps: NextStep[]) {
   localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(steps));
 }
 
-function NotesTab() {
+function NextStepsTab() {
   const [granolaLoading, setGranolaLoading] = useState(true);
   const [granolaError, setGranolaError] = useState<string | null>(null);
   const [granolaSearch, setGranolaSearch] = useState('');
@@ -2272,7 +2311,7 @@ type Tab = 'dashboard' | 'campaigns' | 'notes' | 'map';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'campaigns', label: 'Campaigns' },
-  { id: 'notes',     label: 'Notes' },
+  { id: 'notes',     label: 'Next Steps' },
   { id: 'map',       label: 'Client Map' },
 ];
 
@@ -2339,16 +2378,16 @@ export default function WarRoomPage() {
             </div>
           </div>
 
-          {/* Tabs — clean pill/underline style, no emoji */}
-          <div className="flex gap-0.5 overflow-x-auto scrollbar-none -mb-px">
+          {/* Tabs */}
+          <div className="flex gap-1 overflow-x-auto scrollbar-none -mb-px mt-1">
             {TABS.map(t => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex-shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex-shrink-0 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
                   tab === t.id
-                    ? 'border-[#C4874A] text-[#C4874A]'
-                    : 'border-transparent text-gray-500 hover:text-[#1B2A4A] hover:border-gray-300'
+                    ? 'border-[#1B2A4A] text-[#1B2A4A]'
+                    : 'border-transparent text-gray-400 hover:text-[#1B2A4A] hover:border-gray-200'
                 }`}
               >
                 {t.label}
@@ -2362,7 +2401,7 @@ export default function WarRoomPage() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {tab === 'dashboard'  && <DashboardTab stats={stats} />}
         {tab === 'campaigns'  && <CampaignsTab stats={stats} />}
-        {tab === 'notes'      && <NotesTab />}
+        {tab === 'notes'      && <NextStepsTab />}
         {tab === 'map'        && <ClientMapTab statsDeals={stats?.recentDeals ?? []} />}
       </div>
     </div>
