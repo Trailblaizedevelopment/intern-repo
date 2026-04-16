@@ -37,8 +37,18 @@ export async function GET(req: NextRequest) {
 
   if (!tokenRes.ok) {
     const body = await tokenRes.text();
-    console.error('[DocuSign callback] Token exchange failed:', tokenRes.status, body);
-    return NextResponse.json({ error: 'Token exchange failed', details: body }, { status: 502 });
+    const debugInfo = {
+      status: tokenRes.status,
+      body,
+      integrationKeyPrefix: DOCUSIGN_INTEGRATION_KEY?.slice(0, 8),
+      secretKeyPresent: !!DOCUSIGN_CLIENT_SECRET,
+      secretKeyLength: DOCUSIGN_CLIENT_SECRET?.length,
+      redirectUri: DOCUSIGN_REDIRECT_URI,
+      authUrl: DOCUSIGN_AUTH_URL,
+      codeLength: code?.length,
+    };
+    console.error('[DocuSign callback] Token exchange failed:', debugInfo);
+    return NextResponse.json({ error: 'Token exchange failed', details: body, debug: debugInfo }, { status: 502 });
   }
 
   const tokens = await tokenRes.json();
