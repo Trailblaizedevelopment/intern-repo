@@ -152,6 +152,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
+        { name: 'Connects', href: '/workspace/connects', icon: 'Phone' },
         { name: 'Mission Control', href: '/nucleus/mission-control', icon: 'Radar' },
         { name: 'Socials', href: '/workspace/socials', icon: 'Share2' },
       ];
@@ -165,11 +166,12 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       ];
     case 'growth_intern':
     default: {
-      // Interns: Dashboard, War Room, Team (no pipeline — use War Room campaigns instead)
+      // Interns: Dashboard, War Room, Team, Connects
       const internItems: NavItem[] = [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
         { name: 'War Room', href: '/nucleus/war-room', icon: 'Tv' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
+        { name: 'Connects', href: '/workspace/connects', icon: 'Phone' },
       ];
       // Marketing interns also get the Socials page
       if (role === 'marketing_intern') {

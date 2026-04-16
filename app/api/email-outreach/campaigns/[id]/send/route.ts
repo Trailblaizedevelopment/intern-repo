@@ -56,7 +56,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       email: c.email,
       first_name: c.first_name || '',
       last_name: c.last_name || '',
-      grad_year: (c as any).year || null,
+      grad_year: (c as unknown as { year?: number | null }).year || null,
       status: 'pending',
     }));
 
