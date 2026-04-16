@@ -692,21 +692,6 @@ function DashboardTab({ stats, onOpenDeal }: { stats: PipelineStats | null; onOp
 
 // ─── Tab 2: Campaigns ─────────────────────────────────────────────────────────
 
-const CAMPAIGNS_STORAGE_KEY = 'tb_campaigns_v2';
-
-function loadCampaigns(): Campaign[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Campaign[]) : [];
-  } catch { return []; }
-}
-
-function saveCampaigns(campaigns: Campaign[]) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CAMPAIGNS_STORAGE_KEY, JSON.stringify(campaigns));
-}
-
 interface CreateCampaignDrawerProps {
   schools: { id: string; name: string }[];
   onClose: () => void;
@@ -1276,25 +1261,33 @@ function CampaignCard({
 
 function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
-  // Track whether we've already attempted seeding to avoid wiping campaigns on re-render
+  // Track whether we've already attempted seeding to avoid re-seeding on every render
   const seededRef = useRef(false);
 
+  // Fetch campaigns from API on mount
   useEffect(() => {
-    // Always load from storage first
-    const existing = loadCampaigns();
-    if (existing.length > 0) {
-      setCampaigns(existing);
-      seededRef.current = true;
-      return;
-    }
-    // Only auto-seed once, and only when stats are available
-    if (seededRef.current || !stats?.recentDeals?.length) return;
+    fetch('/api/war-room/campaigns')
+      .then(r => r.json())
+      .then((data: Campaign[]) => {
+        setCampaigns(data);
+        if (data.length > 0) seededRef.current = true;
+      })
+      .catch(err => console.error('[campaigns] fetch error:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Auto-seed from pipeline stats if API returned 0 campaigns and stats are loaded
+  useEffect(() => {
+    if (loading) return;
+    if (seededRef.current) return;
+    if (!stats?.recentDeals?.length) return;
     seededRef.current = true;
 
     const seenSchools = new Map<string, { id: string; name: string }>();
@@ -1326,12 +1319,30 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
       updatedAt: new Date().toISOString(),
     }));
     seeded.sort((a, b) => b.rows.length - a.rows.length);
-    saveCampaigns(seeded);
-    setCampaigns(seeded);
-  }, [stats]);
 
-  const persist = useCallback((updated: Campaign[]) => {
-    setCampaigns(updated); saveCampaigns(updated);
+    // POST each seeded campaign to the API
+    Promise.all(seeded.map(c =>
+      fetch('/api/war-room/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(c),
+      }).then(r => r.ok ? r.json() : null)
+    )).then(results => {
+      const created = results.filter(Boolean) as Campaign[];
+      if (created.length > 0) setCampaigns(created);
+    }).catch(err => console.error('[campaigns] seed error:', err));
+  }, [loading, stats]);
+
+  // Persist a single updated campaign to the API via PATCH
+  const persistOne = useCallback(async (campaign: Campaign) => {
+    try {
+      const res = await fetch('/api/war-room/campaigns', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(campaign),
+      });
+      if (!res.ok) console.error('[campaigns] patch error:', await res.text());
+    } catch (err) { console.error('[campaigns] patch error:', err); }
   }, []);
 
   // Build school list from stats for the create drawer
@@ -1364,24 +1375,67 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
     });
   }, [campaigns, typeFilter, statusFilter, search]);
 
-  function handleCreate(c: Campaign) {
-    const updated = [...campaigns, c];
-    persist(updated);
-    setExpandedId(c.id);
+  async function handleCreate(c: Campaign) {
+    try {
+      const res = await fetch('/api/war-room/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(c),
+      });
+      if (res.ok) {
+        const created: Campaign = await res.json();
+        setCampaigns(prev => [...prev, created]);
+        setExpandedId(created.id);
+      }
+    } catch (err) { console.error('[campaigns] create error:', err); }
   }
 
   function handleUpdateRow(campaignId: string, rowId: string, updates: Partial<CampaignRow>) {
-    persist(campaigns.map(c => c.id === campaignId
+    // Special case: meetingBooked toggled ON → create pipeline deal if no dealId
+    const campaign = campaigns.find(c => c.id === campaignId);
+    const row = campaign?.rows.find(r => r.id === rowId);
+    const meetingBookedToggled = updates.meetingBooked === true && row && !row.meetingBooked;
+
+    const updatedCampaigns = campaigns.map(c => c.id === campaignId
       ? { ...c, rows: c.rows.map(r => r.id === rowId ? { ...r, ...updates } : r), updatedAt: new Date().toISOString() }
       : c
-    ));
+    );
+    setCampaigns(updatedCampaigns);
+
+    const updatedCampaign = updatedCampaigns.find(c => c.id === campaignId)!;
+    const updatedRow = updatedCampaign.rows.find(r => r.id === rowId)!;
+
+    if (meetingBookedToggled && !updatedRow.dealId && updatedRow.orgId) {
+      // Create a pipeline deal and store dealId back
+      fetch('/api/pipeline/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org_id: updatedRow.orgId, stage: 'demo_booked', value: 0 }),
+      }).then(r => r.ok ? r.json() : null).then(deal => {
+        if (!deal) return;
+        const finalCampaigns = campaigns.map(c => c.id === campaignId
+          ? {
+              ...c,
+              rows: c.rows.map(r => r.id === rowId ? { ...r, ...updates, dealId: deal.id } : r),
+              updatedAt: new Date().toISOString(),
+            }
+          : c
+        );
+        setCampaigns(finalCampaigns);
+        persistOne(finalCampaigns.find(c => c.id === campaignId)!);
+      }).catch(err => console.error('[campaigns] deal create error:', err));
+    } else {
+      persistOne(updatedCampaign);
+    }
   }
 
   function handleDeleteRow(campaignId: string, rowId: string) {
-    persist(campaigns.map(c => c.id === campaignId
+    const updatedCampaigns = campaigns.map(c => c.id === campaignId
       ? { ...c, rows: c.rows.filter(r => r.id !== rowId), updatedAt: new Date().toISOString() }
       : c
-    ));
+    );
+    setCampaigns(updatedCampaigns);
+    persistOne(updatedCampaigns.find(c => c.id === campaignId)!);
   }
 
   function handleAddRow(campaignId: string) {
@@ -1389,26 +1443,37 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
       id: uid(), chapterName: '', status: 'not_contacted', method: 'email',
       contactName: '', contactInfo: '', sourceUrl: '', meetingBooked: false,
     };
-    persist(campaigns.map(c => c.id === campaignId
+    const updatedCampaigns = campaigns.map(c => c.id === campaignId
       ? { ...c, rows: [...c.rows, newRow], updatedAt: new Date().toISOString() }
       : c
-    ));
+    );
+    setCampaigns(updatedCampaigns);
+    persistOne(updatedCampaigns.find(c => c.id === campaignId)!);
   }
 
   function handleUpdateCampaign(id: string, updates: Partial<Campaign>) {
-    persist(campaigns.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c));
+    const updatedCampaigns = campaigns.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c);
+    setCampaigns(updatedCampaigns);
+    persistOne(updatedCampaigns.find(c => c.id === id)!);
   }
 
   function handleUpdateCampaignMeta(id: string, rows: CampaignRow[], schoolId?: string) {
-    persist(campaigns.map(c => c.id === id
+    const updatedCampaigns = campaigns.map(c => c.id === id
       ? { ...c, rows, schoolId: schoolId ?? c.schoolId, updatedAt: new Date().toISOString() }
       : c
-    ));
+    );
+    setCampaigns(updatedCampaigns);
+    persistOne(updatedCampaigns.find(c => c.id === id)!);
   }
 
-  function handleDeleteCampaign(id: string) {
-    persist(campaigns.filter(c => c.id !== id));
-    if (expandedId === id) setExpandedId(null);
+  async function handleDeleteCampaign(id: string) {
+    try {
+      const res = await fetch(`/api/war-room/campaigns?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCampaigns(prev => prev.filter(c => c.id !== id));
+        if (expandedId === id) setExpandedId(null);
+      }
+    } catch (err) { console.error('[campaigns] delete error:', err); }
   }
 
   return (
@@ -1464,7 +1529,11 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
       </div>
 
       {/* Campaign list */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 20px', color: '#9ca3af', gap: '8px' }}>
+          <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading campaigns…
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="module-table-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 20px', gap: '16px' }}>
           <Target size={32} color="#e5e7eb" />
           <div style={{ textAlign: 'center' }}>
