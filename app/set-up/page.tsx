@@ -707,7 +707,7 @@ function SetUpPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <a href="https://calendly.com/trailblaize" target="_blank" rel="noopener noreferrer"
+              <a href="https://calendly.com/owen-trailblaize/30min" target="_blank" rel="noopener noreferrer"
                 style={{ display: 'block', textAlign: 'center', padding: '12px 24px', borderRadius: '10px', border: '1.5px solid #0F172A', color: '#0F172A', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}>
                 Book Onboarding Call
               </a>
