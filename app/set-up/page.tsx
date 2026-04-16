@@ -310,7 +310,7 @@ function SetUpPage() {
         )}
         {/* Nav — matches trailblaize.net */}
         <nav style={{ padding: '0 32px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6' }}>
-          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '24px' }} />
+          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '32px' }} />
           <button onClick={() => goToStep(1)}
             style={{ padding: '8px 20px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.875rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
             Get Started
