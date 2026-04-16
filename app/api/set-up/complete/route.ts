@@ -93,20 +93,31 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) { console.warn('[set-up/complete] deal update failed:', e); }
 
-    // Send DocuSign contract (non-fatal)
-    if (!bypass) {
-      try {
-        const contractRes = await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL || 'https://trailblaize.space'}/api/chapters/${chapterId}/send-contract`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.INTERNAL_API_KEY || ''}` },
-            body: JSON.stringify({ recipientEmail: leaderEmail, recipientName: leaderName, memberCount, chapterLegalName: designation ? `${orgName} ${designation}` : orgName }),
-          }
-        );
-        if (!contractRes.ok) console.warn('[set-up/complete] DocuSign failed:', await contractRes.text());
-      } catch (e) { console.warn('[set-up/complete] DocuSign error:', e); }
-    }
+    // Send confirmation email to the signer with agreement summary (no DocuSign needed)
+    try {
+      await sendEmail({
+        to: leaderEmail,
+        toName: leaderName,
+        subject: 'Your Trailblaize Agreement — Welcome!',
+        htmlBody: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+            <img src="https://trailblaize.space/logos/logo-wordmark-navy.png" alt="Trailblaize" style="height:28px;margin-bottom:24px;" />
+            <h2 style="color:#111827;margin-bottom:8px;">You're all set, ${leaderName}!</h2>
+            <p style="color:#374151;">Your agreement has been signed and your account is being created.</p>
+            <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:16px 20px;margin:20px 0;">
+              <p style="margin:0 0 8px 0;font-size:0.875rem;color:#374151;"><strong>Organization:</strong> ${orgName}</p>
+              <p style="margin:0 0 8px 0;font-size:0.875rem;color:#374151;"><strong>School:</strong> ${school}</p>
+              <p style="margin:0 0 8px 0;font-size:0.875rem;color:#374151;"><strong>Monthly Plan:</strong> $${pricePerMonth}/month</p>
+              <p style="margin:0 0 8px 0;font-size:0.875rem;color:#374151;"><strong>Signed by:</strong> ${agreedName}</p>
+              <p style="margin:0;font-size:0.875rem;color:#374151;"><strong>Date:</strong> ${new Date(agreedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+            <p style="color:#374151;font-size:0.875rem;">This email serves as your confirmation that you have agreed to the Trailblaize SaaS Agreement. A member of our team will reach out within 24 hours.</p>
+            <a href="https://www.trailblaize.net/sign-in" style="display:inline-block;background:#0F172A;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px;">Log In to Your Platform →</a>
+            <p style="color:#9ca3af;font-size:0.75rem;margin-top:24px;">Questions? Reply to this email or contact support@trailblaize.net</p>
+          </div>
+        `,
+      });
+    } catch (e) { console.warn('[set-up/complete] confirmation email error:', e); }
 
     // Email notifications
     const msg = `🎉 ${orgName} at ${school} just signed up — ${memberCount} members — $${pricePerMonth}/mo. Make the launch post!${bypass ? ' [Internal]' : ''}`;
