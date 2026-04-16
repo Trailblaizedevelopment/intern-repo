@@ -15,10 +15,8 @@ import {
   Tag,
   X,
   Zap,
-  ArrowLeft,
   LayoutDashboard,
   User,
-  Calendar,
   Clock,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -37,10 +35,6 @@ interface LogPanel {
   followUp: boolean;
   followUpDate: string;
   saving: boolean;
-}
-
-interface ContactWithCall extends AlumniContact {
-  callStatus?: CallOutcome | null;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -65,36 +59,40 @@ const SUGGESTED_TAGS = [
   'Dallas', 'Houston', 'NYC', 'Chicago', 'Austin', 'Atlanta',
 ];
 
+// ─── Color-coded card status ─────────────────────────────────────────────────
+
+type CardStatus = 'uncalled' | 'voicemail' | 'called' | 'declined';
+
+interface CardStyle {
+  borderColor: string;
+  badgeBg: string;
+  badgeColor: string;
+  label: string;
+  priority: number; // lower = higher in queue
+}
+
+const CARD_STATUS_CONFIG: Record<CardStatus, CardStyle> = {
+  uncalled: { borderColor: '#d1d5db', badgeBg: '#f3f4f6', badgeColor: '#6b7280', label: 'Not Called',       priority: 0 },
+  voicemail:{ borderColor: '#93c5fd', badgeBg: '#dbeafe', badgeColor: '#1d4ed8', label: 'Voicemail Sent',   priority: 1 },
+  called:   { borderColor: '#86efac', badgeBg: '#dcfce7', badgeColor: '#15803d', label: 'Called / Logged',  priority: 2 },
+  declined: { borderColor: '#fcd34d', badgeBg: '#fef3c7', badgeColor: '#92400e', label: 'Declined',         priority: 3 },
+};
+
+function getCardStatus(contact: AlumniContact): CardStatus {
+  const s = contact.outreach_status;
+  if (s === 'opted_out' || s === 'wrong_number') return 'declined';
+  if (s === 'responded' || s === 'touch2_sent' || s === 'touch3_sent' || s === 'verified') return 'called';
+  if (s === 'touch1_sent') return 'voicemail';
+  // Default: signed_up, not_contacted, pitched, etc. → uncalled
+  return 'uncalled';
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function getCallStatus(contact: AlumniContact): CallOutcome | null {
-  if (!contact.response_text) return null;
-  const lower = contact.response_text.toLowerCase();
-  if (lower.startsWith('[answered]')) return 'answered';
-  if (lower.startsWith('[voicemail]')) return 'voicemail';
-  if (lower.startsWith('[no_answer]')) return 'no_answer';
-  if (lower.startsWith('[declined]')) return 'declined';
-  // Fall back: if they have a response, treat as answered
-  if (contact.outreach_status === 'responded') return 'answered';
-  return null;
-}
-
-function getStatusBadge(contact: AlumniContact) {
-  const status = getCallStatus(contact);
-  if (!status) {
-    return { label: 'Not Called', color: '#6b7280', bg: '#f3f4f6' };
-  }
-  return {
-    label: OUTCOME_CONFIG[status].label,
-    color: OUTCOME_CONFIG[status].color,
-    bg: OUTCOME_CONFIG[status].bg,
-  };
-}
 
 function parseNotesPreview(responseText: string | null): string {
   if (!responseText) return '';
-  // Strip leading [outcome] tag
-  return responseText.replace(/^\[[a-z_]+\]\s*/i, '');
+  const cleaned = responseText.replace(/^\[[a-z_]+\]\s*/i, '');
+  return cleaned.length > 100 ? cleaned.slice(0, 100) + '…' : cleaned;
 }
 
 function formatPhone(phone: string | null): string {
@@ -111,11 +109,10 @@ function formatPhone(phone: string | null): string {
 
 function sortContacts(contacts: AlumniContact[]): AlumniContact[] {
   return [...contacts].sort((a, b) => {
-    const aContacted = !!getCallStatus(a);
-    const bContacted = !!getCallStatus(b);
-    // Uncontacted first
-    if (aContacted !== bContacted) return aContacted ? 1 : -1;
-    // Then by grad year DESC
+    const aPriority = CARD_STATUS_CONFIG[getCardStatus(a)].priority;
+    const bPriority = CARD_STATUS_CONFIG[getCardStatus(b)].priority;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    // Within the same priority bucket, sort by grad year DESC
     const aYear = a.grad_year || a.year || 0;
     const bYear = b.grad_year || b.year || 0;
     return bYear - aYear;
@@ -133,6 +130,28 @@ function emptyPanel(contactId: string): LogPanel {
     followUpDate: '',
     saving: false,
   };
+}
+
+// ─── Status Legend ───────────────────────────────────────────────────────────
+
+function StatusLegend() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '0.25rem' }}>Legend:</span>
+      {(Object.entries(CARD_STATUS_CONFIG) as [CardStatus, CardStyle][]).map(([key, cfg]) => (
+        <span key={key} style={{
+          display: 'inline-flex', alignItems: 'center', gap: '5px',
+          padding: '3px 10px', borderRadius: 9999,
+          fontSize: '0.72rem', fontWeight: 600,
+          color: cfg.badgeColor, background: cfg.badgeBg,
+          border: `1px solid ${cfg.borderColor}`,
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: cfg.borderColor, display: 'inline-block', flexShrink: 0 }} />
+          {cfg.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -162,16 +181,17 @@ export default function ConnectsCenter() {
     load();
   }, []);
 
-  // ── Fetch contacts when chapter changes ──
+  // ── Fetch ALL contacts for selected chapter (no status filter) ──
   const loadContacts = useCallback(async (chapterId: string) => {
     if (!chapterId) return;
     setLoadingContacts(true);
     try {
       const res = await fetch(
-        `/api/alumni-contacts?chapter_id=${chapterId}&outreach_status=signed_up&limit=100`
+        `/api/alumni-contacts?chapter_id=${chapterId}&limit=200`
       );
-      const data = await res.json();
-      const raw: AlumniContact[] = data.data || data || [];
+      const json = await res.json();
+      // API returns { data: { contacts: [...], total: N } }
+      const raw: AlumniContact[] = json.data?.contacts ?? json.data ?? json ?? [];
       setContacts(sortContacts(raw));
     } catch (e) {
       console.error('Failed to load contacts', e);
@@ -243,12 +263,16 @@ export default function ConnectsCenter() {
         updatePanel({ saving: false });
         return;
       }
-      // Update contact in state
+      // Update contact in state and re-sort
       setContacts(prev =>
         sortContacts(
           prev.map(c =>
             c.id === contactId
-              ? { ...c, outreach_status: STATUS_MAP[panel!.outcome!] as AlumniContact['outreach_status'], response_text: responseText }
+              ? {
+                  ...c,
+                  outreach_status: STATUS_MAP[panel!.outcome!] as AlumniContact['outreach_status'],
+                  response_text: responseText,
+                }
               : c
           )
         )
@@ -262,11 +286,14 @@ export default function ConnectsCenter() {
     }
   }
 
-  // ── Derived data ──
-  const selectedChapter = chapters.find(c => c.id === selectedChapterId);
-  const answeredContacts = contacts.filter(c => getCallStatus(c) === 'answered');
-  const notCalledCount = contacts.filter(c => !getCallStatus(c)).length;
-  const calledCount = contacts.filter(c => !!getCallStatus(c)).length;
+  // ── Derived stats ──
+  const uncalledContacts  = contacts.filter(c => getCardStatus(c) === 'uncalled');
+  const voicemailContacts = contacts.filter(c => getCardStatus(c) === 'voicemail');
+  const calledContacts    = contacts.filter(c => getCardStatus(c) === 'called');
+  const declinedContacts  = contacts.filter(c => getCardStatus(c) === 'declined');
+  const answeredContacts  = contacts.filter(c =>
+    c.outreach_status === 'responded' || (c.outreach_status === 'touch2_sent' && !!c.response_text)
+  );
 
   // ── Render ──────────────────────────────────────────────────────────────
 
@@ -335,24 +362,28 @@ export default function ConnectsCenter() {
             )}
           </div>
 
-          {/* Stats row (shown once chapter selected) */}
+          {/* Stats bar (shown once chapter selected and data loaded) */}
           {selectedChapterId && !loadingContacts && contacts.length > 0 && (
             <div className="module-stats-row" style={{ marginBottom: '1.5rem' }}>
               <div className="module-stat">
                 <span className="module-stat-value">{contacts.length}</span>
-                <span className="module-stat-label">In Queue</span>
+                <span className="module-stat-label">Total Loaded</span>
               </div>
               <div className="module-stat">
-                <span className="module-stat-value" style={{ color: '#6b7280' }}>{notCalledCount}</span>
-                <span className="module-stat-label">Not Called</span>
+                <span className="module-stat-value" style={{ color: '#6b7280' }}>{uncalledContacts.length}</span>
+                <span className="module-stat-label">Not Yet Called</span>
               </div>
               <div className="module-stat">
-                <span className="module-stat-value" style={{ color: '#2563eb' }}>{calledCount}</span>
-                <span className="module-stat-label">Logged</span>
+                <span className="module-stat-value" style={{ color: '#1d4ed8' }}>{voicemailContacts.length}</span>
+                <span className="module-stat-label">Voicemail Only</span>
               </div>
               <div className="module-stat">
-                <span className="module-stat-value" style={{ color: '#15803d' }}>{answeredContacts.length}</span>
-                <span className="module-stat-label">Answered</span>
+                <span className="module-stat-value" style={{ color: '#15803d' }}>{calledContacts.length}</span>
+                <span className="module-stat-label">Called / Logged</span>
+              </div>
+              <div className="module-stat">
+                <span className="module-stat-value" style={{ color: '#92400e' }}>{declinedContacts.length}</span>
+                <span className="module-stat-label">Declined</span>
               </div>
             </div>
           )}
@@ -373,298 +404,304 @@ export default function ConnectsCenter() {
           ) : contacts.length === 0 ? (
             <div className="module-empty-state">
               <User size={48} />
-              <h3>No signed-up alumni found</h3>
-              <p>This chapter doesn't have any alumni who've signed up on the platform yet.</p>
+              <h3>No alumni contacts found</h3>
+              <p>This chapter doesn't have any alumni contacts yet.</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-              {contacts.map(contact => {
-                const badge = getStatusBadge(contact);
-                const callStatus = getCallStatus(contact);
-                const notesPreview = parseNotesPreview(contact.response_text);
-                const phone = contact.phone_primary || contact.phone_secondary;
-                const name = `${contact.first_name} ${contact.last_name}`;
-                const year = contact.grad_year || contact.year;
-                const isPanelOpen = openPanel === contact.id;
+            <>
+              {/* Status Legend */}
+              <StatusLegend />
 
-                return (
-                  <div key={contact.id}>
-                    {/* Queue Card */}
-                    <div style={{
-                      background: '#ffffff',
-                      border: `1px solid ${callStatus ? '#e5e7eb' : '#d1d5db'}`,
-                      borderRadius: 12,
-                      padding: '0.875rem 1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      flexWrap: 'wrap',
-                      boxShadow: callStatus ? 'none' : '0 1px 3px rgba(0,0,0,0.04)',
-                      opacity: callStatus === 'declined' ? 0.7 : 1,
-                    }}>
-                      {/* Name + meta */}
-                      <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{name}</span>
-                          {year && (
-                            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>'{String(year).slice(-2)}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                {contacts.map(contact => {
+                  const cardStatus = getCardStatus(contact);
+                  const cardStyle = CARD_STATUS_CONFIG[cardStatus];
+                  const notesPreview = parseNotesPreview(contact.response_text);
+                  const phone = contact.phone_primary || contact.phone_secondary;
+                  const name = `${contact.first_name} ${contact.last_name}`;
+                  const year = contact.grad_year || contact.year;
+                  const isPanelOpen = openPanel === contact.id;
+
+                  return (
+                    <div key={contact.id}>
+                      {/* Queue Card */}
+                      <div style={{
+                        background: '#ffffff',
+                        border: `1px solid #e5e7eb`,
+                        borderLeft: `4px solid ${cardStyle.borderColor}`,
+                        borderRadius: 12,
+                        padding: '0.875rem 1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        flexWrap: 'wrap',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        opacity: cardStatus === 'declined' ? 0.7 : 1,
+                      }}>
+                        {/* Name + meta */}
+                        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{name}</span>
+                            {year && (
+                              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>'{String(year).slice(-2)}</span>
+                            )}
+                            {/* Status badge */}
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '3px',
+                              padding: '2px 8px', borderRadius: 9999,
+                              fontSize: '0.7rem', fontWeight: 600,
+                              color: cardStyle.badgeColor, background: cardStyle.badgeBg,
+                            }}>
+                              {cardStyle.label}
+                            </span>
+                          </div>
+                          {/* Location / notes preview */}
+                          {(contact.location_city || notesPreview) && (
+                            <div style={{ fontSize: '0.8125rem', color: '#6b7280', marginTop: '0.125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {contact.location_city && <span>{contact.location_city}</span>}
+                              {contact.location_city && notesPreview && <span style={{ margin: '0 4px' }}>·</span>}
+                              {notesPreview && <span style={{ fontStyle: 'italic' }}>{notesPreview}</span>}
+                            </div>
                           )}
-                          {/* Status badge */}
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '3px',
-                            padding: '2px 8px', borderRadius: 9999,
-                            fontSize: '0.7rem', fontWeight: 600,
-                            color: badge.color, background: badge.bg,
-                          }}>
-                            {badge.label}
-                          </span>
+                          {contact.major && (
+                            <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.0625rem' }}>
+                              {contact.major}
+                            </div>
+                          )}
                         </div>
-                        {/* Industry / location */}
-                        {(contact.location_city || notesPreview) && (
-                          <div style={{ fontSize: '0.8125rem', color: '#6b7280', marginTop: '0.125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {contact.location_city && <span>{contact.location_city}</span>}
-                            {contact.location_city && notesPreview && <span style={{ margin: '0 4px' }}>·</span>}
-                            {notesPreview && <span>{notesPreview}</span>}
-                          </div>
-                        )}
-                        {contact.major && (
-                          <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.0625rem' }}>
-                            {contact.major}
-                          </div>
-                        )}
-                      </div>
 
-                      {/* Phone */}
-                      <div style={{ fontSize: '0.8125rem', color: '#374151', whiteSpace: 'nowrap' }}>
-                        {phone ? formatPhone(phone) : <span style={{ color: '#d1d5db' }}>No phone</span>}
-                      </div>
+                        {/* Phone */}
+                        <div style={{ fontSize: '0.8125rem', color: '#374151', whiteSpace: 'nowrap' }}>
+                          {phone ? formatPhone(phone) : <span style={{ color: '#d1d5db' }}>No phone</span>}
+                        </div>
 
-                      {/* Actions */}
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
-                        {phone && (
-                          <a
-                            href={`tel:${phone}`}
+                        {/* Actions */}
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+                          {phone && (
+                            <a
+                              href={`tel:${phone}`}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                padding: '0.375rem 0.75rem', borderRadius: 8,
+                                background: '#2563eb', color: '#fff',
+                                fontSize: '0.8125rem', fontWeight: 600,
+                                textDecoration: 'none',
+                              }}
+                            >
+                              <Phone size={14} />
+                              Call
+                            </a>
+                          )}
+                          <button
+                            onClick={() => togglePanel(contact.id)}
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: '5px',
                               padding: '0.375rem 0.75rem', borderRadius: 8,
-                              background: '#2563eb', color: '#fff',
+                              background: isPanelOpen ? '#f3f4f6' : '#fff',
+                              border: '1px solid #e5e7eb',
+                              color: '#374151',
                               fontSize: '0.8125rem', fontWeight: 600,
-                              textDecoration: 'none',
-                            }}
-                          >
-                            <Phone size={14} />
-                            Call
-                          </a>
-                        )}
-                        <button
-                          onClick={() => togglePanel(contact.id)}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '5px',
-                            padding: '0.375rem 0.75rem', borderRadius: 8,
-                            background: isPanelOpen ? '#f3f4f6' : '#fff',
-                            border: '1px solid #e5e7eb',
-                            color: '#374151',
-                            fontSize: '0.8125rem', fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {isPanelOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                          Log Call
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Inline Log Panel */}
-                    {isPanelOpen && panel && (
-                      <div style={{
-                        background: '#f9fafb',
-                        border: '1px solid #e5e7eb',
-                        borderTop: 'none',
-                        borderRadius: '0 0 12px 12px',
-                        padding: '1.25rem 1rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1rem',
-                      }}>
-
-                        {/* Outcome pills */}
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
-                            Outcome
-                          </label>
-                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            {(Object.keys(OUTCOME_CONFIG) as CallOutcome[]).map(o => (
-                              <button
-                                key={o}
-                                onClick={() => updatePanel({ outcome: panel.outcome === o ? null : o })}
-                                style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: '5px',
-                                  padding: '0.375rem 0.875rem', borderRadius: 9999,
-                                  border: panel.outcome === o ? `2px solid ${OUTCOME_CONFIG[o].color}` : '1.5px solid #e5e7eb',
-                                  background: panel.outcome === o ? OUTCOME_CONFIG[o].bg : '#fff',
-                                  color: panel.outcome === o ? OUTCOME_CONFIG[o].color : '#6b7280',
-                                  fontSize: '0.8125rem', fontWeight: 600,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease',
-                                }}
-                              >
-                                {OUTCOME_CONFIG[o].icon}
-                                {OUTCOME_CONFIG[o].label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Notes */}
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
-                            Notes
-                          </label>
-                          <textarea
-                            value={panel.notes}
-                            onChange={e => updatePanel({ notes: e.target.value })}
-                            placeholder="Industry, location, hiring status, family info, interests — anything useful for headhunting..."
-                            rows={3}
-                            style={{
-                              width: '100%', padding: '0.625rem 0.75rem',
-                              border: '1px solid #e5e7eb', borderRadius: 8,
-                              fontSize: '0.875rem', color: '#111827',
-                              background: '#fff', resize: 'vertical', outline: 'none',
-                              fontFamily: 'inherit',
-                            }}
-                          />
-                        </div>
-
-                        {/* Tags */}
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
-                            Headhunting Tags
-                          </label>
-                          {/* Active tags */}
-                          {panel.tags.length > 0 && (
-                            <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-                              {panel.tags.map(t => (
-                                <span key={t} style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                  padding: '3px 8px', borderRadius: 9999,
-                                  background: '#dbeafe', color: '#1d4ed8',
-                                  fontSize: '0.75rem', fontWeight: 600,
-                                }}>
-                                  {t}
-                                  <button onClick={() => removeTag(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1d4ed8', display: 'flex' }}>
-                                    <X size={11} />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {/* Tag input */}
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <input
-                              type="text"
-                              value={panel.tagInput}
-                              onChange={e => updatePanel({ tagInput: e.target.value })}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter' || e.key === ',') {
-                                  e.preventDefault();
-                                  addTag(panel.tagInput);
-                                }
-                              }}
-                              placeholder="Type and press Enter..."
-                              style={{
-                                padding: '0.375rem 0.625rem',
-                                border: '1px solid #e5e7eb', borderRadius: 8,
-                                fontSize: '0.8125rem', outline: 'none',
-                                background: '#fff', width: 180,
-                              }}
-                            />
-                            {/* Suggested tags */}
-                            {SUGGESTED_TAGS.filter(t => !panel.tags.includes(t) && (!panel.tagInput || t.includes(panel.tagInput.toLowerCase()))).slice(0, 6).map(t => (
-                              <button
-                                key={t}
-                                onClick={() => addTag(t)}
-                                style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                  padding: '3px 8px', borderRadius: 9999,
-                                  background: '#f3f4f6', color: '#6b7280',
-                                  border: '1px dashed #d1d5db',
-                                  fontSize: '0.73rem', fontWeight: 500,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <Tag size={10} />
-                                {t}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Follow-up */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                          <button
-                            onClick={() => updatePanel({ followUp: !panel.followUp })}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', color: panel.followUp ? '#2563eb' : '#6b7280', fontSize: '0.875rem', fontWeight: 600, padding: 0 }}
-                          >
-                            {panel.followUp ? <CheckSquare size={16} /> : <Square size={16} />}
-                            Follow-up needed
-                          </button>
-                          {panel.followUp && (
-                            <input
-                              type="date"
-                              value={panel.followUpDate}
-                              onChange={e => updatePanel({ followUpDate: e.target.value })}
-                              style={{
-                                padding: '0.3rem 0.5rem',
-                                border: '1px solid #e5e7eb', borderRadius: 8,
-                                fontSize: '0.8125rem', outline: 'none', background: '#fff',
-                              }}
-                            />
-                          )}
-                        </div>
-
-                        {/* Save / Cancel */}
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', paddingTop: '0.25rem' }}>
-                          <button
-                            onClick={() => { setOpenPanel(null); setPanel(null); }}
-                            style={{
-                              padding: '0.5rem 1rem', borderRadius: 8,
-                              border: '1px solid #e5e7eb', background: '#fff',
-                              color: '#374151', fontSize: '0.875rem', fontWeight: 600,
                               cursor: 'pointer',
                             }}
                           >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => saveLog(contact.id)}
-                            disabled={!panel.outcome || panel.saving}
-                            style={{
-                              padding: '0.5rem 1.25rem', borderRadius: 8,
-                              background: !panel.outcome || panel.saving ? '#e5e7eb' : '#111827',
-                              color: !panel.outcome || panel.saving ? '#9ca3af' : '#fff',
-                              fontSize: '0.875rem', fontWeight: 600,
-                              border: 'none', cursor: !panel.outcome || panel.saving ? 'not-allowed' : 'pointer',
-                              display: 'flex', alignItems: 'center', gap: '6px',
-                            }}
-                          >
-                            {panel.saving ? (
-                              <>
-                                <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                                Saving...
-                              </>
-                            ) : 'Save Log'}
+                            {isPanelOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            Log Call
                           </button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+
+                      {/* Inline Log Panel */}
+                      {isPanelOpen && panel && (
+                        <div style={{
+                          background: '#f9fafb',
+                          border: '1px solid #e5e7eb',
+                          borderTop: 'none',
+                          borderRadius: '0 0 12px 12px',
+                          padding: '1.25rem 1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '1rem',
+                        }}>
+
+                          {/* Outcome pills */}
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                              Outcome
+                            </label>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              {(Object.keys(OUTCOME_CONFIG) as CallOutcome[]).map(o => (
+                                <button
+                                  key={o}
+                                  onClick={() => updatePanel({ outcome: panel.outcome === o ? null : o })}
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                    padding: '0.375rem 0.875rem', borderRadius: 9999,
+                                    border: panel.outcome === o ? `2px solid ${OUTCOME_CONFIG[o].color}` : '1.5px solid #e5e7eb',
+                                    background: panel.outcome === o ? OUTCOME_CONFIG[o].bg : '#fff',
+                                    color: panel.outcome === o ? OUTCOME_CONFIG[o].color : '#6b7280',
+                                    fontSize: '0.8125rem', fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                >
+                                  {OUTCOME_CONFIG[o].icon}
+                                  {OUTCOME_CONFIG[o].label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Notes */}
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                              Notes
+                            </label>
+                            <textarea
+                              value={panel.notes}
+                              onChange={e => updatePanel({ notes: e.target.value })}
+                              placeholder="Industry, location, hiring status, family info, interests — anything useful for headhunting..."
+                              rows={3}
+                              style={{
+                                width: '100%', padding: '0.625rem 0.75rem',
+                                border: '1px solid #e5e7eb', borderRadius: 8,
+                                fontSize: '0.875rem', color: '#111827',
+                                background: '#fff', resize: 'vertical', outline: 'none',
+                                fontFamily: 'inherit',
+                              }}
+                            />
+                          </div>
+
+                          {/* Tags */}
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                              Headhunting Tags
+                            </label>
+                            {/* Active tags */}
+                            {panel.tags.length > 0 && (
+                              <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                                {panel.tags.map(t => (
+                                  <span key={t} style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                    padding: '3px 8px', borderRadius: 9999,
+                                    background: '#dbeafe', color: '#1d4ed8',
+                                    fontSize: '0.75rem', fontWeight: 600,
+                                  }}>
+                                    {t}
+                                    <button onClick={() => removeTag(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1d4ed8', display: 'flex' }}>
+                                      <X size={11} />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {/* Tag input */}
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <input
+                                type="text"
+                                value={panel.tagInput}
+                                onChange={e => updatePanel({ tagInput: e.target.value })}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter' || e.key === ',') {
+                                    e.preventDefault();
+                                    addTag(panel.tagInput);
+                                  }
+                                }}
+                                placeholder="Type and press Enter..."
+                                style={{
+                                  padding: '0.375rem 0.625rem',
+                                  border: '1px solid #e5e7eb', borderRadius: 8,
+                                  fontSize: '0.8125rem', outline: 'none',
+                                  background: '#fff', width: 180,
+                                }}
+                              />
+                              {/* Suggested tags */}
+                              {SUGGESTED_TAGS.filter(t => !panel.tags.includes(t) && (!panel.tagInput || t.includes(panel.tagInput.toLowerCase()))).slice(0, 6).map(t => (
+                                <button
+                                  key={t}
+                                  onClick={() => addTag(t)}
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                    padding: '3px 8px', borderRadius: 9999,
+                                    background: '#f3f4f6', color: '#6b7280',
+                                    border: '1px dashed #d1d5db',
+                                    fontSize: '0.73rem', fontWeight: 500,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <Tag size={10} />
+                                  {t}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Follow-up */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => updatePanel({ followUp: !panel.followUp })}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', color: panel.followUp ? '#2563eb' : '#6b7280', fontSize: '0.875rem', fontWeight: 600, padding: 0 }}
+                            >
+                              {panel.followUp ? <CheckSquare size={16} /> : <Square size={16} />}
+                              Follow-up needed
+                            </button>
+                            {panel.followUp && (
+                              <input
+                                type="date"
+                                value={panel.followUpDate}
+                                onChange={e => updatePanel({ followUpDate: e.target.value })}
+                                style={{
+                                  padding: '0.3rem 0.5rem',
+                                  border: '1px solid #e5e7eb', borderRadius: 8,
+                                  fontSize: '0.8125rem', outline: 'none', background: '#fff',
+                                }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Save / Cancel */}
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', paddingTop: '0.25rem' }}>
+                            <button
+                              onClick={() => { setOpenPanel(null); setPanel(null); }}
+                              style={{
+                                padding: '0.5rem 1rem', borderRadius: 8,
+                                border: '1px solid #e5e7eb', background: '#fff',
+                                color: '#374151', fontSize: '0.875rem', fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => saveLog(contact.id)}
+                              disabled={!panel.outcome || panel.saving}
+                              style={{
+                                padding: '0.5rem 1.25rem', borderRadius: 8,
+                                background: !panel.outcome || panel.saving ? '#e5e7eb' : '#111827',
+                                color: !panel.outcome || panel.saving ? '#9ca3af' : '#fff',
+                                fontSize: '0.875rem', fontWeight: 600,
+                                border: 'none', cursor: !panel.outcome || panel.saving ? 'not-allowed' : 'pointer',
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                              }}
+                            >
+                              {panel.saving ? (
+                                <>
+                                  <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                  Saving...
+                                </>
+                              ) : 'Save Log'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </section>
 
-        {/* ── Section 3: Intel Board ── */}
+        {/* ── Section 2: Intel Board (answered contacts) ── */}
         {answeredContacts.length > 0 && (
           <section>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1rem' }}>
@@ -675,7 +712,7 @@ export default function ConnectsCenter() {
                 Intel Board
               </h2>
               <span style={{ fontSize: '0.8125rem', color: '#6b7280' }}>
-                — {answeredContacts.length} answered contact{answeredContacts.length !== 1 ? 's' : ''}
+                — {answeredContacts.length} logged contact{answeredContacts.length !== 1 ? 's' : ''}
               </span>
             </div>
 
