@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -326,7 +325,7 @@ function SetUpPage() {
             lineHeight: 1.1,
             color: '#0F172A',
             marginBottom: '20px',
-            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontFamily: '"Instrument Serif", Georgia, serif',
             letterSpacing: '-0.02em',
           }}>
             The alumni network for every organization.
@@ -346,9 +345,19 @@ function SetUpPage() {
           </div>
         </section>
 
-        {/* Platform screenshots — matches marketing site layout */}
+        {/* Chapter logos — social proof row */}
+        <section style={{ maxWidth: '700px', margin: '0 auto', padding: '0 24px 48px', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', fontWeight: 500, letterSpacing: '0.05em', marginBottom: '20px' }}>Trusted by member-driven communities</p>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '32px', flexWrap: 'wrap', opacity: 0.7 }}>
+            {['Alabama KA', 'Ole Miss ATO', 'Ole Miss Sigma Chi', 'Theta Xi', 'TAMU Sigma Chi'].map(name => (
+              <span key={name} style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>{name}</span>
+            ))}
+          </div>
+        </section>
+
+        {/* Feature cards */}
         <section style={{ maxWidth: '900px', margin: '0 auto', padding: '0 24px 32px', textAlign: 'center' }}>
-          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '20px' }}>Trusted by member-driven communities</p>
+          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '20px' }}>What you get</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', textAlign: 'left' }}>
             {[
               { title: 'System of Record', desc: 'One source of truth for members and communication.', img: null },
