@@ -35,7 +35,7 @@ class MissionControlErrorBoundary extends React.Component<
       return (
         <div style={{ padding: '2rem', textAlign: 'center', color: '#991b1b' }}>
           <AlertCircle size={32} style={{ margin: '0 auto 1rem' }} />
-          <h2 style={{ fontFamily: 'Instrument Serif, Georgia, serif', marginBottom: '0.5rem' }}>Mission Control crashed</h2>
+          <h2 style={{ marginBottom: "0.5rem" }}>Mission Control crashed</h2>
           <pre style={{ fontSize: '0.8rem', background: '#fee2e2', padding: '1rem', borderRadius: 8, textAlign: 'left', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
             {this.state.error}
           </pre>
@@ -73,7 +73,7 @@ interface AlumniContact {
 interface AlumniData {
   data: AlumniContact[];
   count: number;
-  chapters: string[];
+  chapters: Array<{ id: string; chapter_name: string; fraternity: string | null; school: string | null }>;
   statusCounts: Record<string, number>;
   page: number;
   limit: number;
@@ -305,12 +305,12 @@ function StatCard({ label, value, icon, color }: {
       <div style={{
         width: 36, height: 36, borderRadius: 8,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0, background: '#F0EDE8', color: '#C4874A',
+        flexShrink: 0, background: '#F3F4F6', color: '#6B7280',
       }}>
         {icon}
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: '0.72rem', color: '#8C7B6B', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+        <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
         <div className="module-stat-value" style={{ fontSize: '1.2rem' }}>{value}</div>
       </div>
     </div>
@@ -533,10 +533,10 @@ function MissionControlInner() {
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all border-b-2 ${
                 activeTab === t.key
-                  ? 'bg-[#F0EDE8] text-[#2D2A26]'
-                  : 'text-[#8C7B6B] hover:text-[#2D2A26] hover:bg-[#F7F5F2]'
+                  ? 'border-[#0F172A] text-[#0F172A]'
+                  : 'border-transparent text-[#6B7280] hover:text-[#0F172A]'
               }`}
             >
               {t.icon}
@@ -553,13 +553,13 @@ function MissionControlInner() {
         {activeTab === 'alumni' && (
           <div>
             {/* Sub-tabs */}
-            <div className="flex gap-1 mb-6 bg-[#F0EDE8] rounded-xl p-1 w-fit">
+            <div className="flex gap-1 mb-6 bg-[#F3F4F6] rounded-xl p-1 w-fit">
               {(['alumni', 'outreach'] as OutreachSubTab[]).map((sub) => (
                 <button
                   key={sub}
                   onClick={() => setOutreachSub(sub)}
                   className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
-                    outreachSub === sub ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B] hover:text-[#2D2A26]'
+                    outreachSub === sub ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280] hover:text-[#0F172A]'
                   }`}
                 >
                   {sub === 'alumni' ? 'Alumni Contacts' : 'Outreach Dashboard'}
@@ -634,34 +634,34 @@ function MissionControlInner() {
         <div className="fixed inset-0 z-50 flex" onClick={() => setSoulAgent(null)}>
           <div className="flex-1" />
           <div
-            className="w-full max-w-lg h-full bg-white border-l border-[#E8E4DC] overflow-y-auto shadow-2xl"
+            className="w-full max-w-lg h-full bg-white border-l border-[#E5E7EB] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E4DC]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E7EB]">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{soulAgent.emoji}</span>
                 <div>
-                  <div className="font-semibold text-[#2D2A26]" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>
+                  <div className="font-semibold text-[#0F172A]">
                     {soulAgent.name}
                   </div>
-                  <div className="text-xs text-[#8C7B6B]">SOUL.md</div>
+                  <div className="text-xs text-[#6B7280]">SOUL.md</div>
                 </div>
               </div>
-              <button onClick={() => setSoulAgent(null)} className="text-[#8C7B6B] hover:text-[#2D2A26]">
+              <button onClick={() => setSoulAgent(null)} className="text-[#6B7280] hover:text-[#0F172A]">
                 <X size={18} />
               </button>
             </div>
             <div className="p-5">
               {soulLoading ? (
-                <div className="flex items-center gap-2 text-[#8C7B6B]">
+                <div className="flex items-center gap-2 text-[#6B7280]">
                   <Loader2 size={16} className="animate-spin" /> Loading soul…
                 </div>
               ) : soulContent ? (
-                <div className="prose prose-sm max-w-none text-[#2D2A26]">
+                <div className="prose prose-sm max-w-none text-[#0F172A]">
                   <ReactMarkdown>{soulContent}</ReactMarkdown>
                 </div>
               ) : (
-                <div className="text-[#8C7B6B] text-sm italic">No SOUL.md found for this agent.</div>
+                <div className="text-[#6B7280] text-sm italic">No SOUL.md found for this agent.</div>
               )}
             </div>
           </div>
@@ -743,7 +743,7 @@ function AlumniSection({
           >
             <option value="">All Chapters</option>
             {(data?.chapters ?? []).map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c.id} value={c.id}>{c.chapter_name}</option>
             ))}
           </select>
           <select
@@ -762,12 +762,12 @@ function AlumniSection({
       {/* Table */}
       <div className="module-table-container">
         {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#8C7B6B' }}>
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
             <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 0.5rem' }} />
             <div>Loading…</div>
           </div>
         ) : (data?.data ?? []).length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#8C7B6B', fontSize: '0.875rem' }}>
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#6B7280', fontSize: '0.875rem' }}>
             No contacts found
           </div>
         ) : (
@@ -787,16 +787,16 @@ function AlumniSection({
                   <td className="module-table-name">
                     {contact.first_name} {contact.last_name}
                   </td>
-                  <td style={{ color: '#5C5245', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                  <td style={{ color: '#6B7280', fontSize: '0.8rem', fontFamily: 'monospace' }}>
                     {contact.chapter?.chapter_name ?? (contact.chapter_id ? contact.chapter_id.slice(0, 8) + '…' : '—')}
                   </td>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.8125rem', color: '#5C5245' }}>
+                  <td style={{ fontFamily: 'monospace', fontSize: '0.8125rem', color: '#6B7280' }}>
                     {contact.phone_primary ?? '—'}
                   </td>
                   <td>
                     <StatusBadge status={contact.outreach_status} />
                   </td>
-                  <td style={{ fontSize: '0.75rem', color: '#8C7B6B' }}>
+                  <td style={{ fontSize: '0.75rem', color: '#6B7280' }}>
                     {fmtTime(contact.updated_at)}
                   </td>
                 </tr>
@@ -809,9 +809,9 @@ function AlumniSection({
         {totalPages > 1 && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '0.75rem 1rem', borderTop: '1px solid #E8E4DC', background: '#FAFAF8',
+            padding: '0.75rem 1rem', borderTop: '1px solid #E5E7EB', background: '#F9FAFB',
           }}>
-            <div style={{ fontSize: '0.75rem', color: '#8C7B6B' }}>
+            <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
               {(data?.count ?? 0).toLocaleString()} contacts · Page {page} of {totalPages}
             </div>
             <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -850,7 +850,7 @@ function OutreachSection({
 }) {
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center py-20 text-[#8C7B6B]">
+      <div className="flex items-center justify-center py-20 text-[#6B7280]">
         <Loader2 size={20} className="animate-spin mr-2" /> Loading outreach data…
       </div>
     );
@@ -868,7 +868,7 @@ function OutreachSection({
       <div className="flex justify-end">
         <button
           onClick={onRefresh}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E8E4DC] text-sm text-[#8C7B6B] hover:bg-white transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E7EB] text-sm text-[#6B7280] hover:bg-white transition-colors"
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           Refresh
@@ -877,16 +877,16 @@ function OutreachSection({
 
       {/* Line Health */}
       <div>
-        <h3 className="text-base font-semibold text-[#2D2A26] mb-3" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>Line Health</h3>
+        <h3 className="text-base font-semibold text-[#0F172A] mb-3">Line Health</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {lines.map((line) => {
             const sentToday = line.sent_today ?? 0;
             const pct = Math.min(100, Math.round((sentToday / (line.daily_limit || 1)) * 100));
             const isActive = line.linq_status === 'active' || (!line.is_paused && line.linq_status !== 'inactive');
             return (
-              <div key={line.line_number} className="bg-white border border-[#E8E4DC] rounded-xl p-4">
+              <div key={line.line_number} className="bg-white border border-[#E5E7EB] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="font-semibold text-[#2D2A26]">{line.label}</div>
+                  <div className="font-semibold text-[#0F172A]">{line.label}</div>
                   <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
                     line.is_paused ? 'bg-red-50 text-red-600' :
                     isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
@@ -895,14 +895,14 @@ function OutreachSection({
                     {line.is_paused ? 'Paused' : isActive ? 'Active' : 'Idle'}
                   </span>
                 </div>
-                <div className="text-xs text-[#8C7B6B] mb-2">{sentToday} / {line.daily_limit} today</div>
-                <div className="h-1.5 bg-[#F0EDE8] rounded-full overflow-hidden">
+                <div className="text-xs text-[#6B7280] mb-2">{sentToday} / {line.daily_limit} today</div>
+                <div className="h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full bg-emerald-400 transition-all"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <div className="text-xs text-[#B0A89A] mt-1">{pct}% daily cap</div>
+                <div className="text-xs text-[#9CA3AF] mt-1">{pct}% daily cap</div>
               </div>
             );
           })}
@@ -912,7 +912,7 @@ function OutreachSection({
       {/* Today's Activity */}
       {stats && (
         <div>
-          <h3 className="text-base font-semibold text-[#2D2A26] mb-3" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>Today&apos;s Activity</h3>
+          <h3 className="text-base font-semibold text-[#0F172A] mb-3">Today&apos;s Activity</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <StatCard label="T1 Sent" value={stats.t1_sent} icon={<MessageSquare size={14} className="text-blue-500" />} color="bg-blue-50" />
             <StatCard label="T2 Sent" value={stats.t2_sent} icon={<MessageSquare size={14} className="text-violet-500" />} color="bg-violet-50" />
@@ -928,11 +928,11 @@ function OutreachSection({
       {/* Chapter Funnels */}
       {chapters.length > 0 && (
         <div>
-          <h3 className="text-base font-semibold text-[#2D2A26] mb-3" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>Chapter Funnels</h3>
+          <h3 className="text-base font-semibold text-[#0F172A] mb-3">Chapter Funnels</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {chapters.map((ch) => (
-              <div key={ch.chapter_id} className="bg-white border border-[#E8E4DC] rounded-xl p-4">
-                <div className="font-semibold text-[#2D2A26] mb-3 text-sm">{ch.chapter_name}</div>
+              <div key={ch.chapter_id} className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+                <div className="font-semibold text-[#0F172A] mb-3 text-sm">{ch.chapter_name}</div>
                 <div className="space-y-1.5 text-xs">
                   {[
                     { label: 'Total', value: ch.total, color: 'bg-slate-200' },
@@ -943,14 +943,14 @@ function OutreachSection({
                     { label: 'Signed Up', value: ch.signed_up, color: 'bg-emerald-300' },
                   ].map((row) => (
                     <div key={row.label} className="flex items-center gap-2">
-                      <div className="w-20 text-[#8C7B6B] flex-shrink-0">{row.label}</div>
-                      <div className="flex-1 h-2 bg-[#F0EDE8] rounded-full overflow-hidden">
+                      <div className="w-20 text-[#6B7280] flex-shrink-0">{row.label}</div>
+                      <div className="flex-1 h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${row.color}`}
                           style={{ width: ch.total > 0 ? `${Math.min(100, (row.value / ch.total) * 100)}%` : '0%' }}
                         />
                       </div>
-                      <div className="w-8 text-right text-[#5C5245] font-medium">{row.value}</div>
+                      <div className="w-8 text-right text-[#6B7280] font-medium">{row.value}</div>
                     </div>
                   ))}
                 </div>
@@ -963,24 +963,24 @@ function OutreachSection({
       {/* Batch History */}
       {batches.length > 0 && (
         <div>
-          <h3 className="text-base font-semibold text-[#2D2A26] mb-3" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>Batch History</h3>
-          <div className="bg-white border border-[#E8E4DC] rounded-xl overflow-hidden">
+          <h3 className="text-base font-semibold text-[#0F172A] mb-3">Batch History</h3>
+          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#E8E4DC] bg-[#FAFAF8]">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Date</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden md:table-cell">Chapter</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Contacts</th>
+                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Date</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden md:table-cell">Chapter</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Contacts</th>
                   </tr>
                 </thead>
                 <tbody>
                   {batches.slice(0, 20).map((batch, i) => {
                     const b = batch as Record<string, unknown>;
                     return (
-                      <tr key={String(b.id ?? i)} className="border-b border-[#F0EDE8] hover:bg-[#FAFAF8]">
-                        <td className="px-4 py-3 text-[#2D2A26] font-mono text-xs">{String(b.scheduled_date ?? '—')}</td>
+                      <tr key={String(b.id ?? i)} className="border-b border-[#F3F4F6] hover:bg-[#F9FAFB]">
+                        <td className="px-4 py-3 text-[#0F172A] font-mono text-xs">{String(b.scheduled_date ?? '—')}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-xs ${
                             b.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
@@ -989,8 +989,8 @@ function OutreachSection({
                             'bg-slate-50 text-slate-700'
                           }`}>{String(b.status ?? '—')}</span>
                         </td>
-                        <td className="px-4 py-3 text-[#5C5245] hidden md:table-cell">{String(b.chapter_name ?? b.chapter_id ?? 'Multi')}</td>
-                        <td className="px-4 py-3 text-[#2D2A26] tabular-nums">{String(b.total_contacts ?? '—')}</td>
+                        <td className="px-4 py-3 text-[#6B7280] hidden md:table-cell">{String(b.chapter_name ?? b.chapter_id ?? 'Multi')}</td>
+                        <td className="px-4 py-3 text-[#0F172A] tabular-nums">{String(b.total_contacts ?? '—')}</td>
                       </tr>
                     );
                   })}
@@ -1004,7 +1004,7 @@ function OutreachSection({
       {/* Response Inbox Summary */}
       {inbox && (
         <div>
-          <h3 className="text-base font-semibold text-[#2D2A26] mb-3" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>Response Inbox</h3>
+          <h3 className="text-base font-semibold text-[#0F172A] mb-3">Response Inbox</h3>
           <div className="grid grid-cols-3 gap-4">
             <StatCard label="Total Responses" value={inbox.total} icon={<MessageSquare size={14} className="text-blue-500" />} color="bg-blue-50" />
             <StatCard label="Needs T2" value={inbox.needs_t2} icon={<ArrowUpRight size={14} className="text-amber-500" />} color="bg-amber-50" />
@@ -1034,11 +1034,11 @@ function AgentsSection({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 bg-[#F0EDE8] rounded-xl p-1">
+        <div className="flex gap-1 bg-[#F3F4F6] rounded-xl p-1">
           <button
             onClick={() => onViewMode('hierarchy')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'hierarchy' ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B]'
+              viewMode === 'hierarchy' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
             }`}
           >
             <Network size={14} /> Hierarchy
@@ -1046,19 +1046,19 @@ function AgentsSection({
           <button
             onClick={() => onViewMode('grid')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'grid' ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B]'
+              viewMode === 'grid' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
             }`}
           >
             <LayoutGrid size={14} /> Grid
           </button>
         </div>
-        <button onClick={onRefresh} className="p-2 rounded-lg border border-[#E8E4DC] text-[#8C7B6B] hover:bg-white">
+        <button onClick={onRefresh} className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-white">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-[#8C7B6B]">
+        <div className="flex items-center justify-center py-20 text-[#6B7280]">
           <Loader2 size={20} className="animate-spin mr-2" /> Loading agents…
         </div>
       ) : viewMode === 'hierarchy' ? (
@@ -1069,7 +1069,7 @@ function AgentsSection({
               <AgentCard agent={mainAgent} onViewSoul={onViewSoul} isMain />
               {/* Connector */}
               <div className="flex justify-center">
-                <div className="w-px h-6 bg-[#E8E4DC]" />
+                <div className="w-px h-6 bg-[#E5E7EB]" />
               </div>
             </div>
           )}
@@ -1100,7 +1100,7 @@ function AgentCard({ agent, onViewSoul, isMain }: {
   return (
     <div style={{
       background: 'white',
-      border: `1px solid ${isMain ? '#c4b5fd' : '#E8E4DC'}`,
+      border: `1px solid ${isMain ? '#c4b5fd' : '#E5E7EB'}`,
       borderRadius: 12,
       padding: '1rem',
       boxShadow: isMain ? '0 1px 4px rgba(109,40,217,0.08)' : undefined,
@@ -1115,14 +1115,14 @@ function AgentCard({ agent, onViewSoul, isMain }: {
             {agent.emoji}
           </div>
           <div>
-            <div style={{ fontWeight: 600, color: '#2D2A26', fontSize: '0.875rem' }}>{agent.name}</div>
+            <div style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.875rem' }}>{agent.name}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <span style={{
                 width: 6, height: 6, borderRadius: '50%',
                 background: agent.status === 'active' ? '#34d399' : '#cbd5e1',
                 display: 'inline-block',
               }} />
-              <span style={{ fontSize: '0.72rem', color: agent.status === 'active' ? '#059669' : '#8C7B6B' }}>
+              <span style={{ fontSize: '0.72rem', color: agent.status === 'active' ? '#059669' : '#6B7280' }}>
                 {agent.status === 'active' ? 'Active' : 'Idle'}
               </span>
             </div>
@@ -1137,12 +1137,12 @@ function AgentCard({ agent, onViewSoul, isMain }: {
           </span>
         )}
       </div>
-      <p style={{ fontSize: '0.75rem', color: '#8C7B6B', lineHeight: 1.6, marginBottom: '0.75rem',
+      <p style={{ fontSize: '0.75rem', color: '#6B7280', lineHeight: 1.6, marginBottom: '0.75rem',
         overflow: 'hidden', display: '-webkit-box', WebkitBoxOrient: 'vertical' as const, WebkitLineClamp: 2 } as React.CSSProperties}>
         {agent.description}
       </p>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: '0.72rem', color: '#B0A89A' }}>
+        <div style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>
           {agent.lastActive ? fmtTime(agent.lastActive) : 'Never active'}
         </div>
         <button
@@ -1208,7 +1208,7 @@ function CronsSection({
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
-          <div className="text-sm text-[#8C7B6B]">
+          <div className="text-sm text-[#6B7280]">
             {jobs.length} jobs
             {enabledCount > 0 && <span className="ml-1 text-emerald-600">· {enabledCount} enabled</span>}
             {disabledCount > 0 && <span className="ml-1 text-slate-500">· {disabledCount} disabled</span>}
@@ -1218,11 +1218,11 @@ function CronsSection({
         </div>
         <div className="flex items-center gap-2">
           {/* View toggle */}
-          <div className="flex gap-0.5 bg-[#F0EDE8] rounded-lg p-0.5">
+          <div className="flex gap-0.5 bg-[#F3F4F6] rounded-lg p-0.5">
             <button
               onClick={() => setView('list')}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                view === 'list' ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B]'
+                view === 'list' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
               }`}
             >
               <Activity size={12} /> All Jobs
@@ -1230,32 +1230,32 @@ function CronsSection({
             <button
               onClick={() => setView('schedule')}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                view === 'schedule' ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B]'
+                view === 'schedule' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
               }`}
             >
               <Calendar size={12} /> Daily Schedule
             </button>
           </div>
-          <button onClick={onRefresh} className="p-2 rounded-lg border border-[#E8E4DC] text-[#8C7B6B] hover:bg-white">
+          <button onClick={onRefresh} className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-white">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
 
       {loading && jobs.length === 0 ? (
-        <div className="flex items-center justify-center py-20 text-[#8C7B6B]">
+        <div className="flex items-center justify-center py-20 text-[#6B7280]">
           <Loader2 size={20} className="animate-spin mr-2" /> Loading crons…
         </div>
       ) : jobs.length === 0 ? (
-        <div className="text-center py-20 text-[#8C7B6B] text-sm">No cron jobs found</div>
+        <div className="text-center py-20 text-[#6B7280] text-sm">No cron jobs found</div>
       ) : view === 'schedule' ? (
         /* Daily Schedule View */
         <div className="space-y-3">
-          <h3 className="text-base font-semibold text-[#2D2A26]" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>
+          <h3 className="text-base font-semibold text-[#0F172A]">
             Coming Up — Next 7 Days
           </h3>
           {upcoming.length === 0 ? (
-            <div className="text-[#8C7B6B] text-sm italic py-8 text-center">No upcoming runs in the next 7 days</div>
+            <div className="text-[#6B7280] text-sm italic py-8 text-center">No upcoming runs in the next 7 days</div>
           ) : (
             <div className="space-y-2">
               {upcoming.map((job) => {
@@ -1265,16 +1265,16 @@ function CronsSection({
                 const dayLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                 const timeLabel = nextDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' });
                 return (
-                  <div key={job.id} className="flex items-center gap-3 bg-white border border-[#E8E4DC] rounded-xl px-4 py-3 hover:bg-[#FAFAF8]">
+                  <div key={job.id} className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3 hover:bg-[#F9FAFB]">
                     <div className="w-24 flex-shrink-0">
-                      <div className={`text-xs font-semibold ${ isToday ? 'text-violet-600' : 'text-[#8C7B6B]' }`}>{dayLabel}</div>
-                      <div className="text-sm font-mono text-[#2D2A26]">{timeLabel}</div>
+                      <div className={`text-xs font-semibold ${ isToday ? 'text-violet-600' : 'text-[#6B7280]' }`}>{dayLabel}</div>
+                      <div className="text-sm font-mono text-[#0F172A]">{timeLabel}</div>
                     </div>
-                    <div className="w-px h-10 bg-[#E8E4DC] flex-shrink-0" />
+                    <div className="w-px h-10 bg-[#E5E7EB] flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-[#2D2A26] text-sm">{job.name}</div>
+                      <div className="font-medium text-[#0F172A] text-sm">{job.name}</div>
                       {job.description && (
-                        <div className="text-xs text-[#8C7B6B] mt-0.5 truncate">{job.description}</div>
+                        <div className="text-xs text-[#6B7280] mt-0.5 truncate">{job.description}</div>
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -1315,26 +1315,26 @@ function CronsSection({
               </select>
             </div>
           )}
-          <div className="bg-white border border-[#E8E4DC] rounded-xl overflow-hidden">
+          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#E8E4DC] bg-[#FAFAF8]">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden sm:table-cell">Agent</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden md:table-cell">Schedule</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden lg:table-cell">Next Run</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide hidden lg:table-cell">Last Run</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Status</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-[#8C7B6B] uppercase tracking-wide">Actions</th>
+                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Name</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden sm:table-cell">Agent</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden md:table-cell">Schedule</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden lg:table-cell">Next Run</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden lg:table-cell">Last Run</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Status</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((job) => (
-                    <tr key={job.id} className={`border-b border-[#F0EDE8] hover:bg-[#FAFAF8] ${ job.enabled === false ? 'opacity-60' : '' }`}>
+                    <tr key={job.id} className={`border-b border-[#F3F4F6] hover:bg-[#F9FAFB] ${ job.enabled === false ? 'opacity-60' : '' }`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="font-medium text-[#2D2A26] text-sm">{job.name}</div>
+                          <div className="font-medium text-[#0F172A] text-sm">{job.name}</div>
                           {job.enabled === false && (
                             <span className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-500 font-medium">disabled</span>
                           )}
@@ -1345,7 +1345,7 @@ function CronsSection({
                           )}
                         </div>
                         {job.description && (
-                          <div className="text-xs text-[#8C7B6B] mt-0.5 hidden sm:block line-clamp-1">{job.description}</div>
+                          <div className="text-xs text-[#6B7280] mt-0.5 hidden sm:block line-clamp-1">{job.description}</div>
                         )}
                         {job.lastError && job.lastStatus === 'error' && (
                           <div className="text-xs text-red-500 mt-0.5 hidden sm:block truncate max-w-xs" title={job.lastError}>
@@ -1363,16 +1363,16 @@ function CronsSection({
                         )}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <span className="text-xs text-[#5C5245]">
+                        <span className="text-xs text-[#6B7280]">
                           {humanScheduleFromJob(job)}
                         </span>
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className={`text-xs font-medium ${ job.nextRun && new Date(job.nextRun).getTime() - now < 3600000 ? 'text-violet-600' : 'text-[#8C7B6B]' }`}>
+                        <span className={`text-xs font-medium ${ job.nextRun && new Date(job.nextRun).getTime() - now < 3600000 ? 'text-violet-600' : 'text-[#6B7280]' }`}>
                           {fmtNextRun(job.nextRun)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-[#8C7B6B]">
+                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-[#6B7280]">
                         {job.lastRun ? fmtTime(job.lastRun) : '—'}
                       </td>
                       <td className="px-4 py-3">
@@ -1388,14 +1388,14 @@ function CronsSection({
                             {job.consecutiveErrors && job.consecutiveErrors > 1 ? ` ×${job.consecutiveErrors}` : ''}
                           </span>
                         ) : (
-                          <span className="text-xs text-[#B0A89A]">—</span>
+                          <span className="text-xs text-[#9CA3AF]">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => onTrigger(job.id)}
                           disabled={triggering === job.id}
-                          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#F0EDE8] text-[#5C5245] hover:bg-[#E8E4DC] transition-colors disabled:opacity-50 ml-auto"
+                          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB] transition-colors disabled:opacity-50 ml-auto"
                         >
                           {triggering === job.id ? (
                             <Loader2 size={11} className="animate-spin" />
@@ -1432,11 +1432,11 @@ function MemorySection({
 }) {
   return (
     <div className="space-y-5">
-      <div className="flex gap-1 bg-[#F0EDE8] rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-[#F3F4F6] rounded-xl p-1 w-fit">
         <button
           onClick={() => onSub('daily')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            sub === 'daily' ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B]'
+            sub === 'daily' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
           }`}
         >
           <Calendar size={14} /> Daily Notes
@@ -1444,7 +1444,7 @@ function MemorySection({
         <button
           onClick={() => onSub('longterm')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            sub === 'longterm' ? 'bg-white text-[#2D2A26] shadow-sm' : 'text-[#8C7B6B]'
+            sub === 'longterm' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
           }`}
         >
           <FileText size={14} /> Long-term Memory
@@ -1452,20 +1452,20 @@ function MemorySection({
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-[#8C7B6B]">
+        <div className="flex items-center justify-center py-20 text-[#6B7280]">
           <Loader2 size={20} className="animate-spin mr-2" /> Loading memory…
         </div>
       ) : sub === 'longterm' ? (
-        <div className="bg-white border border-[#E8E4DC] rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-[#2D2A26] mb-4" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>
+        <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-[#0F172A] mb-4">
             MEMORY.md — Tony&apos;s Long-term Memory
           </h3>
           {longTermContent ? (
-            <div className="prose prose-sm max-w-none text-[#2D2A26]">
+            <div className="prose prose-sm max-w-none text-[#0F172A]">
               <ReactMarkdown>{longTermContent}</ReactMarkdown>
             </div>
           ) : (
-            <div className="text-[#8C7B6B] text-sm italic">Memory file is empty.</div>
+            <div className="text-[#6B7280] text-sm italic">Memory file is empty.</div>
           )}
         </div>
       ) : (
@@ -1473,7 +1473,7 @@ function MemorySection({
           {/* Entry list */}
           <div className="w-64 flex-shrink-0 space-y-2">
             {entries.length === 0 ? (
-              <div className="text-[#8C7B6B] text-sm italic px-2">No daily notes found.</div>
+              <div className="text-[#6B7280] text-sm italic px-2">No daily notes found.</div>
             ) : entries.map((entry) => (
               <button
                 key={entry.date}
@@ -1481,12 +1481,12 @@ function MemorySection({
                 className={`w-full text-left p-3 rounded-xl border transition-all ${
                   selected?.date === entry.date
                     ? 'border-violet-200 bg-violet-50'
-                    : 'border-[#E8E4DC] bg-white hover:bg-[#FAFAF8]'
+                    : 'border-[#E5E7EB] bg-white hover:bg-[#F9FAFB]'
                 }`}
               >
-                <div className="font-medium text-[#2D2A26] text-sm font-mono">{entry.date}</div>
+                <div className="font-medium text-[#0F172A] text-sm font-mono">{entry.date}</div>
                 {entry.preview && (
-                  <div className="text-xs text-[#8C7B6B] mt-0.5 line-clamp-2">{entry.preview}</div>
+                  <div className="text-xs text-[#6B7280] mt-0.5 line-clamp-2">{entry.preview}</div>
                 )}
               </button>
             ))}
@@ -1495,21 +1495,21 @@ function MemorySection({
           {/* Entry content */}
           <div className="flex-1 min-w-0">
             {selected ? (
-              <div className="bg-white border border-[#E8E4DC] rounded-xl p-6">
+              <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-[#2D2A26]" style={{ fontFamily: 'Instrument Serif, Georgia, serif' }}>
+                  <h3 className="font-semibold text-[#0F172A]">
                     {selected.date}
                   </h3>
-                  <button onClick={() => onSelect(null)} className="text-[#8C7B6B] hover:text-[#2D2A26]">
+                  <button onClick={() => onSelect(null)} className="text-[#6B7280] hover:text-[#0F172A]">
                     <X size={16} />
                   </button>
                 </div>
-                <div className="prose prose-sm max-w-none text-[#2D2A26]">
+                <div className="prose prose-sm max-w-none text-[#0F172A]">
                   <ReactMarkdown>{selected.content ?? ''}</ReactMarkdown>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-40 text-[#8C7B6B] text-sm italic">
+              <div className="flex items-center justify-center h-40 text-[#6B7280] text-sm italic">
                 Select a date to read the notes
               </div>
             )}
