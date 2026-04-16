@@ -303,71 +303,72 @@ function SetUpPage() {
 
   if (step === 0) {
     return (
-      <div style={{ background: '#F9FAFB', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div style={{ background: 'white', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' }}>
         {testMode && (
           <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '8px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#92400e' }}>
             🧪 TEST MODE — No real charges will be made
           </div>
         )}
-        {/* Nav */}
-        <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 24px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '28px' }} />
-          <button
-            onClick={() => goToStep(1)}
-            style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            Get started →
+        {/* Nav — matches trailblaize.net */}
+        <nav style={{ padding: '0 32px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6' }}>
+          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '24px' }} />
+          <button onClick={() => goToStep(1)}
+            style={{ padding: '8px 20px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.875rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+            Get Started
           </button>
         </nav>
 
-        {/* Hero */}
-        <section style={{ maxWidth: '720px', margin: '0 auto', padding: '64px 24px 48px', textAlign: 'center' }}>
-          <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', fontWeight: 700, lineHeight: 1.15, color: '#111827', marginBottom: '16px', fontFamily: 'Inter, system-ui, sans-serif' }}>
-            Activate your alumni network.
+        {/* Hero — large serif, centered, matches marketing site */}
+        <section style={{ maxWidth: '680px', margin: '0 auto', padding: '80px 24px 56px', textAlign: 'center' }}>
+          <h1 style={{
+            fontSize: 'clamp(2.25rem, 6vw, 3.75rem)',
+            fontWeight: 700,
+            lineHeight: 1.1,
+            color: '#0F172A',
+            marginBottom: '20px',
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            letterSpacing: '-0.02em',
+          }}>
+            The alumni network for every organization.
           </h1>
-          <p style={{ fontSize: '1.125rem', color: '#6B7280', marginBottom: '32px', lineHeight: 1.6 }}>
-            The platform that keeps your organization connected long after graduation.
+          <p style={{ fontSize: '1.125rem', color: '#6B7280', marginBottom: '36px', lineHeight: 1.6, maxWidth: '480px', margin: '0 auto 36px' }}>
+            A shared platform where organizations own their alumni community.
           </p>
-          <button
-            onClick={() => goToStep(1)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 28px', borderRadius: '10px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            Get Started <ArrowRight size={18} />
-          </button>
-
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => goToStep(1)}
+              style={{ padding: '12px 28px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.9375rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              Get Started <ArrowRight size={16} />
+            </button>
+            <a href="https://www.trailblaize.net" target="_blank" rel="noopener noreferrer"
+              style={{ padding: '12px 28px', borderRadius: '8px', background: 'white', color: '#0F172A', fontWeight: 600, fontSize: '0.9375rem', border: '1.5px solid #E5E7EB', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+              Learn more
+            </a>
+          </div>
         </section>
 
-        {/* Feature Cards */}
-        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '0 24px 64px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+        {/* Platform screenshots — matches marketing site layout */}
+        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '0 24px 32px', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '20px' }}>Trusted by member-driven communities</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', textAlign: 'left' }}>
             {[
-              {
-                icon: <Users size={22} color="#0F172A" />,
-                title: 'Alumni Pipeline',
-                desc: 'See every alumni, their industry, location, and how to reach them.',
-              },
-              {
-                icon: <MessageSquare size={22} color="#0F172A" />,
-                title: 'Message Board',
-                desc: 'Post announcements, opportunities, and updates your alumni actually see.',
-              },
-              {
-                icon: <User size={22} color="#0F172A" />,
-                title: 'Alumni Profiles',
-                desc: 'Every member gets a profile card with chapter, graduation year, industry, and location.',
-              },
-            ].map((card) => (
-              <div
-                key={card.title}
-                style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px' }}
-              >
-                <div style={{ marginBottom: '10px' }}>{card.icon}</div>
-                <h3 style={{ fontWeight: 700, color: '#111827', fontSize: '0.9375rem', marginBottom: '6px', margin: '0 0 6px 0' }}>{card.title}</h3>
-                <p style={{ color: '#6B7280', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>{card.desc}</p>
+              { title: 'System of Record', desc: 'One source of truth for members and communication.', img: null },
+              { title: 'Unified Alumni Network', desc: 'Profiles, messaging, and networking in one place.', img: null },
+              { title: 'Headhunting Pipeline', desc: 'Connect actives with alumni opportunities instantly.', img: null },
+            ].map(card => (
+              <div key={card.title} style={{ background: '#F9FAFB', borderRadius: '16px', padding: '24px', border: '1px solid #F3F4F6' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', margin: '0 0 8px 0' }}>{card.title}</h3>
+                <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0, lineHeight: 1.5 }}>{card.desc}</p>
               </div>
             ))}
           </div>
+        </section>
 
+        {/* Bottom CTA */}
+        <section style={{ textAlign: 'center', padding: '32px 24px 80px' }}>
+          <button onClick={() => goToStep(1)}
+            style={{ padding: '14px 36px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+            Start your free onboarding
+          </button>
         </section>
       </div>
     );
