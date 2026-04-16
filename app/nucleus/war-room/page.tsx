@@ -1275,7 +1275,15 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
   useEffect(() => {
     fetch('/api/war-room/campaigns')
       .then(r => r.json())
-      .then((data: Campaign[]) => {
+      .then((raw: unknown) => {
+        // Normalize: API returns array or {data: array}
+        const arr = Array.isArray(raw) ? raw : ((raw as any)?.data ?? []);
+        // Ensure rows is always an array on each campaign
+        const data: Campaign[] = arr.map((c: any) => ({
+          ...c,
+          rows: Array.isArray(c.rows) ? c.rows : [],
+          updatedAt: c.updated_at || c.updatedAt || new Date().toISOString(),
+        }));
         setCampaigns(data);
         if (data.length > 0) seededRef.current = true;
       })
@@ -1356,7 +1364,7 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
   }, [stats]);
 
   const unlinkedDealsCount = useMemo(() => {
-    const linkedOrgIds = new Set(campaigns.flatMap(c => c.rows.map(r => r.orgId).filter(Boolean)));
+    const linkedOrgIds = new Set((Array.isArray(campaigns) ? campaigns : []).flatMap(c => (Array.isArray(c.rows) ? c.rows : []).map(r => r.orgId).filter(Boolean)));
     return stats?.recentDeals.filter(d => d.organization?.id && !linkedOrgIds.has(d.organization.id)).length ?? 0;
   }, [campaigns, stats]);
 
