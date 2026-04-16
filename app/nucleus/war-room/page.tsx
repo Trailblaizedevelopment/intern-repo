@@ -99,6 +99,7 @@ interface CampaignRow {
   sourceUrl: string;
   meetingBooked: boolean;
   dealId?: string;
+  notes?: string;
 }
 
 interface Campaign {
@@ -112,18 +113,7 @@ interface Campaign {
   updatedAt: string;
 }
 
-// Next Steps (Notes tab)
-interface NextStep {
-  id: string;
-  noteId: string;
-  noteTitle: string;
-  noteDate: string;
-  text: string;
-  assignedTo: 'Owen' | 'Ford' | 'Adam' | 'All';
-  dueDate?: string;
-  done: boolean;
-  createdAt: string;
-}
+
 
 // Client Map types
 type SchoolStatus = 'active_client' | 'in_pipeline' | 'not_contacted';
@@ -510,83 +500,29 @@ function MethodPill({ method }: { method: OutreachMethod }) {
 
 // ─── Tab 1: Dashboard ─────────────────────────────────────────────────────────
 
-interface PipelineGroup {
-  label: string;
-  color: string;
-  deals: Deal[];
-}
 
-function groupDealsByUrgency(deals: Deal[]): PipelineGroup[] {
-  const today = todayISO();
-  const week = in7DaysISO();
-  const overdue: Deal[] = [];
-  const thisWeek: Deal[] = [];
-  const upcoming: Deal[] = [];
-  for (const d of deals) {
-    const fu = d.next_followup;
-    if (!fu) { upcoming.push(d); continue; }
-    if (fu < today) overdue.push(d);
-    else if (fu <= week) thisWeek.push(d);
-    else upcoming.push(d);
+
+function DashboardTab({ stats, onOpenDeal: _onOpenDeal }: { stats: PipelineStats | null; onOpenDeal: (deal: Deal) => void }) {
+  const [mapSchools, setMapSchools] = useState<MapSchool[]>([]);
+  const [selectedState, setSelectedState] = useState<string | null>(null);
+  const [stateDeals, setStateDeals] = useState<Deal[]>([]);
+  const [showStatePanel, setShowStatePanel] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/pipeline/schools').then(r => r.json()).then(d => setMapSchools(Array.isArray(d) ? d : [])).catch(console.error);
+  }, []);
+
+  function handleStateClick(state: string | null) {
+    setSelectedState(state);
+    if (state && stats) {
+      const deals = stats.recentDeals.filter(d => d.organization?.school?.state?.toUpperCase() === state.toUpperCase());
+      setStateDeals(deals);
+      setShowStatePanel(true);
+    } else {
+      setShowStatePanel(false);
+    }
   }
-  return [
-    { label: 'Overdue', color: '#ef4444', deals: overdue },
-    { label: 'This Week', color: '#d97706', deals: thisWeek },
-    { label: 'Upcoming', color: '#9ca3af', deals: upcoming },
-  ].filter(g => g.deals.length > 0);
-}
 
-function PipelineDealRow({ deal, onOpen }: { deal: Deal; onOpen: (deal: Deal) => void }) {
-  const org = deal.organization;
-  const chapterName = org?.name || '—';
-  const schoolName = org?.school?.name || deal.conference || '—';
-  return (
-    <tr
-      style={{ cursor: 'pointer' }}
-      onClick={() => onOpen(deal)}
-    >
-      <td className="module-table-name">{chapterName}</td>
-      <td style={{ color: '#6b7280', fontSize: '0.8125rem' }}>{schoolName}</td>
-      <td><StageBadge stage={deal.stage} /></td>
-      <td style={{ textAlign: 'center' }}><TempBadge temp={deal.temperature} /></td>
-      <td style={{ textAlign: 'right', fontSize: '0.8125rem', ...followupStyle(deal.next_followup) }}>
-        {fmtDate(deal.next_followup)}
-      </td>
-      <td><RepChip name={deal.assigned_to} /></td>
-      <td style={{ textAlign: 'right', fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>
-        {deal.value ? fmt$(deal.value) : '—'}
-      </td>
-    </tr>
-  );
-}
-
-function CollapsiblePipelineGroup({ group, onOpen }: { group: PipelineGroup; onOpen: (deal: Deal) => void }) {
-  const [open, setOpen] = useState(true);
-  return (
-    <>
-      <tr style={{ background: '#F9FAFB', borderTop: '1px solid #E5E7EB', borderBottom: '1px solid #E5E7EB' }}>
-        <td colSpan={7} style={{ padding: '8px 20px' }}>
-          <button
-            onClick={() => setOpen(o => !o)}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-          >
-            <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: group.color, flexShrink: 0 }} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1 }}>
-              {group.label}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 500 }}>
-              {group.deals.length} deal{group.deals.length !== 1 ? 's' : ''}
-            </span>
-            {open ? <ChevronUp size={13} color="#9ca3af" /> : <ChevronDown size={13} color="#9ca3af" />}
-          </button>
-        </td>
-      </tr>
-      {open && group.deals.map(deal => <PipelineDealRow key={deal.id} deal={deal} onOpen={onOpen} />)}
-    </>
-  );
-}
-
-function DashboardTab({ stats, onOpenDeal }: { stats: PipelineStats | null; onOpenDeal: (deal: Deal) => void }) {
   if (!stats) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '16rem', color: '#9ca3af' }}>
@@ -599,7 +535,6 @@ function DashboardTab({ stats, onOpenDeal }: { stats: PipelineStats | null; onOp
   const closedCount = stats.closedDealCount ?? 0;
   const closedGoal = 20; // internal milestone
   const closedPct = Math.min(100, Math.round((closedCount / closedGoal) * 100));
-  const pipelineGroups = groupDealsByUrgency(stats.recentDeals);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -673,52 +608,17 @@ function DashboardTab({ stats, onOpenDeal }: { stats: PipelineStats | null; onOp
         </div>
       )}
 
-      {/* Live Pipeline Feed */}
-      <div className="module-table-container">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ position: 'relative', display: 'inline-flex', width: '10px', height: '10px' }}>
-              <span style={{ position: 'absolute', inset: 0, borderRadius: '9999px', background: '#34d399', opacity: 0.75, animation: 'ping 1s cubic-bezier(0,0,0.2,1) infinite' }} />
-              <span style={{ position: 'relative', borderRadius: '9999px', background: '#10b981', width: '10px', height: '10px' }} />
-            </span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280' }}>Pipeline</span>
-            <span style={{ fontSize: '0.75rem', color: '#9ca3af', background: '#F3F4F6', borderRadius: '9999px', padding: '2px 8px' }}>
-              {stats.recentDeals.length}
-            </span>
-          </div>
-          <Link
-            href="/nucleus/pipeline"
-            style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
-          >
-            View all <ExternalLink size={11} />
-          </Link>
-        </div>
-        {stats.recentDeals.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: '#9ca3af', fontSize: '0.875rem' }}>No active deals</div>
-        ) : (
-          <div style={{ overflowY: 'auto', maxHeight: '560px' }}>
-            <table className="module-table">
-              <thead>
-                <tr>
-                  <th>Org</th>
-                  <th>School</th>
-                  <th>Stage</th>
-                  <th style={{ textAlign: 'center' }}>Temp</th>
-                  <th style={{ textAlign: 'right' }}>Followup</th>
-                  <th>Rep</th>
-                  <th style={{ textAlign: 'right' }}>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pipelineGroups.length > 0
-                  ? pipelineGroups.map(group => <CollapsiblePipelineGroup key={group.label} group={group} onOpen={onOpenDeal} />)
-                  : stats.recentDeals.map(deal => <PipelineDealRow key={deal.id} deal={deal} onOpen={onOpenDeal} />)
-                }
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* US Pipeline Map */}
+      <USPipelineMap schools={mapSchools} selectedState={selectedState} onStateClick={handleStateClick} />
+
+      {/* State Deal Slide-out Panel */}
+      {showStatePanel && selectedState && (
+        <StateDealPanel
+          stateAbbr={selectedState}
+          deals={stateDeals}
+          onClose={() => { setShowStatePanel(false); setSelectedState(null); }}
+        />
+      )}
     </div>
   );
 }
@@ -763,7 +663,7 @@ function CreateCampaignDrawer({ schools, onClose, onCreate }: CreateCampaignDraw
         const allDeals: Deal[] = await res.json();
         const schoolDeals = allDeals.filter(
           d => d.organization?.school?.id === s.id &&
-               d.stage !== 'closed_lost' && d.stage !== 'hold_off'
+               d.stage !== 'closed_lost'
         );
         setPreviewedDeals(schoolDeals);
       }
@@ -916,12 +816,31 @@ function CampaignRowItem({
   dealValueMap: Record<string, number>;
   dealTempMap: Record<string, string>;
 }) {
+  // Hooks must precede any early returns
+  const [showNextSteps, setShowNextSteps] = useState(false);
+  const [granolaMatches, setGranolaMatches] = useState<GranolaNote[]>([]);
+  const [granolaLoaded, setGranolaLoaded] = useState(false);
+
   const rowType = getRowType(row, dealStageMap);
   const stage = row.dealId ? dealStageMap[row.dealId] : undefined;
   const dealValue = row.dealId ? dealValueMap[row.dealId] : undefined;
   const dealTemp = row.dealId ? dealTempMap[row.dealId] : undefined;
   const mrr = dealValue ? Math.round(dealValue / 12) : undefined;
   const TEMP_EMOJI: Record<string, string> = { hot: '🔥', warm: '🌡️', cold: '🧊' };
+
+  async function fetchGranolaMatches() {
+    if (granolaLoaded) return;
+    setGranolaLoaded(true);
+    try {
+      const res = await fetch('/api/granola/notes');
+      if (res.ok) {
+        const data = await res.json();
+        const allNotes: GranolaNote[] = data.notes || [];
+        const chapterLower = row.chapterName.toLowerCase();
+        setGranolaMatches(allNotes.filter(n => n.title && n.title.toLowerCase().includes(chapterLower)));
+      }
+    } catch { /* silent */ }
+  }
 
   // ── Client row ────────────────────────────────────────────────────────────
   if (rowType === 'client') {
@@ -947,24 +866,55 @@ function CampaignRowItem({
   // ── Deal row ──────────────────────────────────────────────────────────────
   if (rowType === 'deal') {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', background: '#ffffff', borderBottom: '1px solid #f3f4f6', minHeight: '44px' }}>
-        <span style={{ flex: 1, fontWeight: 600, fontSize: '0.875rem', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {row.chapterName || '—'}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          {stage && <StageBadge stage={stage} />}
-          {dealTemp && <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{TEMP_EMOJI[dealTemp] ?? ''}</span>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          {row.dealId && openDeal && (
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #f3f4f6' }}>
+        {/* Main row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', minHeight: '44px' }}>
+          <span style={{ flex: 1, fontWeight: 600, fontSize: '0.875rem', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {row.chapterName || '—'}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {stage && <StageBadge stage={stage} />}
+            {dealTemp && <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{TEMP_EMOJI[dealTemp] ?? ''}</span>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             <button
-              onClick={() => openDeal({ id: row.dealId } as Deal)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700, padding: '5px 12px', borderRadius: '8px', background: '#0F172A', color: '#ffffff', border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+              onClick={() => { setShowNextSteps(s => !s); if (!showNextSteps) fetchGranolaMatches(); }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', fontWeight: 700, padding: '4px 8px', borderRadius: '6px', background: showNextSteps ? '#F3F4F6' : 'transparent', color: '#6B7280', border: '1px solid #E5E7EB', cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase', letterSpacing: '0.04em' }}
             >
-              Edit →
+              Next Steps {showNextSteps ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
             </button>
-          )}
+            {row.dealId && openDeal && (
+              <button
+                onClick={() => openDeal({ id: row.dealId } as Deal)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700, padding: '5px 12px', borderRadius: '8px', background: '#0F172A', color: '#ffffff', border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+              >
+                Edit →
+              </button>
+            )}
+          </div>
         </div>
+        {/* Collapsible Next Steps */}
+        {showNextSteps && (
+          <div style={{ padding: '8px 16px 12px', background: '#FAFAFA', borderTop: '1px solid #F3F4F6' }}>
+            <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', margin: '0 0 6px 0' }}>Next Steps</p>
+            <textarea
+              value={row.notes || ''}
+              onChange={e => onUpdate(campaignId, row.id, { notes: e.target.value })}
+              placeholder="Add next steps..."
+              rows={2}
+              style={{ width: '100%', fontSize: '0.8125rem', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '8px 10px', resize: 'vertical', outline: 'none', fontFamily: 'inherit', color: '#374151', background: '#ffffff', boxSizing: 'border-box' }}
+            />
+            {granolaMatches.length > 0 && (
+              <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {granolaMatches.map(note => (
+                  <Link key={note.id} href="/nucleus/war-room?tab=notes" style={{ fontSize: '0.75rem', color: '#4B5563', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    📋 {note.title} →
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -1819,273 +1769,8 @@ function CampaignsTab({ stats, openDeal }: { stats: PipelineStats | null; openDe
   );
 }
 
-// ─── Tab 3: Next Steps ───────────────────────────────────────────────────────
+// ─── Map Components (used in Dashboard) ─────────────────────────────────────
 
-const NOTES_STORAGE_KEY = 'tb_meeting_notes';
-
-function loadNextSteps(): NextStep[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as NextStep[]) : [];
-  } catch { return []; }
-}
-
-function saveNextSteps(steps: NextStep[]) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(steps));
-}
-
-function NextStepsTab() {
-  const [granolaLoading, setGranolaLoading] = useState(true);
-  const [granolaError, setGranolaError] = useState<string | null>(null);
-  const [granolaSearch, setGranolaSearch] = useState('');
-  const [notes, setNotes] = useState<GranolaNote[]>([]);
-  const [nextSteps, setNextSteps] = useState<NextStep[]>([]);
-  const [stepsFilter, setStepsFilter] = useState<string>('all');
-  const [addingForNote, setAddingForNote] = useState<GranolaNote | null>(null);
-  const [newStepText, setNewStepText] = useState('');
-  const [newStepAssignee, setNewStepAssignee] = useState<'Owen' | 'Ford' | 'Adam' | 'All'>('Owen');
-  const [newStepDue, setNewStepDue] = useState('');
-
-  useEffect(() => {
-    setNextSteps(loadNextSteps());
-    fetch('/api/granola/notes')
-      .then(r => r.json())
-      .then(d => { setNotes(d.notes || []); if (d.error) setGranolaError(d.error); })
-      .catch(() => setGranolaError('Failed to load Granola notes'))
-      .finally(() => setGranolaLoading(false));
-  }, []);
-
-  const persistSteps = useCallback((updated: NextStep[]) => {
-    setNextSteps(updated); saveNextSteps(updated);
-  }, []);
-
-  function handleAddStep() {
-    if (!addingForNote || !newStepText.trim()) return;
-    const step: NextStep = {
-      id: uid(),
-      noteId: addingForNote.id,
-      noteTitle: addingForNote.title || 'Untitled Meeting',
-      noteDate: addingForNote.created_at || new Date().toISOString(),
-      text: newStepText.trim(),
-      assignedTo: newStepAssignee,
-      dueDate: newStepDue || undefined,
-      done: false,
-      createdAt: new Date().toISOString(),
-    };
-    persistSteps([step, ...nextSteps]);
-    setNewStepText(''); setNewStepDue(''); setAddingForNote(null);
-  }
-
-  function toggleDone(id: string) {
-    persistSteps(nextSteps.map(s => s.id === id ? { ...s, done: !s.done } : s));
-  }
-
-  function deleteStep(id: string) {
-    persistSteps(nextSteps.filter(s => s.id !== id));
-  }
-
-  const filteredNotes = useMemo(() => {
-    if (!granolaSearch.trim()) return notes;
-    const q = granolaSearch.toLowerCase();
-    return notes.filter(n => n.title?.toLowerCase().includes(q));
-  }, [notes, granolaSearch]);
-
-  const filteredSteps = useMemo(() => {
-    let list = [...nextSteps];
-    if (stepsFilter === 'Owen') list = list.filter(s => s.assignedTo === 'Owen' || s.assignedTo === 'All');
-    else if (stepsFilter === 'Ford') list = list.filter(s => s.assignedTo === 'Ford' || s.assignedTo === 'All');
-    else if (stepsFilter === 'Adam') list = list.filter(s => s.assignedTo === 'Adam' || s.assignedTo === 'All');
-    else if (stepsFilter === 'pending') list = list.filter(s => !s.done);
-    else if (stepsFilter === 'done') list = list.filter(s => s.done);
-    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [nextSteps, stepsFilter]);
-
-  const assigneeColors: Record<string, string> = { Owen: '#0F172A', Ford: '#2563eb', Adam: '#10b981', All: '#6b7280' };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Section A: Granola Meetings */}
-      <div className="module-table-container">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280', margin: 0 }}>Recent Meetings</p>
-          <div className="module-search" style={{ flex: 1, maxWidth: '280px' }}>
-            <Search size={14} />
-            <input type="text" placeholder="Search meetings…" value={granolaSearch}
-              onChange={e => setGranolaSearch(e.target.value)} />
-          </div>
-        </div>
-
-        {granolaLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', color: '#9ca3af' }}>
-            <RefreshCw size={20} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} /> Loading meetings…
-          </div>
-        ) : granolaError ? (
-          <div style={{ padding: '20px' }}>
-            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '12px 16px', fontSize: '0.875rem', color: '#b45309', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertCircle size={15} /> {granolaError}
-            </div>
-          </div>
-        ) : filteredNotes.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', fontSize: '0.875rem' }}>
-            {granolaSearch ? `No meetings matching "${granolaSearch}"` : 'No recent meetings found'}
-          </div>
-        ) : (
-          <div>
-            {filteredNotes.map(note => (
-              <div key={note.id} style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #F9FAFB' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
-                    {note.title || 'Untitled Meeting'}
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '2px' }}>
-                    {note.created_at && (
-                      <span style={{ fontSize: '0.75rem', color: '#9ca3af', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <Clock size={10} /> {fmtDateLong(note.created_at)}
-                      </span>
-                    )}
-                    {note.attendees && note.attendees.length > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Users size={10} color="#d1d5db" />
-                        {note.attendees.slice(0, 3).map((a, i) => (
-                          <span key={i} style={{ fontSize: '0.7rem', color: '#6B7280', background: '#F3F4F6', padding: '2px 8px', borderRadius: '9999px' }}>
-                            {a.name || a.email || 'Unknown'}
-                          </span>
-                        ))}
-                        {note.attendees.length > 3 && <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>+{note.attendees.length - 3}</span>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setAddingForNote(addingForNote?.id === note.id ? null : note)}
-                  className={addingForNote?.id === note.id ? 'module-primary-btn' : 'module-filter-btn'}
-                  style={{ fontSize: '0.75rem', padding: '6px 12px', flexShrink: 0 }}
-                >
-                  Add Next Steps
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {addingForNote && (
-          <div style={{ borderTop: '2px solid #0F172A', padding: '16px 20px', background: '#F9FAFB', display: 'flex', flexDirection: 'column', gap: '12px', position: 'sticky', top: 0, zIndex: 10 }}>
-            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', margin: 0 }}>
-              Adding next steps for: <span style={{ color: '#111827' }}>{addingForNote.title || 'Untitled'}</span>
-            </p>
-            <textarea
-              value={newStepText} onChange={e => setNewStepText(e.target.value)}
-              placeholder="Next step text…" rows={2}
-              style={{ width: '100%', fontSize: '0.875rem', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '10px 12px', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {(['Owen', 'Ford', 'Adam', 'All'] as const).map(name => (
-                  <button key={name} onClick={() => setNewStepAssignee(name)}
-                    style={{
-                      fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit',
-                      background: newStepAssignee === name ? assigneeColors[name] : '#ffffff',
-                      color: newStepAssignee === name ? '#ffffff' : '#374151',
-                      border: `1px solid ${newStepAssignee === name ? assigneeColors[name] : '#E5E7EB'}`,
-                    }}>
-                    {name}
-                  </button>
-                ))}
-              </div>
-              <input type="date" value={newStepDue} onChange={e => setNewStepDue(e.target.value)}
-                style={{ fontSize: '0.75rem', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '4px 10px', outline: 'none', fontFamily: 'inherit' }} />
-              <div style={{ flex: 1 }} />
-              <button onClick={() => setAddingForNote(null)} style={{ fontSize: '0.75rem', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={handleAddStep} disabled={!newStepText.trim()} className="module-primary-btn" style={{ fontSize: '0.75rem', padding: '6px 14px', opacity: newStepText.trim() ? 1 : 0.5 }}>
-                Add Step
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Section B: Next Steps Board */}
-      <div className="module-table-container">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280', margin: 0 }}>Next Steps</p>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {['all', 'pending', 'done', 'Owen', 'Ford', 'Adam'].map(f => (
-              <button key={f} onClick={() => setStepsFilter(f)}
-                style={{
-                  fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize',
-                  background: stepsFilter === f ? '#0F172A' : '#F3F4F6',
-                  color: stepsFilter === f ? '#ffffff' : '#6B7280',
-                  border: 'none',
-                }}>
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {filteredSteps.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', fontSize: '0.875rem' }}>
-            No next steps yet. Add them from meetings above.
-          </div>
-        ) : (
-          <table className="module-table">
-            <thead>
-              <tr>
-                <th>Meeting</th>
-                <th>Next Step</th>
-                <th>Assigned To</th>
-                <th style={{ textAlign: 'right' }}>Due Date</th>
-                <th style={{ textAlign: 'center' }}>Done</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSteps.map(step => (
-                <tr key={step.id} style={{ opacity: step.done ? 0.6 : 1 }}>
-                  <td style={{ maxWidth: '140px' }}>
-                    <p style={{ fontSize: '0.75rem', color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{step.noteTitle}</p>
-                  </td>
-                  <td>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', textDecoration: step.done ? 'line-through' : 'none', margin: 0 }}>{step.text}</p>
-                  </td>
-                  <td>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '9999px', color: '#ffffff', background: assigneeColors[step.assignedTo] }}>
-                      {step.assignedTo}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>{step.dueDate ? fmtDate(step.dueDate) : '—'}</span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                      <button
-                        onClick={() => toggleDone(step.id)}
-                        style={{
-                          width: '20px', height: '20px', borderRadius: '4px',
-                          border: `2px solid ${step.done ? '#10b981' : '#d1d5db'}`,
-                          background: step.done ? '#10b981' : 'transparent',
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                        }}
-                      >
-                        {step.done && <Check size={11} color="#fff" />}
-                      </button>
-                      <button onClick={() => deleteStep(step.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db' }}>
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Tab 4: Client Map ────────────────────────────────────────────────────────
 
 function MapTooltip({ stateAbbr, data, x, y }: {
   stateAbbr: string; data: StateData | null; x: number; y: number;
@@ -2275,432 +1960,6 @@ function StateDealPanel({ stateAbbr, deals, onClose }: {
   );
 }
 
-function ChapterRow({ org, type, outreachEntry, onLogContact, onViewDeal }: {
-  org: OrgEntry; type: 'fraternity' | 'sorority';
-  outreachEntry: OutreachEntry | undefined;
-  onLogContact: (org: OrgEntry, type: 'fraternity' | 'sorority') => void;
-  onViewDeal: (org: OrgEntry) => void;
-}) {
-  const status: OutreachStatus = outreachEntry?.status ?? 'not_contacted';
-  const statusCfg = OUTREACH_STATUS_CONFIG[status];
-  const primaryDeal = org.deals[0];
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 20px', borderBottom: '1px solid #F9FAFB' }}>
-      <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{org.name}</span>
-      <span style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: '9999px', border: `1px solid ${statusCfg.border}`, color: statusCfg.color, background: statusCfg.bg }}>
-        {statusCfg.label}
-      </span>
-      {outreachEntry && <MethodPill method={outreachEntry.method} />}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-        <button onClick={() => onLogContact(org, type)} className="module-primary-btn" style={{ fontSize: '0.75rem', padding: '6px 10px', gap: '4px' }}>
-          <Plus size={11} /> Log
-        </button>
-        <button onClick={() => onViewDeal(org)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 600, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit',
-            background: primaryDeal ? '#0F172A' : '#ffffff',
-            color: primaryDeal ? '#ffffff' : '#6B7280',
-            border: `1px solid ${primaryDeal ? '#0F172A' : '#E5E7EB'}`,
-          }}>
-          Deal
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ChapterSection({ label, orgs, type, outreachLog, onLogContact, onViewDeal }: {
-  label: string; orgs: OrgEntry[]; type: 'fraternity' | 'sorority';
-  outreachLog: OutreachLog;
-  onLogContact: (org: OrgEntry, type: 'fraternity' | 'sorority') => void;
-  onViewDeal: (org: OrgEntry) => void;
-}) {
-  const contactedCount = orgs.filter(o => { const e = outreachLog[o.id]; return e && e.status !== 'not_contacted'; }).length;
-  const labelColor = type === 'fraternity' ? '#1d4ed8' : '#be185d';
-  const labelBg = type === 'fraternity' ? '#eff6ff' : '#fdf2f8';
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 20px', background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-        <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '4px 10px', borderRadius: '8px', color: labelColor, background: labelBg }}>
-          {label}
-        </span>
-        <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{contactedCount}/{orgs.length} contacted</span>
-        {contactedCount === orgs.length && orgs.length > 0 && <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>All done!</span>}
-      </div>
-      {orgs.length === 0 ? (
-        <div style={{ padding: '16px', textAlign: 'center' }}><p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0 }}>No {label.toLowerCase()} linked yet</p></div>
-      ) : orgs.map(org => (
-        <ChapterRow key={org.id} org={org} type={type} outreachEntry={outreachLog[org.id]}
-          onLogContact={onLogContact} onViewDeal={onViewDeal} />
-      ))}
-    </div>
-  );
-}
-
-function LogContactDrawer({ org, orgType, schoolName, onClose, onSaved }: {
-  org: OrgEntry; orgType: 'fraternity' | 'sorority'; schoolName: string;
-  onClose: () => void; onSaved: (orgId: string, entry: OutreachEntry) => void;
-}) {
-  const [contactType, setContactType] = useState<ContactType>('president');
-  const [method, setMethod] = useState<OutreachMethod>('email');
-  const [notes, setNotes] = useState('');
-  const [sourceUrl, setSourceUrl] = useState('');
-  const [contactInfo, setContactInfo] = useState('');
-  const [meetingBooked, setMeetingBooked] = useState(false);
-  const [createDeal, setCreateDeal] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      let dealId: string | undefined;
-      if (createDeal) {
-        const noteParts = [notes, sourceUrl && `Source: ${sourceUrl}`, contactInfo && `Contact: ${contactInfo}`].filter(Boolean);
-        const res = await fetch('/api/pipeline/deals', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ org_id: org.id, stage: meetingBooked ? 'demo_booked' : 'lead', value: 0, deal_type: orgType, notes: noteParts.join('\n') || null }),
-        });
-        if (res.ok) { const deal = await res.json(); dealId = deal.id; }
-      }
-      const entry: OutreachEntry = {
-        status: meetingBooked ? 'demo_booked' : 'contacted', method, contactType,
-        contactedAt: new Date().toISOString(), notes, dealId,
-        sourceUrl: sourceUrl || undefined, contactInfo: contactInfo || undefined, meetingBooked,
-      };
-      onSaved(org.id, entry);
-      onClose();
-    } catch (e) { console.error(e); }
-    finally { setSaving(false); }
-  }
-
-  const methodOptions: { value: OutreachMethod; label: string; icon: React.ReactNode }[] = [
-    { value: 'email', label: 'Email', icon: <Mail size={14} /> },
-    { value: 'text', label: 'Text', icon: <MessageSquare size={14} /> },
-    { value: 'instagram_dm', label: 'IG DM', icon: <Instagram size={14} /> },
-  ];
-
-  const contactOptions: { value: ContactType; label: string }[] = [
-    { value: 'president', label: 'President' }, { value: 'alumni_chair', label: 'Alumni Chair' },
-    { value: 'rush_chair', label: 'Rush Chair' }, { value: 'other', label: 'Other' },
-  ];
-
-  const selectedBtnStyle = { background: '#0F172A', color: '#ffffff', border: '1px solid #0F172A' };
-  const unselectedBtnStyle = { background: '#ffffff', color: '#374151', border: '1px solid #E5E7EB' };
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
-      <div style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div style={{ width: '440px', background: '#ffffff', display: 'flex', flexDirection: 'column', height: '100%', borderLeft: '1px solid #E5E7EB' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F9FAFB' }}>
-          <div>
-            <h2 style={{ fontWeight: 700, color: '#111827', fontSize: '1rem', margin: 0 }}>Log Contact</h2>
-            <p style={{ fontSize: '0.875rem', color: '#6B7280', marginTop: '2px' }}>{org.name} · {schoolName}</p>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', padding: '4px', borderRadius: '8px' }}><X size={18} /></button>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Who did you reach?</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {contactOptions.map(opt => (
-                <button key={opt.value} onClick={() => setContactType(opt.value)}
-                  style={{ ...(contactType === opt.value ? selectedBtnStyle : unselectedBtnStyle), padding: '8px 12px', fontSize: '0.875rem', borderRadius: '12px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Contact Method</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {methodOptions.map(opt => (
-                <button key={opt.value} onClick={() => setMethod(opt.value)}
-                  style={{ ...(method === opt.value ? selectedBtnStyle : unselectedBtnStyle), flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', fontSize: '0.875rem', borderRadius: '12px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {opt.icon}{opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Contact Info</label>
-            <div style={{ position: 'relative' }}>
-              <Phone size={13} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-              <input type="text" value={contactInfo} onChange={e => setContactInfo(e.target.value)}
-                placeholder="Phone number or @instagram handle"
-                style={{ width: '100%', paddingLeft: '36px', paddingRight: '12px', paddingTop: '10px', paddingBottom: '10px', fontSize: '0.875rem', border: '1px solid #E5E7EB', borderRadius: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const }} />
-            </div>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Source URL</label>
-            <div style={{ position: 'relative' }}>
-              <Link2 size={13} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-              <input type="url" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)}
-                placeholder="Instagram profile, chapter website, etc."
-                style={{ width: '100%', paddingLeft: '36px', paddingRight: '12px', paddingTop: '10px', paddingBottom: '10px', fontSize: '0.875rem', border: '1px solid #E5E7EB', borderRadius: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const }} />
-            </div>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Notes</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="What happened? Key details..." rows={3}
-              style={{ width: '100%', fontSize: '0.875rem', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '10px 12px', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const }} />
-          </div>
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', padding: '12px', borderRadius: '12px', border: '1px solid #E5E7EB' }}>
-            <div style={{ position: 'relative', marginTop: '2px' }}>
-              <input type="checkbox" checked={meetingBooked} onChange={e => setMeetingBooked(e.target.checked)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
-              <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: meetingBooked ? 'none' : '2px solid #D1D5DB', background: meetingBooked ? '#0F172A' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {meetingBooked && <Check size={12} color="white" />}
-              </div>
-            </div>
-            <div>
-              <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>Meeting / demo booked</p>
-              <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '2px 0 0 0' }}>Sets deal stage to Demo Booked automatically</p>
-            </div>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', padding: '12px', borderRadius: '12px', border: '1px solid #E5E7EB' }}>
-            <div style={{ position: 'relative', marginTop: '2px' }}>
-              <input type="checkbox" checked={createDeal} onChange={e => setCreateDeal(e.target.checked)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
-              <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: createDeal ? 'none' : '2px solid #D1D5DB', background: createDeal ? '#0F172A' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {createDeal && <Check size={12} color="white" />}
-              </div>
-            </div>
-            <div>
-              <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>Create pipeline deal</p>
-              <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '2px 0 0 0' }}>Add this chapter as a new lead in the pipeline</p>
-            </div>
-          </label>
-        </div>
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #E5E7EB', display: 'flex', gap: '12px' }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '10px', fontSize: '0.875rem', fontWeight: 500, color: '#374151', background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-          <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px', fontSize: '0.875rem', fontWeight: 700, color: 'white', background: saving ? '#9ca3af' : '#0F172A', border: 'none', borderRadius: '12px', cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-            {saving ? 'Saving...' : 'Save Contact'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── View Deal Drawer ───────────────────────────────────────────────────────
-function ViewDealDrawer({ org, onClose, onSaved }: { org: OrgEntry; onClose: () => void; onSaved: () => void }) {
-  const primaryDeal = org.deals[0];
-  const [deal, setDeal] = useState<DealDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [stage, setStage] = useState('');
-  const [temperature, setTemperature] = useState('');
-  const [nextFollowup, setNextFollowup] = useState('');
-  const [notes, setNotes] = useState('');
-
-  useEffect(() => {
-    if (!primaryDeal) { setLoading(false); return; }
-    fetch(`/api/pipeline/deals/${primaryDeal.id}`)
-      .then(r => r.json()).then(d => { setDeal(d); setStage(d.stage ?? 'lead'); setTemperature(d.temperature ?? ''); setNextFollowup(d.next_followup ?? ''); setNotes(d.notes ?? ''); })
-      .catch(console.error).finally(() => setLoading(false));
-  }, [primaryDeal]);
-
-  async function handleSave() {
-    if (!deal) return;
-    setSaving(true);
-    try {
-      await fetch(`/api/pipeline/deals/${deal.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage, temperature: temperature || null, next_followup: nextFollowup || null, notes: notes || null }) });
-      onSaved(); onClose();
-    } catch (e) { console.error(e); } finally { setSaving(false); }
-  }
-
-  const cardStyle = { background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', boxSizing: 'border-box' as const };
-  const labelStyle = { display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: '8px' };
-  const inputStyle = { width: '100%', padding: '10px 12px', fontSize: '0.875rem', border: '1px solid #E5E7EB', borderRadius: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const };
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
-      <div style={{ flex: 1, background: 'rgba(0,0,0,0.2)' }} onClick={onClose} />
-      <div style={{ width: '420px', background: 'white', display: 'flex', flexDirection: 'column', height: '100%', borderLeft: '1px solid #E5E7EB' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F9FAFB' }}>
-          <div>
-            <h2 style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#111827', margin: 0 }}>Pipeline Deal</h2>
-            <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: '2px 0 0 0' }}>{org.name}</p>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', borderRadius: '8px' }}><X size={18} /></button>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px' }}><RefreshCw size={20} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} /></div>
-          : !deal ? <div style={{ textAlign: 'center', padding: '48px 0' }}><Building2 size={28} color="#D1D5DB" style={{ margin: '0 auto 12px' }} /><p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0 }}>No deal found</p></div>
-          : <>
-            <div><label style={labelStyle}>Stage</label>
-              <div style={{ position: 'relative' }}>
-                <select value={stage} onChange={e => setStage(e.target.value)} style={{ ...inputStyle, paddingRight: '32px', appearance: 'none' }}>
-                  {STAGE_OPTIONS_MAP.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-                <ChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
-              </div>
-            </div>
-            <div><label style={labelStyle}>Temperature</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {TEMP_OPTIONS_MAP.map(opt => (
-                  <button key={opt.value} onClick={() => setTemperature(opt.value === temperature ? '' : opt.value)}
-                    style={{ flex: 1, padding: '8px', fontSize: '0.875rem', borderRadius: '12px', border: temperature === opt.value ? 'none' : '1px solid #E5E7EB', background: temperature === opt.value ? '#0F172A' : 'white', color: temperature === opt.value ? 'white' : '#374151', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div><label style={labelStyle}>Next Follow-up</label>
-              <div style={{ position: 'relative' }}>
-                <Calendar size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-                <input type="date" value={nextFollowup} onChange={e => setNextFollowup(e.target.value)} style={{ ...inputStyle, paddingLeft: '36px' }} />
-              </div>
-            </div>
-            <div><label style={labelStyle}>Notes</label>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Deal notes, context, next steps..." rows={4}
-                style={{ ...inputStyle, resize: 'none' }} />
-            </div>
-          </>}
-        </div>
-        {deal && (
-          <div style={{ padding: '16px 24px', borderTop: '1px solid #E5E7EB', display: 'flex', gap: '12px' }}>
-            <button onClick={onClose} style={{ flex: 1, padding: '10px', fontSize: '0.875rem', fontWeight: 500, color: '#374151', background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px', fontSize: '0.875rem', fontWeight: 700, color: 'white', background: saving ? '#9ca3af' : '#0F172A', border: 'none', borderRadius: '12px', cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Client Map Tab ────────────────────────────────────────────────────────
-function ClientMapTab({ statsDeals }: { statsDeals: Deal[] }) {
-  const [mapSchools, setMapSchools] = useState<MapSchool[]>([]);
-  const [selectedState, setSelectedState] = useState<string | null>(null);
-  const [selectedSchool, setSelectedSchool] = useState<MapSchool | null>(null);
-  const [outreachLog, setOutreachLog] = useState<OutreachLog>({});
-  const [logContactOrg, setLogContactOrg] = useState<{ org: OrgEntry; type: 'fraternity' | 'sorority' } | null>(null);
-  const [viewDealOrg, setViewDealOrg] = useState<OrgEntry | null>(null);
-  const [schoolSearch, setSchoolSearch] = useState('');
-  const [stateDeals, setStateDeals] = useState<Deal[]>([]);
-  const [showStatePanel, setShowStatePanel] = useState(false);
-
-  useEffect(() => {
-    try { const s = localStorage.getItem('tb_outreach_log'); if (s) setOutreachLog(JSON.parse(s)); } catch {}
-    fetch('/api/pipeline/schools').then(r => r.json()).then(d => setMapSchools(Array.isArray(d) ? d : [])).catch(console.error);
-  }, []);
-
-  function handleStateClick(state: string | null) {
-    setSelectedState(state);
-    if (state) {
-      const deals = statsDeals.filter(d => d.organization?.school?.state?.toUpperCase() === state.toUpperCase());
-      setStateDeals(deals);
-      setShowStatePanel(true);
-    } else {
-      setShowStatePanel(false);
-    }
-  }
-
-  function handleOutreachSaved(orgId: string, entry: OutreachEntry) {
-    const next = { ...outreachLog, [orgId]: entry };
-    setOutreachLog(next);
-    try { localStorage.setItem('tb_outreach_log', JSON.stringify(next)); } catch {}
-  }
-
-  const filteredSchools = useMemo(() => {
-    if (!schoolSearch.trim()) return mapSchools;
-    const q = schoolSearch.toLowerCase();
-    return mapSchools.filter(s => s.name.toLowerCase().includes(q));
-  }, [mapSchools, schoolSearch]);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* US Map */}
-      <USPipelineMap schools={mapSchools} selectedState={selectedState} onStateClick={handleStateClick} />
-
-      {/* State deals panel */}
-      {showStatePanel && selectedState && (
-        <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#111827', margin: 0 }}>Deals in {selectedState} <span style={{ fontSize: '0.8125rem', color: '#6B7280', fontWeight: 400 }}>({stateDeals.length})</span></h3>
-            <button onClick={() => { setShowStatePanel(false); setSelectedState(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><X size={16} /></button>
-          </div>
-          <div className="module-table-container" style={{ border: 'none', borderRadius: 0 }}>
-            <table className="module-table">
-              <thead><tr><th>Org</th><th>School</th><th>Stage</th><th>Rep</th><th>Value</th><th>Followup</th></tr></thead>
-              <tbody>
-                {stateDeals.length === 0 ? (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '24px' }}>No deals in this state</td></tr>
-                ) : stateDeals.map(deal => {
-                  const displayName = resolveRep(deal.assigned_to) ?? deal.assigned_to ?? '—';
-                  const repColor = getRepColor(displayName);
-                  return (
-                    <tr key={deal.id}>
-                      <td style={{ fontWeight: 600, color: '#111827' }}>{deal.organization?.name ?? '—'}</td>
-                      <td style={{ color: '#6B7280' }}>{deal.organization?.school?.name ?? '—'}</td>
-                      <td><StageBadge stage={deal.stage} /></td>
-                      <td>{deal.assigned_to ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '2px 8px 2px 2px', borderRadius: '20px', background: repColor, color: 'white', fontSize: '0.75rem', fontWeight: 600 }}><span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.625rem', fontWeight: 700 }}>{getRepInitials(displayName)}</span>{displayName}</span> : '—'}</td>
-                      <td style={{ color: '#111827', fontWeight: 600 }}>{deal.value ? fmt$(deal.value) : '—'}</td>
-                      <td style={{ color: !deal.next_followup ? '#6B7280' : deal.next_followup < todayISO() ? '#ef4444' : deal.next_followup === todayISO() ? '#d97706' : '#6B7280' }}>{fmtDate(deal.next_followup)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* School search + drill-down */}
-      <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#111827', margin: 0 }}>School Outreach</h3>
-          {selectedSchool && <button onClick={() => setSelectedSchool(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><X size={16} /></button>}
-        </div>
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid #E5E7EB' }}>
-          <div className="module-search" style={{ maxWidth: '400px' }}>
-            <Search size={16} />
-            <input type="text" value={schoolSearch} onChange={e => { setSchoolSearch(e.target.value); setSelectedSchool(null); }} placeholder="Search for a school..." />
-          </div>
-          {schoolSearch && !selectedSchool && (
-            <div style={{ marginTop: '8px', border: '1px solid #E5E7EB', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-              {filteredSchools.slice(0, 6).map(school => (
-                <button key={school.id} onClick={() => { setSelectedSchool(school); setSchoolSearch(''); }}
-                  style={{ width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.875rem', background: 'white', border: 'none', borderBottom: '1px solid #F3F4F6', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', fontFamily: 'inherit' }}>
-                  <span style={{ fontWeight: 500, color: '#111827' }}>{school.name}</span>
-                  <span style={{ color: '#9ca3af' }}>{school.fraternities.length + school.sororities.length} orgs</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        {selectedSchool ? (
-          <div>
-            <div style={{ padding: '12px 20px', background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-              <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>{selectedSchool.name}</p>
-              <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '2px 0 0 0' }}>{selectedSchool.state ?? ''}{selectedSchool.conference ? ` · ${selectedSchool.conference}` : ''}</p>
-            </div>
-            <ChapterSection label="Fraternities" orgs={selectedSchool.fraternities} type="fraternity" outreachLog={outreachLog}
-              onLogContact={(o, t) => setLogContactOrg({ org: o, type: t })} onViewDeal={o => setViewDealOrg(o)} />
-            <ChapterSection label="Sororities" orgs={selectedSchool.sororities} type="sorority" outreachLog={outreachLog}
-              onLogContact={(o, t) => setLogContactOrg({ org: o, type: t })} onViewDeal={o => setViewDealOrg(o)} />
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
-            <MapPin size={28} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-            <p style={{ fontSize: '0.875rem', fontWeight: 500, color: '#6B7280', margin: 0 }}>Select a school to see all chapters</p>
-          </div>
-        )}
-      </div>
-
-      {logContactOrg && selectedSchool && (
-        <LogContactDrawer org={logContactOrg.org} orgType={logContactOrg.type} schoolName={selectedSchool.name}
-          onClose={() => setLogContactOrg(null)} onSaved={handleOutreachSaved} />
-      )}
-      {viewDealOrg && <ViewDealDrawer org={viewDealOrg} onClose={() => setViewDealOrg(null)} onSaved={() => {}} />}
-    </div>
-  );
-}
-
 // ── Constants referenced in drawers ──────────────────────────────────────
 const STAGE_OPTIONS_MAP = [
   { value: 'lead', label: 'New Lead' }, { value: 'demo_booked', label: 'Demo Booked' },
@@ -2712,12 +1971,10 @@ const TEMP_OPTIONS_MAP = [
 ];
 
 // ── Main Page ──────────────────────────────────────────────────────────────
-type Tab = 'dashboard' | 'campaigns' | 'notes' | 'map';
+type Tab = 'dashboard' | 'campaigns';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'campaigns', label: 'Campaigns' },
-  { id: 'notes',     label: 'Next Steps' },
-  { id: 'map',       label: 'Client Map' },
 ];
 
 export default function WarRoomPage() {
@@ -2810,8 +2067,6 @@ export default function WarRoomPage() {
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
         {tab === 'dashboard'  && <DashboardTab stats={stats} onOpenDeal={openDeal} />}
         {tab === 'campaigns'  && <CampaignsTab stats={stats} openDeal={openDeal} />}
-        {tab === 'notes'      && <NextStepsTab />}
-        {tab === 'map'        && <ClientMapTab statsDeals={stats?.recentDeals ?? []} />}
       </div>
 
       {/* Deal Edit Panel — slide-in from right */}
