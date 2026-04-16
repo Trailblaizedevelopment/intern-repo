@@ -7,7 +7,7 @@ import {
   CheckCircle2, AlertCircle, Circle, Play, Phone, MessageSquare,
   TrendingUp, ArrowUpRight, BookOpen, FileText, Calendar,
   ToggleLeft, ToggleRight, Loader2, ChevronDown,
-  ArrowLeft, LayoutDashboard,
+  ArrowLeft, LayoutDashboard, Home, Building2, DollarSign,
 } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
@@ -54,7 +54,7 @@ class MissionControlErrorBoundary extends React.Component<
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type MainTab = 'alumni' | 'agents' | 'crons' | 'memory';
+type MainTab = 'home' | 'alumni' | 'agents' | 'crons' | 'memory';
 type OutreachSubTab = 'alumni' | 'outreach';
 type AgentViewMode = 'hierarchy' | 'grid';
 type MemorySubTab = 'daily' | 'longterm';
@@ -320,8 +320,8 @@ function StatCard({ label, value, icon, color }: {
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 function MissionControlInner() {
-  const [activeTab, setActiveTab] = useState<MainTab>('alumni');
-  const [outreachSub, setOutreachSub] = useState<OutreachSubTab>('alumni');
+  const [activeTab, setActiveTab] = useState<MainTab>('home');
+  const [outreachSub, setOutreachSub] = useState<OutreachSubTab>('outreach');
 
   // Alumni
   const [alumniData, setAlumniData] = useState<AlumniData | null>(null);
@@ -493,7 +493,8 @@ function MissionControlInner() {
   }, [alumniSearch, alumniChapter, alumniStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const TABS: { key: MainTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'alumni',  label: 'Alumni & Outreach', icon: <Users size={15} /> },
+    { key: 'home',    label: 'Home',               icon: <Home size={15} /> },
+    { key: 'alumni',  label: 'Alumni & Outreach',  icon: <Users size={15} /> },
     { key: 'agents',  label: 'Agents',             icon: <Bot size={15} /> },
     { key: 'crons',   label: 'Crons',              icon: <Clock size={15} /> },
     { key: 'memory',  label: 'Memory',             icon: <Brain size={15} /> },
@@ -549,12 +550,17 @@ function MissionControlInner() {
       {/* Content */}
       <main className="module-main">
 
+        {/* ═══ HOME TAB ═══ */}
+        {activeTab === 'home' && (
+          <HomeTab />
+        )}
+
         {/* ═══ ALUMNI & OUTREACH TAB ═══ */}
         {activeTab === 'alumni' && (
           <div>
             {/* Sub-tabs */}
             <div className="flex gap-1 mb-6 bg-[#F3F4F6] rounded-xl p-1 w-fit">
-              {(['alumni', 'outreach'] as OutreachSubTab[]).map((sub) => (
+              {(['outreach', 'alumni'] as OutreachSubTab[]).map((sub) => (
                 <button
                   key={sub}
                   onClick={() => setOutreachSub(sub)}
@@ -562,7 +568,7 @@ function MissionControlInner() {
                     outreachSub === sub ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280] hover:text-[#0F172A]'
                   }`}
                 >
-                  {sub === 'alumni' ? 'Alumni Contacts' : 'Outreach Dashboard'}
+                  {sub === 'outreach' ? 'Outreach Dashboard' : 'Alumni Contacts'}
                 </button>
               ))}
             </div>
@@ -1413,6 +1419,284 @@ function CronsSection({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Home Tab ───────────────────────────────────────────────────────────────
+
+interface PipelineStats {
+  mrr: number;
+  mrrGoal?: number;
+  closedDealCount: number;
+  schoolsInConversation: number;
+  demosNext7: number;
+  decisionsNext7: number;
+  recentDeals: Array<{
+    id: string;
+    stage: string;
+    value: number | null;
+    assigned_to: string | null;
+    updated_at: string | null;
+    organization?: {
+      name: string | null;
+      school?: { name: string | null } | null;
+    } | null;
+  }>;
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  prospect: 'Prospect',
+  outreach: 'Outreach',
+  demo_booked: 'Demo Booked',
+  first_demo: 'First Demo',
+  second_call: 'Decision Call',
+  proposal: 'Proposal',
+  closed_won: 'Closed Won',
+  closed_lost: 'Closed Lost',
+  hold_off: 'Hold Off',
+};
+
+const STAGE_BADGE: Record<string, { bg: string; color: string }> = {
+  prospect:    { bg: '#F3F4F6', color: '#6B7280' },
+  outreach:    { bg: '#EFF6FF', color: '#1D4ED8' },
+  demo_booked: { bg: '#F5F3FF', color: '#6D28D9' },
+  first_demo:  { bg: '#EDE9FE', color: '#5B21B6' },
+  second_call: { bg: '#FEF3C7', color: '#B45309' },
+  proposal:    { bg: '#ECFDF5', color: '#065F46' },
+  closed_won:  { bg: '#D1FAE5', color: '#064E3B' },
+  closed_lost: { bg: '#FEE2E2', color: '#991B1B' },
+  hold_off:    { bg: '#F3F4F6', color: '#6B7280' },
+};
+
+const REP_NAMES: Record<string, string> = {
+  owen: 'Owen',
+  ford: 'Ford',
+  adam: 'Adam',
+};
+
+const TEAM: Array<{ name: string; role: string; focus: string; emoji: string }> = [
+  { name: 'Owen',  role: 'Co-Founder',    focus: 'Sales & strategy',       emoji: '🧠' },
+  { name: 'Ford',  role: 'CS',            focus: 'Alumni calls & onboarding', emoji: '📞' },
+  { name: 'Adam',  role: 'Sales',         focus: 'Outreach & lead gen',    emoji: '📬' },
+  { name: 'Tony',  role: 'AI Chief of Staff', focus: 'Everything else',    emoji: '🤙' },
+];
+
+function HomeTab() {
+  const [crons, setCrons] = useState<CronJob[]>([]);
+  const [cronsLoading, setCronsLoading] = useState(true);
+  const [cronsError, setCronsError] = useState<string | null>(null);
+  const [stats, setStats] = useState<PipelineStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    // Load crons
+    fetch('/api/mission-control/crons')
+      .then((r) => r.json())
+      .then((d) => {
+        setCrons(d.jobs ?? []);
+        if (d.error) setCronsError(d.error);
+      })
+      .catch(() => setCronsError('Failed to load crons'))
+      .finally(() => setCronsLoading(false));
+
+    // Load pipeline stats
+    fetch('/api/pipeline/stats')
+      .then((r) => r.json())
+      .then((d) => setStats(d))
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
+  }, []);
+
+  // Upcoming crons — next 5 with a nextRun in the future
+  const now = Date.now();
+  const upcoming = [...crons]
+    .filter((j) => j.nextRun && new Date(j.nextRun).getTime() > now)
+    .sort((a, b) => new Date(a.nextRun!).getTime() - new Date(b.nextRun!).getTime())
+    .slice(0, 5);
+
+  // Recent active deals from stats
+  const INACTIVE = ['closed_lost', 'hold_off'];
+  const recentDeals = (stats?.recentDeals ?? [])
+    .filter((d) => !INACTIVE.includes(d.stage))
+    .sort((a, b) => {
+      const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return tb - ta;
+    })
+    .slice(0, 5);
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+
+      {/* ─── Left: Today's Schedule ─── */}
+      <div className="space-y-4">
+        <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', margin: 0 }}>Today&apos;s Schedule</h2>
+
+        {cronsLoading ? (
+          <div className="flex items-center gap-2 text-[#6B7280] text-sm py-4">
+            <Loader2 size={14} className="animate-spin" /> Loading schedule…
+          </div>
+        ) : cronsError ? (
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+            <div className="text-sm text-[#6B7280] italic">{cronsError}</div>
+          </div>
+        ) : upcoming.length === 0 ? (
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+            <div className="text-sm text-[#6B7280] italic">No upcoming jobs in the next 24h.</div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {upcoming.map((job) => {
+              const nextDate = new Date(job.nextRun!);
+              const isToday = nextDate.toDateString() === new Date().toDateString();
+              const timeLabel = nextDate.toLocaleTimeString('en-US', {
+                hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago',
+              });
+              const dayLabel = isToday ? '' : nextDate.toLocaleDateString('en-US', { weekday: 'short' }) + ' ';
+              return (
+                <div
+                  key={job.id}
+                  className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3"
+                >
+                  <div style={{ width: 72, flexShrink: 0 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>{dayLabel || 'Today'}</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', fontFamily: 'monospace' }}>{timeLabel}</div>
+                  </div>
+                  <div style={{ width: 1, height: 32, background: '#E5E7EB', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, fontSize: '0.875rem', color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.name}</div>
+                    {job.agent && (
+                      <div style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: 2 }}>{job.agent}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Team Activity — hardcoded */}
+        <div style={{ marginTop: '1.5rem' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', margin: '0 0 0.75rem' }}>Team Activity</h2>
+          <div className="space-y-2">
+            {TEAM.map((member) => (
+              <div
+                key={member.name}
+                className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3"
+              >
+                <span style={{ fontSize: '1.25rem', width: 32, textAlign: 'center', flexShrink: 0 }}>{member.emoji}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#0F172A' }}>{member.name}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>{member.focus}</div>
+                </div>
+                <span style={{
+                  fontSize: '0.72rem', padding: '2px 8px', borderRadius: 9999,
+                  background: '#F3F4F6', color: '#6B7280', fontWeight: 500, flexShrink: 0,
+                }}>{member.role}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Right: Office View ─── */}
+      <div className="space-y-4">
+        <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', margin: 0 }}>Office View</h2>
+
+        {/* Pipeline health stats */}
+        {statsLoading ? (
+          <div className="flex items-center gap-2 text-[#6B7280] text-sm py-4">
+            <Loader2 size={14} className="animate-spin" /> Loading pipeline…
+          </div>
+        ) : stats ? (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+              <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+                <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 500, marginBottom: 4 }}>MRR</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A' }}>
+                  ${stats.mrr.toLocaleString()}
+                </div>
+              </div>
+              <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+                <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 500, marginBottom: 4 }}>Demos (7d)</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A' }}>{stats.demosNext7}</div>
+              </div>
+              <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+                <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 500, marginBottom: 4 }}>Schools</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A' }}>{stats.schoolsInConversation}</div>
+              </div>
+            </div>
+
+            {/* Deals in motion */}
+            <div>
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', margin: '0 0 0.5rem' }}>Deals in Motion</h3>
+              {recentDeals.length === 0 ? (
+                <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+                  <div className="text-sm text-[#6B7280] italic">No active deals</div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {recentDeals.map((deal) => {
+                    const stageBadge = STAGE_BADGE[deal.stage] ?? { bg: '#F3F4F6', color: '#6B7280' };
+                    const stageLabel = STAGE_LABELS[deal.stage] ?? deal.stage;
+                    const orgName = deal.organization?.name ?? '—';
+                    const schoolName = deal.organization?.school?.name ?? null;
+                    const rep = deal.assigned_to ? (REP_NAMES[deal.assigned_to.toLowerCase()] ?? deal.assigned_to) : null;
+                    return (
+                      <div
+                        key={deal.id}
+                        className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3"
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 500, fontSize: '0.875rem', color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{orgName}</div>
+                          {schoolName && (
+                            <div style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: 1 }}>{schoolName}</div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                          <span style={{
+                            fontSize: '0.72rem', padding: '2px 8px', borderRadius: 9999,
+                            background: stageBadge.bg, color: stageBadge.color, fontWeight: 600,
+                          }}>{stageLabel}</span>
+                          {rep && (
+                            <span style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>{rep}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Pipeline health summary */}
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 space-y-2">
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', margin: '0 0 0.5rem' }}>Pipeline Health</h3>
+              <div className="flex items-center justify-between text-sm">
+                <span style={{ color: '#6B7280' }}>Clients closed</span>
+                <span style={{ fontWeight: 600, color: '#0F172A' }}>{stats.closedDealCount}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span style={{ color: '#6B7280' }}>Demos booked (7d)</span>
+                <span style={{ fontWeight: 600, color: '#0F172A' }}>{stats.demosNext7}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span style={{ color: '#6B7280' }}>Decision calls (7d)</span>
+                <span style={{ fontWeight: 600, color: '#0F172A' }}>{stats.decisionsNext7}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span style={{ color: '#6B7280' }}>Schools in conversation</span>
+                <span style={{ fontWeight: 600, color: '#0F172A' }}>{stats.schoolsInConversation}</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+            <div className="text-sm text-[#6B7280] italic">Pipeline data unavailable.</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

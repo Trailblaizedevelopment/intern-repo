@@ -1490,7 +1490,7 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     if (selectedConv.chapter_id) {
       fetch(`/api/chapters/${selectedConv.chapter_id}`, { headers: { Authorization: AUTH } })
         .then(r => r.json())
-        .then(json => setChapterJoinLink(json?.alumni_join_link ?? null))
+        .then(json => setChapterJoinLink(json?.data?.alumni_join_link ?? null))
         .catch(() => setChapterJoinLink(null));
     } else {
       setChapterJoinLink(null);
