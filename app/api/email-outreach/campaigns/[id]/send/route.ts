@@ -35,7 +35,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     // Load alumni contacts (internal DB)
     const { data: contacts, error: contErr } = await supabase
       .from('alumni_contacts')
-      .select('id, first_name, last_name, email, grad_year')
+      .select('id, first_name, last_name, email, year')
       .eq('chapter_id', campaign.chapter_id)
       .not('email', 'is', null)
       .neq('email', '');
@@ -56,7 +56,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       email: c.email,
       first_name: c.first_name || '',
       last_name: c.last_name || '',
-      grad_year: c.grad_year || null,
+      grad_year: (c as any).year || null,
       status: 'pending',
     }));
 
