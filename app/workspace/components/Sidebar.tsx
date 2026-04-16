@@ -140,7 +140,6 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     ? [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
         { name: 'War Room', href: '/nucleus/war-room', icon: 'Tv', badge: 0 },
-        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp', badge: 0 },
         { name: 'Team', href: '/workspace/team', icon: 'Users', badge: 0 },
       ]
     : [

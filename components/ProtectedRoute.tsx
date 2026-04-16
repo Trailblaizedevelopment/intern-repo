@@ -25,7 +25,6 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     // Growth interns are allowed through to specific nucleus routes
     const isGrowthIntern = profile.role === 'growth_intern';
     const internAllowedRoutes = [
-      '/nucleus/pipeline',
       '/nucleus/war-room',
     ];
     const isInternAllowedNucleusRoute = isGrowthIntern && internAllowedRoutes.some(r => pathname.startsWith(r));
@@ -74,7 +73,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
   // Exception: growth_intern can access pipeline + war room
   const isNucleusRoute = pathname.startsWith('/nucleus');
   const isGrowthIntern = profile.role === 'growth_intern';
-  const internNucleusAllowed = ['/nucleus/pipeline', '/nucleus/war-room'];
+  const internNucleusAllowed = ['/nucleus/war-room'];
   const isInternAllowedNucleusRoute = isGrowthIntern && internNucleusAllowed.some(r => pathname.startsWith(r));
   if (isNucleusRoute && !isAdmin && !isInternAllowedNucleusRoute) {
     return (

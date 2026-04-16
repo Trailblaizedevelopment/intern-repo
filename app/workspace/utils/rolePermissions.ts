@@ -165,11 +165,10 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       ];
     case 'growth_intern':
     default: {
-      // Interns: Dashboard, War Room, Pipeline, Team
+      // Interns: Dashboard, War Room, Team (no pipeline — use War Room campaigns instead)
       const internItems: NavItem[] = [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
         { name: 'War Room', href: '/nucleus/war-room', icon: 'Tv' },
-        { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
       // Marketing interns also get the Socials page
