@@ -5,7 +5,7 @@ import {
   Plus, X, ChevronLeft, FileText, Ticket, Loader2, Calendar, Target,
   Edit3, Trash2, Image, Upload, Users, MessageSquare, Send, Paperclip,
   StickyNote, MoreHorizontal, Camera, Link2, ExternalLink, Globe, Smartphone,
-  LayoutGrid, GanttChart, Sparkles,
+  LayoutGrid, GanttChart, Sparkles, Columns,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
@@ -256,7 +256,7 @@ export default function ProjectsPage() {
               className={`sn__platform-btn ${viewMode === 'timeline' ? 'active' : ''}`}
               onClick={() => setViewMode('timeline')}
             >
-              <GanttChart size={13} /> Timeline
+              <Columns size={13} /> Tracker
             </button>
           </div>
           <button className="sn__create-btn" onClick={() => setShowCreate(true)}>
@@ -355,267 +355,140 @@ function ProjectTimeline({
   projects: Project[];
   onProjectClick: (id: string) => void;
 }) {
-  const now = new Date();
-  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
+  // Group projects by platform — web = Devin, ios = Parker
+  const devinProjects = projects.filter(p => p.platform === 'web' || !p.platform);
+  const parkerProjects = projects.filter(p => p.platform === 'ios');
+  const otherProjects: Project[] = [];
 
-  // Determine timeline range from project dates
-  const allDates: Date[] = [];
-  projects.forEach(p => {
-    if (p.start_date) allDates.push(new Date(p.start_date + 'T00:00:00'));
-    if (p.target_date) allDates.push(new Date(p.target_date + 'T00:00:00'));
-  });
+  const statusColors: Record<string, string> = {
+    active: '#10b981',
+    planning: '#6366f1',
+    completed: '#3b82f6',
+    paused: '#9ca3af',
+  };
 
-  // Default to current quarter if no dates
-  const rangeStart = allDates.length > 0
-    ? new Date(Math.min(...allDates.map(d => d.getTime())))
-    : new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-  const rangeEnd = allDates.length > 0
-    ? new Date(Math.max(...allDates.map(d => d.getTime())))
-    : new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 0);
-
-  // Ensure at least 1 month span
-  const minEnd = new Date(rangeStart);
-  minEnd.setMonth(minEnd.getMonth() + 1);
-  const effectiveEnd = rangeEnd > minEnd ? rangeEnd : minEnd;
-
-  // Snap to month boundaries
-  const timelineStart = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
-  const timelineEnd = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth() + 1, 0);
-  const totalMs = timelineEnd.getTime() - timelineStart.getTime();
-
-  // Generate months for header
-  const months: { label: string; leftPct: number; widthPct: number }[] = [];
-  {
-    let cursor = new Date(timelineStart);
-    while (cursor <= timelineEnd) {
-      const mStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-      const mEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
-      const leftPct = ((mStart.getTime() - timelineStart.getTime()) / totalMs) * 100;
-      const widthPct = ((Math.min(mEnd.getTime(), timelineEnd.getTime()) - mStart.getTime()) / totalMs) * 100;
-      months.push({
-        label: mStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        leftPct: Math.max(0, leftPct),
-        widthPct,
-      });
-      cursor.setMonth(cursor.getMonth() + 1);
-    }
+  function ProgressBar({ pct }: { pct: number }) {
+    return (
+      <div style={{ height: '6px', background: '#F3F4F6', borderRadius: '9999px', overflow: 'hidden', width: '80px', flexShrink: 0 }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: '#0F172A', borderRadius: '9999px', transition: 'width 0.3s' }} />
+      </div>
+    );
   }
 
-  const todayPct = Math.max(0, Math.min(100, ((now.getTime() - timelineStart.getTime()) / totalMs) * 100));
-
-  function getStatusColor(project: Project): string {
-    const targetDate = project.target_date ? new Date(project.target_date + 'T00:00:00') : null;
-    const startDate = project.start_date ? new Date(project.start_date + 'T00:00:00') : null;
+  function ProjectRow({ project }: { project: Project }) {
     const ticketCount = project.ticket_count || 0;
     const ticketsDone = project.tickets_done || 0;
-    const pctDone = ticketCount > 0 ? ticketsDone / ticketCount : 0;
-    const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const pct = ticketCount > 0 ? Math.round((ticketsDone / ticketCount) * 100) : 0;
+    const statusColor = statusColors[project.status] || '#6B7280';
+    const targetDate = project.target_date
+      ? new Date(project.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : null;
+    const isOverdue = project.target_date
+      ? new Date(project.target_date + 'T00:00:00') < new Date() && project.status !== 'completed'
+      : false;
 
-    if (project.status === 'completed') return '#3b82f6';
-    if (project.status === 'planning') return '#6366f1';
-    if (project.status === 'paused') return '#9ca3af';
-    if (targetDate && targetDate < now && project.status !== 'completed') return '#ef4444'; // overdue
-    if (project.status === 'active') {
-      if (targetDate && targetDate < in14Days && pctDone < 0.5 && startDate && startDate < now) return '#f59e0b'; // at-risk
-      return '#10b981'; // on-track
-    }
-    return project.color || projectColor(project.name);
+    return (
+      <div
+        onClick={() => onProjectClick(project.id)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '10px 16px', borderBottom: '1px solid #F3F4F6',
+          cursor: 'pointer', background: 'white', transition: 'background 0.1s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = '#F9FAFB')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+      >
+        {/* Status dot */}
+        <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: statusColor, flexShrink: 0 }} />
+        {/* Name */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {project.name}
+          </p>
+          {project.description && (
+            <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '2px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {project.description}
+            </p>
+          )}
+        </div>
+        {/* Status badge */}
+        <span style={{
+          fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: '9999px',
+          background: `${statusColor}18`, color: statusColor, flexShrink: 0, textTransform: 'capitalize',
+        }}>
+          {project.status}
+        </span>
+        {/* Progress */}
+        {ticketCount > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <ProgressBar pct={pct} />
+            <span style={{ fontSize: '0.7rem', color: '#6B7280', width: '28px', textAlign: 'right' }}>{pct}%</span>
+          </div>
+        )}
+        {/* Target date */}
+        {targetDate && (
+          <span style={{ fontSize: '0.75rem', color: isOverdue ? '#ef4444' : '#6B7280', flexShrink: 0, fontWeight: isOverdue ? 600 : 400 }}>
+            {isOverdue ? '⚠ ' : ''}{targetDate}
+          </span>
+        )}
+        {/* Ticket count */}
+        {ticketCount > 0 && (
+          <span style={{ fontSize: '0.75rem', color: '#9ca3af', flexShrink: 0 }}>
+            {ticketsDone}/{ticketCount}
+          </span>
+        )}
+      </div>
+    );
   }
 
-  function getBarProps(project: Project): { left: string; width: string; color: string; fillPct: number; isPlaceholder: boolean } {
-    const start = project.start_date
-      ? new Date(project.start_date + 'T00:00:00')
-      : now;
-    const end = project.target_date
-      ? new Date(project.target_date + 'T00:00:00')
-      : new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    const leftPct = Math.max(0, ((start.getTime() - timelineStart.getTime()) / totalMs) * 100);
-    const rightPct = Math.min(100, ((end.getTime() - timelineStart.getTime()) / totalMs) * 100);
-    const width = Math.max(2, rightPct - leftPct);
-    const isPlaceholder = !project.start_date && !project.target_date;
-    const ticketCount = project.ticket_count || 0;
-    const ticketsDone = project.tickets_done || 0;
-    const fillPct = ticketCount > 0 ? Math.round((ticketsDone / ticketCount) * 100) : 0;
-
-    return { left: `${leftPct}%`, width: `${width}%`, color: getStatusColor(project), fillPct, isPlaceholder };
+  function Lane({ title, subtitle, projects: laneProjects, accentColor }: {
+    title: string; subtitle: string; projects: Project[]; accentColor: string;
+  }) {
+    return (
+      <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '14px', overflow: 'hidden', flex: 1, minWidth: '280px' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '9999px', background: accentColor, flexShrink: 0 }} />
+          <div>
+            <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#111827', margin: 0 }}>{title}</p>
+            <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: 0 }}>{subtitle}</p>
+          </div>
+          <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', background: '#F3F4F6', padding: '2px 8px', borderRadius: '9999px' }}>
+            {laneProjects.length}
+          </span>
+        </div>
+        {laneProjects.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#9ca3af', fontSize: '0.8125rem' }}>No projects</div>
+        ) : (
+          laneProjects.map(p => <ProjectRow key={p.id} project={p} />)
+        )}
+      </div>
+    );
   }
 
   return (
-    <div style={{
-      background: 'rgba(15, 23, 42, 0.95)',
-      border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: 12,
-      padding: 16,
-      overflow: 'hidden',
-    }}>
-      {/* Month header */}
-      <div style={{
-        display: 'flex',
-        background: 'rgba(255,255,255,0.05)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        marginBottom: 4,
-      }}>
-        <div style={{ width: 180, flexShrink: 0 }} />
-        <div style={{ position: 'relative', flex: 1, height: 28, overflow: 'hidden' }}>
-          {months.map((m, i) => (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                left: `${m.leftPct}%`,
-                width: `${m.widthPct}%`,
-                color: '#94a3b8',
-                fontSize: 11,
-                padding: '4px 2px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                lineHeight: '20px',
-              }}
-            >
-              {m.label}
-            </div>
-          ))}
-          {/* Today line in header */}
-          <div style={{
-            position: 'absolute', left: `${todayPct}%`, top: 0, bottom: 0,
-            width: 2, background: '#ef4444', zIndex: 10,
-          }}>
-            <span style={{
-              position: 'absolute', top: 0, left: 3, fontSize: '0.6rem',
-              color: '#ef4444', fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1,
-            }}>Today</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Project rows */}
-      <div>
-        {projects.length === 0 ? (
-          <p style={{ color: '#9ca3af', padding: '16px 0' }}>No projects to display.</p>
-        ) : (
-          projects.map(project => {
-            const { left, width, color, fillPct, isPlaceholder } = getBarProps(project);
-            const ticketCount = project.ticket_count || 0;
-            const targetDateStr = project.target_date
-              ? new Date(project.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-              : 'No target date';
-            const milestones = project.milestones || [];
-            return (
-              <div
-                key={project.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  cursor: 'pointer',
-                  minHeight: 44,
-                }}
-                onClick={() => onProjectClick(project.id)}
-              >
-                <div style={{ width: 180, flexShrink: 0, paddingRight: 12, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
-                  <span style={{ color, fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginTop: 1 }}>
-                    {(project.platform || 'web') === 'ios' ? 'iOS' : 'Web'}
-                  </span>
-                </div>
-                <div style={{ position: 'relative', flex: 1, height: 28 }}>
-                  {/* Project bar with progress fill and hover tooltip */}
-                  <div
-                    onMouseEnter={() => setHoveredProjectId(project.id)}
-                    onMouseLeave={() => setHoveredProjectId(null)}
-                    style={{
-                      position: 'absolute',
-                      left,
-                      width,
-                      top: 0,
-                      bottom: 0,
-                      opacity: isPlaceholder ? 0.4 : 1,
-                      background: color,
-                      borderRadius: 4,
-                      height: 28,
-                      overflow: 'visible',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {/* Progress fill (lighter inner bar) */}
-                    {fillPct > 0 && (
-                      <div style={{
-                        position: 'absolute', left: 0, top: 0, bottom: 0,
-                        width: `${fillPct}%`,
-                        background: `${color}55`,
-                        borderRadius: 4,
-                      }} />
-                    )}
-                    {/* Hover tooltip */}
-                    <div style={{
-                      display: hoveredProjectId === project.id ? 'block' : 'none',
-                      position: 'absolute',
-                      bottom: 'calc(100% + 8px)',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: 'rgba(15,23,42,0.98)',
-                      color: '#f9fafb',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 8,
-                      padding: '10px 14px',
-                      minWidth: 200,
-                      zIndex: 50,
-                      fontSize: '0.78rem',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-                      pointerEvents: 'none',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: '0.85rem' }}>{project.name}</div>
-                      <div style={{ marginBottom: 2 }}>
-                        <span style={{
-                          background: color,
-                          color: '#fff',
-                          borderRadius: 4,
-                          padding: '1px 6px',
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          textTransform: 'capitalize',
-                        }}>{project.status}</span>
-                      </div>
-                      <div style={{ color: '#d1d5db', marginTop: 4 }}>
-                        {ticketCount} ticket{ticketCount !== 1 ? 's' : ''} · {fillPct}% done
-                      </div>
-                      <div style={{ color: '#9ca3af', marginTop: 2 }}>{targetDateStr}</div>
-                    </div>
-                    {/* Milestone ticks */}
-                    {milestones.filter(ms => ms.target_date).map(ms => {
-                      const msDate = new Date(ms.target_date! + 'T00:00:00');
-                      const barStart = project.start_date ? new Date(project.start_date + 'T00:00:00') : now;
-                      const barEnd = project.target_date ? new Date(project.target_date + 'T00:00:00') : new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                      const barMs = barEnd.getTime() - barStart.getTime();
-                      const msPct = barMs > 0 ? Math.max(0, Math.min(100, ((msDate.getTime() - barStart.getTime()) / barMs) * 100)) : 0;
-                      return (
-                        <div key={ms.id} title={ms.name} style={{
-                          position: 'absolute',
-                          left: `${msPct}%`,
-                          top: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: 8,
-                          color: '#fff',
-                          zIndex: 5,
-                          cursor: 'default',
-                        }}>◆</div>
-                      );
-                    })}
-                  </div>
-                  {/* Today line */}
-                  <div style={{
-                    position: 'absolute', left: `${todayPct}%`, top: 0, bottom: 0,
-                    width: 2, background: '#ef4444', zIndex: 10, pointerEvents: 'none',
-                  }} />
-                </div>
-              </div>
-            );
-          })
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+        <Lane
+          title="Devin Mason"
+          subtitle="Web Platform · trailblaize.space"
+          projects={devinProjects}
+          accentColor="#0F172A"
+        />
+        <Lane
+          title="Parker Sherril"
+          subtitle="iOS App"
+          projects={parkerProjects}
+          accentColor="#7c3aed"
+        />
+        {otherProjects.length > 0 && (
+          <Lane
+            title="Unassigned"
+            subtitle="Needs assignment"
+            projects={otherProjects}
+            accentColor="#9ca3af"
+          />
         )}
       </div>
-
     </div>
   );
 }
