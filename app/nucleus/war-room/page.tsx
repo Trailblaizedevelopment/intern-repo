@@ -345,6 +345,25 @@ function in7DaysISO(): string {
   return d.toISOString().split('T')[0];
 }
 
+// ─── Stage ↔ Status mapping ──────────────────────────────────────────────────
+
+function stageToStatus(stage: string): CampaignRow['status'] {
+  if (stage === 'closed_won') return 'signed';
+  if (['demo_booked', 'first_demo', 'second_call', 'contract_sent'].includes(stage)) return 'demo_booked';
+  if (stage === 'lead') return 'not_contacted';
+  return 'contacted';
+}
+
+function statusToStage(status: CampaignRow['status']): string {
+  switch (status) {
+    case 'not_contacted': return 'lead';
+    case 'demo_booked':   return 'demo_booked';
+    case 'signed':        return 'closed_won';
+    case 'contacted':     return 'lead';
+    default:              return 'lead';
+  }
+}
+
 // ─── Shared Components ────────────────────────────────────────────────────────
 
 function StageBadge({ stage }: { stage: string }) {
@@ -706,6 +725,8 @@ function CreateCampaignDrawer({ schools, onClose, onCreate }: CreateCampaignDraw
   const [status] = useState<CampaignStatus>('active');
   const [schoolQuery, setSchoolQuery] = useState('');
   const [showSchoolDrop, setShowSchoolDrop] = useState(false);
+  const [previewedDeals, setPreviewedDeals] = useState<Deal[]>([]);
+  const [fetchingPreview, setFetchingPreview] = useState(false);
 
   const filteredSchools = useMemo(() => {
     if (!schoolQuery.trim()) return schools.slice(0, 8);
@@ -713,20 +734,50 @@ function CreateCampaignDrawer({ schools, onClose, onCreate }: CreateCampaignDraw
     return schools.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8);
   }, [schools, schoolQuery]);
 
-  function handleSchoolSelect(s: { id: string; name: string }) {
+  async function handleSchoolSelect(s: { id: string; name: string }) {
     setSchool(s.name);
     setSchoolId(s.id);
     setSchoolQuery(s.name);
     setShowSchoolDrop(false);
     if (!name.trim()) setName(s.name);
+    // Fetch existing deals for preview
+    setPreviewedDeals([]);
+    setFetchingPreview(true);
+    try {
+      const res = await fetch('/api/pipeline/deals');
+      if (res.ok) {
+        const allDeals: Deal[] = await res.json();
+        const schoolDeals = allDeals.filter(
+          d => d.organization?.school?.id === s.id &&
+               d.stage !== 'closed_lost' && d.stage !== 'hold_off'
+        );
+        setPreviewedDeals(schoolDeals);
+      }
+    } catch (err) {
+      console.error('[create-campaign] deal preview error:', err);
+    } finally {
+      setFetchingPreview(false);
+    }
   }
 
   function handleCreate() {
     if (!name.trim()) return;
+    const rows: CampaignRow[] = previewedDeals.map(d => ({
+      id: uid(),
+      chapterName: d.organization?.name || '',
+      orgId: d.organization?.id,
+      dealId: d.id,
+      status: stageToStatus(d.stage),
+      method: 'email' as OutreachMethod,
+      contactName: d.contact?.name || '',
+      contactInfo: '',
+      sourceUrl: '',
+      meetingBooked: d.stage === 'demo_booked' || d.stage === 'first_demo',
+    }));
     const campaign: Campaign = {
       id: uid(), name: name.trim(), type, school: school.trim(),
       schoolId: schoolId || undefined,
-      status, rows: [], updatedAt: new Date().toISOString(),
+      status, rows, updatedAt: new Date().toISOString(),
     };
     onCreate(campaign);
     onClose();
@@ -772,6 +823,18 @@ function CreateCampaignDrawer({ schools, onClose, onCreate }: CreateCampaignDraw
                   </button>
                 ))}
               </div>
+            )}
+            {fetchingPreview && (
+              <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '6px' }}>Checking existing deals…</p>
+            )}
+            {!fetchingPreview && previewedDeals.length > 0 && (
+              <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CheckCircle2 size={12} />
+                {previewedDeals.length} existing deal{previewedDeals.length !== 1 ? 's' : ''} will be imported
+              </p>
+            )}
+            {!fetchingPreview && schoolId && previewedDeals.length === 0 && (
+              <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '6px' }}>No existing pipeline deals for this school</p>
             )}
           </div>
 
@@ -827,12 +890,14 @@ function CreateCampaignDrawer({ schools, onClose, onCreate }: CreateCampaignDraw
 }
 
 function CampaignRowItem({
-  row, campaignId, onUpdate, onDelete, signed,
+  row, campaignId, onUpdate, onDelete, onDealCreate, openDeal, signed,
 }: {
   row: CampaignRow;
   campaignId: string;
   onUpdate: (campaignId: string, rowId: string, updates: Partial<CampaignRow>) => void;
   onDelete: (campaignId: string, rowId: string) => void;
+  onDealCreate?: (campaignId: string, rowId: string) => void;
+  openDeal?: (deal: Deal) => void;
   signed?: boolean;
 }) {
   return (
@@ -840,6 +905,7 @@ function CampaignRowItem({
       <td>
         <input type="text" value={row.chapterName}
           onChange={e => onUpdate(campaignId, row.id, { chapterName: e.target.value })}
+          onBlur={() => { if (row.chapterName.trim() && row.orgId && !row.dealId) { onDealCreate?.(campaignId, row.id); } }}
           style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', minWidth: '120px', fontFamily: 'inherit' }}
           placeholder="Chapter name" />
       </td>
@@ -896,14 +962,14 @@ function CampaignRowItem({
       </td>
       <td style={{ whiteSpace: 'nowrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {row.dealId && (
-            <a
-              href={`/nucleus/pipeline?deal=${row.dealId}`}
-              title="Edit in Pipeline"
-              style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, color: '#0F172A', border: '1px solid #E5E7EB', textDecoration: 'none', background: 'white', whiteSpace: 'nowrap' }}
+          {row.dealId && openDeal && (
+            <button
+              onClick={() => openDeal({ id: row.dealId } as Deal)}
+              title="Edit deal"
+              style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, color: '#0F172A', border: '1px solid #E5E7EB', background: 'white', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
             >
               <Edit3 size={10} style={{ marginRight: '3px' }} /> Edit
-            </a>
+            </button>
           )}
           <button onClick={() => onDelete(campaignId, row.id)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: '2px' }}>
@@ -925,7 +991,7 @@ interface CsvImportState {
 }
 
 function ExpandedCampaign({
-  campaign, onUpdate, onDelete, onAddRow, onUpdateCampaign, onUpdateCampaignMeta,
+  campaign, onUpdate, onDelete, onAddRow, onUpdateCampaign, onUpdateCampaignMeta, onDealCreate, openDeal,
 }: {
   campaign: Campaign;
   onUpdate: (campaignId: string, rowId: string, updates: Partial<CampaignRow>) => void;
@@ -933,6 +999,8 @@ function ExpandedCampaign({
   onAddRow: (campaignId: string) => void;
   onUpdateCampaign: (id: string, updates: Partial<Campaign>) => void;
   onUpdateCampaignMeta: (id: string, rows: CampaignRow[], schoolId?: string) => void;
+  onDealCreate?: (campaignId: string, rowId: string) => void;
+  openDeal?: (deal: Deal) => void;
 }) {
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [csvState, setCsvState] = useState<CsvImportState>({ importing: false, progress: 0, total: 0, summary: null });
@@ -1084,12 +1152,12 @@ function ExpandedCampaign({
             {/* Open deals first */}
             {campaign.rows.filter(r => r.status !== 'signed').map(row => (
               <CampaignRowItem key={row.id} row={row} campaignId={campaign.id}
-                onUpdate={onUpdate} onDelete={onDelete} />
+                onUpdate={onUpdate} onDelete={onDelete} onDealCreate={onDealCreate} openDeal={openDeal} />
             ))}
             {/* Signed/closed deals at bottom in light green */}
             {campaign.rows.filter(r => r.status === 'signed').map(row => (
               <CampaignRowItem key={row.id} row={row} campaignId={campaign.id}
-                onUpdate={onUpdate} onDelete={onDelete} signed />
+                onUpdate={onUpdate} onDelete={onDelete} onDealCreate={onDealCreate} openDeal={openDeal} signed />
             ))}
           </tbody>
         </table>
@@ -1137,7 +1205,7 @@ function ExpandedCampaign({
 }
 
 function CampaignCard({
-  campaign, expanded, onToggle, onUpdate, onDelete, onAddRow, onUpdateCampaign, onDeleteCampaign, onUpdateCampaignMeta, pipelineDeals,
+  campaign, expanded, onToggle, onUpdate, onDelete, onAddRow, onUpdateCampaign, onDeleteCampaign, onUpdateCampaignMeta, pipelineDeals, onDealCreate, openDeal,
 }: {
   campaign: Campaign;
   expanded: boolean;
@@ -1149,6 +1217,8 @@ function CampaignCard({
   onDeleteCampaign: (id: string) => void;
   onUpdateCampaignMeta: (id: string, rows: CampaignRow[], schoolId?: string) => void;
   pipelineDeals: Deal[];
+  onDealCreate?: (campaignId: string, rowId: string) => void;
+  openDeal?: (deal: Deal) => void;
 }) {
   const contacted = campaign.rows.filter(r => r.status !== 'not_contacted').length;
   const total = campaign.rows.length;
@@ -1253,13 +1323,15 @@ function CampaignCard({
           onAddRow={onAddRow}
           onUpdateCampaign={onUpdateCampaign}
           onUpdateCampaignMeta={onUpdateCampaignMeta}
+          onDealCreate={onDealCreate}
+          openDeal={openDeal}
         />
       )}
     </div>
   );
 }
 
-function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
+function CampaignsTab({ stats, openDeal }: { stats: PipelineStats | null; openDeal?: (deal: Deal) => void }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -1267,6 +1339,19 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [allSchools, setAllSchools] = useState<{ id: string; name: string }[]>([]);
+
+  // Fetch full school list for the create drawer
+  useEffect(() => {
+    fetch('/api/pipeline/schools')
+      .then(r => r.json())
+      .then((d: any[]) => {
+        if (Array.isArray(d)) {
+          setAllSchools(d.map(s => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name)));
+        }
+      })
+      .catch(err => console.error('[campaigns] schools fetch error:', err));
+  }, []);
 
   // Track whether we've already attempted seeding to avoid re-seeding on every render
   const seededRef = useRef(false);
@@ -1353,15 +1438,16 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
     } catch (err) { console.error('[campaigns] patch error:', err); }
   }, []);
 
-  // Build school list from stats for the create drawer
+  // Build school list from allSchools (API) + stats fallback for the create drawer
   const schoolList = useMemo(() => {
+    if (allSchools.length > 0) return allSchools;
     const map = new Map<string, { id: string; name: string }>();
     stats?.recentDeals.forEach(d => {
       const school = d.organization?.school;
       if (school && !map.has(school.id)) map.set(school.id, { id: school.id, name: school.name });
     });
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [stats]);
+  }, [allSchools, stats]);
 
   const unlinkedDealsCount = useMemo(() => {
     const linkedOrgIds = new Set((Array.isArray(campaigns) ? campaigns : []).flatMap(c => (Array.isArray(c.rows) ? c.rows : []).map(r => r.orgId).filter(Boolean)));
@@ -1413,6 +1499,16 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
     const updatedCampaign = updatedCampaigns.find(c => c.id === campaignId)!;
     const updatedRow = updatedCampaign.rows.find(r => r.id === rowId)!;
 
+    // Status change → sync deal stage on existing deal
+    if (updates.status !== undefined && row?.dealId) {
+      const newStage = statusToStage(updates.status);
+      fetch(`/api/pipeline/deals/${row.dealId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newStage }),
+      }).catch(err => console.error('[campaigns] deal stage sync error:', err));
+    }
+
     if (meetingBookedToggled && !updatedRow.dealId && updatedRow.orgId) {
       // Create a pipeline deal and store dealId back
       fetch('/api/pipeline/deals', {
@@ -1435,6 +1531,28 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
     } else {
       persistOne(updatedCampaign);
     }
+  }
+
+  async function handleDealCreate(campaignId: string, rowId: string) {
+    const campaign = campaigns.find(c => c.id === campaignId);
+    const row = campaign?.rows.find(r => r.id === rowId);
+    if (!row || !row.orgId || row.dealId || !row.chapterName.trim()) return;
+    try {
+      const res = await fetch('/api/pipeline/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org_id: row.orgId, stage: 'lead', value: 0, deal_type: 'local' }),
+      });
+      if (res.ok) {
+        const deal = await res.json();
+        const updatedCampaigns = campaigns.map(c => c.id === campaignId
+          ? { ...c, rows: c.rows.map(r => r.id === rowId ? { ...r, dealId: deal.id } : r), updatedAt: new Date().toISOString() }
+          : c
+        );
+        setCampaigns(updatedCampaigns);
+        persistOne(updatedCampaigns.find(c => c.id === campaignId)!);
+      }
+    } catch (err) { console.error('[campaigns] deal create on blur error:', err); }
   }
 
   function handleDeleteRow(campaignId: string, rowId: string) {
@@ -1567,6 +1685,8 @@ function CampaignsTab({ stats }: { stats: PipelineStats | null }) {
               onDeleteCampaign={handleDeleteCampaign}
               onUpdateCampaignMeta={handleUpdateCampaignMeta}
               pipelineDeals={stats?.recentDeals ?? []}
+              onDealCreate={handleDealCreate}
+              openDeal={openDeal}
             />
           ))}
         </div>
@@ -2573,7 +2693,7 @@ export default function WarRoomPage() {
       {/* Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
         {tab === 'dashboard'  && <DashboardTab stats={stats} onOpenDeal={openDeal} />}
-        {tab === 'campaigns'  && <CampaignsTab stats={stats} />}
+        {tab === 'campaigns'  && <CampaignsTab stats={stats} openDeal={openDeal} />}
         {tab === 'notes'      && <NextStepsTab />}
         {tab === 'map'        && <ClientMapTab statsDeals={stats?.recentDeals ?? []} />}
       </div>
