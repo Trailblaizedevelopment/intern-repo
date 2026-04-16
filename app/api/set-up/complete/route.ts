@@ -112,14 +112,46 @@ export async function POST(req: NextRequest) {
               <p style="margin:0;font-size:0.875rem;color:#374151;"><strong>Date:</strong> ${new Date(agreedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
             </div>
             <p style="color:#374151;font-size:0.875rem;">This email serves as your confirmation that you have agreed to the Trailblaize SaaS Agreement. A member of our team will reach out within 24 hours.</p>
+            <details style="margin:16px 0;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;">
+              <summary style="padding:12px 16px;cursor:pointer;font-size:0.875rem;font-weight:600;color:#111827;background:#F9FAFB;list-style:none;">View full agreement ↓</summary>
+              <div style="padding:16px;background:white;">
+                <pre style="font-size:0.75rem;color:#374151;white-space:pre-wrap;font-family:sans-serif;line-height:1.6;margin:0;">TRAILBLAIZE SOFTWARE AS A SERVICE AGREEMENT
+
+This Software as a Service Agreement ("Agreement") is entered into between Trailblaize, Inc. ("Trailblaize") and ${orgName} ("Client").
+
+1. SERVICES
+Trailblaize agrees to provide Client with access to the Trailblaize platform, including the alumni directory, message board, engagement tools, and related features.
+
+2. SUBSCRIPTION TERM
+This Agreement commences on ${new Date(agreedAt).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})} and continues for an initial term of twelve (12) months. After the Initial Term, this Agreement converts to month-to-month and may be terminated with thirty (30) days written notice.
+
+3. FEES AND PAYMENT
+Client agrees to pay $${pricePerMonth}/month. Fees are billed monthly via the payment method on file. All fees are non-refundable except as required by law.
+
+4. CLIENT DATA
+Client retains full ownership of all data. Trailblaize will not sell Client Data to third parties. Client may request export or deletion at support@trailblaize.net.
+
+5. CANCELLATION
+After the Initial Term, Client may cancel with thirty (30) days written notice to support@trailblaize.net.
+
+6. LIMITATION OF LIABILITY
+Trailblaize's total liability shall not exceed fees paid in the three (3) months preceding the claim.
+
+7. GOVERNING LAW
+This Agreement shall be governed by the laws of the State of Mississippi.
+
+Signed by: ${agreedName}
+Date: ${new Date(agreedAt).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}
+Organization: ${orgName}, ${school}</pre>
+              </div>
+            </details>
             <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:12px 16px;margin:16px 0;">
               <p style="font-size:0.75rem;color:#6B7280;margin:0 0 6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Agreement Summary</p>
               <p style="font-size:0.8125rem;color:#374151;margin:0;line-height:1.6;">
                 • 12-month initial commitment starting today<br/>
                 • $${pricePerMonth}/month billed monthly<br/>
                 • Cancel after year one with 30 days written notice<br/>
-                • Your data belongs to you — never sold<br/>
-                • Full agreement available at trailblaize.net/terms
+                • Your data belongs to you — never sold
               </p>
             </div>
             <a href="https://www.trailblaize.net/sign-in" style="display:inline-block;background:#0F172A;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px;">Log In to Your Platform →</a>
