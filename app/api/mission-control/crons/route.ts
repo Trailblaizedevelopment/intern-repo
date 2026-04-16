@@ -89,9 +89,15 @@ export async function GET() {
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Graceful fallback — exec fails on Vercel (no local openclaw binary)
     return NextResponse.json(
-      { jobs: [], total: 0, error: `Failed to load cron jobs: ${msg}` },
-      { status: 500, headers: { 'Cache-Control': 'no-store' } }
+      {
+        jobs: [],
+        total: 0,
+        error: 'Cron data is only available when running locally on the Mac mini.',
+        detail: msg,
+      },
+      { status: 200, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }
