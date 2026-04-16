@@ -33,6 +33,7 @@ import {
   Star,
   Radar,
   Tv,
+  Share2,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -58,6 +59,7 @@ const iconMap: Record<string, LucideIcon> = {
   Star,
   Radar,
   Tv,
+  Share2,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {

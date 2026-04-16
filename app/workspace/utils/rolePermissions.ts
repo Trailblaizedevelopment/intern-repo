@@ -153,6 +153,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
         { name: 'Mission Control', href: '/nucleus/mission-control', icon: 'Radar' },
+        { name: 'Socials', href: '/workspace/socials', icon: 'Share2' },
       ];
     case 'engineer':
       return [
@@ -163,13 +164,19 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
     case 'growth_intern':
-    default:
+    default: {
       // Interns: Dashboard, War Room, Pipeline, Team
-      return [
+      const internItems: NavItem[] = [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
         { name: 'War Room', href: '/nucleus/war-room', icon: 'Tv' },
         { name: 'Pipeline', href: '/nucleus/pipeline', icon: 'TrendingUp' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
+      // Marketing interns also get the Socials page
+      if (role === 'marketing_intern') {
+        internItems.push({ name: 'Socials', href: '/workspace/socials', icon: 'Share2' });
+      }
+      return internItems;
+    }
   }
 }
