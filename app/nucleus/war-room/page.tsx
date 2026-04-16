@@ -364,6 +364,20 @@ function statusToStage(status: CampaignRow['status']): string {
   }
 }
 
+// ─── Row Type Classification ──────────────────────────────────────────────────
+
+type RowType = 'client' | 'deal' | 'prospect';
+
+function getRowType(row: CampaignRow, dealStageMap: Record<string, string>): RowType {
+  if (row.status === 'signed' || (row.dealId && dealStageMap[row.dealId] === 'closed_won')) {
+    return 'client';
+  }
+  if (row.dealId && dealStageMap[row.dealId] && dealStageMap[row.dealId] !== 'closed_won') {
+    return 'deal';
+  }
+  return 'prospect';
+}
+
 // ─── Shared Components ────────────────────────────────────────────────────────
 
 function StageBadge({ stage }: { stage: string }) {
@@ -890,7 +904,7 @@ function CreateCampaignDrawer({ schools, onClose, onCreate }: CreateCampaignDraw
 }
 
 function CampaignRowItem({
-  row, campaignId, onUpdate, onDelete, onDealCreate, openDeal, signed,
+  row, campaignId, onUpdate, onDelete, onDealCreate, openDeal, dealStageMap, dealValueMap, dealTempMap,
 }: {
   row: CampaignRow;
   campaignId: string;
@@ -898,86 +912,125 @@ function CampaignRowItem({
   onDelete: (campaignId: string, rowId: string) => void;
   onDealCreate?: (campaignId: string, rowId: string) => void;
   openDeal?: (deal: Deal) => void;
-  signed?: boolean;
+  dealStageMap: Record<string, string>;
+  dealValueMap: Record<string, number>;
+  dealTempMap: Record<string, string>;
 }) {
+  const rowType = getRowType(row, dealStageMap);
+  const stage = row.dealId ? dealStageMap[row.dealId] : undefined;
+  const dealValue = row.dealId ? dealValueMap[row.dealId] : undefined;
+  const dealTemp = row.dealId ? dealTempMap[row.dealId] : undefined;
+  const mrr = dealValue ? Math.round(dealValue / 12) : undefined;
+  const TEMP_EMOJI: Record<string, string> = { hot: '🔥', warm: '🌡️', cold: '🧊' };
+
+  // ── Client row ────────────────────────────────────────────────────────────
+  if (rowType === 'client') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', background: '#f0fdf4', borderBottom: '1px solid #dcfce7', minHeight: '44px' }}>
+        <CheckCircle2 size={16} color="#15803d" style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, fontWeight: 700, color: '#15803d', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {row.chapterName || '—'}
+        </span>
+        <span style={{ flexShrink: 0, fontSize: '0.875rem', fontWeight: 700, color: '#15803d' }}>
+          {dealValue
+            ? `$${mrr}/mo`
+            : <span style={{ fontSize: '0.75rem', fontWeight: 600, background: '#dcfce7', padding: '2px 8px', borderRadius: '9999px', color: '#15803d' }}>Active Client</span>
+          }
+        </span>
+        <span style={{ fontSize: '0.8125rem', color: '#6b7280', flexShrink: 0, minWidth: '120px', textAlign: 'right' }}>
+          {row.contactName || '—'}
+        </span>
+      </div>
+    );
+  }
+
+  // ── Deal row ──────────────────────────────────────────────────────────────
+  if (rowType === 'deal') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', background: '#ffffff', borderBottom: '1px solid #f3f4f6', minHeight: '44px' }}>
+        <span style={{ flex: 1, fontWeight: 600, fontSize: '0.875rem', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {row.chapterName || '—'}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {stage && <StageBadge stage={stage} />}
+          {dealTemp && <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{TEMP_EMOJI[dealTemp] ?? ''}</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {row.dealId && openDeal && (
+            <button
+              onClick={() => openDeal({ id: row.dealId } as Deal)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700, padding: '5px 12px', borderRadius: '8px', background: '#0F172A', color: '#ffffff', border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+            >
+              Edit →
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Prospect row ──────────────────────────────────────────────────────────
   return (
-    <tr style={signed ? { background: '#f0fdf4', opacity: 0.85 } : {}}>
-      <td>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#fafafa', borderBottom: '1px solid #f3f4f6', minHeight: '44px' }}>
+      <div style={{ width: '160px', flexShrink: 0 }}>
         <input type="text" value={row.chapterName}
           onChange={e => onUpdate(campaignId, row.id, { chapterName: e.target.value })}
           onBlur={() => { if (row.chapterName.trim() && row.orgId && !row.dealId) { onDealCreate?.(campaignId, row.id); } }}
-          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', minWidth: '120px', fontFamily: 'inherit' }}
+          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', fontFamily: 'inherit' }}
           placeholder="Chapter name" />
-      </td>
-      <td>
+      </div>
+      <div style={{ width: '120px', flexShrink: 0 }}>
         <select value={row.status}
           onChange={e => onUpdate(campaignId, row.id, { status: e.target.value as CampaignRow['status'] })}
-          style={{ background: 'transparent', fontSize: '0.75rem', border: 'none', outline: 'none', fontFamily: 'inherit' }}>
+          style={{ background: 'transparent', fontSize: '0.75rem', border: 'none', outline: 'none', fontFamily: 'inherit', width: '100%' }}>
           <option value="not_contacted">Not Contacted</option>
           <option value="contacted">Contacted</option>
           <option value="demo_booked">Demo Booked</option>
           <option value="signed">Signed</option>
         </select>
-      </td>
-      <td>
+      </div>
+      <div style={{ width: '80px', flexShrink: 0 }}>
         <select value={row.method}
           onChange={e => onUpdate(campaignId, row.id, { method: e.target.value as OutreachMethod })}
-          style={{ background: 'transparent', fontSize: '0.75rem', border: 'none', outline: 'none', fontFamily: 'inherit' }}>
+          style={{ background: 'transparent', fontSize: '0.75rem', border: 'none', outline: 'none', fontFamily: 'inherit', width: '100%' }}>
           <option value="email">Email</option>
           <option value="text">Text</option>
-          <option value="instagram_dm">Instagram DM</option>
+          <option value="instagram_dm">IG DM</option>
         </select>
-      </td>
-      <td>
+      </div>
+      <div style={{ width: '120px', flexShrink: 0 }}>
         <input type="text" value={row.contactName}
           onChange={e => onUpdate(campaignId, row.id, { contactName: e.target.value })}
-          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', minWidth: '100px', fontFamily: 'inherit' }}
+          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', fontFamily: 'inherit' }}
           placeholder="Name" />
-      </td>
-      <td>
+      </div>
+      <div style={{ flex: 1, minWidth: '120px' }}>
         <input type="text" value={row.contactInfo}
           onChange={e => onUpdate(campaignId, row.id, { contactInfo: e.target.value })}
-          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', minWidth: '120px', fontFamily: 'inherit' }}
+          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', fontFamily: 'inherit' }}
           placeholder="Email / phone" />
-      </td>
-      <td>
+      </div>
+      <div style={{ flex: 1, minWidth: '130px' }}>
         <input type="text" value={row.sourceUrl}
           onChange={e => onUpdate(campaignId, row.id, { sourceUrl: e.target.value })}
-          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', minWidth: '140px', fontFamily: 'inherit' }}
+          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid transparent', outline: 'none', fontSize: '0.875rem', padding: '2px 0', fontFamily: 'inherit' }}
           placeholder="https://..." />
-      </td>
-      <td style={{ textAlign: 'center' }}>
+      </div>
+      <div style={{ width: '44px', flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
         <button
           onClick={() => onUpdate(campaignId, row.id, { meetingBooked: !row.meetingBooked })}
-          style={{
-            width: '20px', height: '20px', borderRadius: '4px',
-            border: `1px solid ${row.meetingBooked ? '#0F172A' : '#d1d5db'}`,
-            background: row.meetingBooked ? '#0F172A' : 'transparent',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', margin: '0 auto',
-          }}
+          style={{ width: '20px', height: '20px', borderRadius: '4px', border: `1px solid ${row.meetingBooked ? '#0F172A' : '#d1d5db'}`, background: row.meetingBooked ? '#0F172A' : 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
           {row.meetingBooked && <Check size={12} color="#fff" />}
         </button>
-      </td>
-      <td style={{ whiteSpace: 'nowrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {row.dealId && openDeal && (
-            <button
-              onClick={() => openDeal({ id: row.dealId } as Deal)}
-              title="Edit deal"
-              style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, color: '#0F172A', border: '1px solid #E5E7EB', background: 'white', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
-            >
-              <Edit3 size={10} style={{ marginRight: '3px' }} /> Edit
-            </button>
-          )}
-          <button onClick={() => onDelete(campaignId, row.id)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: '2px' }}>
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </td>
-    </tr>
+      </div>
+      <div style={{ flexShrink: 0 }}>
+        <button onClick={() => onDelete(campaignId, row.id)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: '2px' }}>
+          <Trash2 size={13} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -992,6 +1045,7 @@ interface CsvImportState {
 
 function ExpandedCampaign({
   campaign, onUpdate, onDelete, onAddRow, onUpdateCampaign, onUpdateCampaignMeta, onDealCreate, openDeal,
+  dealStageMap, dealValueMap, dealTempMap,
 }: {
   campaign: Campaign;
   onUpdate: (campaignId: string, rowId: string, updates: Partial<CampaignRow>) => void;
@@ -1001,6 +1055,9 @@ function ExpandedCampaign({
   onUpdateCampaignMeta: (id: string, rows: CampaignRow[], schoolId?: string) => void;
   onDealCreate?: (campaignId: string, rowId: string) => void;
   openDeal?: (deal: Deal) => void;
+  dealStageMap: Record<string, string>;
+  dealValueMap: Record<string, number>;
+  dealTempMap: Record<string, string>;
 }) {
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [csvState, setCsvState] = useState<CsvImportState>({ importing: false, progress: 0, total: 0, summary: null });
@@ -1133,34 +1190,67 @@ function ExpandedCampaign({
         </button>
       </div>
 
-      {/* Sheet table */}
+      {/* Sheet — three grouped sections */}
       <div style={{ overflowX: 'auto' }}>
-        <table className="module-table">
-          <thead>
-            <tr>
-              <th>Chapter</th>
-              <th>Status</th>
-              <th>Method</th>
-              <th>Contact</th>
-              <th>Contact Info</th>
-              <th>Source URL</th>
-              <th style={{ textAlign: 'center' }}>Booked</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Open deals first */}
-            {campaign.rows.filter(r => r.status !== 'signed').map(row => (
-              <CampaignRowItem key={row.id} row={row} campaignId={campaign.id}
-                onUpdate={onUpdate} onDelete={onDelete} onDealCreate={onDealCreate} openDeal={openDeal} />
-            ))}
-            {/* Signed/closed deals at bottom in light green */}
-            {campaign.rows.filter(r => r.status === 'signed').map(row => (
-              <CampaignRowItem key={row.id} row={row} campaignId={campaign.id}
-                onUpdate={onUpdate} onDelete={onDelete} onDealCreate={onDealCreate} openDeal={openDeal} signed />
-            ))}
-          </tbody>
-        </table>
+        {(() => {
+          const clientRows = campaign.rows.filter(r => getRowType(r, dealStageMap) === 'client');
+          const dealRows   = campaign.rows.filter(r => getRowType(r, dealStageMap) === 'deal');
+          const prospectRows = campaign.rows.filter(r => getRowType(r, dealStageMap) === 'prospect');
+          const rowProps = { campaignId: campaign.id, onUpdate, onDelete, onDealCreate, openDeal, dealStageMap, dealValueMap, dealTempMap };
+          return (
+            <>
+              {/* ── Active Clients ── */}
+              {clientRows.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 16px', background: '#f0fdf4', borderBottom: '1px solid #bbf7d0' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: '#15803d' }}>Active Clients</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', background: '#15803d', color: '#fff' }}>{clientRows.length}</span>
+                  </div>
+                  {clientRows.map(row => <CampaignRowItem key={row.id} row={row} {...rowProps} />)}
+                </div>
+              )}
+
+              {/* ── Pipeline (active deals) ── */}
+              {dealRows.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: '#1e3a5f' }}>Pipeline</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', background: '#1e3a5f', color: '#fff' }}>{dealRows.length}</span>
+                  </div>
+                  {dealRows.map(row => <CampaignRowItem key={row.id} row={row} {...rowProps} />)}
+                </div>
+              )}
+
+              {/* ── Outreach (prospects) ── */}
+              {prospectRows.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 16px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: '#6b7280' }}>Outreach</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', background: '#6b7280', color: '#fff' }}>{prospectRows.length}</span>
+                  </div>
+                  {/* Column header for prospect rows */}
+                  <div style={{ display: 'flex', gap: '8px', padding: '5px 16px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6', fontSize: '0.67rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <span style={{ width: '160px', flexShrink: 0 }}>Chapter</span>
+                    <span style={{ width: '120px', flexShrink: 0 }}>Status</span>
+                    <span style={{ width: '80px', flexShrink: 0 }}>Method</span>
+                    <span style={{ width: '120px', flexShrink: 0 }}>Contact</span>
+                    <span style={{ flex: 1, minWidth: '120px' }}>Contact Info</span>
+                    <span style={{ flex: 1, minWidth: '130px' }}>Source URL</span>
+                    <span style={{ width: '44px', flexShrink: 0, textAlign: 'center' }}>Booked</span>
+                    <span style={{ flexShrink: 0, width: '24px' }}></span>
+                  </div>
+                  {prospectRows.map(row => <CampaignRowItem key={row.id} row={row} {...rowProps} />)}
+                </div>
+              )}
+
+              {campaign.rows.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '32px', color: '#9ca3af', fontSize: '0.875rem' }}>
+                  No rows yet — add chapters below
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Footer: Add row + CSV import */}
@@ -1224,10 +1314,22 @@ function CampaignCard({
   const total = campaign.rows.length;
   const pct = total > 0 ? Math.round((contacted / total) * 100) : 0;
 
-  // Build a map of dealId → pipeline stage for quick lookup
+  // Build lookup maps from pipelineDeals
   const dealStageMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const d of pipelineDeals) map[d.id] = d.stage;
+    return map;
+  }, [pipelineDeals]);
+
+  const dealValueMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const d of pipelineDeals) if (d.value) map[d.id] = d.value;
+    return map;
+  }, [pipelineDeals]);
+
+  const dealTempMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const d of pipelineDeals) if (d.temperature) map[d.id] = d.temperature;
     return map;
   }, [pipelineDeals]);
 
@@ -1278,9 +1380,20 @@ function CampaignCard({
             <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: '9999px', color: typeBadge.color, background: typeBadge.bg }}>
               {CAMPAIGN_TYPE_LABELS[campaign.type]}
             </span>
-            {total > 0 && (
-              <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>{contacted}/{total} contacted</span>
-            )}
+            {total > 0 && (() => {
+              const cCount = campaign.rows.filter(r => getRowType(r, dealStageMap) === 'client').length;
+              const dCount = campaign.rows.filter(r => getRowType(r, dealStageMap) === 'deal').length;
+              const pCount = campaign.rows.filter(r => getRowType(r, dealStageMap) === 'prospect').length;
+              return (
+                <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                  {cCount > 0 && <span style={{ color: '#15803d', fontWeight: 700 }}>{cCount} client{cCount !== 1 ? 's' : ''}</span>}
+                  {cCount > 0 && (dCount > 0 || pCount > 0) && ' · '}
+                  {dCount > 0 && <span>{dCount} deal{dCount !== 1 ? 's' : ''}</span>}
+                  {dCount > 0 && pCount > 0 && ' · '}
+                  {pCount > 0 && <span>{pCount} prospect{pCount !== 1 ? 's' : ''}</span>}
+                </span>
+              );
+            })()}
           </div>
         </div>
 
@@ -1325,6 +1438,9 @@ function CampaignCard({
           onUpdateCampaignMeta={onUpdateCampaignMeta}
           onDealCreate={onDealCreate}
           openDeal={openDeal}
+          dealStageMap={dealStageMap}
+          dealValueMap={dealValueMap}
+          dealTempMap={dealTempMap}
         />
       )}
     </div>
