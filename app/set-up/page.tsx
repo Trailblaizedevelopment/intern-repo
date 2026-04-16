@@ -334,11 +334,7 @@ function SetUpPage() {
           >
             Get Started <ArrowRight size={18} />
           </button>
-          {activeChapterCount !== null && activeChapterCount > 0 && (
-            <p style={{ marginTop: '16px', fontSize: '0.875rem', color: '#9ca3af' }}>
-              Join <span style={{ fontWeight: 600, color: '#111827' }}>{activeChapterCount} organizations</span> already on Trailblaize
-            </p>
-          )}
+
         </section>
 
         {/* Feature Cards */}
@@ -371,9 +367,7 @@ function SetUpPage() {
               </div>
             ))}
           </div>
-          <div style={{ marginTop: '32px', textAlign: 'center' }}>
-            <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>Plans start at <span style={{ fontWeight: 600, color: '#111827' }}>$99/month</span> based on your member count.</p>
-          </div>
+
         </section>
       </div>
     );
