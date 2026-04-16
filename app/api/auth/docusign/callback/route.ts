@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-const DOCUSIGN_INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY!;
-const DOCUSIGN_CLIENT_SECRET = process.env.DOCUSIGN_CLIENT_SECRET!;
+const DOCUSIGN_INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY?.trim()!;
+const DOCUSIGN_CLIENT_SECRET = process.env.DOCUSIGN_CLIENT_SECRET?.trim()!;
 const DOCUSIGN_REDIRECT_URI = process.env.DOCUSIGN_REDIRECT_URI?.trim() || 'https://trailblaize.space/api/auth/docusign/callback';
 const DOCUSIGN_AUTH_URL = 'https://account.docusign.com';
 
@@ -43,6 +43,8 @@ export async function GET(req: NextRequest) {
       integrationKeyPrefix: DOCUSIGN_INTEGRATION_KEY?.slice(0, 8),
       secretKeyPresent: !!DOCUSIGN_CLIENT_SECRET,
       secretKeyLength: DOCUSIGN_CLIENT_SECRET?.length,
+      secretKeyPrefix: DOCUSIGN_CLIENT_SECRET?.slice(0, 4),
+      secretKeySuffix: DOCUSIGN_CLIENT_SECRET?.slice(-4),
       redirectUri: DOCUSIGN_REDIRECT_URI,
       authUrl: DOCUSIGN_AUTH_URL,
       codeLength: code?.length,
