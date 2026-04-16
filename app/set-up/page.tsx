@@ -310,7 +310,7 @@ function SetUpPage() {
         )}
         {/* Nav — matches trailblaize.net */}
         <nav style={{ padding: '0 32px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6' }}>
-          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '32px' }} />
+          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '44px' }} />
           <button onClick={() => goToStep(1)}
             style={{ padding: '8px 20px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.875rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
             Get Started
@@ -321,38 +321,22 @@ function SetUpPage() {
         <section style={{ maxWidth: '680px', margin: '0 auto', padding: '80px 24px 56px', textAlign: 'center' }}>
           <h1 style={{
             fontSize: 'clamp(2.25rem, 6vw, 3.75rem)',
-            fontWeight: 700,
+            fontWeight: 400,
             lineHeight: 1.1,
             color: '#0F172A',
             marginBottom: '20px',
             fontFamily: '"Instrument Serif", Georgia, serif',
-            letterSpacing: '-0.02em',
+            letterSpacing: '-0.01em',
           }}>
             The alumni network for every organization.
           </h1>
           <p style={{ fontSize: '1.125rem', color: '#6B7280', marginBottom: '36px', lineHeight: 1.6, maxWidth: '480px', margin: '0 auto 36px' }}>
             A shared platform where organizations own their alumni community.
           </p>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => goToStep(1)}
-              style={{ padding: '12px 28px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.9375rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              Get Started <ArrowRight size={16} />
-            </button>
-            <a href="https://www.trailblaize.net" target="_blank" rel="noopener noreferrer"
-              style={{ padding: '12px 28px', borderRadius: '8px', background: 'white', color: '#0F172A', fontWeight: 600, fontSize: '0.9375rem', border: '1.5px solid #E5E7EB', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-              Learn more
-            </a>
-          </div>
-        </section>
-
-        {/* Chapter logos — social proof row */}
-        <section style={{ maxWidth: '700px', margin: '0 auto', padding: '0 24px 48px', textAlign: 'center' }}>
-          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', fontWeight: 500, letterSpacing: '0.05em', marginBottom: '20px' }}>Trusted by member-driven communities</p>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '32px', flexWrap: 'wrap', opacity: 0.7 }}>
-            {['Alabama KA', 'Ole Miss ATO', 'Ole Miss Sigma Chi', 'Theta Xi', 'TAMU Sigma Chi'].map(name => (
-              <span key={name} style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>{name}</span>
-            ))}
-          </div>
+          <button onClick={() => goToStep(1)}
+            style={{ padding: '14px 32px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            Get Started <ArrowRight size={16} />
+          </button>
         </section>
 
         {/* Feature cards */}
@@ -372,13 +356,7 @@ function SetUpPage() {
           </div>
         </section>
 
-        {/* Bottom CTA */}
-        <section style={{ textAlign: 'center', padding: '32px 24px 80px' }}>
-          <button onClick={() => goToStep(1)}
-            style={{ padding: '14px 36px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-            Start your free onboarding
-          </button>
-        </section>
+        <div style={{ height: '64px' }} />
       </div>
     );
   }

@@ -112,6 +112,16 @@ export async function POST(req: NextRequest) {
               <p style="margin:0;font-size:0.875rem;color:#374151;"><strong>Date:</strong> ${new Date(agreedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
             </div>
             <p style="color:#374151;font-size:0.875rem;">This email serves as your confirmation that you have agreed to the Trailblaize SaaS Agreement. A member of our team will reach out within 24 hours.</p>
+            <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:12px 16px;margin:16px 0;">
+              <p style="font-size:0.75rem;color:#6B7280;margin:0 0 6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Agreement Summary</p>
+              <p style="font-size:0.8125rem;color:#374151;margin:0;line-height:1.6;">
+                • 12-month initial commitment starting today<br/>
+                • $${pricePerMonth}/month billed monthly<br/>
+                • Cancel after year one with 30 days written notice<br/>
+                • Your data belongs to you — never sold<br/>
+                • Full agreement available at trailblaize.net/terms
+              </p>
+            </div>
             <a href="https://www.trailblaize.net/sign-in" style="display:inline-block;background:#0F172A;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px;">Log In to Your Platform →</a>
             <p style="color:#9ca3af;font-size:0.75rem;margin-top:24px;">Questions? Reply to this email or contact support@trailblaize.net</p>
           </div>
