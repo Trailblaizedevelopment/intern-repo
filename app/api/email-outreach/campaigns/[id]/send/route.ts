@@ -45,7 +45,19 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     if (contErr) throw new Error(`Failed to load contacts: ${contErr.message}`);
 
-    const eligible = (contacts || []).filter(c => c.email && !suppressed.has(c.email.toLowerCase()));
+    // Get already-sent emails for this campaign to avoid double-sending on resume
+    const { data: alreadySent } = await supabase
+      .from('email_sends')
+      .select('email')
+      .eq('campaign_id', id)
+      .eq('status', 'sent');
+    const alreadySentEmails = new Set((alreadySent || []).map(s => s.email.toLowerCase()));
+
+    const eligible = (contacts || []).filter(c =>
+      c.email &&
+      !suppressed.has(c.email.toLowerCase()) &&
+      !alreadySentEmails.has(c.email.toLowerCase()) // skip already sent
+    );
 
     if (eligible.length === 0) {
       await supabase.from('email_campaigns').update({ status: 'sent', sent_at: new Date().toISOString(), sent_count: 0 }).eq('id', id);
