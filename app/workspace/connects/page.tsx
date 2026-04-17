@@ -156,11 +156,12 @@ function StatusLegend() {
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 
-function GoalBar({ contacts }: { contacts: AlumniContact[] }) {
-  const called = contacts.filter(c => getCardStatus(c) === 'called').length;
-  const voicemail = contacts.filter(c => getCardStatus(c) === 'voicemail').length;
-  const uncalled = contacts.filter(c => getCardStatus(c) === 'uncalled').length;
-  const total = called + voicemail;
+function GoalBar({ stats, chapterContacts }: { stats: { called: number; voicemail: number; total: number }; chapterContacts: AlumniContact[] }) {
+  // Use company-wide stats for the goal bar, chapter contacts for breakdown
+  const called = stats.called;
+  const voicemail = stats.voicemail;
+  const uncalled = chapterContacts.filter(c => getCardStatus(c) === 'uncalled').length;
+  const total = stats.total;
   const pct = Math.min(100, Math.round((total / 100) * 100));
   return (
     <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 16, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginBottom: '1.5rem' }}>
@@ -201,8 +202,57 @@ export default function ConnectsCenter() {
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [openPanel, setOpenPanel] = useState<string | null>(null);
   const [panel, setPanel] = useState<LogPanel | null>(null);
+  // Company-wide daily stats (independent of chapter selector)
+  const [dailyStats, setDailyStats] = useState({ called: 0, voicemail: 0, total: 0 });
+  const [calendarData, setCalendarData] = useState<Record<string, number>>({});
 
-  // ── Fetch chapters ──
+  // Load company-wide stats across all chapters
+  const loadDailyStats = useCallback(async () => {
+    try {
+      // Pull all contacted/responded contacts across all chapters to get true daily count
+      // We use the response_text date stamps to determine today's calls
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const allChapRes = await fetch('/api/chapters?status=active');
+      const allChapData = await allChapRes.json();
+      const allChaps: Chapter[] = allChapData.data || allChapData || [];
+      
+      let totalCalled = 0, totalVoicemail = 0;
+      const dateCounts: Record<string, number> = {};
+
+      await Promise.all(allChaps.map(async (ch) => {
+        try {
+          // Fetch contacts with call notes (touch1_sent, touch1_confirmed, responded)
+          const res = await fetch(`/api/alumni-contacts?chapter_id=${ch.id}&outreach_status=touch1_confirmed&limit=500`);
+          const json = await res.json();
+          const confirmed: AlumniContact[] = json.data?.contacts ?? json.data ?? [];
+          
+          const res2 = await fetch(`/api/alumni-contacts?chapter_id=${ch.id}&outreach_status=touch1_sent&limit=500`);
+          const json2 = await res2.json();
+          const sent: AlumniContact[] = json2.data?.contacts ?? json2.data ?? [];
+
+          confirmed.forEach(c => {
+            const text = c.response_text || '';
+            const match = text.match(/(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4})/);
+            const dateStr = match ? match[1] : null;
+            if (dateStr && (dateStr === today || text.includes(today.slice(0, 7)))) totalCalled++;
+            // Calendar: count by date
+            if (dateStr) dateCounts[dateStr] = (dateCounts[dateStr] || 0) + 1;
+          });
+          sent.forEach(c => {
+            const text = c.response_text || '';
+            if (text.includes(today.slice(0, 7))) totalVoicemail++;
+          });
+        } catch {}
+      }));
+
+      setDailyStats({ called: totalCalled, voicemail: totalVoicemail, total: totalCalled + totalVoicemail });
+      setCalendarData(dateCounts);
+    } catch (e) {
+      console.error('Failed to load daily stats', e);
+    }
+  }, []);
+
+  // ── Fetch chapters + daily stats on mount ──
   useEffect(() => {
     async function load() {
       setLoadingChapters(true);
@@ -216,20 +266,30 @@ export default function ConnectsCenter() {
       setLoadingChapters(false);
     }
     load();
-  }, []);
+    loadDailyStats(); // Load company-wide stats independently
+  }, [loadDailyStats]);
 
-  // ── Fetch ALL contacts for selected chapter (no status filter) ──
+  // ── Fetch ALL contacts for selected chapter — paginated ──
   const loadContacts = useCallback(async (chapterId: string) => {
     if (!chapterId) return;
     setLoadingContacts(true);
     try {
-      const res = await fetch(
-        `/api/alumni-contacts?chapter_id=${chapterId}&limit=200`
-      );
-      const json = await res.json();
-      // API returns { data: { contacts: [...], total: N } }
-      const raw: AlumniContact[] = json.data?.contacts ?? json.data ?? json ?? [];
-      setContacts(sortContacts(raw));
+      // First get total count
+      const first = await fetch(`/api/alumni-contacts?chapter_id=${chapterId}&limit=1`);
+      const firstJson = await first.json();
+      const total: number = firstJson.data?.total ?? 500;
+      const pageSize = 500;
+      const pages = Math.ceil(total / pageSize);
+      
+      const allContacts: AlumniContact[] = [];
+      for (let p = 0; p < pages; p++) {
+        const res = await fetch(`/api/alumni-contacts?chapter_id=${chapterId}&limit=${pageSize}&offset=${p * pageSize}`);
+        const json = await res.json();
+        const batch: AlumniContact[] = json.data?.contacts ?? json.data ?? [];
+        allContacts.push(...batch);
+        if (batch.length < pageSize) break; // last page
+      }
+      setContacts(sortContacts(allContacts));
     } catch (e) {
       console.error('Failed to load contacts', e);
     }
@@ -360,7 +420,30 @@ export default function ConnectsCenter() {
       <main className="module-main">
 
         {/* ── 100-Call Goal ── */}
-        <GoalBar contacts={contacts} />
+        <GoalBar stats={dailyStats} chapterContacts={contacts} />
+        {/* Calendar — last 14 days of outreach */}
+        {Object.keys(calendarData).length > 0 && (
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 16, padding: '16px 20px', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px 0' }}>Outreach History</p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {Array.from({ length: 14 }, (_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - (13 - i));
+                const key = d.toISOString().slice(0, 10);
+                const count = calendarData[key] || 0;
+                const isToday = key === new Date().toISOString().slice(0, 10);
+                const opacity = count === 0 ? 0.15 : Math.min(1, 0.3 + (count / 20));
+                return (
+                  <div key={key} title={`${key}: ${count} calls`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: count > 0 ? `rgba(15,23,42,${opacity})` : '#F3F4F6', border: isToday ? '2px solid #0F172A' : '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 700, color: count > 0 ? 'white' : '#9ca3af' }}>
+                      {count > 0 ? count : ''}
+                    </div>
+                    <span style={{ fontSize: '0.6rem', color: '#9ca3af' }}>{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
 
         {/* ── Section 1: Chapter Selector + Queue ── */}
