@@ -140,6 +140,18 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       updated_at: now.toISOString(),
     }).eq('id', id);
 
+    // Send completion notification to founders
+    try {
+      const { sendEmail } = await import('@/lib/sendgrid');
+      const subject = `✅ Campaign sent: ${campaign.chapter_name} T${campaign.touch_number} — ${results.sent} emails delivered`;
+      const body = `<p><strong>${campaign.subject_line}</strong></p><p>Chapter: ${campaign.chapter_name}</p><p>Touch: T${campaign.touch_number}</p><p>Sent: ${results.sent} | Failed: ${results.failed} | Total eligible: ${eligible.length + alreadySentEmails.size}</p><p>Sent at: ${new Date().toLocaleString('en-US', {timeZone:'America/Chicago'})}</p>`;
+      await Promise.allSettled([
+        sendEmail({ to: 'owen@trailblaize.net', subject, htmlBody: body }),
+        sendEmail({ to: 'ford@trailblaize.net', subject, htmlBody: body }),
+        sendEmail({ to: 'adam@trailblaize.net', subject, htmlBody: body }),
+      ]);
+    } catch { /* non-fatal */ }
+
     return NextResponse.json({
       data: { sent: results.sent, failed: results.failed, errors: results.errors.slice(0, 10), next_touch_eligible_at: nextTouchEligibleAt },
       error: null,
