@@ -174,21 +174,35 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
   /* ─── Actions ─── */
 
   async function createCampaign() {
-    if (!selectedChapter || !form.subject_line || !form.template_html) {
-      showToast('Fill in all required fields', 'error'); return;
+    // Require at minimum T1 subject + content
+    if (!selectedChapter) { showToast('Select a chapter first', 'error'); return; }
+    const t1 = touchForms[1];
+    if (!t1.subject_line || !t1.template_html) {
+      showToast('T1 subject and content are required', 'error'); return;
     }
     setSaving(true);
     try {
-      const res = await fetch('/api/email-outreach/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, chapter_id: selectedChapter, touch_number: Number(form.touch_number) }),
-      });
-      const json = await res.json();
-      if (json.error) { showToast(json.error, 'error'); return; }
-      showToast('Campaign created', 'success');
+      // Create all filled touches as a sequence in parallel
+      const touches = [1, 2, 3].filter(t => touchForms[t].subject_line && touchForms[t].template_html);
+      const results = await Promise.all(
+        touches.map(t =>
+          fetch('/api/email-outreach/campaigns', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chapter_id: selectedChapter,
+              touch_number: t,
+              subject_line: touchForms[t].subject_line,
+              template_html: touchForms[t].template_html,
+              scheduled_at: touchForms[t].scheduled_at || null,
+            }),
+          }).then(r => r.json())
+        )
+      );
+      const errors = results.filter(r => r.error);
+      if (errors.length > 0) { showToast(errors[0].error, 'error'); return; }
+      showToast(`${touches.length}-touch campaign created (T${touches.join(', T')})`, 'success');
       setView('list');
-      // Reset all touches
       setTouchForms({ 1: { subject_line: '', template_html: '', scheduled_at: '' }, 2: { subject_line: '', template_html: '', scheduled_at: '' }, 3: { subject_line: '', template_html: '', scheduled_at: '' } });
       setActiveTouch(1);
       fetchCampaigns();
@@ -439,10 +453,10 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
               <button onClick={() => setView('list')} style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Cancel</button>
               <button
                 onClick={createCampaign}
-                disabled={saving || !form.subject_line || !form.template_html}
+                disabled={saving || !touchForms[1].subject_line || !touchForms[1].template_html}
                 style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: saving ? '#9ca3af' : 'linear-gradient(135deg, #2563eb, #3b82f6)', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}
               >
-                {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : 'Create Campaign'}
+                {saving ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : `Create ${[1,2,3].filter(t=>touchForms[t].subject_line&&touchForms[t].template_html).length}-Touch Campaign`}
               </button>
             </div>
           </div>
