@@ -83,6 +83,24 @@ export async function POST(request: NextRequest) {
           if (campaignId) {
             await supabase.rpc('increment_campaign_stat', { campaign_id: campaignId, stat: 'clicked_count' });
           }
+          // Cross-check: if this email has signed up on the platform, mark them as signed_up
+          if (email) {
+            try {
+              const { data: pmatch } = await supabase
+                .from('platform_members')
+                .select('id, chapter_id')
+                .ilike('email', email)
+                .limit(1);
+              if (pmatch && pmatch.length > 0) {
+                // Mark the alumni contact as signed_up
+                await supabase
+                  .from('alumni_contacts')
+                  .update({ outreach_status: 'signed_up', signed_up_at: ts })
+                  .ilike('email', email)
+                  .neq('outreach_status', 'signed_up');
+              }
+            } catch { /* non-fatal */ }
+          }
           break;
 
         case 'bounce':
