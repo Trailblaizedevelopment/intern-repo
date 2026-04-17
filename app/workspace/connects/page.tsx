@@ -92,7 +92,7 @@ function getCardStatus(contact: AlumniContact): CardStatus {
 function parseNotesPreview(responseText: string | null): string {
   if (!responseText) return '';
   const cleaned = responseText.replace(/^\[[a-z_]+\]\s*/i, '');
-  return cleaned.length > 100 ? cleaned.slice(0, 100) + '…' : cleaned;
+  return cleaned; // Show full notes
 }
 
 function formatPhone(phone: string | null): string {
@@ -155,6 +155,43 @@ function StatusLegend() {
 }
 
 // ─── Page ───────────────────────────────────────────────────────────────────
+
+function GoalBar({ contacts }: { contacts: AlumniContact[] }) {
+  const called = contacts.filter(c => getCardStatus(c) === 'called').length;
+  const voicemail = contacts.filter(c => getCardStatus(c) === 'voicemail').length;
+  const uncalled = contacts.filter(c => getCardStatus(c) === 'uncalled').length;
+  const total = called + voicemail;
+  const pct = Math.min(100, Math.round((total / 100) * 100));
+  return (
+    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 16, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px 0' }}>Team Daily Goal — 100 Calls</p>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: '2.5rem', fontWeight: 700, color: '#111827', lineHeight: 1 }}>{total}</span>
+          <span style={{ fontSize: '1.25rem', color: '#9ca3af', fontWeight: 500 }}>/100</span>
+        </div>
+        <div style={{ background: '#F3F4F6', borderRadius: 9999, height: 8, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: pct >= 100 ? '#10b981' : '#0F172A', borderRadius: 9999, transition: 'width 0.5s' }} />
+        </div>
+        <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '4px 0 0 0' }}>
+          {100 - total > 0 ? `${100 - total} more to hit the goal` : '🎉 Goal reached!'}
+        </p>
+      </div>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        {[
+          { label: 'Answered', value: called, color: '#15803d' },
+          { label: 'Voicemail', value: voicemail, color: '#1d4ed8' },
+          { label: 'Not Called', value: uncalled, color: '#9ca3af' },
+        ].map(s => (
+          <div key={s.label} style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: '1.5rem', fontWeight: 700, color: s.color, margin: 0 }}>{s.value}</p>
+            <p style={{ fontSize: '0.7rem', color: '#9ca3af', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ConnectsCenter() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -322,43 +359,39 @@ export default function ConnectsCenter() {
 
       <main className="module-main">
 
+        {/* ── 100-Call Goal ── */}
+        <GoalBar contacts={contacts} />
+
+
         {/* ── Section 1: Chapter Selector + Queue ── */}
         <section style={{ marginBottom: '2rem' }}>
 
-          {/* Chapter Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 280px', maxWidth: 400 }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>
-                Select Chapter
-              </label>
-              {loadingChapters ? (
-                <div style={{ height: 42, background: '#f3f4f6', borderRadius: 8, animation: 'pulse 1.5s infinite' }} />
-              ) : (
-                <select
-                  className="applications-filter-select"
-                  value={selectedChapterId}
-                  onChange={e => setSelectedChapterId(e.target.value)}
-                  style={{ width: '100%', height: 42, fontSize: '0.9375rem' }}
-                >
-                  <option value="">— Choose a chapter —</option>
-                  {chapters.map(ch => (
-                    <option key={ch.id} value={ch.id}>
-                      {ch.fraternity} – {ch.school}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {selectedChapterId && (
-              <button
-                className="module-filter-btn"
-                onClick={() => loadContacts(selectedChapterId)}
-                style={{ marginTop: '1.25rem' }}
-              >
-                <RefreshCw size={15} />
-                Refresh
-              </button>
+          {/* Chapter Selector — card grid instead of dropdown */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px 0' }}>Select Chapter</p>
+            {loadingChapters ? (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[...Array(4)].map((_, i) => <div key={i} style={{ height: 56, width: 180, background: '#f3f4f6', borderRadius: 12, animation: 'pulse 1.5s infinite' }} />)}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {chapters.map(ch => (
+                  <button
+                    key={ch.id}
+                    onClick={() => setSelectedChapterId(ch.id === selectedChapterId ? '' : ch.id)}
+                    style={{
+                      padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${ch.id === selectedChapterId ? '#0F172A' : '#E5E7EB'}`,
+                      background: ch.id === selectedChapterId ? '#0F172A' : 'white',
+                      color: ch.id === selectedChapterId ? 'white' : '#111827',
+                      fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit',
+                      transition: 'all 0.15s', textAlign: 'left' as const,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>{ch.fraternity || ch.chapter_name}</div>
+                    <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: 2 }}>{ch.school}</div>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
