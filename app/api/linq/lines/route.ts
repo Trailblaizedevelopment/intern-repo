@@ -11,9 +11,15 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  */
 
 const DEFAULT_LINES = [
-  { line_number: 1, label: 'Owen',  line_phone: '+16462101111', daily_limit: 45 },
-  { line_number: 2, label: 'Adam',  line_phone: '+16462178274', daily_limit: 45 },
-  { line_number: 3, label: 'Ford',  line_phone: '+16462442696', daily_limit: 45 },
+  { line_number: 1, label: 'Owen',   line_phone: '+16462101111', daily_limit: 45 },
+  { line_number: 2, label: 'Adam',   line_phone: '+16462178274', daily_limit: 45 },
+  { line_number: 3, label: 'Ford',   line_phone: '+16462442696', daily_limit: 45 },
+  { line_number: 4, label: 'Line 4', line_phone: '+14044239427', daily_limit: 45 },
+  { line_number: 5, label: 'Line 5', line_phone: '+14045428435', daily_limit: 45 },
+  { line_number: 6, label: 'Line 6', line_phone: '+19725590427', daily_limit: 45 },
+  { line_number: 7, label: 'Line 7', line_phone: '+19725590438', daily_limit: 45 },
+  { line_number: 8, label: 'Line 8', line_phone: '+15042234218', daily_limit: 45 },
+  { line_number: 9, label: 'Line 9', line_phone: '+15042236050', daily_limit: 45 },
 ];
 
 export async function GET(request: NextRequest) {

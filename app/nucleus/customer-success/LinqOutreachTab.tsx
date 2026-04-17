@@ -1133,24 +1133,37 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
         {linesLoading ? (
           <div style={{ padding: '14px 18px', color: '#9ca3af', fontSize: '0.8125rem' }}>Loading…</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
             {lines.map((line, i) => {
               const activeLines = lines.filter(l => !l.is_paused);
               const totalPool = lines.reduce((s, l) => s + l.daily_limit, 0);
               const effectiveLimit = line.is_paused ? 0 : (activeLines.length > 0 ? Math.min(Math.floor(totalPool / activeLines.length), 50) : 0);
               const isToggling = pausingLine === line.line_phone;
               const showingReason = showPauseReason === line.line_phone;
-              const lineColors = [['#ede9fe', '#7c3aed'], ['#dbeafe', '#1d4ed8'], ['#d1fae5', '#065f46']];
+              const lineColors = [
+                ['#ede9fe', '#7c3aed'], ['#dbeafe', '#1d4ed8'], ['#d1fae5', '#065f46'],
+                ['#fef3c7', '#b45309'], ['#fee2e2', '#991b1b'], ['#f0fdf4', '#166534'],
+                ['#fdf4ff', '#7e22ce'], ['#fff7ed', '#c2410c'], ['#f0f9ff', '#0369a1'],
+              ];
+              const [lineBg, lineText] = lineColors[i % lineColors.length] || ['#f3f4f6', '#6b7280'];
 
+              const col = i % 3;
+              const row = Math.floor(i / 3);
               return (
-                <div key={line.line_phone} style={{ borderTop: i > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                <div key={line.line_phone} style={{
+                  width: 'calc(33.333% - 1px)',
+                  minWidth: 180,
+                  flex: '1 1 180px',
+                  borderTop: row > 0 ? '1px solid #f3f4f6' : 'none',
+                  borderLeft: col > 0 ? '1px solid #f3f4f6' : 'none',
+                }}>
                   <div style={{ padding: '11px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{
                       width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                      background: line.is_paused ? '#f3f4f6' : lineColors[i][0],
+                      background: line.is_paused ? '#f3f4f6' : lineBg,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '0.8rem', fontWeight: 700,
-                      color: line.is_paused ? '#9ca3af' : lineColors[i][1],
+                      color: line.is_paused ? '#9ca3af' : lineText,
                     }}>
                       {line.label[0]}
                     </div>
@@ -1441,6 +1454,8 @@ export default function LinqOutreachTab({ showToast }: LinqOutreachTabProps) {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @media (max-width: 900px) { .linq-lines-item { min-width: 50% !important; } }
+        @media (max-width: 600px) { .linq-lines-item { min-width: 100% !important; } }
       `}</style>
     </div>
   );

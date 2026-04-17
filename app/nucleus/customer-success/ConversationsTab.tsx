@@ -14,11 +14,17 @@ const AUTH = INTERNAL_AUTH_HEADER;
 const API = '/api/conversations';
 const LIMIT = 50;
 
-// Owen=blue, Adam=green, Ford=purple (per spec)
+// Lines 1-3: Owen/Adam/Ford (named); Lines 4-9: labeled generically
 const LINES: { phone: string; label: string; color: { bg: string; text: string } }[] = [
-  { phone: '+16462101111', label: 'Owen', color: { bg: '#dbeafe', text: '#1d4ed8' } },
-  { phone: '+16462178274', label: 'Adam', color: { bg: '#d1fae5', text: '#065f46' } },
-  { phone: '+16462442696', label: 'Ford', color: { bg: '#ede9fe', text: '#7c3aed' } },
+  { phone: '+16462101111', label: 'Owen',   color: { bg: '#dbeafe', text: '#1d4ed8' } },
+  { phone: '+16462178274', label: 'Adam',   color: { bg: '#d1fae5', text: '#065f46' } },
+  { phone: '+16462442696', label: 'Ford',   color: { bg: '#ede9fe', text: '#7c3aed' } },
+  { phone: '+14044239427', label: 'Line 4', color: { bg: '#fef3c7', text: '#b45309' } },
+  { phone: '+14045428435', label: 'Line 5', color: { bg: '#fee2e2', text: '#991b1b' } },
+  { phone: '+19725590427', label: 'Line 6', color: { bg: '#f0fdf4', text: '#166534' } },
+  { phone: '+19725590438', label: 'Line 7', color: { bg: '#fdf4ff', text: '#7e22ce' } },
+  { phone: '+15042234218', label: 'Line 8', color: { bg: '#fff7ed', text: '#c2410c' } },
+  { phone: '+15042236050', label: 'Line 9', color: { bg: '#f0f9ff', text: '#0369a1' } },
 ];
 
 const LINQ_LINE_PHONES = new Set(LINES.map(l => l.phone));
@@ -36,10 +42,10 @@ const OUTREACH_META: Record<string, { bg: string; text: string; label: string }>
 type Tab = 'active' | 'flagged' | 'unresponsive' | 'handled';
 
 const TAB_META: Record<Tab, { label: string; color: string }> = {
-  active:       { label: 'Active',       color: '#2563eb' },
-  flagged:      { label: 'Flagged',      color: '#d97706' },
-  unresponsive: { label: 'Unresponsive', color: '#6b7280' },
-  handled:      { label: 'Handled',      color: '#16a34a' },
+  active:       { label: 'Active',       color: '#0F172A' },
+  flagged:      { label: 'Flagged',      color: '#0F172A' },
+  unresponsive: { label: 'Unresponsive', color: '#0F172A' },
+  handled:      { label: 'Handled',      color: '#0F172A' },
 };
 
 type ConvCategory = 'needs_reply' | 'flagged' | 'touch1' | 'touch2' | 'touch3' | 'signed_up' | 'confirmed' | 'no_response' | 'handled' | 'all';
@@ -363,7 +369,7 @@ function ReplyBox({ convId, linqChatId, onSent, onError }: ReplyBoxProps) {
           disabled={!canSend}
           style={{
             padding: '10px 14px', borderRadius: 10, border: 'none',
-            background: canSend ? '#2563eb' : '#e5e7eb',
+            background: canSend ? '#0F172A' : '#e5e7eb',
             color: canSend ? '#fff' : '#9ca3af',
             cursor: canSend ? 'pointer' : 'default',
             display: 'flex', alignItems: 'center', gap: 5,
@@ -633,6 +639,8 @@ function ConvListPanel({
   chapterName, tab, convs, total, page, loading, selectedConvId,
   onBack, onConvClick, onPageChange, hideBackButton,
 }: ConvListPanelProps) {
+  const [lineFilter, setLineFilter] = useState<string>('');
+  const displayedConvs = lineFilter ? convs.filter(c => c.line_phone === lineFilter) : convs;
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
@@ -658,6 +666,21 @@ function ConvListPanel({
             {TAB_META[tab].label} · {total} conversation{total !== 1 ? 's' : ''}
           </div>
         </div>
+        {/* Line filter */}
+        <select
+          value={lineFilter}
+          onChange={e => setLineFilter(e.target.value)}
+          style={{
+            padding: '3px 8px', borderRadius: 6, border: '1px solid #e5e7eb',
+            background: '#fff', color: '#374151', fontSize: '0.72rem',
+            cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          <option value=''>All Lines</option>
+          {LINES.map(l => (
+            <option key={l.phone} value={l.phone}>{l.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* List */}
@@ -673,7 +696,7 @@ function ConvListPanel({
             <span style={{ fontSize: '0.8rem' }}>No {TAB_META[tab].label.toLowerCase()} conversations</span>
           </div>
         ) : (
-          convs.map(c => (
+          displayedConvs.map(c => (
             <ConvRow
               key={c.id}
               conv={c}
@@ -1115,7 +1138,7 @@ interface CategorySidebarProps {
 function CategorySidebar({ chapterName, selectedCategory, counts, onSelect, onSync, syncing }: CategorySidebarProps) {
   return (
     <div style={{
-      width: 200, flexShrink: 0, background: '#1B2A4A',
+      width: 200, flexShrink: 0, background: '#0F172A',
       display: 'flex', flexDirection: 'column', overflowY: 'auto',
       borderRight: '1px solid rgba(255,255,255,0.08)',
     }}>
@@ -1123,7 +1146,6 @@ function CategorySidebar({ chapterName, selectedCategory, counts, onSelect, onSy
       <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
           <div style={{
-            fontFamily: "'Instrument Serif', serif",
             fontWeight: 700, fontSize: '0.9rem', color: '#fff',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
           }}>
@@ -1190,9 +1212,9 @@ function CategoryItem({ icon, label, count, isActive, onClick }: CategoryItemPro
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '9px 14px 9px 13px',
         cursor: 'pointer',
-        borderLeft: isActive ? '3px solid #C4874A' : '3px solid transparent',
+        borderLeft: isActive ? '3px solid rgba(255,255,255,0.8)' : '3px solid transparent',
         background: isActive
-          ? 'rgba(196,135,74,0.25)'
+          ? 'rgba(255,255,255,0.15)'
           : hovered ? 'rgba(255,255,255,0.08)' : 'transparent',
         transition: 'background 0.12s',
       }}
@@ -1208,16 +1230,14 @@ function CategoryItem({ icon, label, count, isActive, onClick }: CategoryItemPro
           {label}
         </span>
       </div>
-      {count > 0 && (
-        <span style={{
-          fontSize: '0.68rem', fontWeight: 600,
-          color: '#C4874A',
-          background: 'rgba(196,135,74,0.18)',
-          padding: '1px 6px', borderRadius: 10, flexShrink: 0, marginLeft: 4,
-        }}>
-          {count}
-        </span>
-      )}
+      <span style={{
+        fontSize: '0.68rem', fontWeight: 600,
+        color: 'rgba(255,255,255,0.8)',
+        background: 'rgba(255,255,255,0.12)',
+        padding: '1px 6px', borderRadius: 10, flexShrink: 0, marginLeft: 4,
+      }}>
+        {count}
+      </span>
     </div>
   );
 }
