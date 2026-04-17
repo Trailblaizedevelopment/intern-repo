@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmailBatch, interpolate, BatchRecipient } from '@/lib/sendgrid';
 
+export const runtime = 'nodejs';
+export const maxDuration = 300; // 5 minutes — needed for large campaigns
+
 /**
  * POST /api/email-outreach/campaigns/[id]/send
  * Sends a campaign via SendGrid. alumni_contacts + all tables are on the internal DB.
