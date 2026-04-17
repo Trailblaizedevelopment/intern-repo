@@ -513,19 +513,20 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
           </div>
         </div>
 
-        {/* Stats grid — Mailchimp-style */}
+        {/* Stats grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
           {[
-            { icon: <Users size={16} />, label: 'Sent', value: fmtNum(c.sent_count), color: '#374151' },
-            { icon: <CheckCircle2 size={16} />, label: 'Delivered', value: fmtNum(c.delivered_count), color: '#059669' },
+            { icon: <Users size={16} />, label: 'Available', value: fmtNum(c.total_contacts), sub: 'eligible contacts', color: '#374151' },
+            { icon: <Send size={16} />, label: 'Sent', value: fmtNum(c.sent_count), sub: c.total_contacts > 0 ? `${Math.round((c.sent_count/c.total_contacts)*100)}% of list` : '', color: '#0F172A' },
+            { icon: <CheckCircle2 size={16} />, label: 'Delivered', value: fmtNum(c.delivered_count), sub: c.sent_count > 0 ? `${Math.round((c.delivered_count/c.sent_count)*100)}% delivery` : '', color: '#059669' },
             { icon: <Eye size={16} />, label: 'Opens', value: `${c.open_rate}%`, sub: `${c.opened_count} contacts`, color: '#2563eb' },
             { icon: <MousePointer size={16} />, label: 'Clicks', value: `${c.click_rate}%`, sub: `${c.clicked_count} contacts`, color: '#7c3aed' },
             { icon: <AlertTriangle size={16} />, label: 'Bounced', value: `${c.bounce_rate}%`, sub: `${c.bounced_count} contacts`, color: c.bounced_count > 0 ? '#d97706' : '#9ca3af' },
-            { icon: <XCircle size={16} />, label: 'Unsubs', value: String(c.unsubscribed_count), color: c.unsubscribed_count > 0 ? '#ef4444' : '#9ca3af' },
+            { icon: <XCircle size={16} />, label: 'Unsubs', value: String(c.unsubscribed_count), sub: '', color: c.unsubscribed_count > 0 ? '#ef4444' : '#9ca3af' },
           ].map(stat => (
-            <div key={stat.label} style={{ padding: '12px 14px', background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: stat.color, marginBottom: 4 }}>
-                {stat.icon}
+            <div key={stat.label} style={{ padding: '12px 14px', background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ color: stat.color }}>{stat.icon}</span>
                 <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af' }}>{stat.label}</span>
               </div>
               <div style={{ fontSize: '1.375rem', fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
@@ -533,6 +534,24 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
             </div>
           ))}
         </div>
+
+        {/* Email preview */}
+        {c.template_html && (
+          <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Preview</p>
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: '#6B7280' }}>Subject: <span style={{ fontWeight: 600, color: '#111827' }}>{c.subject_line}</span></p>
+            </div>
+            <div style={{ padding: 0, maxHeight: 400, overflow: 'auto', background: '#F9FAFB' }}>
+              <iframe
+                srcDoc={c.template_html}
+                style={{ width: '100%', minHeight: 300, border: 'none', display: 'block' }}
+                title="Email preview"
+                sandbox="allow-same-origin"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Next touch callout */}
         {c.status === 'sent' && c.touch_number < 3 && c.next_touch_eligible_at && (
