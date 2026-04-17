@@ -33,6 +33,8 @@ export interface SendEmailOptions {
   campaignId?: string;
   /** Custom headers */
   headers?: Record<string, string>;
+  /** Skip the Trailblaize wrapper — send htmlBody as-is (for custom campaign HTML) */
+  rawHtml?: boolean;
 }
 
 /**
@@ -53,9 +55,9 @@ export function wrapEmailHtml(html: string, sendId?: string): string {
   <style>
     body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; color: #111827; }
     .email-wrap { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    .email-header { background: linear-gradient(135deg, #6d28d9, #8b5cf6); padding: 24px 32px; }
-    .email-header img { height: 28px; }
-    .email-header span { color: #fff; font-weight: 700; font-size: 1.125rem; letter-spacing: -0.01em; }
+    .email-header { background: #0F172A; padding: 16px 32px; }
+    .email-header img { height: 24px; }
+    .email-header span { color: #fff; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; }
     .email-body { padding: 32px; font-size: 0.9375rem; line-height: 1.65; color: #374151; }
     .email-body p { margin: 0 0 16px; }
     .email-body a { color: #7c3aed; text-decoration: underline; }
@@ -97,7 +99,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ success: bool
   const sg = getSendgridClient();
   if (!sg) return { success: false, error: 'SendGrid not configured — add SENDGRID_API_KEY to .env.local' };
 
-  const wrappedHtml = wrapEmailHtml(opts.htmlBody, opts.sendId);
+  const wrappedHtml = opts.rawHtml ? opts.htmlBody : wrapEmailHtml(opts.htmlBody, opts.sendId);
 
   const msg: MailDataRequired = {
     to:   { email: opts.to, name: opts.toName || '' },
@@ -161,6 +163,7 @@ export async function sendEmailBatch(
           htmlBody: r.htmlBody,
           sendId: r.sendId,
           campaignId,
+          rawHtml: true, // Campaign HTML is already fully customized — skip wrapper
         });
         if (result.success) results.sent++;
         else { results.failed++; results.errors.push(`${r.email}: ${result.error}`); }

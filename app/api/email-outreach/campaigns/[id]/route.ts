@@ -66,3 +66,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   await supabase.from('email_campaigns').update({ status: 'cancelled' }).eq('id', id);
   return NextResponse.json({ data: { cancelled: true }, error: null });
 }
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
+  const body = await request.json();
+  const { data, error } = await supabase.from('email_campaigns').update(body).eq('id', id).select().single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ data, error: null });
+}
