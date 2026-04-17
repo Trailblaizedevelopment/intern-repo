@@ -102,8 +102,26 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
   const [sendsFilter, setSendsFilter] = useState('');
 
 
-  // Create form state
-  const [form, setForm] = useState({ touch_number: 1, subject_line: '', template_html: '', scheduled_at: '' });
+  // Per-touch form state — each touch number keeps its own data
+  const [touchForms, setTouchForms] = useState<Record<number, { subject_line: string; template_html: string; scheduled_at: string }>>({
+    1: { subject_line: '', template_html: '', scheduled_at: '' },
+    2: { subject_line: '', template_html: '', scheduled_at: '' },
+    3: { subject_line: '', template_html: '', scheduled_at: '' },
+  });
+
+  const [activeTouch, setActiveTouch] = useState<1|2|3>(1);
+  // Derived form for backwards compat with existing code
+  const form = { touch_number: activeTouch, ...touchForms[activeTouch] };
+  function setForm(updater: ((f: typeof form) => Partial<typeof form>) | Partial<typeof form>) {
+    const updates = typeof updater === 'function' ? updater(form) : updater;
+    setTouchForms(prev => ({
+      ...prev,
+      [activeTouch]: { ...prev[activeTouch], ...updates },
+    }));
+    if (updates.touch_number && updates.touch_number !== activeTouch) {
+      setActiveTouch(updates.touch_number as 1|2|3);
+    }
+  }
   const [templates, setTemplates] = useState<Template[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -170,7 +188,9 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
       if (json.error) { showToast(json.error, 'error'); return; }
       showToast('Campaign created', 'success');
       setView('list');
-      setForm({ touch_number: 1, subject_line: '', template_html: '', scheduled_at: '' });
+      // Reset all touches
+      setTouchForms({ 1: { subject_line: '', template_html: '', scheduled_at: '' }, 2: { subject_line: '', template_html: '', scheduled_at: '' }, 3: { subject_line: '', template_html: '', scheduled_at: '' } });
+      setActiveTouch(1);
       fetchCampaigns();
     } catch { showToast('Failed to create campaign', 'error'); }
     finally { setSaving(false); }
@@ -356,7 +376,7 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
                   return (
                     <button
                       key={t}
-                      onClick={() => { setForm(f => ({ ...f, touch_number: t })); loadTemplate(t); }}
+                      onClick={() => setActiveTouch(t)}
                       style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `2px solid ${selected ? cfg.color : '#e5e7eb'}`, background: selected ? cfg.bg : '#fff', color: selected ? cfg.color : '#6b7280', cursor: 'pointer', fontWeight: selected ? 700 : 500, fontSize: '0.8125rem', transition: 'all 0.15s' }}
                     >
                       <div style={{ fontWeight: 700 }}>T{t}</div>
