@@ -103,6 +103,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           .update({ status: 'sent', sent_at: new Date().toISOString() })
           .in('id', chunkIds);
       }
+      // Update campaign sent_count after each chunk so it reflects real progress
+      await supabase.from('email_campaigns')
+        .update({ sent_count: results.sent, updated_at: new Date().toISOString() })
+        .eq('id', id);
     }
 
     // Compute next touch date
