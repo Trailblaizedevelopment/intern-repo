@@ -35,6 +35,10 @@ export interface SendEmailOptions {
   headers?: Record<string, string>;
   /** Skip the Trailblaize wrapper — send htmlBody as-is (for custom campaign HTML) */
   rawHtml?: boolean;
+  /** Override sender email */
+  fromEmail?: string;
+  /** Override sender name */
+  fromName?: string;
 }
 
 /**
@@ -103,7 +107,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ success: bool
 
   const msg: MailDataRequired = {
     to:   { email: opts.to, name: opts.toName || '' },
-    from: { email: FROM_EMAIL, name: FROM_NAME },
+    from: { email: opts.fromEmail || FROM_EMAIL, name: opts.fromName || FROM_NAME },
     subject: opts.subject,
     html: wrappedHtml,
     trackingSettings: {
@@ -164,6 +168,8 @@ export async function sendEmailBatch(
           sendId: r.sendId,
           campaignId,
           rawHtml: true, // Campaign HTML is already fully customized — skip wrapper
+          fromEmail: 'support@trailblaize.net',
+          fromName: 'Trailblaize',
         });
         if (result.success) results.sent++;
         else { results.failed++; results.errors.push(`${r.email}: ${result.error}`); }
