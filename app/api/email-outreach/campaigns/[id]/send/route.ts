@@ -87,13 +87,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       };
     });
 
-    // Send
-    const results = await sendEmailBatch(recipients, id);
-
-    // Mark sent records
-    const sentIds = (insertedSends || []).map(s => s.id);
-    if (sentIds.length > 0) {
-      await supabase.from('email_sends').update({ status: 'sent', sent_at: new Date().toISOString() }).in('id', sentIds);
+    // Send in chunks of 50 to avoid memory/timeout issues on large lists
+    const SEND_CHUNK = 50;
+    const results = { sent: 0, failed: 0, errors: [] as string[] };
+    for (let i = 0; i < recipients.length; i += SEND_CHUNK) {
+      const chunk = recipients.slice(i, i + SEND_CHUNK);
+      const chunkResult = await sendEmailBatch(chunk, id);
+      results.sent += chunkResult.sent;
+      results.failed += chunkResult.failed;
+      results.errors.push(...chunkResult.errors);
+      // Mark this chunk as sent immediately so progress is saved even if later chunks fail
+      const chunkIds = chunk.map(r => r.sendId);
+      if (chunkIds.length > 0) {
+        await supabase.from('email_sends')
+          .update({ status: 'sent', sent_at: new Date().toISOString() })
+          .in('id', chunkIds);
+      }
     }
 
     // Compute next touch date
