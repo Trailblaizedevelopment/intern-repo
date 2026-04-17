@@ -1729,6 +1729,7 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
 
   function handleReplySent() {
     showToast('Reply sent', 'success');
+    // Refresh messages
     if (selectedConv) {
       setLoadingMsgs(true);
       fetch(`${API}/${selectedConv.id}/messages`, { headers: { Authorization: AUTH } })
@@ -1736,6 +1737,12 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
         .then(json => { setMessages(json.data ?? []); })
         .finally(() => setLoadingMsgs(false));
     }
+    // Refresh tab counts so the numbers update after reply
+    loadChapterSummaries();
+    if (initialChapterId) fetchCategoryCounts(initialChapterId);
+    // Reload the conv list so the replied conv moves to the right tab
+    const chapterId = selectedConv?.chapter_id ?? (selectedChapter?.id || null);
+    if (chapterId) loadConvs(chapterId, tab, page, selectedCategory, categorySearch);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
