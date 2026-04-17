@@ -1575,25 +1575,33 @@ function CampaignsTab({ stats, openDeal }: { stats: PipelineStats | null; openDe
       }).catch(err => console.error('[campaigns] deal stage sync error:', err));
     }
 
-    if (meetingBookedToggled && !updatedRow.dealId && updatedRow.orgId) {
-      // Create a pipeline deal and store dealId back
-      fetch('/api/pipeline/deals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ org_id: updatedRow.orgId, stage: 'demo_booked', value: 0 }),
-      }).then(r => r.ok ? r.json() : null).then(deal => {
-        if (!deal) return;
-        const finalCampaigns = campaigns.map(c => c.id === campaignId
-          ? {
-              ...c,
-              rows: c.rows.map(r => r.id === rowId ? { ...r, ...updates, dealId: deal.id } : r),
-              updatedAt: new Date().toISOString(),
-            }
-          : c
-        );
-        setCampaigns(finalCampaigns);
-        persistOne(finalCampaigns.find(c => c.id === campaignId)!);
-      }).catch(err => console.error('[campaigns] deal create error:', err));
+    if (meetingBookedToggled && !updatedRow.dealId) {
+      // Update row status to demo_booked immediately so it moves to Pipeline section
+      const withStatus = updatedCampaigns.map(c => c.id === campaignId
+        ? { ...c, rows: c.rows.map(r => r.id === rowId ? { ...r, ...updates, status: 'demo_booked' as const, meetingBooked: true } : r), updatedAt: new Date().toISOString() }
+        : c
+      );
+      setCampaigns(withStatus);
+
+      // Create pipeline deal if we have an orgId
+      if (updatedRow.orgId) {
+        fetch('/api/pipeline/deals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ org_id: updatedRow.orgId, stage: 'demo_booked', value: 0 }),
+        }).then(r => r.ok ? r.json() : null).then(deal => {
+          if (!deal) { persistOne(withStatus.find(c => c.id === campaignId)!); return; }
+          const finalCampaigns = withStatus.map(c => c.id === campaignId
+            ? { ...c, rows: c.rows.map(r => r.id === rowId ? { ...r, ...updates, status: 'demo_booked' as const, meetingBooked: true, dealId: deal.id } : r), updatedAt: new Date().toISOString() }
+            : c
+          );
+          setCampaigns(finalCampaigns);
+          persistOne(finalCampaigns.find(c => c.id === campaignId)!);
+        }).catch(err => { console.error('[campaigns] deal create error:', err); persistOne(withStatus.find(c => c.id === campaignId)!); });
+      } else {
+        // No orgId — just update status and persist
+        persistOne(withStatus.find(c => c.id === campaignId)!);
+      }
     } else {
       persistOne(updatedCampaign);
     }
