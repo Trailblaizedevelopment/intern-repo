@@ -3,9 +3,15 @@ import { listChats, LinqChat } from '@/lib/linq';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 const LINES = [
-  { number: 1, label: 'Owen', phone: '+16462101111' },
-  { number: 2, label: 'Adam', phone: '+16462178274' },
-  { number: 3, label: 'Ford', phone: '+16462442696' },
+  { number: 1, label: 'Owen',   phone: '+16462101111' },
+  { number: 2, label: 'Adam',   phone: '+16462178274' },
+  { number: 3, label: 'Ford',   phone: '+16462442696' },
+  { number: 4, label: 'Line 4', phone: '+14044239427' },
+  { number: 5, label: 'Line 5', phone: '+14045428435' },
+  { number: 6, label: 'Line 6', phone: '+19725590427' },
+  { number: 7, label: 'Line 7', phone: '+19725590438' },
+  { number: 8, label: 'Line 8', phone: '+15042234218' },
+  { number: 9, label: 'Line 9', phone: '+15042236050' },
 ] as const;
 
 export async function GET(request: NextRequest) {

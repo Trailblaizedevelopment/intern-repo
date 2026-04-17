@@ -13,9 +13,15 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 const LINQ_BASE = 'https://api.linqapp.com/api/partner/v3';
 
 const OUR_LINES = [
-  { line_number: 1, label: 'Owen',  phone: '+16462101111', daily_limit: 45 },
-  { line_number: 2, label: 'Adam',  phone: '+16462178274', daily_limit: 45 },
-  { line_number: 3, label: 'Ford',  phone: '+16462442696', daily_limit: 45 },
+  { line_number: 1, label: 'Owen',   phone: '+16462101111', daily_limit: 45 },
+  { line_number: 2, label: 'Adam',   phone: '+16462178274', daily_limit: 45 },
+  { line_number: 3, label: 'Ford',   phone: '+16462442696', daily_limit: 45 },
+  { line_number: 4, label: 'Line 4', phone: '+14044239427', daily_limit: 45 },
+  { line_number: 5, label: 'Line 5', phone: '+14045428435', daily_limit: 45 },
+  { line_number: 6, label: 'Line 6', phone: '+19725590427', daily_limit: 45 },
+  { line_number: 7, label: 'Line 7', phone: '+19725590438', daily_limit: 45 },
+  { line_number: 8, label: 'Line 8', phone: '+15042234218', daily_limit: 45 },
+  { line_number: 9, label: 'Line 9', phone: '+15042236050', daily_limit: 45 },
 ];
 
 interface LinqLineResponse {
