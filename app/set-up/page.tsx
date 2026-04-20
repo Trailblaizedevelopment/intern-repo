@@ -25,6 +25,12 @@ import {
   UserCheck,
   Mail,
   Network,
+  GraduationCap,
+  Briefcase,
+  Building2,
+  Heart,
+  TrendingUp,
+  Trophy,
 } from 'lucide-react';
 
 // ─── Pricing ────────────────────────────────────────────────────────────────
@@ -339,6 +345,16 @@ function SetUpPage() {
             from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
           }
+          .org-types-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+          }
+          @media (max-width: 640px) {
+            .org-types-grid {
+              grid-template-columns: repeat(2, 1fr);
+            }
+          }
         `}</style>
 
         {testMode && (
@@ -377,7 +393,7 @@ function SetUpPage() {
               onClick={() => goToStep(1)}
               style={{
                 padding: '13px 32px', borderRadius: '8px',
-                background: '#10B981', color: 'white',
+                background: '#0F172A', color: 'white',
                 fontWeight: 600, fontSize: '1rem',
                 border: 'none', cursor: 'pointer',
                 fontFamily: 'inherit',
@@ -400,13 +416,13 @@ function SetUpPage() {
                 One place for everyone
               </h2>
               <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                Your members, alumni, and leadership — connected in a single private network your organization actually owns.
+                Your members, alumni, and leadership - connected in a single private network your organization actually owns.
               </p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
               {[
                 { icon: <Users size={18} color="#10B981" />, title: 'Private member directory', desc: 'Every member, past and present, in one searchable space.', delay: '0.15s' },
-                { icon: <MessageSquare size={18} color="#10B981" />, title: 'Instant messaging', desc: 'Message anyone in your org directly — no group chats scattered across apps.', delay: '0.25s' },
+                { icon: <MessageSquare size={18} color="#10B981" />, title: 'Instant messaging', desc: 'Message anyone in your org directly - no group chats scattered across apps.', delay: '0.25s' },
                 { icon: <Shield size={18} color="#10B981" />, title: 'You control access', desc: 'Approve who joins, manage roles, keep your network clean.', delay: '0.35s' },
               ].map((card) => (
                 <div
@@ -425,6 +441,37 @@ function SetUpPage() {
                 </div>
               ))}
             </div>
+            {/* Product screenshots */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginTop: '48px' }}>
+              <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
+                <img
+                  src="/setup-screenshots/feed.png"
+                  alt="Social feed"
+                  style={{ width: '100%', display: 'block', borderRadius: '12px' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const p = document.createElement('p');
+                    p.textContent = 'Feed Preview';
+                    p.style.cssText = 'color:#9CA3AF;font-weight:500;margin:0;font-family:Inter,sans-serif;';
+                    (e.target as HTMLImageElement).parentElement!.appendChild(p);
+                  }}
+                />
+              </div>
+              <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
+                <img
+                  src="/setup-screenshots/alumni.png"
+                  alt="Alumni directory"
+                  style={{ width: '100%', display: 'block', borderRadius: '12px' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const p = document.createElement('p');
+                    p.textContent = 'Alumni Directory';
+                    p.style.cssText = 'color:#9CA3AF;font-weight:500;margin:0;font-family:Inter,sans-serif;';
+                    (e.target as HTMLImageElement).parentElement!.appendChild(p);
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </section>
 
@@ -432,55 +479,36 @@ function SetUpPage() {
         <section style={{ background: 'white', padding: '80px 24px' }}>
           <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '64px', alignItems: 'center' }}>
             <div style={{ animation: 'fadeUp 0.6s ease 0.1s both' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #D1FAE5', marginBottom: '20px' }}>
-                <Share2 size={20} color="#10B981" />
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #D1FAE5', marginBottom: '20px' }}>
+                <Share2 size={32} color="#10B981" />
               </div>
               <h2 style={{ fontSize: '1.625rem', fontWeight: 700, color: '#111827', margin: '0 0 14px', letterSpacing: '-0.01em' }}>
                 Real connections, not just contacts
               </h2>
               <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 12px' }}>
-                Members find jobs, mentors, and friendships through your alumni network — matched by industry, city, and shared interests.
+                Members find jobs, mentors, and friendships through your alumni network - matched by industry, city, and shared interests.
               </p>
               <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                Whether you're a new grad looking for your first role or an alum giving back — Trailblaize makes the introduction.
+                Whether you're a new grad looking for your first role or an alum giving back - Trailblaize makes the introduction.
               </p>
             </div>
-            {/* Subtle network illustration */}
+            {/* Alumni directory screenshot */}
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <svg viewBox="0 0 280 180" width="280" height="180" style={{ overflow: 'visible' }}>
-                {/* Connection lines */}
-                {[
-                  { x1: 140, y1: 90, x2: 52, y2: 38, d: '0.2s' },
-                  { x1: 140, y1: 90, x2: 228, y2: 38, d: '0.35s' },
-                  { x1: 140, y1: 90, x2: 228, y2: 142, d: '0.5s' },
-                  { x1: 140, y1: 90, x2: 52, y2: 142, d: '0.65s' },
-                  { x1: 140, y1: 90, x2: 140, y2: 18, d: '0.8s' },
-                ].map((l, i) => (
-                  <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-                    stroke="#E5E7EB" strokeWidth="1.5"
-                    strokeDasharray="300" strokeDashoffset="300"
-                    style={{ animation: `lineAppear 0.6s ease ${l.d} forwards` }}
-                  />
-                ))}
-                {/* Center node */}
-                <circle cx="140" cy="90" r="20" fill="#0F172A"
-                  style={{ animation: 'dotPop 0.4s ease both' }}
-                />
-                <text x="140" y="95" textAnchor="middle" fill="white" fontSize="9" fontWeight="700" fontFamily="Inter, sans-serif">YOUR ORG</text>
-                {/* Outer nodes */}
-                {[
-                  { cx: 52, cy: 38, label: 'JD', d: '0.3s' },
-                  { cx: 228, cy: 38, label: 'MK', d: '0.45s' },
-                  { cx: 228, cy: 142, label: 'TR', d: '0.6s' },
-                  { cx: 52, cy: 142, label: 'SL', d: '0.75s' },
-                  { cx: 140, cy: 18, label: 'AB', d: '0.9s' },
-                ].map((n, i) => (
-                  <g key={i} style={{ animation: `dotPop 0.4s ease ${n.d} both` }}>
-                    <circle cx={n.cx} cy={n.cy} r="14" fill="white" stroke="#E5E7EB" strokeWidth="1.5" />
-                    <text x={n.cx} y={n.cy + 4} textAnchor="middle" fill="#374151" fontSize="8" fontWeight="600" fontFamily="Inter, sans-serif">{n.label}</text>
-                  </g>
-                ))}
-              </svg>
+              <img
+                src="/setup-screenshots/alumni.png"
+                alt="Alumni directory with profiles"
+                style={{ width: '100%', maxWidth: '360px', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'block' }}
+                onError={(e) => {
+                  const el = e.target as HTMLImageElement;
+                  el.style.display = 'none';
+                  const wrap = el.parentElement!;
+                  wrap.style.cssText += 'min-height:200px;background:#F9FAFB;border-radius:12px;border:1px solid #E5E7EB;align-items:center;justify-content:center;';
+                  const p = document.createElement('p');
+                  p.textContent = 'Alumni Directory';
+                  p.style.cssText = 'color:#9CA3AF;font-weight:500;margin:0;font-family:Inter,sans-serif;';
+                  wrap.appendChild(p);
+                }}
+              />
             </div>
           </div>
         </section>
@@ -496,17 +524,19 @@ function SetUpPage() {
                 Built for your organization
               </h2>
               <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                Whether you're a fraternity, athletic team, professional association, or alumni club — Trailblaize works for you.
+                Whether you&apos;re a university, Greek chapter, high school, or professional network - Trailblaize works for you.
               </p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <div className="org-types-grid">
               {[
-                { icon: <Users size={18} color="#10B981" />, label: 'Fraternities & Sororities', d: '0.15s' },
-                { icon: <Zap size={18} color="#10B981" />, label: 'Athletic Teams', d: '0.25s' },
-                { icon: <Globe size={18} color="#10B981" />, label: 'Professional Associations', d: '0.35s' },
-                { icon: <Shield size={18} color="#10B981" />, label: 'Country Clubs', d: '0.45s' },
-                { icon: <Network size={18} color="#10B981" />, label: 'Alumni Networks', d: '0.55s' },
-                { icon: <Share2 size={18} color="#10B981" />, label: 'Social Clubs', d: '0.65s' },
+                { icon: <GraduationCap size={18} color="#10B981" />, label: 'Universities / Business Schools', d: '0.15s' },
+                { icon: <Users size={18} color="#10B981" />, label: 'Greek Life Chapters', d: '0.2s' },
+                { icon: <Globe size={18} color="#10B981" />, label: 'High Schools', d: '0.25s' },
+                { icon: <Briefcase size={18} color="#10B981" />, label: 'Professional Associations', d: '0.3s' },
+                { icon: <Building2 size={18} color="#10B981" />, label: 'Corporate Alumni Networks', d: '0.35s' },
+                { icon: <Heart size={18} color="#10B981" />, label: 'Philanthropic / Advisory Boards', d: '0.4s' },
+                { icon: <TrendingUp size={18} color="#10B981" />, label: 'Investor / Founder Networks', d: '0.45s' },
+                { icon: <Trophy size={18} color="#10B981" />, label: 'Athletic Programs / Teams', d: '0.5s' },
               ].map((item) => (
                 <div
                   key={item.label}
