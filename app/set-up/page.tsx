@@ -15,6 +15,16 @@ import {
   User,
   Loader2,
   ArrowRight,
+  Rocket,
+  Phone,
+  Radio,
+  Database,
+  Clock,
+  Globe,
+  Share2,
+  UserCheck,
+  Mail,
+  Network,
 } from 'lucide-react';
 
 // ─── Pricing ────────────────────────────────────────────────────────────────
@@ -63,7 +73,7 @@ interface FormData {
 
 // ─── Step Indicator ──────────────────────────────────────────────────────────
 
-const STEPS = ['Overview', 'Org Info', 'Agreement', 'Payment', 'Confirmation'];
+const STEPS = ['Overview', 'Org Info', 'Your Launch', 'Agreement', 'Payment', 'Confirmation'];
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -183,12 +193,12 @@ function SetUpPage() {
     const bypassParam = searchParams.get('bypass');
     if (success === 'true' && bypassParam === '1') {
       // Internal bypass — extract all params from URL
-      setStep(4);
+      setStep(5);
       const bypassData: Record<string, string> = {};
       searchParams.forEach((v, k) => { bypassData[k] = v; });
       handleBypassConfirmation(bypassData);
     } else if (success === 'true' && sessionId) {
-      setStep(4);
+      setStep(5);
       handleConfirmation(sessionId);
     } else if (stepParam) {
       setStep(Number(stepParam));
@@ -497,14 +507,372 @@ function SetUpPage() {
     );
   }
 
-  // ─── Step 2: Agreement ────────────────────────────────────────────────────
+  // ─── Step 2: Member Activation — Roll Out ────────────────────────
 
   if (step === 2) {
+    return (
+      <div style={{ fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100vh', background: 'white' }}>
+        <style>{`
+          @keyframes nodePulse {
+            0%, 100% { transform: scale(1); opacity: 0.85; }
+            50% { transform: scale(1.3); opacity: 1; }
+          }
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes checkPop {
+            0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+            65% { transform: scale(1.18) rotate(3deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0); opacity: 1; }
+          }
+          @keyframes floatY {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-7px); }
+          }
+          @keyframes lineGrow {
+            from { stroke-dashoffset: 200; opacity: 0; }
+            to { stroke-dashoffset: 0; opacity: 1; }
+          }
+          @keyframes orbitIn {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+          }
+          @keyframes glowPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+          }
+          @keyframes rowFade {
+            0% { opacity: 0.3; transform: translateX(-8px); }
+            100% { opacity: 1; transform: translateX(0); }
+          }
+          @keyframes hubPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+          }
+        `}</style>
+
+        {testMode && (
+          <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '8px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#92400e' }}>
+            🧪 TEST MODE — No real charges will be made
+          </div>
+        )}
+
+        <nav style={{ background: 'white', borderBottom: '1px solid #F3F4F6', padding: '12px 24px', display: 'flex', alignItems: 'center' }}>
+          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '28px' }} />
+        </nav>
+
+        <div style={{ background: 'white' }}>
+          <div style={{ maxWidth: '640px', margin: '0 auto', padding: '24px 24px 0' }}>
+            <StepIndicator current={2} />
+          </div>
+        </div>
+
+        {/* Hero */}
+        <section style={{ background: '#0F172A', padding: '64px 24px 52px', textAlign: 'center' }}>
+          <div style={{ maxWidth: '580px', margin: '0 auto', animation: 'fadeUp 0.7s ease both' }}>
+            <span style={{ display: 'inline-block', background: 'rgba(16,185,129,0.14)', color: '#10B981', borderRadius: '100px', padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '20px' }}>
+              Your Onboarding Plan
+            </span>
+            <h2 style={{ fontSize: 'clamp(1.875rem, 5vw, 2.75rem)', fontWeight: 400, color: 'white', margin: '0 0 16px', lineHeight: 1.15, fontFamily: '"Instrument Serif", Georgia, serif', letterSpacing: '-0.01em' }}>
+              Here’s how we launch your alumni network.
+            </h2>
+            <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
+              From day one, our team works alongside yours — every single step of the way.
+            </p>
+          </div>
+        </section>
+
+        {/* Section 1: Collaborative Launch — dark */}
+        <section style={{ background: '#0F172A', padding: '56px 24px 72px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
+            <div style={{ animation: 'fadeUp 0.7s ease 0.1s both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease infinite' }}>
+                  <Rocket size={20} color="#10B981" />
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 1</span>
+              </div>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 12px', lineHeight: 1.2 }}>Collaborative Launch</h3>
+              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
+                We create a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>collaborative Instagram post with your chapter</strong> — driving early adopters to join from day one.
+              </p>
+              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
+                Those early adopters become your ambassadors, bringing in the rest of your alumni through real word-of-mouth. The network effect starts here.
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <svg viewBox="0 0 260 160" width="260" height="160" style={{ overflow: 'visible' }}>
+                {[
+                  [0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[0,3],[1,4]
+                ].map(([a,b], i) => {
+                  const pts = [{x:48,y:30},{x:130,y:20},{x:212,y:40},{x:220,y:120},{x:130,y:140},{x:40,y:120}];
+                  return <line key={i} x1={pts[a].x} y1={pts[a].y} x2={pts[b].x} y2={pts[b].y}
+                    stroke="rgba(16,185,129,0.25)" strokeWidth="1.5"
+                    strokeDasharray="200" strokeDashoffset="200"
+                    style={{ animation: `lineGrow 0.6s ease ${i * 0.2 + 0.2}s both` }} />;
+                })}
+                {[
+                  {cx:48,cy:30},{cx:130,cy:20},{cx:212,cy:40},{cx:220,cy:120},{cx:130,cy:140},{cx:40,cy:120}
+                ].map((n,i) => (
+                  <circle key={i} cx={n.cx} cy={n.cy} r="9" fill="#10B981"
+                    style={{ animation: `orbitIn 0.4s ease ${i * 0.15}s both, nodePulse 2.4s ease ${i * 0.4}s infinite` }}
+                  />
+                ))}
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 2: Activate Your Network — white */}
+        <section style={{ background: 'white', padding: '72px 24px' }}>
+          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
+              <svg viewBox="0 0 260 160" width="260" height="160" style={{ overflow: 'visible' }}>
+                <circle cx="130" cy="80" r="22" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
+                <text x="130" y="85" textAnchor="middle" fill="white" fontSize="11" fontWeight="700">YOU</text>
+                {[
+                  {cx:42,cy:32,label:'JD',d:'0.2s'},{cx:218,cy:32,label:'MK',d:'0.4s'},
+                  {cx:218,cy:128,label:'TR',d:'0.6s'},{cx:42,cy:128,label:'SL',d:'0.8s'},
+                  {cx:130,cy:14,label:'AB',d:'1.0s'},
+                ].map((p,i) => (
+                  <g key={i} style={{ animation: `orbitIn 0.5s ease ${p.d} both` }}>
+                    <line x1={p.cx} y1={p.cy} x2="130" y2="80" stroke="#E5E7EB" strokeWidth="1.5"
+                      strokeDasharray="200" strokeDashoffset="200"
+                      style={{ animation: `lineGrow 0.5s ease ${p.d} both` }} />
+                    <circle cx={p.cx} cy={p.cy} r="16" fill="#F3F4F6" stroke="#E5E7EB" strokeWidth="1.5" />
+                    <text x={p.cx} y={p.cy+4} textAnchor="middle" fill="#374151" fontSize="9" fontWeight="600">{p.label}</text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+            <div style={{ order: 1, animation: 'fadeUp 0.7s ease 0.2s both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Phone size={20} color="#0F172A" />
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 2</span>
+              </div>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Activate Your Network</h3>
+              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                We personally call your early adopters — connecting them with each other by industry, city, and shared interests.
+              </p>
+              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                Looking for a job, a mentor, advice, or just curious who’s really in your network? We make those introductions happen.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 3: Meet Alumni Where They Are — dark */}
+        <section style={{ background: '#0F172A', padding: '72px 24px' }}>
+          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
+            <div style={{ animation: 'fadeUp 0.7s ease 0.1s both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease 0.4s infinite' }}>
+                  <Radio size={20} color="#10B981" />
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 3</span>
+              </div>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 12px', lineHeight: 1.2 }}>Meet Alumni Where They Are</h3>
+              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
+                We utilize any channels you already have — Facebook groups, LinkedIn, GroupMe — providing <strong style={{ color: 'rgba(255,255,255,0.85)' }}>custom flyers, blurbs, and a private sign-up link</strong> for each.
+              </p>
+              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
+                Alumni can also find your space on our mobile app and request access. You approve or reject — you’re always in control.
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{ position: 'relative', width: '220px', height: '160px' }}>
+                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: '52px', height: '52px', borderRadius: '14px', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'hubPulse 2.5s ease infinite', zIndex: 2 }}>
+                  <Share2 size={22} color="white" />
+                </div>
+                {[
+                  {label:'f', bg:'#1877F2', top:'4px', left:'10px', d:'0.2s'},
+                  {label:'in', bg:'#0A66C2', top:'4px', right:'10px', d:'0.4s'},
+                  {label:'G', bg:'#25D366', bottom:'4px', left:'10px', d:'0.6s'},
+                  {label:'✉', bg:'#6366F1', bottom:'4px', right:'10px', d:'0.8s'},
+                  {label:'📱', bg:'#374151', top:'calc(50% - 20px)', right:'-2px', d:'1.0s'},
+                ].map((c,i) => (
+                  <div key={i} style={{
+                    position: 'absolute',
+                    ...(c.top !== undefined ? {top: c.top} : {}),
+                    ...(c.bottom !== undefined ? {bottom: c.bottom} : {}),
+                    ...(c.left !== undefined ? {left: c.left} : {}),
+                    ...(c.right !== undefined ? {right: c.right} : {}),
+                    width: '40px', height: '40px', borderRadius: '10px', background: c.bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontSize: '0.75rem', fontWeight: 700,
+                    animation: `orbitIn 0.5s ease ${c.d} both, floatY 3s ease ${i * 0.5}s infinite`,
+                    zIndex: 1,
+                  }}>
+                    {c.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 4: Database Outreach — white */}
+        <section style={{ background: 'white', padding: '72px 24px' }}>
+          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
+              <div style={{ width: '240px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px', overflow: 'hidden', animation: 'fadeUp 0.7s ease both' }}>
+                <div style={{ background: '#0F172A', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Database size={14} color="#10B981" />
+                  <span style={{ color: 'white', fontSize: '0.75rem', fontWeight: 600 }}>alumni_contacts.csv</span>
+                </div>
+                {[
+                  {name:'James D.', d:'0.2s'},{name:'Maria K.', d:'0.5s'},
+                  {name:'Tyler R.', d:'0.8s'},{name:'Sara L.', d:'1.1s'},{name:'Alex B.', d:'1.4s'},
+                ].map((row,i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: '1px solid #F3F4F6', animation: `rowFade 0.5s ease ${row.d} both` }}>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>{row.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Mail size={12} color="#10B981" style={{ animation: `checkPop 0.4s ease ${parseFloat(row.d) + 0.3}s both`, opacity: 0 }} />
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: `checkPop 0.4s ease ${parseFloat(row.d) + 0.5}s both`, opacity: 0 }}>
+                        <Check size={9} color="#16a34a" strokeWidth={3} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ order: 1, animation: 'fadeUp 0.7s ease 0.2s both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Database size={20} color="#0F172A" />
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 4</span>
+              </div>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Database Outreach</h3>
+              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                Have a spreadsheet of alumni contacts? We <strong style={{ color: '#111827' }}>email every alumni three times</strong> and personally text everyone via iMessage.
+              </p>
+              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                We verify contact info, clean up the data, and invite each one personally to join your platform.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 5: Alumni Sign Up in Minutes — dark */}
+        <section style={{ background: '#0F172A', padding: '72px 24px' }}>
+          <div style={{ maxWidth: '860px', margin: '0 auto' }}>
+            <div style={{ marginBottom: '36px', animation: 'fadeUp 0.7s ease both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease 0.6s infinite' }}>
+                  <Clock size={20} color="#10B981" />
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 5</span>
+              </div>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 10px', lineHeight: 1.2 }}>Alumni Sign Up in Minutes</h3>
+              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0, maxWidth: '480px' }}>
+                Once alumni receive the invite, joining is frictionless. Create a profile, join your space, done. Then the whole network opens up.
+              </p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              {[
+                {icon:<User size={22} color="#10B981" />, title:'Create Profile', desc:'Name, photo, industry, city, graduation year', d:'0.2s'},
+                {icon:<Users size={22} color="#10B981" />, title:'Join Your Space', desc:'Request access — admin approves in one tap', d:'0.5s'},
+                {icon:<Check size={22} color="#10B981" />, title:'Fully Connected', desc:'Text & email alumni, store org info, accept donations', d:'0.8s'},
+              ].map((s,i) => (
+                <div key={i} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '24px 20px', animation: `fadeUp 0.6s ease ${s.d} both` }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px', animation: `checkPop 0.5s ease ${parseFloat(s.d) + 0.3}s both` }}>
+                    {s.icon}
+                  </div>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '0 0 6px' }}>{s.title}</h4>
+                  <p style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, margin: 0 }}>{s.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Section 6: Your Digital Community — white */}
+        <section style={{ background: 'white', padding: '72px 24px' }}>
+          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
+              <svg viewBox="0 0 260 180" width="260" height="180" style={{ overflow: 'visible' }}>
+                <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
+                <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
+                {[
+                  {cx:86,cy:52,d:'0.2s'},{cx:174,cy:52,d:'0.4s'},
+                  {cx:174,cy:128,d:'0.6s'},{cx:86,cy:128,d:'0.8s'},
+                ].map((n,i) => (
+                  <g key={i}>
+                    <line x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
+                      strokeDasharray="200" strokeDashoffset="200"
+                      style={{ animation: `lineGrow 0.5s ease ${n.d} both` }} />
+                    <circle cx={n.cx} cy={n.cy} r="11" fill="#10B981"
+                      style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
+                  </g>
+                ))}
+                {[
+                  {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s'},{cx:218,cy:38,fromX:174,fromY:52,d:'1.2s'},
+                  {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s'},{cx:42,cy:142,fromX:86,fromY:128,d:'1.6s'},
+                  {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s'},{cx:130,cy:168,fromX:130,fromY:90,d:'2.0s'},
+                ].map((n,i) => (
+                  <g key={i}>
+                    <line x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
+                      strokeDasharray="200" strokeDashoffset="200"
+                      style={{ animation: `lineGrow 0.4s ease ${n.d} both` }} />
+                    <circle cx={n.cx} cy={n.cy} r="7" fill="#F3F4F6" stroke="#E5E7EB" strokeWidth="1.5"
+                      style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
+                  </g>
+                ))}
+              </svg>
+            </div>
+            <div style={{ order: 1, animation: 'fadeUp 0.7s ease 0.2s both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Globe size={20} color="#0F172A" />
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 6</span>
+              </div>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Your Digital Community</h3>
+              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                The digital space and community you’ve built for your entire organization. Network effect and word of mouth take over.
+              </p>
+              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                Trailblaize becomes the <strong style={{ color: '#111827' }}>living, breathing alumni network</strong> your organization has always needed.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section style={{ background: '#0F172A', padding: '56px 24px' }}>
+          <div style={{ maxWidth: '560px', margin: '0 auto', textAlign: 'center', animation: 'fadeUp 0.7s ease both' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 400, color: 'white', margin: '0 0 10px', fontFamily: '"Instrument Serif", Georgia, serif' }}>
+              Ready to build your network?
+            </h3>
+            <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.5)', margin: '0 0 32px', lineHeight: 1.6 }}>
+              Sign the agreement and you’re minutes away from a live alumni platform.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button onClick={() => goToStep(1)} style={{ ...S.backBtn, color: 'rgba(255,255,255,0.4)' }}>
+                ← Back
+              </button>
+              <NavButton onClick={() => goToStep(3)}>
+                Continue to Agreement <ChevronRight size={16} />
+              </NavButton>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  // ─── Step 3: Agreement ────────────────────────────────────────────────────
+
+  if (step === 3) {
     const canProceed = agreedName.trim().length > 0 && agreedAuthorized;
 
     return (
       <PageShell testMode={testMode}>
-        <StepIndicator current={2} />
+        <StepIndicator current={3} />
         <Card>
           <h2 style={S.h2}>Here&apos;s what you&apos;re agreeing to</h2>
           <p style={S.sub}>Plain language, no surprises.</p>
@@ -565,13 +933,13 @@ function SetUpPage() {
 
           <div style={S.actions}>
             <button
-              onClick={() => goToStep(1)}
+              onClick={() => goToStep(2)}
               style={S.backBtn}
             >
               ← Back
             </button>
             <NavButton
-              onClick={() => { if (canProceed) goToStep(3); }}
+              onClick={() => { if (canProceed) goToStep(4); }}
               disabled={!canProceed}
             >
               Continue to Payment <ChevronRight size={16} />
@@ -582,12 +950,12 @@ function SetUpPage() {
     );
   }
 
-  // ─── Step 3: Payment ──────────────────────────────────────────────────────
+  // ─── Step 4: Payment ──────────────────────────────────────────────────────
 
-  if (step === 3) {
+  if (step === 4) {
     return (
       <PageShell testMode={testMode}>
-        <StepIndicator current={3} />
+        <StepIndicator current={4} />
         <Card>
           <h2 style={S.h2}>Complete your payment</h2>
           <p style={S.sub}>You&apos;ll be redirected to Stripe&apos;s secure checkout.</p>
@@ -622,7 +990,7 @@ function SetUpPage() {
 
           <div style={S.actions}>
             <button
-              onClick={() => goToStep(2)}
+              onClick={() => goToStep(3)}
               style={S.backBtn}
             >
               ← Back
@@ -640,11 +1008,11 @@ function SetUpPage() {
     );
   }
 
-  // ─── Step 4: Confirmation ─────────────────────────────────────────────────
+  // ─── Step 5: Confirmation ─────────────────────────────────────────────────
 
   return (
     <PageShell testMode={testMode}>
-      <StepIndicator current={4} />
+      <StepIndicator current={5} />
       <Card>
         {confirmLoading ? (
           <div style={{ padding: '64px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
