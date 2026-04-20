@@ -467,11 +467,55 @@ function SetUpPage() {
                 ))}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '8px' }}>
-                <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F9FAFB', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img src="/setup-screenshots/feed.png" alt="Social feed" style={{ width: '100%', display: 'block', borderRadius: '12px' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                {/* Mock Feed */}
+                <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', background: 'white', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em' }}>Recent Posts</div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>EH</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Ethan Hill</span>
+                        <span style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>· 2h ago</span>
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.5, margin: '0 0 8px' }}>Working at Fidelity Investments in Dallas, TX. Always open to help with jobs or advice on getting into the industry.</p>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#6B7280' }}>❤️ 6</span>
+                        <span style={{ fontSize: '0.72rem', color: '#6B7280' }}>💬 1</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: '14px', display: 'flex', gap: '10px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>TD</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Taylor Durham</span>
+                        <span style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>· 5h ago</span>
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.5, margin: '0 0 8px' }}>Graduated in 2025, staying in Oxford at Farm Bureau. Open to chatting about insurance or life insurance - let's make something happen!</p>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#6B7280' }}>❤️ 5</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F9FAFB', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img src="/setup-screenshots/alumni.png" alt="Alumni directory" style={{ width: '100%', display: 'block', borderRadius: '12px' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                {/* Mock Alumni Grid */}
+                <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', background: 'white', padding: '16px' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: '12px' }}>Alumni Directory</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    {[
+                      { initials: 'EG', name: 'Ewing Gillaspy', title: 'M&A at AND Capital', location: 'Phoenix, AZ', color: '#0F172A' },
+                      { initials: 'JB', name: 'Jack Blackburn', title: 'Catalyst Financial', location: 'Houston, TX', color: '#6366F1' },
+                      { initials: 'WD', name: 'Worth DuPerier', title: 'Fifth Third Bank', location: 'Nashville, TN', color: '#0EA5E9' },
+                      { initials: 'ZF', name: 'Zach Fosseen', title: 'VP, Virtue', location: 'Seattle, WA', color: '#10B981' },
+                    ].map((a) => (
+                      <div key={a.initials} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.65rem', fontWeight: 700, marginBottom: '2px' }}>{a.initials}</div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>{a.name}</span>
+                        <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>{a.title}</span>
+                        <span style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>{a.location}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -496,12 +540,25 @@ function SetUpPage() {
                   </p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <img
-                    src="/setup-screenshots/alumni.png"
-                    alt="Alumni directory with profiles"
-                    style={{ width: '100%', maxWidth: '320px', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'block' }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
+                  <div style={{ width: '100%', maxWidth: '320px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      {[
+                        { initials: 'EG', name: 'Ewing Gillaspy', title: 'Managing Director, M&A', org: 'AND Capital Ventures', location: 'Phoenix, AZ', color: '#0F172A' },
+                        { initials: 'JB', name: 'Jack Blackburn', title: 'Investment Advisor Rep', org: 'Catalyst Financial', location: 'Houston, TX', color: '#6366F1' },
+                        { initials: 'WD', name: 'Worth DuPerier', title: 'Client Banker', org: 'Fifth Third Bank', location: 'Nashville, TN', color: '#0EA5E9' },
+                        { initials: 'JC', name: 'Joe Chatham', title: 'Technical Assistant', org: 'Amwins', location: 'Dallas, TX', color: '#F59E0B' },
+                      ].map((a) => (
+                        <div key={a.initials} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px' }}>{a.initials}</div>
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>{a.name}</span>
+                          <span style={{ fontSize: '0.72rem', color: '#374151' }}>{a.title}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>{a.org}</span>
+                          <span style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>{a.location}</span>
+                          <button style={{ marginTop: '6px', padding: '4px 10px', fontSize: '0.7rem', fontWeight: 600, color: '#0F172A', border: '1px solid #E5E7EB', borderRadius: '6px', background: 'white', cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-start' as const }}>Connect</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -814,24 +871,31 @@ function SetUpPage() {
               </p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <svg viewBox="0 0 260 160" width="260" height="160" style={{ overflow: 'visible' }}>
-                {[
-                  [0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[0,3],[1,4]
-                ].map(([a,b], i) => {
-                  const pts = [{x:48,y:30},{x:130,y:20},{x:212,y:40},{x:220,y:120},{x:130,y:140},{x:40,y:120}];
-                  return <line key={i} x1={pts[a].x} y1={pts[a].y} x2={pts[b].x} y2={pts[b].y}
-                    stroke="rgba(16,185,129,0.25)" strokeWidth="1.5"
-                    strokeDasharray="200" strokeDashoffset="200"
-                    style={{ animation: `lineGrow 0.6s ease ${i * 0.2 + 0.2}s both` }} />;
-                })}
-                {[
-                  {cx:48,cy:30},{cx:130,cy:20},{cx:212,cy:40},{cx:220,cy:120},{cx:130,cy:140},{cx:40,cy:120}
-                ].map((n,i) => (
-                  <circle key={i} cx={n.cx} cy={n.cy} r="9" fill="#10B981"
-                    style={{ animation: `orbitIn 0.4s ease ${i * 0.15}s both, nodePulse 2.4s ease ${i * 0.4}s infinite` }}
-                  />
-                ))}
-              </svg>
+              {/* Instagram DM Mock */}
+              <div style={{ width: '230px', background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
+                <div style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5" fill="white" stroke="none"/></svg>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#111827' }}>Direct Messages</span>
+                </div>
+                <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#E5E7EB', flexShrink: 0 }} />
+                    <div style={{ background: '#F3F4F6', borderRadius: '12px 12px 12px 2px', padding: '8px 10px', maxWidth: '160px' }}>
+                      <p style={{ fontSize: '0.75rem', color: '#111827', margin: 0, lineHeight: 1.4 }}>Hey! I saw the post about your chapter on Trailblaize. How do I join?</p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ background: '#0F172A', borderRadius: '12px 12px 2px 12px', padding: '8px 10px', maxWidth: '160px' }}>
+                      <p style={{ fontSize: '0.75rem', color: 'white', margin: 0, lineHeight: 1.4 }}>Here's your private link: trailblaize.net/join/alpha...</p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <span style={{ fontSize: '0.6875rem', color: '#9CA3AF' }}>Seen</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -934,20 +998,30 @@ function SetUpPage() {
                 </div>
               </div>
             </div>
-            {/* Product screenshots */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-              <img
-                src="/setup-screenshots/feed.png"
-                alt="Platform feed"
-                style={{ width: '100%', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'block' }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-              <img
-                src="/setup-screenshots/alumni.png"
-                alt="Alumni directory"
-                style={{ width: '100%', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'block' }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
+            {/* Messaging Hub Mock */}
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessageSquare size={14} color="#10B981" />
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>Messages</span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>Payne Parker</span>
+              </div>
+              {[
+                { initials: 'EH', name: 'Ethan Hill', preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas insurance - let me connect you.", time: '2m ago', unread: true, color: '#0F172A' },
+                { initials: 'EF', name: 'Evan Foster', preview: 'Would love to chat about wealth management opportunities. Are you free this week?', time: '1h ago', unread: false, color: '#8B5CF6' },
+                { initials: 'BK', name: 'Bryce Kallio', preview: "Great to see you on here. Let's catch up soon.", time: '3h ago', unread: false, color: '#0EA5E9' },
+              ].map((m, i) => (
+                <div key={i} style={{ padding: '12px 16px', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0 }}>{m.initials}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: m.unread ? 700 : 600, color: 'white' }}>{m.name}</span>
+                      <span style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{m.time}</span>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{m.preview}</p>
+                  </div>
+                  {m.unread && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />}
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -1011,19 +1085,57 @@ function SetUpPage() {
               </p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-              {[
-                {icon:<User size={22} color="#10B981" />, title:'Create Profile', desc:'Name, photo, industry, city, graduation year', d:'0.2s'},
-                {icon:<Users size={22} color="#10B981" />, title:'Join Your Space', desc:'Request access - admin approves in one tap', d:'0.5s'},
-                {icon:<Check size={22} color="#10B981" />, title:'Fully Connected', desc:'Text & email alumni, store org info, accept donations', d:'0.8s'},
-              ].map((s,i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '24px 20px', animation: `fadeUp 0.6s ease ${s.d} both` }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px', animation: `checkPop 0.5s ease ${parseFloat(s.d) + 0.3}s both` }}>
-                    {s.icon}
+              {/* Step 1: Create Profile */}
+              <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px', animation: 'fadeUp 0.6s ease 0.2s both' }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 1</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '4px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2px' }}>
+                    <User size={18} color="rgba(255,255,255,0.4)" />
                   </div>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '0 0 6px' }}>{s.title}</h4>
-                  <p style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, margin: 0 }}>{s.desc}</p>
+                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Evan Foster</span>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Finance · Senior</span>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Nashville, TN</span>
+                  </div>
                 </div>
-              ))}
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Create Profile</h4>
+                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Name, photo, industry, city, grad year</p>
+              </div>
+              {/* Step 2: Join Your Space */}
+              <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px', animation: 'fadeUp 0.6s ease 0.5s both' }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 2</div>
+                <div style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10B981' }}>TB</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'white' }}>Alpha Chapter</div>
+                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)' }}>247 members</div>
+                    </div>
+                  </div>
+                  <button style={{ width: '100%', padding: '7px', borderRadius: '7px', background: '#10B981', color: 'white', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Request to Join</button>
+                </div>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Join Your Space</h4>
+                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Request access - admin approves in one tap</p>
+              </div>
+              {/* Step 3: Connected */}
+              <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px', animation: 'fadeUp 0.6s ease 0.8s both' }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 3</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0 8px' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(16,185,129,0.15)', border: '2px solid rgba(16,185,129,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px', animation: 'checkPop 0.5s ease 1.1s both' }}>
+                    <Check size={26} color="#10B981" strokeWidth={2.5} />
+                  </div>
+                  <span style={{ fontSize: '1rem', fontWeight: 700, color: 'white' }}>You&apos;re in!</span>
+                  <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: '4px', textAlign: 'center' as const }}>Connected to Alpha Chapter</span>
+                </div>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Fully Connected</h4>
+                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Message alumni, explore the network, get opportunities</p>
+              </div>
             </div>
           </div>
         </section>
