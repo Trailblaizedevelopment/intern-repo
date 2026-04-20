@@ -471,7 +471,8 @@ function SetUpPage() {
                 <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', background: 'white', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em' }}>Recent Posts</div>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>EH</div>
+                    <img src="https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg" alt="Ethan Hill" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0F172A', display: 'none', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>EH</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                         <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Ethan Hill</span>
@@ -485,7 +486,8 @@ function SetUpPage() {
                     </div>
                   </div>
                   <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: '14px', display: 'flex', gap: '10px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>TD</div>
+                    <img src="https://api.trailblaize.net/storage/v1/object/public/user-avatar/11aae122-df59-40ac-baef-800fa16f6763-1776174041250.jpg" alt="Taylor Durham" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#10B981', display: 'none', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>TD</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                         <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Taylor Durham</span>
@@ -503,13 +505,14 @@ function SetUpPage() {
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: '12px' }}>Alumni Directory</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     {[
-                      { initials: 'EG', name: 'Ewing Gillaspy', title: 'M&A at AND Capital', location: 'Phoenix, AZ', color: '#0F172A' },
-                      { initials: 'JB', name: 'Jack Blackburn', title: 'Catalyst Financial', location: 'Houston, TX', color: '#6366F1' },
-                      { initials: 'WD', name: 'Worth DuPerier', title: 'Fifth Third Bank', location: 'Nashville, TN', color: '#0EA5E9' },
-                      { initials: 'ZF', name: 'Zach Fosseen', title: 'VP, Virtue', location: 'Seattle, WA', color: '#10B981' },
+                      { initials: 'EG', name: 'Ewing Gillaspy', title: 'M&A at AND Capital', location: 'Phoenix, AZ', color: '#0F172A', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg' },
+                      { initials: 'JB', name: 'Jack Blackburn', title: 'Catalyst Financial', location: 'Houston, TX', color: '#6366F1', avatar: 'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg' },
+                      { initials: 'WD', name: 'Worth DuPerier', title: 'Fifth Third Bank', location: 'Nashville, TN', color: '#0EA5E9', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg' },
+                      { initials: 'ZF', name: 'Zach Fosseen', title: 'VP, Virtue', location: 'Seattle, WA', color: '#10B981', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg' },
                     ].map((a) => (
                       <div key={a.initials} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.65rem', fontWeight: 700, marginBottom: '2px' }}>{a.initials}</div>
+                        <img src={a.avatar} alt={a.name} style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', marginBottom: '2px' }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
+                        <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: a.color, display: 'none', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.65rem', fontWeight: 700, marginBottom: '2px' }}>{a.initials}</div>
                         <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>{a.name}</span>
                         <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>{a.title}</span>
                         <span style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>{a.location}</span>
@@ -543,13 +546,14 @@ function SetUpPage() {
                   <div style={{ width: '100%', maxWidth: '320px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       {[
-                        { initials: 'EG', name: 'Ewing Gillaspy', title: 'Managing Director, M&A', org: 'AND Capital Ventures', location: 'Phoenix, AZ', color: '#0F172A' },
-                        { initials: 'JB', name: 'Jack Blackburn', title: 'Investment Advisor Rep', org: 'Catalyst Financial', location: 'Houston, TX', color: '#6366F1' },
-                        { initials: 'WD', name: 'Worth DuPerier', title: 'Client Banker', org: 'Fifth Third Bank', location: 'Nashville, TN', color: '#0EA5E9' },
-                        { initials: 'JC', name: 'Joe Chatham', title: 'Technical Assistant', org: 'Amwins', location: 'Dallas, TX', color: '#F59E0B' },
+                        { initials: 'EG', name: 'Ewing Gillaspy', title: 'Managing Director, M&A', org: 'AND Capital Ventures', location: 'Phoenix, AZ', color: '#0F172A', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg' },
+                        { initials: 'JB', name: 'Jack Blackburn', title: 'Investment Advisor Rep', org: 'Catalyst Financial', location: 'Houston, TX', color: '#6366F1', avatar: 'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg' },
+                        { initials: 'WD', name: 'Worth DuPerier', title: 'Client Banker', org: 'Fifth Third Bank', location: 'Nashville, TN', color: '#0EA5E9', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg' },
+                        { initials: 'JC', name: 'Joe Chatham', title: 'Technical Assistant', org: 'Amwins', location: 'Dallas, TX', color: '#F59E0B', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/20ba450e-709c-4a78-a963-7cbfb2de72ef-1776173885369.jpg' },
                       ].map((a) => (
                         <div key={a.initials} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px' }}>{a.initials}</div>
+                          <img src={a.avatar} alt={a.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', marginBottom: '4px' }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: a.color, display: 'none', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px' }}>{a.initials}</div>
                           <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>{a.name}</span>
                           <span style={{ fontSize: '0.72rem', color: '#374151' }}>{a.title}</span>
                           <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>{a.org}</span>
@@ -1006,12 +1010,13 @@ function SetUpPage() {
                 <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>Payne Parker</span>
               </div>
               {[
-                { initials: 'EH', name: 'Ethan Hill', preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas insurance - let me connect you.", time: '2m ago', unread: true, color: '#0F172A' },
-                { initials: 'EF', name: 'Evan Foster', preview: 'Would love to chat about wealth management opportunities. Are you free this week?', time: '1h ago', unread: false, color: '#8B5CF6' },
-                { initials: 'BK', name: 'Bryce Kallio', preview: "Great to see you on here. Let's catch up soon.", time: '3h ago', unread: false, color: '#0EA5E9' },
+                { initials: 'EH', name: 'Ethan Hill', preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas insurance - let me connect you.", time: '2m ago', unread: true, color: '#0F172A', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg' },
+                { initials: 'EF', name: 'Evan Foster', preview: 'Would love to chat about wealth management opportunities. Are you free this week?', time: '1h ago', unread: false, color: '#8B5CF6', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png' },
+                { initials: 'BK', name: 'Bryce Kallio', preview: "Great to see you on here. Let's catch up soon.", time: '3h ago', unread: false, color: '#0EA5E9', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cd5b69be-83c4-4cf3-b961-abfb7a892d35-1776217083451.png' },
               ].map((m, i) => (
                 <div key={i} style={{ padding: '12px 16px', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0 }}>{m.initials}</div>
+                  <img src={m.avatar} alt={m.name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: m.color, display: 'none', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0 }}>{m.initials}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                       <span style={{ fontSize: '0.8125rem', fontWeight: m.unread ? 700 : 600, color: 'white' }}>{m.name}</span>
