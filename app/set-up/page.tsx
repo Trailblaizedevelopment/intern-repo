@@ -365,6 +365,13 @@ function SetUpPage() {
             .org-types-grid {
               grid-template-columns: repeat(2, 1fr);
             }
+            .overview-grid {
+              grid-template-columns: 1fr !important;
+              gap: 24px !important;
+            }
+            .overview-cards {
+              grid-template-columns: 1fr !important;
+            }
           }
         `}</style>
 
@@ -481,7 +488,7 @@ function SetUpPage() {
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '8px' }}>
+              <div className="overview-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '8px' }}>
                 {/* Mock Feed */}
                 <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', background: 'white', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em' }}>Recent Posts</div>
@@ -542,7 +549,7 @@ function SetUpPage() {
           {/* ── Sub-step 3: Real Connections ── */}
           {subStep === 3 && (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '52px 24px 0', minHeight: 'calc(100vh - 210px)' }}>
-              <div style={{ maxWidth: '680px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
+              <div className="overview-grid" style={{ maxWidth: '680px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
                 <div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #D1FAE5', marginBottom: '20px' }}>
                     <Share2 size={28} color="#10B981" />
