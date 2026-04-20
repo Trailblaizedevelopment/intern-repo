@@ -153,6 +153,8 @@ function SetUpPage() {
   const testMode = searchParams.get('test') === '1';
 
   const [step, setStep] = useState(0);
+  const [subStep, setSubStep] = useState(0);
+  const [subStepVisible, setSubStepVisible] = useState(true);
   const [activeChapterCount, setActiveChapterCount] = useState<number | null>(null);
 
   // Form state
@@ -286,6 +288,18 @@ function SetUpPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function advanceSubStep() {
+    setSubStepVisible(false);
+    setTimeout(() => {
+      if (subStep >= 5) {
+        goToStep(1);
+      } else {
+        setSubStep((s) => s + 1);
+        setSubStepVisible(true);
+      }
+    }, 220);
+  }
+
   async function handleCheckout() {
     setCheckoutLoading(true);
     setCheckoutError('');
@@ -314,32 +328,16 @@ function SetUpPage() {
     }
   }
 
-  // ─── Step 0: Value Page ────────────────────────────────────────────────────
+  // ─── Step 0: Overview (click-through) ──────────────────────────────────────
 
   if (step === 0) {
+    const TOTAL_SUBSTEPS = 6;
     return (
-      <div style={{ background: 'white', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div style={{ background: 'white', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
         <style>{`
           @keyframes fadeUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-          @keyframes nodeDrift {
-            0%, 100% { transform: translate(0px, 0px); }
-            33% { transform: translate(3px, -4px); }
-            66% { transform: translate(-3px, 2px); }
-          }
-          @keyframes lineAppear {
-            from { stroke-dashoffset: 300; opacity: 0; }
-            to { stroke-dashoffset: 0; opacity: 1; }
-          }
-          @keyframes dotPop {
-            from { transform: scale(0); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
           }
           @keyframes iconSlideIn {
             from { opacity: 0; transform: translateY(12px); }
@@ -363,224 +361,246 @@ function SetUpPage() {
           </div>
         )}
 
-        {/* Nav — matches trailblaize.net */}
-        <nav style={{ padding: '0 32px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6', background: 'white' }}>
+        {/* Nav — always visible */}
+        <nav style={{ padding: '0 32px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6', background: 'white', flexShrink: 0 }}>
           <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '44px' }} />
-          <button onClick={() => goToStep(1)}
-            style={{ padding: '8px 20px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.875rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button
+            onClick={() => goToStep(1)}
+            style={{ padding: '8px 20px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.875rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
             Get Started
           </button>
         </nav>
 
-        {/* ── Hero ── */}
-        <section style={{ maxWidth: '680px', margin: '0 auto', padding: '88px 24px 72px', textAlign: 'center' }}>
-          <div style={{ animation: 'fadeUp 0.6s ease both' }}>
-            <h1 style={{
-              fontSize: 'clamp(2.5rem, 6vw, 4rem)',
-              fontWeight: 400,
-              lineHeight: 1.08,
-              color: '#0F172A',
-              marginBottom: '20px',
-              fontFamily: '"Instrument Serif", Georgia, serif',
-              letterSpacing: '-0.02em',
-            }}>
-              The alumni network for every organization.
-            </h1>
-            <p style={{ fontSize: '1.125rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '460px', margin: '0 auto 40px' }}>
-              A shared social network where organizations own their alumni community.
-            </p>
-            <button
-              onClick={() => goToStep(1)}
+        {/* Progress dots */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '14px 0', background: 'white', borderBottom: '1px solid #F3F4F6', flexShrink: 0 }}>
+          {Array.from({ length: TOTAL_SUBSTEPS }).map((_, i) => (
+            <div
+              key={i}
               style={{
-                padding: '13px 32px', borderRadius: '8px',
-                background: '#0F172A', color: 'white',
-                fontWeight: 600, fontSize: '1rem',
-                border: 'none', cursor: 'pointer',
+                width: i === subStep ? '22px' : '7px',
+                height: '7px',
+                borderRadius: '4px',
+                background: i === subStep ? '#0F172A' : '#D1D5DB',
+                transition: 'all 0.3s ease',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Transitioning content area */}
+        <div
+          style={{
+            flex: 1,
+            opacity: subStepVisible ? 1 : 0,
+            transform: subStepVisible ? 'translateY(0)' : 'translateY(20px)',
+            transition: 'opacity 0.22s ease, transform 0.22s ease',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+
+          {/* ── Sub-step 0: Hook ── */}
+          {subStep === 0 && (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', minHeight: 'calc(100vh - 210px)' }}>
+              <div style={{ maxWidth: '680px', textAlign: 'center' }}>
+                <h1 style={{
+                  fontSize: 'clamp(2.25rem, 5.5vw, 3.75rem)',
+                  fontWeight: 400,
+                  lineHeight: 1.15,
+                  color: '#0F172A',
+                  margin: 0,
+                  fontFamily: '"Instrument Serif", Georgia, serif',
+                  letterSpacing: '-0.02em',
+                }}>
+                  What if every alumni in your organization was one tap away?
+                </h1>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step 1: Hero ── */}
+          {subStep === 1 && (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', minHeight: 'calc(100vh - 210px)' }}>
+              <div style={{ maxWidth: '680px', textAlign: 'center' }}>
+                <h1 style={{
+                  fontSize: 'clamp(2.25rem, 5.5vw, 3.75rem)',
+                  fontWeight: 400,
+                  lineHeight: 1.08,
+                  color: '#0F172A',
+                  marginBottom: '20px',
+                  fontFamily: '"Instrument Serif", Georgia, serif',
+                  letterSpacing: '-0.02em',
+                }}>
+                  The alumni network for every organization.
+                </h1>
+                <p style={{ fontSize: '1.125rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '460px', margin: '0 auto' }}>
+                  A shared social network where organizations own their alumni community — without relying on LinkedIn or scattered group chats.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step 2: One Place for Everyone ── */}
+          {subStep === 2 && (
+            <div style={{ padding: '52px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '12px', background: '#F9FAFB', border: '1px solid #E5E7EB', marginBottom: '16px' }}>
+                  <Users size={20} color="#10B981" />
+                </div>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
+                  One place for everyone
+                </h2>
+                <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
+                  Your members, alumni, and leadership — connected in a single private network your organization actually owns.
+                </p>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '28px' }}>
+                {[
+                  { icon: <Users size={18} color="#10B981" />, title: 'Private member directory', desc: 'Every member, past and present, in one searchable space.' },
+                  { icon: <MessageSquare size={18} color="#10B981" />, title: 'Instant messaging', desc: 'Message anyone directly — no scattered group chats.' },
+                  { icon: <Shield size={18} color="#10B981" />, title: 'You control access', desc: 'Approve who joins, manage roles, keep your network clean.' },
+                ].map((card) => (
+                  <div key={card.title} style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px' }}>
+                    <div style={{ marginBottom: '10px' }}>{card.icon}</div>
+                    <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: '0 0 6px' }}>{card.title}</h3>
+                    <p style={{ fontSize: '0.8125rem', color: '#6B7280', margin: 0, lineHeight: 1.6 }}>{card.desc}</p>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '8px' }}>
+                <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F9FAFB', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img src="/setup-screenshots/feed.png" alt="Social feed" style={{ width: '100%', display: 'block', borderRadius: '12px' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                </div>
+                <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F9FAFB', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img src="/setup-screenshots/alumni.png" alt="Alumni directory" style={{ width: '100%', display: 'block', borderRadius: '12px' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step 3: Real Connections ── */}
+          {subStep === 3 && (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '52px 24px 0', minHeight: 'calc(100vh - 210px)' }}>
+              <div style={{ maxWidth: '680px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
+                <div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #D1FAE5', marginBottom: '20px' }}>
+                    <Share2 size={28} color="#10B981" />
+                  </div>
+                  <h2 style={{ fontSize: '1.625rem', fontWeight: 700, color: '#111827', margin: '0 0 14px', letterSpacing: '-0.01em' }}>
+                    Real connections, not just contacts
+                  </h2>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 12px' }}>
+                    Members find jobs, mentors, and friendships through your alumni network — matched by industry, city, and shared interests.
+                  </p>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                    Whether you&apos;re a new grad looking for your first role or an alum giving back — Trailblaize makes the introduction.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <img
+                    src="/setup-screenshots/alumni.png"
+                    alt="Alumni directory with profiles"
+                    style={{ width: '100%', maxWidth: '320px', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'block' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step 4: Built for Your Organization ── */}
+          {subStep === 4 && (
+            <div style={{ padding: '52px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
+              <div style={{ marginBottom: '32px' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '12px', background: '#F9FAFB', border: '1px solid #E5E7EB', marginBottom: '16px' }}>
+                  <Zap size={20} color="#10B981" />
+                </div>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
+                  Built for your organization
+                </h2>
+                <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
+                  Whether you&apos;re a Greek chapter, high school, or professional network — Trailblaize works for you.
+                </p>
+              </div>
+              <div className="org-types-grid">
+                {[
+                  { icon: <GraduationCap size={18} color="#10B981" />, label: 'Universities / Business Schools' },
+                  { icon: <Users size={18} color="#10B981" />, label: 'Greek Life Chapters' },
+                  { icon: <Globe size={18} color="#10B981" />, label: 'High Schools' },
+                  { icon: <Briefcase size={18} color="#10B981" />, label: 'Professional Associations' },
+                  { icon: <Building2 size={18} color="#10B981" />, label: 'Corporate Alumni Networks' },
+                  { icon: <Heart size={18} color="#10B981" />, label: 'Philanthropic / Advisory Boards' },
+                  { icon: <TrendingUp size={18} color="#10B981" />, label: 'Investor / Founder Networks' },
+                  { icon: <Trophy size={18} color="#10B981" />, label: 'Athletic Programs / Teams' },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      background: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '12px',
+                      padding: '18px 12px',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
+                    }}
+                  >
+                    {item.icon}
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step 5: CTA ── */}
+          {subStep === 5 && (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', minHeight: 'calc(100vh - 210px)' }}>
+              <div style={{ maxWidth: '480px', textAlign: 'center' }}>
+                <h2 style={{ fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', fontWeight: 700, color: '#111827', margin: '0 0 14px', letterSpacing: '-0.01em' }}>
+                  Ready to activate your network?
+                </h2>
+                <p style={{ fontSize: '1rem', color: '#6B7280', margin: 0, lineHeight: 1.65 }}>
+                  Takes about 5 minutes to set up.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom nav: Skip + Next */}
+          <div style={{ maxWidth: '680px', margin: '0 auto', width: '100%', padding: '24px 24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {subStep < 5 ? (
+              <button
+                onClick={() => goToStep(1)}
+                style={{ fontSize: '0.8125rem', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+              >
+                Skip to setup →
+              </button>
+            ) : (
+              <div />
+            )}
+            <button
+              onClick={advanceSubStep}
+              style={{
+                padding: '10px 28px',
+                borderRadius: '8px',
+                background: '#0F172A',
+                color: 'white',
+                fontWeight: 600,
+                fontSize: '0.9375rem',
+                border: 'none',
+                cursor: 'pointer',
                 fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
               }}
             >
-              Get Started <ArrowRight size={16} />
+              {subStep === 5 ? 'Get Started' : 'Next'}
+              {subStep === 5 ? <ArrowRight size={16} /> : <ChevronRight size={16} />}
             </button>
           </div>
-        </section>
 
-        {/* ── Section 1: One Place for Everyone (#F9FAFB) ── */}
-        <section style={{ background: '#F9FAFB', borderTop: '1px solid #E5E7EB', borderBottom: '1px solid #E5E7EB', padding: '72px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto' }}>
-            <div style={{ textAlign: 'center', marginBottom: '48px', animation: 'fadeUp 0.6s ease 0.1s both' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '12px', background: 'white', border: '1px solid #E5E7EB', marginBottom: '16px' }}>
-                <Users size={20} color="#10B981" />
-              </div>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
-                One place for everyone
-              </h2>
-              <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                Your members, alumni, and leadership - connected in a single private network your organization actually owns.
-              </p>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-              {[
-                { icon: <Users size={18} color="#10B981" />, title: 'Private member directory', desc: 'Every member, past and present, in one searchable space.', delay: '0.15s' },
-                { icon: <MessageSquare size={18} color="#10B981" />, title: 'Instant messaging', desc: 'Message anyone in your org directly - no group chats scattered across apps.', delay: '0.25s' },
-                { icon: <Shield size={18} color="#10B981" />, title: 'You control access', desc: 'Approve who joins, manage roles, keep your network clean.', delay: '0.35s' },
-              ].map((card) => (
-                <div
-                  key={card.title}
-                  style={{
-                    background: 'white',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '14px',
-                    padding: '24px',
-                    animation: `iconSlideIn 0.5s ease ${card.delay} both`,
-                  }}
-                >
-                  <div style={{ marginBottom: '12px' }}>{card.icon}</div>
-                  <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#111827', margin: '0 0 8px' }}>{card.title}</h3>
-                  <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0, lineHeight: 1.6 }}>{card.desc}</p>
-                </div>
-              ))}
-            </div>
-            {/* Product screenshots */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginTop: '48px' }}>
-              <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
-                <img
-                  src="/setup-screenshots/feed.png"
-                  alt="Social feed"
-                  style={{ width: '100%', display: 'block', borderRadius: '12px' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    const p = document.createElement('p');
-                    p.textContent = 'Feed Preview';
-                    p.style.cssText = 'color:#9CA3AF;font-weight:500;margin:0;font-family:Inter,sans-serif;';
-                    (e.target as HTMLImageElement).parentElement!.appendChild(p);
-                  }}
-                />
-              </div>
-              <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
-                <img
-                  src="/setup-screenshots/alumni.png"
-                  alt="Alumni directory"
-                  style={{ width: '100%', display: 'block', borderRadius: '12px' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    const p = document.createElement('p');
-                    p.textContent = 'Alumni Directory';
-                    p.style.cssText = 'color:#9CA3AF;font-weight:500;margin:0;font-family:Inter,sans-serif;';
-                    (e.target as HTMLImageElement).parentElement!.appendChild(p);
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Section 2: Real Connections (white) ── */}
-        <section style={{ background: 'white', padding: '80px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '64px', alignItems: 'center' }}>
-            <div style={{ animation: 'fadeUp 0.6s ease 0.1s both' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #D1FAE5', marginBottom: '20px' }}>
-                <Share2 size={32} color="#10B981" />
-              </div>
-              <h2 style={{ fontSize: '1.625rem', fontWeight: 700, color: '#111827', margin: '0 0 14px', letterSpacing: '-0.01em' }}>
-                Real connections, not just contacts
-              </h2>
-              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 12px' }}>
-                Members find jobs, mentors, and friendships through your alumni network - matched by industry, city, and shared interests.
-              </p>
-              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                Whether you're a new grad looking for your first role or an alum giving back - Trailblaize makes the introduction.
-              </p>
-            </div>
-            {/* Alumni directory screenshot */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <img
-                src="/setup-screenshots/alumni.png"
-                alt="Alumni directory with profiles"
-                style={{ width: '100%', maxWidth: '360px', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'block' }}
-                onError={(e) => {
-                  const el = e.target as HTMLImageElement;
-                  el.style.display = 'none';
-                  const wrap = el.parentElement!;
-                  wrap.style.cssText += 'min-height:200px;background:#F9FAFB;border-radius:12px;border:1px solid #E5E7EB;align-items:center;justify-content:center;';
-                  const p = document.createElement('p');
-                  p.textContent = 'Alumni Directory';
-                  p.style.cssText = 'color:#9CA3AF;font-weight:500;margin:0;font-family:Inter,sans-serif;';
-                  wrap.appendChild(p);
-                }}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* ── Section 3: Built for Your Organization (#F9FAFB) ── */}
-        <section style={{ background: '#F9FAFB', borderTop: '1px solid #E5E7EB', borderBottom: '1px solid #E5E7EB', padding: '72px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto', textAlign: 'center' }}>
-            <div style={{ marginBottom: '48px', animation: 'fadeUp 0.6s ease 0.1s both' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '12px', background: 'white', border: '1px solid #E5E7EB', marginBottom: '16px' }}>
-                <Zap size={20} color="#10B981" />
-              </div>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
-                Built for your organization
-              </h2>
-              <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                Whether you&apos;re a university, Greek chapter, high school, or professional network - Trailblaize works for you.
-              </p>
-            </div>
-            <div className="org-types-grid">
-              {[
-                { icon: <GraduationCap size={18} color="#10B981" />, label: 'Universities / Business Schools', d: '0.15s' },
-                { icon: <Users size={18} color="#10B981" />, label: 'Greek Life Chapters', d: '0.2s' },
-                { icon: <Globe size={18} color="#10B981" />, label: 'High Schools', d: '0.25s' },
-                { icon: <Briefcase size={18} color="#10B981" />, label: 'Professional Associations', d: '0.3s' },
-                { icon: <Building2 size={18} color="#10B981" />, label: 'Corporate Alumni Networks', d: '0.35s' },
-                { icon: <Heart size={18} color="#10B981" />, label: 'Philanthropic / Advisory Boards', d: '0.4s' },
-                { icon: <TrendingUp size={18} color="#10B981" />, label: 'Investor / Founder Networks', d: '0.45s' },
-                { icon: <Trophy size={18} color="#10B981" />, label: 'Athletic Programs / Teams', d: '0.5s' },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  style={{
-                    background: 'white',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '12px',
-                    padding: '20px 16px',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
-                    animation: `iconSlideIn 0.5s ease ${item.d} both`,
-                  }}
-                >
-                  {item.icon}
-                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── CTA ── */}
-        <section style={{ background: 'white', padding: '80px 24px', textAlign: 'center' }}>
-          <div style={{ maxWidth: '480px', margin: '0 auto', animation: 'fadeUp 0.6s ease 0.1s both' }}>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
-              Ready to activate your network?
-            </h2>
-            <p style={{ fontSize: '0.9375rem', color: '#6B7280', margin: '0 0 32px', lineHeight: 1.65 }}>
-              Takes about 5 minutes to set up.
-            </p>
-            <button
-              onClick={() => goToStep(1)}
-              style={{
-                padding: '14px 36px', borderRadius: '8px',
-                background: '#10B981', color: 'white',
-                fontWeight: 600, fontSize: '1rem',
-                border: 'none', cursor: 'pointer',
-                fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: '8px',
-              }}
-            >
-              Get Started <ArrowRight size={16} />
-            </button>
-          </div>
-        </section>
+        </div>{/* end transitioning wrapper */}
       </div>
     );
   }
