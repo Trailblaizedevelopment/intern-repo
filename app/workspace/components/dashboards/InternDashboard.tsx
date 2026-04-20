@@ -232,7 +232,7 @@ function PipelineWidget({
   const [employees, setEmployees] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [myDealsOnly, setMyDealsOnly] = useState(false);
+  const [myDealsOnly, setMyDealsOnly] = useState(true);
   const [sortField, setSortField] = useState<'next_followup' | 'stage' | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
 
