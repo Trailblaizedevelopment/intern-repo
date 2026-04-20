@@ -1,18 +1,53 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Phone, PhoneCall, PhoneMissed, PhoneOff, Voicemail,
+  Phone, PhoneCall, Voicemail,
   ChevronDown, ChevronUp, RefreshCw, CheckSquare, Square,
-  X, LayoutDashboard, User, Clock, Users, AlertCircle,
-  MessageSquare, Bell,
+  X, LayoutDashboard, User, Users, AlertCircle,
+  MessageSquare, Bell, Share2, Globe,
 } from 'lucide-react';
 import Link from 'next/link';
-import { AlumniContact, Chapter } from '@/lib/supabase';
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 type ColumnStatus = 'not_called' | 'voicemail' | 'called' | 'declined';
+type ActiveView = 'call_center' | 'web';
+
+interface MergedAlumni {
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  avatar_url: string | null;
+  grad_year: number | null;
+  location: string | null;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  outreach_status: string;
+  platform_joined: boolean;
+  last_active_at: string | null;
+  member_status: string | null;
+  engagement_score: number;
+  chapter_name?: string; // added client-side for All Chapters view
+}
+
+interface Chapter {
+  id: string;
+  chapter_name?: string;
+  fraternity?: string;
+  school?: string;
+}
+
+interface ContactSnapshot {
+  name: string;
+  avatarUrl: string | null;
+  location: string | null;
+  gradYear: number | null;
+  memberStatus: string | null;
+  chapterName?: string;
+}
 
 interface CallLog {
   contactId: string;
@@ -23,6 +58,7 @@ interface CallLog {
   calledAt: string;
   followUpDate?: string;
   followUpCompleted?: boolean;
+  contactSnapshot?: ContactSnapshot;
 }
 
 interface Claim {
@@ -36,9 +72,8 @@ interface Assignment {
   count: number;
 }
 
-interface SlidePanel {
-  contact: AlumniContact;
-  phase: 'actions' | 'logging';
+interface LoggingState {
+  contact: MergedAlumni;
   notes: string;
   tags: string[];
   tagInput: string;
@@ -47,106 +82,88 @@ interface SlidePanel {
   saving: boolean;
 }
 
-interface TodoItem {
-  type: 'overdue_followup' | 'voicemail_callback' | 'assigned_uncalled';
-  contactId: string;
+interface WebNode {
+  id: string;
   name: string;
-  detail: string;
-  completed: boolean;
+  avatarUrl: string | null;
+  tags: string[];
+  location: string | null;
+  gradYear: number | null;
+  memberStatus: string | null;
+  chapterName?: string;
+  notes: string;
+  connectionCount: number;
+  x: number;
+  y: number;
+  radius: number;
 }
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+interface WebEdge {
+  from: string;
+  to: string;
+  type: 'industry' | 'city' | 'interest';
+  sharedTag: string;
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const COLUMN_CONFIG: Record<ColumnStatus, {
-  label: string;
-  borderColor: string;
-  badgeBg: string;
-  badgeColor: string;
-  headerBg: string;
+  label: string; borderColor: string; badgeBg: string; badgeColor: string; headerBg: string;
 }> = {
-  not_called: {
-    label: 'Not Called',
-    borderColor: '#d1d5db',
-    badgeBg: '#f3f4f6',
-    badgeColor: '#6b7280',
-    headerBg: '#f9fafb',
-  },
-  voicemail: {
-    label: 'Voicemail Sent',
-    borderColor: '#93c5fd',
-    badgeBg: '#dbeafe',
-    badgeColor: '#1d4ed8',
-    headerBg: '#eff6ff',
-  },
-  called: {
-    label: 'Called / Logged',
-    borderColor: '#86efac',
-    badgeBg: '#dcfce7',
-    badgeColor: '#15803d',
-    headerBg: '#f0fdf4',
-  },
-  declined: {
-    label: 'Declined',
-    borderColor: '#fca5a5',
-    badgeBg: '#fee2e2',
-    badgeColor: '#b91c1c',
-    headerBg: '#fff1f2',
-  },
+  not_called: { label: 'Not Called',     borderColor: '#d1d5db', badgeBg: '#f3f4f6', badgeColor: '#6b7280', headerBg: '#f9fafb' },
+  voicemail:  { label: 'Voicemail Sent', borderColor: '#93c5fd', badgeBg: '#dbeafe', badgeColor: '#1d4ed8', headerBg: '#eff6ff' },
+  called:     { label: 'Called / Logged',borderColor: '#86efac', badgeBg: '#dcfce7', badgeColor: '#15803d', headerBg: '#f0fdf4' },
+  declined:   { label: 'Declined',       borderColor: '#fca5a5', badgeBg: '#fee2e2', badgeColor: '#b91c1c', headerBg: '#fff1f2' },
 };
 
 const PREDEFINED_TAGS: { label: string; color: string; bg: string }[] = [
-  { label: 'Hiring',            color: '#15803d', bg: '#dcfce7' },
-  { label: 'Mentoring',         color: '#1d4ed8', bg: '#dbeafe' },
-  { label: 'Looking to Connect',color: '#7c3aed', bg: '#ede9fe' },
-  { label: 'Advice',            color: '#d97706', bg: '#fef3c7' },
-  { label: 'Industry Expert',   color: '#0d9488', bg: '#ccfbf1' },
-  { label: 'Wants to Help',     color: '#15803d', bg: '#f0fdf4' },
-  { label: 'Event Interest',    color: '#db2777', bg: '#fce7f3' },
-  { label: 'Referred Someone',  color: '#ea580c', bg: '#ffedd5' },
-  { label: 'Posted on Platform',color: '#4f46e5', bg: '#e0e7ff' },
+  { label: 'Hiring',             color: '#15803d', bg: '#dcfce7' },
+  { label: 'Mentoring',          color: '#1d4ed8', bg: '#dbeafe' },
+  { label: 'Looking to Connect', color: '#7c3aed', bg: '#ede9fe' },
+  { label: 'Advice',             color: '#d97706', bg: '#fef3c7' },
+  { label: 'Industry Expert',    color: '#0d9488', bg: '#ccfbf1' },
+  { label: 'Wants to Help',      color: '#15803d', bg: '#f0fdf4' },
+  { label: 'Event Interest',     color: '#db2777', bg: '#fce7f3' },
+  { label: 'Referred Someone',   color: '#ea580c', bg: '#ffedd5' },
+  { label: 'Posted on Platform', color: '#4f46e5', bg: '#e0e7ff' },
 ];
 
 const TAG_COLOR_MAP: Record<string, { color: string; bg: string }> = {};
 PREDEFINED_TAGS.forEach(t => { TAG_COLOR_MAP[t.label.toLowerCase()] = { color: t.color, bg: t.bg }; });
-
 function getTagStyle(tag: string): { color: string; bg: string } {
   return TAG_COLOR_MAP[tag.toLowerCase()] ?? { color: '#6b7280', bg: '#f3f4f6' };
 }
 
-const STATUS_MAP: Record<ColumnStatus, string> = {
-  not_called: 'not_contacted',
-  voicemail:  'touch1_sent',
-  called:     'responded',
-  declined:   'opted_out',
+const INDUSTRY_TAGS = ['Hiring', 'Industry Expert', 'Mentoring'];
+const CALLER_NAMES = ['Owen', 'Ford', 'Adam', 'Katie', 'Hyatt', 'Zach', 'Other'];
+const EDGE_COLORS: Record<'industry' | 'city' | 'interest', string> = {
+  industry: '#10b981',
+  city: '#3b82f6',
+  interest: '#8b5cf6',
 };
 
-const CALLER_NAMES = ['Owen', 'Ford', 'Adam', 'Katie', 'Hyatt', 'Zach', 'Other'];
-
-// ─── localStorage Helpers ────────────────────────────────────────────────────
+// ─── localStorage ─────────────────────────────────────────────────────────────
 
 const LS = {
-  callLogs:      'connects_call_logs_v2',
-  claims:        'connects_claims_v2',
-  assignments:   'connects_assignments_v2',
+  callLogs:      'connects_call_logs_v3',
+  claims:        'connects_claims_v3',
+  assignments:   'connects_assignments_v3',
   currentUser:   'connects_current_user',
-  todoCompleted: 'connects_todo_completed_v2',
+  todoCompleted: 'connects_todo_completed_v3',
 };
 
 function readCallLogs(): Record<string, CallLog> {
-  try { return JSON.parse(localStorage.getItem(LS.callLogs) || '{}'); }
-  catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(LS.callLogs) || '{}'); } catch { return {}; }
 }
 function writeCallLog(log: CallLog) {
-  const all = readCallLogs();
-  all[log.contactId] = log;
+  const all = readCallLogs(); all[log.contactId] = log;
   localStorage.setItem(LS.callLogs, JSON.stringify(all));
 }
 
 function readClaims(): Record<string, Claim> {
   try {
     const raw: Record<string, Claim> = JSON.parse(localStorage.getItem(LS.claims) || '{}');
-    const now = Date.now();
-    const active: Record<string, Claim> = {};
+    const now = Date.now(); const active: Record<string, Claim> = {};
     for (const [id, c] of Object.entries(raw)) {
       if (now - new Date(c.claimedAt).getTime() < 30 * 60 * 1000) active[id] = c;
     }
@@ -159,46 +176,27 @@ function writeClaim(contactId: string, by: string) {
   localStorage.setItem(LS.claims, JSON.stringify(all));
 }
 function deleteClaim(contactId: string) {
-  const all = readClaims();
-  delete all[contactId];
+  const all = readClaims(); delete all[contactId];
   localStorage.setItem(LS.claims, JSON.stringify(all));
 }
 
 function readAssignments(): Assignment[] {
-  try { return JSON.parse(localStorage.getItem(LS.assignments) || '[]'); }
-  catch { return []; }
+  try { return JSON.parse(localStorage.getItem(LS.assignments) || '[]'); } catch { return []; }
 }
-function writeAssignments(a: Assignment[]) {
-  localStorage.setItem(LS.assignments, JSON.stringify(a));
-}
-
+function writeAssignments(a: Assignment[]) { localStorage.setItem(LS.assignments, JSON.stringify(a)); }
 function readCurrentUser(): string { return localStorage.getItem(LS.currentUser) || 'Owen'; }
 function saveCurrentUser(n: string) { localStorage.setItem(LS.currentUser, n); }
-
 function readTodoCompleted(): string[] {
-  try { return JSON.parse(localStorage.getItem(LS.todoCompleted) || '[]'); }
-  catch { return []; }
+  try { return JSON.parse(localStorage.getItem(LS.todoCompleted) || '[]'); } catch { return []; }
 }
 function toggleTodoDone(key: string): string[] {
-  const all = readTodoCompleted();
-  const idx = all.indexOf(key);
+  const all = readTodoCompleted(); const idx = all.indexOf(key);
   if (idx >= 0) all.splice(idx, 1); else all.push(key);
   localStorage.setItem(LS.todoCompleted, JSON.stringify(all));
   return [...all];
 }
 
-// ─── Status Derivation ───────────────────────────────────────────────────────
-
-function getContactStatus(c: AlumniContact, logs: Record<string, CallLog>): ColumnStatus {
-  if (logs[c.id]) return logs[c.id].status;
-  const s = c.outreach_status;
-  if (s === 'opted_out' || s === 'wrong_number') return 'declined';
-  if (s === 'responded' || s === 'touch2_sent' || s === 'touch3_sent' || s === 'verified') return 'called';
-  if (s === 'touch1_sent') return 'voicemail';
-  return 'not_called';
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtPhone(p: string | null): string {
   if (!p) return '';
@@ -207,10 +205,33 @@ function fmtPhone(p: string | null): string {
   if (d.length === 11 && d[0] === '1') return `(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
   return p;
 }
-function isOverdue(dateStr?: string): boolean {
-  return !!dateStr && new Date(dateStr) < new Date();
-}
+function isOverdue(dateStr?: string): boolean { return !!dateStr && new Date(dateStr) < new Date(); }
 function today(): string { return new Date().toISOString().slice(0, 10); }
+function getContactStatus(c: MergedAlumni, logs: Record<string, CallLog>): ColumnStatus {
+  return logs[c.id]?.status ?? 'not_called';
+}
+function getInitials(name: string): string {
+  const p = name.trim().split(' ');
+  if (p.length >= 2) return `${p[0][0]}${p[p.length - 1][0]}`.toUpperCase();
+  return (name.slice(0, 2) || '?').toUpperCase();
+}
+
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+
+function AvatarImg({ avatarUrl, name, size = 40 }: { avatarUrl: string | null; name: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  const initials = getInitials(name);
+  const bgColors = ['#0F172A', '#1d4ed8', '#0d9488', '#7c3aed', '#db2777'];
+  const bg = bgColors[(name.charCodeAt(0) || 0) % bgColors.length];
+  if (avatarUrl && !err) {
+    return <img src={avatarUrl} alt={name} onError={() => setErr(true)} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #E5E7EB' }} />;
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: size * 0.35, flexShrink: 0, border: '2px solid #E5E7EB', letterSpacing: '0.03em' }}>
+      {initials}
+    </div>
+  );
+}
 
 // ─── Tag Pill ─────────────────────────────────────────────────────────────────
 
@@ -228,7 +249,7 @@ function TagPill({ tag, onRemove }: { tag: string; onRemove?: () => void }) {
   );
 }
 
-// ─── Goal Bar ────────────────────────────────────────────────────────────────
+// ─── Goal Bar ─────────────────────────────────────────────────────────────────
 
 function GoalBar({ callLogs, assignments }: { callLogs: Record<string, CallLog>; assignments: Assignment[] }) {
   const t = today();
@@ -241,7 +262,6 @@ function GoalBar({ callLogs, assignments }: { callLogs: Record<string, CallLog>;
   const total = Object.values(personMap).reduce((s, v) => s + v, 0);
   const pct = Math.min(100, Math.round((total / 100) * 100));
   const names = new Set([...Object.keys(personMap), ...assignments.map(a => a.name)]);
-
   return (
     <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 16, padding: '20px 24px', marginBottom: '1.5rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
@@ -274,7 +294,7 @@ function GoalBar({ callLogs, assignments }: { callLogs: Record<string, CallLog>;
   );
 }
 
-// ─── Assign Calls Panel ──────────────────────────────────────────────────────
+// ─── Assign Calls Panel ───────────────────────────────────────────────────────
 
 function AssignCallsPanel({ assignments, callLogs, onUpdate }: {
   assignments: Assignment[];
@@ -285,30 +305,21 @@ function AssignCallsPanel({ assignments, callLogs, onUpdate }: {
   const [newName, setNewName] = useState('');
   const [newCount, setNewCount] = useState('');
   const t = today();
-
   function calledToday(name: string) {
-    return Object.values(callLogs).filter(
-      l => l.calledBy === name && l.calledAt?.slice(0, 10) === t && (l.status === 'called' || l.status === 'voicemail')
-    ).length;
+    return Object.values(callLogs).filter(l => l.calledBy === name && l.calledAt?.slice(0, 10) === t && (l.status === 'called' || l.status === 'voicemail')).length;
   }
   function add() {
     if (!newName.trim() || !newCount) return;
-    const updated = [...assignments.filter(a => a.name !== newName.trim()), { name: newName.trim(), count: parseInt(newCount) }];
-    onUpdate(updated);
+    onUpdate([...assignments.filter(a => a.name !== newName.trim()), { name: newName.trim(), count: parseInt(newCount) }]);
     setNewName(''); setNewCount('');
   }
-
   return (
     <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, marginBottom: '1.5rem', overflow: 'hidden' }}>
       <button onClick={() => setOpen(o => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Users size={16} style={{ color: '#6b7280' }} />
           <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#111827' }}>Assign Calls</span>
-          {assignments.length > 0 && (
-            <span style={{ fontSize: '0.7rem', background: '#f3f4f6', color: '#6b7280', padding: '2px 8px', borderRadius: 9999, fontWeight: 600 }}>
-              {assignments.length} person{assignments.length !== 1 ? 's' : ''}
-            </span>
-          )}
+          {assignments.length > 0 && <span style={{ fontSize: '0.7rem', background: '#f3f4f6', color: '#6b7280', padding: '2px 8px', borderRadius: 9999, fontWeight: 600 }}>{assignments.length} person{assignments.length !== 1 ? 's' : ''}</span>}
         </div>
         {open ? <ChevronUp size={16} style={{ color: '#9ca3af' }} /> : <ChevronDown size={16} style={{ color: '#9ca3af' }} />}
       </button>
@@ -331,9 +342,7 @@ function AssignCallsPanel({ assignments, callLogs, onUpdate }: {
                         <div style={{ height: '100%', width: `${pct}%`, background: pct >= 100 ? '#10b981' : '#0F172A', borderRadius: 9999, transition: 'width 0.4s' }} />
                       </div>
                     </div>
-                    <button onClick={() => onUpdate(assignments.filter(x => x.name !== a.name))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4, display: 'flex' }}>
-                      <X size={14} />
-                    </button>
+                    <button onClick={() => onUpdate(assignments.filter(x => x.name !== a.name))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4, display: 'flex' }}><X size={14} /></button>
                   </div>
                 );
               })}
@@ -352,8 +361,11 @@ function AssignCallsPanel({ assignments, callLogs, onUpdate }: {
 
 // ─── Daily To-Do ──────────────────────────────────────────────────────────────
 
+type TodoItemType = 'overdue_followup' | 'voicemail_callback' | 'assigned_uncalled';
+interface TodoItem { type: TodoItemType; contactId: string; name: string; detail: string; completed: boolean; }
+
 function DailyTodo({ contacts, callLogs, currentUser, assignments, completed, onToggle }: {
-  contacts: AlumniContact[];
+  contacts: MergedAlumni[];
   callLogs: Record<string, CallLog>;
   currentUser: string;
   assignments: Assignment[];
@@ -364,10 +376,9 @@ function DailyTodo({ contacts, callLogs, currentUser, assignments, completed, on
   const t = today();
   const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
   const todos: TodoItem[] = [];
-
   for (const c of contacts) {
     const log = callLogs[c.id];
-    const name = `${c.first_name} ${c.last_name}`;
+    const name = c.full_name;
     if (log?.followUpDate && !log.followUpCompleted && isOverdue(log.followUpDate)) {
       todos.push({ type: 'overdue_followup', contactId: c.id, name, detail: `Follow-up was due ${log.followUpDate}`, completed: completed.includes(`fu_${c.id}`) });
     }
@@ -375,7 +386,6 @@ function DailyTodo({ contacts, callLogs, currentUser, assignments, completed, on
       todos.push({ type: 'voicemail_callback', contactId: c.id, name, detail: `Voicemail sent ${new Date(log.calledAt).toLocaleDateString()}`, completed: completed.includes(`vm_${c.id}`) });
     }
   }
-
   const myAssign = assignments.find(a => a.name === currentUser);
   if (myAssign) {
     const calledByMe = Object.values(callLogs).filter(l => l.calledBy === currentUser && l.calledAt?.slice(0, 10) === t).length;
@@ -383,27 +393,20 @@ function DailyTodo({ contacts, callLogs, currentUser, assignments, completed, on
       todos.push({ type: 'assigned_uncalled', contactId: '', name: `${myAssign.count - calledByMe} calls remaining`, detail: `You have ${myAssign.count - calledByMe} assigned calls left today`, completed: completed.includes('quota') });
     }
   }
-
   if (todos.length === 0) return null;
-
-  const pending = todos.filter(t => !t.completed).length;
-  const typeConfig = {
-    overdue_followup:  { icon: <AlertCircle size={13} />, color: '#b91c1c', bg: '#fee2e2', label: 'Overdue Follow-Up' },
-    voicemail_callback:{ icon: <Voicemail size={13} />,   color: '#1d4ed8', bg: '#dbeafe', label: 'Voicemail Callback' },
-    assigned_uncalled: { icon: <Users size={13} />,       color: '#d97706', bg: '#fef3c7', label: 'Assigned' },
+  const pending = todos.filter(td => !td.completed).length;
+  const typeConfig: Record<TodoItemType, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
+    overdue_followup:   { icon: <AlertCircle size={13} />, color: '#b91c1c', bg: '#fee2e2', label: 'Overdue Follow-Up' },
+    voicemail_callback: { icon: <Voicemail size={13} />,   color: '#1d4ed8', bg: '#dbeafe', label: 'Voicemail Callback' },
+    assigned_uncalled:  { icon: <Users size={13} />,       color: '#d97706', bg: '#fef3c7', label: 'Assigned' },
   };
-
   return (
     <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, marginBottom: '1.5rem', overflow: 'hidden' }}>
       <button onClick={() => setOpen(o => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Bell size={16} style={{ color: '#d97706' }} />
           <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#111827' }}>Daily To-Do</span>
-          {pending > 0 && (
-            <span style={{ fontSize: '0.7rem', background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 9999, fontWeight: 600 }}>
-              {pending} pending
-            </span>
-          )}
+          {pending > 0 && <span style={{ fontSize: '0.7rem', background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 9999, fontWeight: 600 }}>{pending} pending</span>}
         </div>
         {open ? <ChevronUp size={16} style={{ color: '#9ca3af' }} /> : <ChevronDown size={16} style={{ color: '#9ca3af' }} />}
       </button>
@@ -435,84 +438,311 @@ function DailyTodo({ contacts, callLogs, currentUser, assignments, completed, on
   );
 }
 
-// ─── Contact Card ─────────────────────────────────────────────────────────────
+// ─── Contact Card (V3) ────────────────────────────────────────────────────────
 
-function ContactCard({ contact, log, claim, onClick }: {
-  contact: AlumniContact;
+function ContactCard({ contact, log, claim, onCallClick }: {
+  contact: MergedAlumni;
   log: CallLog | undefined;
   claim: Claim | undefined;
-  onClick: () => void;
+  onCallClick: () => void;
 }) {
-  const name = `${contact.first_name} ${contact.last_name}`;
-  const year = contact.grad_year || contact.year;
   const overdueFollowUp = log?.followUpDate && !log.followUpCompleted && isOverdue(log.followUpDate);
-
   return (
-    <div
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onClick()}
-      style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '12px 14px', cursor: 'pointer', opacity: log?.status === 'declined' ? 0.65 : 1, transition: 'border-color 0.15s' }}
+    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px', transition: 'border-color 0.15s', opacity: log?.status === 'declined' ? 0.65 : 1 }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = '#9ca3af')}
       onMouseLeave={e => (e.currentTarget.style.borderColor = '#E5E7EB')}
     >
-      {/* Name + year */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-        <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827' }}>{name}</span>
-        {year && <span style={{ fontSize: '0.7rem', color: '#9ca3af', flexShrink: 0 }}>&apos;{String(year).slice(-2)}</span>}
+      {/* Top: avatar + name/meta */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+        <AvatarImg avatarUrl={contact.avatar_url} name={contact.full_name} size={44} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827', lineHeight: 1.3 }}>{contact.full_name}</span>
+            {contact.grad_year && <span style={{ fontSize: '0.7rem', color: '#9ca3af', flexShrink: 0 }}>&apos;{String(contact.grad_year).slice(-2)}</span>}
+          </div>
+          {contact.member_status && <div style={{ fontSize: '0.73rem', color: '#6b7280', marginTop: 1 }}>{contact.member_status}</div>}
+          {contact.location && <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: 1 }}>📍 {contact.location}</div>}
+          {contact.chapter_name && <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: 1 }}>🏛️ {contact.chapter_name}</div>}
+        </div>
       </div>
 
-      {/* Major */}
-      {contact.major && (
-        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 2 }}>{contact.major}</div>
-      )}
-
-      {/* Location */}
-      {contact.location_city && (
-        <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 2 }}>{contact.location_city}</div>
-      )}
-
-      {/* Note preview */}
-      {log?.notes && (
-        <div style={{ fontSize: '0.75rem', color: '#374151', marginTop: 6, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {log.notes}
-        </div>
-      )}
+      {/* Phone */}
+      {contact.phone && <div style={{ fontSize: '0.8rem', color: '#374151', fontWeight: 500, marginBottom: 8 }}>📞 {fmtPhone(contact.phone)}</div>}
 
       {/* Tags */}
       {log?.tags && log.tags.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           {log.tags.slice(0, 3).map(t => <TagPill key={t} tag={t} />)}
           {log.tags.length > 3 && <span style={{ fontSize: '0.7rem', color: '#9ca3af', alignSelf: 'center' }}>+{log.tags.length - 3}</span>}
         </div>
       )}
 
+      {/* Notes preview */}
+      {log?.notes && <div style={{ fontSize: '0.75rem', color: '#374151', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 8 }}>{log.notes}</div>}
+
       {/* Follow-up */}
       {log?.followUpDate && (
-        <div style={{ fontSize: '0.7rem', fontWeight: 600, marginTop: 6, padding: '2px 8px', borderRadius: 9999, display: 'inline-block', background: overdueFollowUp ? '#fef3c7' : '#f0fdf4', color: overdueFollowUp ? '#92400e' : '#15803d' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 600, marginBottom: 8, padding: '2px 8px', borderRadius: 9999, display: 'inline-block', background: overdueFollowUp ? '#fef3c7' : '#f0fdf4', color: overdueFollowUp ? '#92400e' : '#15803d' }}>
           {overdueFollowUp ? '⚠️ ' : '📅 '}Follow-up: {log.followUpDate}
         </div>
       )}
 
-      {/* Claim */}
-      {claim && (
-        <div style={{ marginTop: 6, fontSize: '0.7rem', color: '#6b7280', fontStyle: 'italic' }}>
-          🔒 Claimed by {claim.claimedBy} — {Math.round((Date.now() - new Date(claim.claimedAt).getTime()) / 60000)}m ago
-        </div>
-      )}
+      {/* Claim badge */}
+      {claim && <div style={{ fontSize: '0.7rem', color: '#6b7280', fontStyle: 'italic', marginBottom: 8 }}>🔒 Claimed by {claim.claimedBy} — {Math.round((Date.now() - new Date(claim.claimedAt).getTime()) / 60000)}m ago</div>}
+
+      {/* THE Call Button */}
+      <button
+        onClick={onCallClick}
+        style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+      >
+        <Phone size={16} /> Call
+      </button>
     </div>
+  );
+}
+
+// ─── Call Prompt Modal ────────────────────────────────────────────────────────
+
+function CallPromptModal({ contact, currentUser, onAnswered, onVoicemailSaved, onDeclined, onClose }: {
+  contact: MergedAlumni;
+  currentUser: string;
+  onAnswered: () => void;
+  onVoicemailSaved: (note: string) => void;
+  onDeclined: () => void;
+  onClose: () => void;
+}) {
+  const [phase, setPhase] = useState<'prompt' | 'voicemail'>('prompt');
+  const [vmNote, setVmNote] = useState('');
+
+  useEffect(() => {
+    writeClaim(contact.id, currentUser);
+  }, [contact.id, currentUser]);
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 49 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: 'white', borderRadius: 20, padding: '28px 28px 24px', width: 400, maxWidth: '92vw', zIndex: 50, boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+          <div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
+              <AvatarImg avatarUrl={contact.avatar_url} name={contact.full_name} size={36} />
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>{contact.full_name}</h3>
+            </div>
+            {contact.phone ? (
+              <a href={`tel:${contact.phone}`} style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <Phone size={14} /> {fmtPhone(contact.phone)}
+              </a>
+            ) : (
+              <span style={{ fontSize: '0.8rem', color: '#d1d5db' }}>No phone number</span>
+            )}
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}><X size={20} /></button>
+        </div>
+
+        {phase === 'prompt' ? (
+          <>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: '0 0 16px' }}>What happened on this call?</p>
+
+            {/* Answered */}
+            <button onClick={onAnswered}
+              style={{ width: '100%', padding: '16px', borderRadius: 12, border: '2px solid #86efac', background: '#f0fdf4', color: '#15803d', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'inherit', marginBottom: 10, textAlign: 'left' }}
+            >
+              <PhoneCall size={22} />
+              <div>
+                <div>Answered</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 400, color: '#4ade80', marginTop: 2 }}>Log the conversation</div>
+              </div>
+            </button>
+
+            {/* Voicemail */}
+            <button onClick={() => setPhase('voicemail')}
+              style={{ width: '100%', padding: '16px', borderRadius: 12, border: '2px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'inherit', marginBottom: 10, textAlign: 'left' }}
+            >
+              <Voicemail size={22} />
+              <div>
+                <div>Voicemail</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 400, color: '#60a5fa', marginTop: 2 }}>Moves to Voicemail Sent column</div>
+              </div>
+            </button>
+
+            {/* Declined */}
+            <button onClick={onDeclined}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1.5px solid #fca5a5', background: 'transparent', color: '#b91c1c', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+            >
+              Asked not to be contacted → Decline
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <button onClick={() => setPhase('prompt')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9ca3af', display: 'flex' }}>
+                <ChevronDown size={16} style={{ transform: 'rotate(90deg)' }} />
+              </button>
+              <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>🔔 Left a Voicemail</p>
+            </div>
+            <textarea
+              value={vmNote}
+              onChange={e => setVmNote(e.target.value)}
+              placeholder="Optional quick note… (e.g. left VM about joining the platform)"
+              rows={3}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', marginBottom: 12 }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setPhase('prompt')} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: '#374151', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Back</button>
+              <button onClick={() => onVoicemailSaved(vmNote)}
+                style={{ flex: 2, padding: '10px', borderRadius: 8, background: '#1d4ed8', color: '#fff', fontSize: '0.875rem', fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Save Voicemail
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── Logging Panel (Answered) ─────────────────────────────────────────────────
+
+function LoggingPanel({ panel, currentUser, onClose, onSave, onChange }: {
+  panel: LoggingState;
+  currentUser: string;
+  onClose: () => void;
+  onSave: () => void;
+  onChange: (u: Partial<LoggingState>) => void;
+}) {
+  const c = panel.contact;
+  const followUpText = `Hey ${c.first_name}, great talking today! Here's the link to join: [chapter join link]. Would love for you to share it with other alumni too.`;
+  function toggleTag(tag: string) {
+    if (panel.tags.includes(tag)) onChange({ tags: panel.tags.filter(t => t !== tag) });
+    else onChange({ tags: [...panel.tags, tag] });
+  }
+  function addCustomTag(tag: string) {
+    const t = tag.trim();
+    if (!t || panel.tags.includes(t)) { onChange({ tagInput: '' }); return; }
+    onChange({ tags: [...panel.tags, t], tagInput: '' });
+  }
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 49 }} />
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 440, maxWidth: '100vw', background: 'white', zIndex: 50, boxShadow: '-4px 0 32px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0, background: 'white', position: 'sticky', top: 0, zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <AvatarImg avatarUrl={c.avatar_url} name={c.full_name} size={44} />
+              <div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', margin: '0 0 2px' }}>{c.full_name}</h2>
+                {c.grad_year && <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Class of &apos;{String(c.grad_year).slice(-2)}</span>}
+                {c.location && <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>📍 {c.location}</div>}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#9ca3af', display: 'flex', flexShrink: 0 }}><X size={20} /></button>
+          </div>
+          <div style={{ marginTop: 10, padding: '6px 12px', background: '#f0fdf4', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <PhoneCall size={14} style={{ color: '#15803d' }} />
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d' }}>✅ They Answered — Log It</span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Notes */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Notes</label>
+            <textarea
+              value={panel.notes}
+              onChange={e => onChange({ notes: e.target.value })}
+              placeholder="What did you talk about? Industry, hiring, open to connecting, what chapter they were in..."
+              rows={4}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', color: '#111827', background: '#fff', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Tags — the gold 🏆</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              {PREDEFINED_TAGS.map(pt => {
+                const sel = panel.tags.includes(pt.label);
+                return (
+                  <button key={pt.label} onClick={() => toggleTag(pt.label)}
+                    style={{ padding: '7px 13px', borderRadius: 9999, border: sel ? `2px solid ${pt.color}` : '1.5px solid #E5E7EB', background: sel ? pt.bg : '#fff', color: sel ? pt.color : '#6b7280', fontSize: '0.8125rem', fontWeight: sel ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}
+                  >
+                    {sel && '✓ '}{pt.label}
+                  </button>
+                );
+              })}
+            </div>
+            {panel.tags.filter(t => !PREDEFINED_TAGS.map(p => p.label).includes(t)).length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                {panel.tags.filter(t => !PREDEFINED_TAGS.map(p => p.label).includes(t)).map(t => (
+                  <TagPill key={t} tag={t} onRemove={() => onChange({ tags: panel.tags.filter(x => x !== t) })} />
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="text" value={panel.tagInput} onChange={e => onChange({ tagInput: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addCustomTag(panel.tagInput); } }}
+                placeholder="Custom tag… (press Enter)"
+                style={{ padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.8125rem', outline: 'none', flex: 1, fontFamily: 'inherit' }}
+              />
+              <button onClick={() => addCustomTag(panel.tagInput)} style={{ padding: '6px 12px', background: '#f3f4f6', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.8125rem', cursor: 'pointer', color: '#374151', fontFamily: 'inherit' }}>Add</button>
+            </div>
+          </div>
+
+          {/* Follow-up */}
+          <div>
+            <button onClick={() => onChange({ followUp: !panel.followUp })}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: panel.followUp ? '#2563eb' : '#6b7280', fontSize: '0.875rem', fontWeight: 600, padding: 0, fontFamily: 'inherit' }}
+            >
+              {panel.followUp ? <CheckSquare size={16} /> : <Square size={16} />}
+              Schedule follow-up
+            </button>
+            {panel.followUp && (
+              <input type="date" value={panel.followUpDate} onChange={e => onChange({ followUpDate: e.target.value })}
+                style={{ display: 'block', marginTop: 8, padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: '#fff', fontFamily: 'inherit' }}
+              />
+            )}
+          </div>
+
+          {/* Follow-up text */}
+          <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 14px' }}>
+            <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', margin: '0 0 6px', letterSpacing: '0.04em' }}>Follow-Up Text Template</p>
+            <p style={{ fontSize: '0.8125rem', color: '#374151', margin: '0 0 10px', lineHeight: 1.5 }}>{followUpText}</p>
+            <button onClick={() => { try { navigator.clipboard.writeText(followUpText); } catch {} }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'white', border: '1px solid #86efac', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600, color: '#15803d', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <MessageSquare size={12} /> Copy Text
+            </button>
+          </div>
+
+          {/* Save */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: '#374151', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+            <button onClick={onSave} disabled={panel.saving}
+              style={{ flex: 2, padding: '10px', borderRadius: 8, background: panel.saving ? '#e5e7eb' : '#0F172A', color: panel.saving ? '#9ca3af' : '#fff', fontSize: '0.875rem', fontWeight: 600, border: 'none', cursor: panel.saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit' }}
+            >
+              {panel.saving ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />Saving...</> : 'Save & Close'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 
-function KanbanColumn({ status, contacts, callLogs, claims, onCardClick }: {
+function KanbanColumn({ status, contacts, callLogs, claims, onCallClick }: {
   status: ColumnStatus;
-  contacts: AlumniContact[];
+  contacts: MergedAlumni[];
   callLogs: Record<string, CallLog>;
   claims: Record<string, Claim>;
-  onCardClick: (c: AlumniContact) => void;
+  onCallClick: (c: MergedAlumni) => void;
 }) {
   const cfg = COLUMN_CONFIG[status];
   return (
@@ -525,223 +755,289 @@ function KanbanColumn({ status, contacts, callLogs, claims, onCardClick }: {
         {contacts.length === 0 ? (
           <div style={{ padding: '24px 0', textAlign: 'center', color: '#d1d5db', fontSize: '0.8125rem' }}>No contacts</div>
         ) : contacts.map(c => (
-          <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} onClick={() => onCardClick(c)} />
+          <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} onCallClick={() => onCallClick(c)} />
         ))}
       </div>
     </div>
   );
 }
 
-// ─── Slide-Out Panel ──────────────────────────────────────────────────────────
+// ─── The Web: Network Visualization ──────────────────────────────────────────
 
-function SlideOutPanel({ panel, currentUser, onClose, onStatusChange, onSaveLog, onStartCall, onChange }: {
-  panel: SlidePanel;
-  currentUser: string;
-  onClose: () => void;
-  onStatusChange: (s: ColumnStatus) => void;
-  onSaveLog: () => void;
-  onStartCall: () => void;
-  onChange: (u: Partial<SlidePanel>) => void;
-}) {
-  const c = panel.contact;
-  const name = `${c.first_name} ${c.last_name}`;
-  const year = c.grad_year || c.year;
-  const phone = c.phone_primary || c.phone_secondary;
-  const followUpText = `Hey ${c.first_name}, great talking today! Here's the link to join: [chapter join link]. Would love for you to share it with other alumni too.`;
+function computeWebGraph(callLogs: Record<string, CallLog>): { nodes: WebNode[]; edges: WebEdge[] } {
+  const calledLogs = Object.values(callLogs).filter(l => l.status === 'called' && l.contactSnapshot);
+  if (calledLogs.length === 0) return { nodes: [], edges: [] };
 
-  function toggleTag(tag: string) {
-    if (panel.tags.includes(tag)) onChange({ tags: panel.tags.filter(t => t !== tag) });
-    else onChange({ tags: [...panel.tags, tag] });
+  const nodeData = calledLogs.map(log => ({
+    id: log.contactId,
+    name: log.contactSnapshot!.name,
+    avatarUrl: log.contactSnapshot!.avatarUrl,
+    tags: log.tags,
+    location: log.contactSnapshot!.location,
+    gradYear: log.contactSnapshot!.gradYear,
+    memberStatus: log.contactSnapshot!.memberStatus,
+    chapterName: log.contactSnapshot!.chapterName,
+    notes: log.notes,
+  }));
+
+  // Compute edges
+  const edges: WebEdge[] = [];
+  for (let i = 0; i < nodeData.length; i++) {
+    for (let j = i + 1; j < nodeData.length; j++) {
+      const a = nodeData[i], b = nodeData[j];
+      let added = false;
+      for (const tag of a.tags) {
+        if (!added && b.tags.includes(tag)) {
+          const type: 'industry' | 'interest' = INDUSTRY_TAGS.includes(tag) ? 'industry' : 'interest';
+          edges.push({ from: a.id, to: b.id, type, sharedTag: tag });
+          added = true;
+          break;
+        }
+      }
+      if (!added && a.location && b.location) {
+        const cityA = a.location.split(',')[0].trim().toLowerCase();
+        const cityB = b.location.split(',')[0].trim().toLowerCase();
+        if (cityA && cityA === cityB) edges.push({ from: a.id, to: b.id, type: 'city', sharedTag: cityA });
+      }
+    }
   }
-  function addCustomTag(tag: string) {
-    const t = tag.trim();
-    if (!t || panel.tags.includes(t)) { onChange({ tagInput: '' }); return; }
-    onChange({ tags: [...panel.tags, t], tagInput: '' });
+
+  const connCount: Record<string, number> = {};
+  nodeData.forEach(nd => { connCount[nd.id] = 0; });
+  edges.forEach(e => { connCount[e.from] = (connCount[e.from] || 0) + 1; connCount[e.to] = (connCount[e.to] || 0) + 1; });
+
+  const sorted = [...nodeData].sort((a, b) => (connCount[b.id] || 0) - (connCount[a.id] || 0));
+  const total = sorted.length;
+  const cx = 400, cy = 410;
+  const ringRadii = [155, 255, 355];
+
+  // Group into rings
+  const rings: (typeof sorted)[] = [[], [], []];
+  sorted.forEach((nd, i) => {
+    const pct = total <= 1 ? 0 : i / (total - 1);
+    const rIdx = pct < 0.34 ? 0 : pct < 0.67 ? 1 : 2;
+    rings[rIdx].push(nd);
+  });
+
+  const nodes: WebNode[] = [];
+  rings.forEach((ring, rIdx) => {
+    ring.forEach((nd, i) => {
+      const angle = ring.length === 1 ? -Math.PI / 2 : (i / ring.length) * 2 * Math.PI - Math.PI / 2;
+      const r = ringRadii[rIdx];
+      nodes.push({
+        ...nd,
+        x: cx + r * Math.cos(angle),
+        y: cy + r * Math.sin(angle),
+        radius: Math.min(22, 12 + (nd.tags.length * 2)),
+        connectionCount: connCount[nd.id] || 0,
+      });
+    });
+  });
+
+  return { nodes, edges };
+}
+
+function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
+  const [selectedNode, setSelectedNode] = useState<WebNode | null>(null);
+  const [copied, setCopied] = useState('');
+  const { nodes, edges } = useMemo(() => computeWebGraph(callLogs), [callLogs]);
+
+  const suggestions = useMemo(() => {
+    if (!selectedNode) return [];
+    return nodes.filter(n => n.id !== selectedNode.id && n.tags.some(t => selectedNode.tags.includes(t)));
+  }, [selectedNode, nodes]);
+
+  if (nodes.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 24px', color: '#9ca3af', background: 'white', border: '1px solid #E5E7EB', borderRadius: 16 }}>
+        <Share2 size={56} style={{ margin: '0 auto 16px', opacity: 0.2, display: 'block' }} />
+        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#374151', margin: '0 0 8px' }}>The Web is empty</h3>
+        <p style={{ margin: 0, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto' }}>
+          Call alumni and log them as &ldquo;Answered&rdquo; to start building your network graph. Each call adds a node.
+        </p>
+      </div>
+    );
   }
+
+  const SVG_W = 800, SVG_H = 820;
+  const cx = 400, cy = 410;
 
   return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 49 }} />
-      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, maxWidth: '100vw', background: 'white', zIndex: 50, boxShadow: '-4px 0 32px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+    <div style={{ display: 'flex', background: 'white', border: '1px solid #E5E7EB', borderRadius: 16, overflow: 'hidden' }}>
+      {/* SVG Canvas */}
+      <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', height: 600, display: 'block' }}>
+          {/* All clip paths */}
+          <defs>
+            {nodes.map(n => (
+              <clipPath key={`clip-${n.id}`} id={`clip-${n.id}`}>
+                <circle cx={n.x} cy={n.y} r={n.radius} />
+              </clipPath>
+            ))}
+          </defs>
 
-        {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0, background: 'white', position: 'sticky', top: 0, zIndex: 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#111827', margin: '0 0 2px 0' }}>{name}</h2>
-              {year && <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>Class of &apos;{String(year).slice(-2)}</span>}
+          {/* Edges */}
+          {edges.map((edge, i) => {
+            const fn = nodes.find(n => n.id === edge.from);
+            const tn = nodes.find(n => n.id === edge.to);
+            if (!fn || !tn) return null;
+            const hi = selectedNode && (selectedNode.id === edge.from || selectedNode.id === edge.to);
+            return (
+              <line key={i} x1={fn.x} y1={fn.y} x2={tn.x} y2={tn.y}
+                stroke={EDGE_COLORS[edge.type]} strokeWidth={hi ? 2 : 1}
+                strokeOpacity={hi ? 0.8 : 0.2}
+              />
+            );
+          })}
+
+          {/* Center hub */}
+          <circle cx={cx} cy={cy} r={44} fill="#0F172A" />
+          <text x={cx} y={cy - 5} textAnchor="middle" fill="white" fontSize={11} fontWeight="700">Trail</text>
+          <text x={cx} y={cy + 9} textAnchor="middle" fill="white" fontSize={11} fontWeight="700">blaize</text>
+
+          {/* Nodes */}
+          {nodes.map(node => {
+            const isSel = selectedNode?.id === node.id;
+            const bgColors = ['#0F172A', '#1d4ed8', '#0d9488', '#7c3aed', '#db2777'];
+            const bg = bgColors[(node.name.charCodeAt(0) || 0) % bgColors.length];
+            const initials = getInitials(node.name);
+            return (
+              <g key={node.id} onClick={() => setSelectedNode(isSel ? null : node)} style={{ cursor: 'pointer' }}>
+                {/* Initials background */}
+                <circle cx={node.x} cy={node.y} r={node.radius} fill={bg} />
+                <text x={node.x} y={node.y + node.radius * 0.35} textAnchor="middle" fill="white" fontSize={node.radius * 0.7} fontWeight="600" style={{ pointerEvents: 'none', userSelect: 'none' }}>{initials}</text>
+                {/* Avatar on top (fails silently if CORS) */}
+                {node.avatarUrl && (
+                  <image href={node.avatarUrl} x={node.x - node.radius} y={node.y - node.radius} width={node.radius * 2} height={node.radius * 2} clipPath={`url(#clip-${node.id})`} />
+                )}
+                {/* Border ring */}
+                <circle cx={node.x} cy={node.y} r={node.radius} fill="none" stroke={isSel ? '#0F172A' : 'white'} strokeWidth={isSel ? 3 : 2} />
+                {/* Name label */}
+                <text x={node.x} y={node.y + node.radius + 14} textAnchor="middle" fill="#374151" fontSize={10} style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                  {node.name.split(' ')[0]}
+                </text>
+                {/* Connection count badge */}
+                {node.connectionCount > 0 && (
+                  <>
+                    <circle cx={node.x + node.radius - 4} cy={node.y - node.radius + 4} r={8} fill="#10b981" />
+                    <text x={node.x + node.radius - 4} y={node.y - node.radius + 8} textAnchor="middle" fill="white" fontSize={8} fontWeight="700" style={{ pointerEvents: 'none' }}>{node.connectionCount}</text>
+                  </>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Legend */}
+        <div style={{ position: 'absolute', bottom: 16, left: 16, display: 'flex', gap: 16, background: 'rgba(255,255,255,0.95)', padding: '8px 14px', borderRadius: 10, border: '1px solid #E5E7EB', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+          {[{ type: 'industry', label: 'Industry' }, { type: 'city', label: 'City' }, { type: 'interest', label: 'Interest' }].map(leg => (
+            <div key={leg.type} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: '#374151', fontWeight: 600 }}>
+              <div style={{ width: 20, height: 2, background: EDGE_COLORS[leg.type as keyof typeof EDGE_COLORS], borderRadius: 1 }} />
+              {leg.label}
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#9ca3af', display: 'flex', flexShrink: 0 }}>
-              <X size={20} />
-            </button>
-          </div>
-          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {c.major && <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>{c.major}</div>}
-            {c.location_city && <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>📍 {c.location_city}</div>}
-            {phone ? (
-              <a href={`tel:${phone}`} onClick={onStartCall} style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <Phone size={15} />
-                {fmtPhone(phone)}
-              </a>
-            ) : (
-              <span style={{ fontSize: '0.8rem', color: '#d1d5db', marginTop: 4 }}>No phone number</span>
-            )}
-          </div>
+          ))}
+          <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{nodes.length} called alumni</div>
         </div>
 
-        {/* Body */}
-        <div style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {panel.phase === 'actions' ? (
-            <div>
-              <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>What happened on this call?</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* Voicemail */}
-                <button
-                  onClick={() => onStatusChange('voicemail')}
-                  style={{ padding: '14px 16px', borderRadius: 10, border: '1.5px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'inherit', textAlign: 'left' }}
-                >
-                  <Voicemail size={20} />
-                  <div>
-                    <div>No Answer / Voicemail</div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 400, color: '#60a5fa', marginTop: 2 }}>Moves to Voicemail Sent column</div>
-                  </div>
-                </button>
-                {/* Answered */}
-                <button
-                  onClick={() => onChange({ phase: 'logging' })}
-                  style={{ padding: '14px 16px', borderRadius: 10, border: '1.5px solid #86efac', background: '#f0fdf4', color: '#15803d', fontWeight: 600, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'inherit', textAlign: 'left' }}
-                >
-                  <PhoneCall size={20} />
-                  <div>
-                    <div>Answered</div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 400, color: '#4ade80', marginTop: 2 }}>Log the conversation</div>
-                  </div>
-                </button>
-                {/* Declined */}
-                <button
-                  onClick={() => onStatusChange('declined')}
-                  style={{ padding: '14px 16px', borderRadius: 10, border: '1.5px solid #fca5a5', background: '#fff1f2', color: '#b91c1c', fontWeight: 600, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'inherit', textAlign: 'left' }}
-                >
-                  <PhoneOff size={20} />
-                  <div>
-                    <div>Declined</div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 400, color: '#f87171', marginTop: 2 }}>Asked not to be contacted</div>
-                  </div>
-                </button>
+        {/* Click hint */}
+        {!selectedNode && (
+          <div style={{ position: 'absolute', bottom: 16, right: 16, fontSize: '0.72rem', color: '#9ca3af', background: 'rgba(255,255,255,0.95)', padding: '6px 10px', borderRadius: 8, border: '1px solid #E5E7EB' }}>
+            Click a node to explore connections
+          </div>
+        )}
+      </div>
+
+      {/* Sidebar */}
+      {selectedNode && (
+        <div style={{ width: 320, borderLeft: '1px solid #E5E7EB', overflowY: 'auto', maxHeight: 600, flexShrink: 0 }}>
+          <div style={{ padding: '20px 20px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <AvatarImg avatarUrl={selectedNode.avatarUrl} name={selectedNode.name} size={48} />
+                <div>
+                  <h3 style={{ margin: '0 0 2px', fontSize: '1rem', fontWeight: 700, color: '#111827' }}>{selectedNode.name}</h3>
+                  {selectedNode.memberStatus && <div style={{ fontSize: '0.73rem', color: '#6b7280' }}>{selectedNode.memberStatus}</div>}
+                  {selectedNode.location && <div style={{ fontSize: '0.73rem', color: '#9ca3af' }}>📍 {selectedNode.location}</div>}
+                  {selectedNode.gradYear && <div style={{ fontSize: '0.73rem', color: '#9ca3af' }}>Class of &apos;{String(selectedNode.gradYear).slice(-2)}</div>}
+                  {selectedNode.chapterName && <div style={{ fontSize: '0.73rem', color: '#6b7280' }}>🏛️ {selectedNode.chapterName}</div>}
+                </div>
               </div>
+              <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex', flexShrink: 0 }}><X size={18} /></button>
             </div>
-          ) : (
-            /* Logging Form */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={() => onChange({ phase: 'actions' })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', padding: 0 }}>
-                  <ChevronDown size={16} style={{ transform: 'rotate(90deg)' }} />
-                </button>
-                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>✅ They Answered — Log It</p>
-              </div>
 
-              {/* Notes */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Notes</label>
-                <textarea
-                  value={panel.notes}
-                  onChange={e => onChange({ notes: e.target.value })}
-                  placeholder="What did you talk about? What did they say? Industry, hiring, open to connecting..."
-                  rows={4}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', color: '#111827', background: '#fff', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                />
+            {/* Tags */}
+            {selectedNode.tags.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Tags</p>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {selectedNode.tags.map(t => <TagPill key={t} tag={t} />)}
+                </div>
               </div>
+            )}
 
-              {/* Tags — the gold */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                  Tags — the gold 🏆
-                </label>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                  {PREDEFINED_TAGS.map(pt => {
-                    const sel = panel.tags.includes(pt.label);
+            {/* Notes */}
+            {selectedNode.notes && (
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Call Notes</p>
+                <p style={{ fontSize: '0.8125rem', color: '#374151', margin: 0, fontStyle: 'italic', lineHeight: 1.5 }}>{selectedNode.notes}</p>
+              </div>
+            )}
+
+            {/* Connections stat */}
+            <div style={{ marginBottom: 16, padding: '8px 12px', background: '#f9fafb', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Share2 size={14} style={{ color: '#10b981' }} />
+              <span style={{ fontSize: '0.8rem', color: '#374151', fontWeight: 600 }}>{selectedNode.connectionCount} connection{selectedNode.connectionCount !== 1 ? 's' : ''} in the Web</span>
+            </div>
+
+            {/* Suggested connections */}
+            {suggestions.length > 0 && (
+              <div style={{ paddingBottom: 20 }}>
+                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px' }}>Suggested Connections ({suggestions.length})</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {suggestions.slice(0, 8).map(s => {
+                    const sharedTags = s.tags.filter(t => selectedNode.tags.includes(t));
+                    const sharedCity = s.location && selectedNode.location &&
+                      s.location.split(',')[0].trim().toLowerCase() === selectedNode.location.split(',')[0].trim().toLowerCase();
+                    const context = sharedTags.length > 0 ? `in ${sharedTags[0]}` : sharedCity ? `in ${s.location?.split(',')[0]}` : 'as Trailblaize alumni';
+                    const cityCtx = sharedCity ? ` in ${s.location?.split(',')[0]}` : '';
+                    const introMsg = `Hey ${selectedNode.name.split(' ')[0]}, I think you should connect with ${s.name} — you're both ${context}${cityCtx}. Would love to make that intro!`;
+                    const isCopied = copied === s.id;
                     return (
-                      <button
-                        key={pt.label}
-                        onClick={() => toggleTag(pt.label)}
-                        style={{ padding: '7px 13px', borderRadius: 9999, border: sel ? `2px solid ${pt.color}` : '1.5px solid #E5E7EB', background: sel ? pt.bg : '#fff', color: sel ? pt.color : '#6b7280', fontSize: '0.8125rem', fontWeight: sel ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}
-                      >
-                        {sel && '✓ '}{pt.label}
-                      </button>
+                      <div key={s.id} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: 10, border: '1px solid #E5E7EB' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                          <AvatarImg avatarUrl={s.avatarUrl} name={s.name} size={28} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827' }}>{s.name}</div>
+                            {sharedTags.length > 0 && <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Shared: {sharedTags.join(', ')}</div>}
+                            {sharedCity && !sharedTags.length && <div style={{ fontSize: '0.7rem', color: '#3b82f6' }}>Same city: {s.location?.split(',')[0]}</div>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            try { navigator.clipboard.writeText(introMsg); } catch {}
+                            setCopied(s.id);
+                            setTimeout(() => setCopied(''), 2500);
+                          }}
+                          style={{ width: '100%', padding: '6px', borderRadius: 6, border: `1px solid ${isCopied ? '#86efac' : '#d1d5db'}`, background: isCopied ? '#f0fdf4' : '#fff', color: isCopied ? '#15803d' : '#374151', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
+                        >
+                          {isCopied ? '✓ Message copied!' : '🤝 Introduce'}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
-                {/* Custom tags */}
-                {panel.tags.filter(t => !PREDEFINED_TAGS.map(p => p.label).includes(t)).length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-                    {panel.tags.filter(t => !PREDEFINED_TAGS.map(p => p.label).includes(t)).map(t => (
-                      <TagPill key={t} tag={t} onRemove={() => onChange({ tags: panel.tags.filter(x => x !== t) })} />
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    type="text"
-                    value={panel.tagInput}
-                    onChange={e => onChange({ tagInput: e.target.value })}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addCustomTag(panel.tagInput); } }}
-                    placeholder="Custom tag... (press Enter)"
-                    style={{ padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.8125rem', outline: 'none', flex: 1, fontFamily: 'inherit' }}
-                  />
-                  <button onClick={() => addCustomTag(panel.tagInput)} style={{ padding: '6px 12px', background: '#f3f4f6', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.8125rem', cursor: 'pointer', color: '#374151', fontFamily: 'inherit' }}>Add</button>
-                </div>
               </div>
-
-              {/* Follow-up */}
-              <div>
-                <button
-                  onClick={() => onChange({ followUp: !panel.followUp })}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: panel.followUp ? '#2563eb' : '#6b7280', fontSize: '0.875rem', fontWeight: 600, padding: 0, fontFamily: 'inherit' }}
-                >
-                  {panel.followUp ? <CheckSquare size={16} /> : <Square size={16} />}
-                  Schedule follow-up
-                </button>
-                {panel.followUp && (
-                  <input
-                    type="date"
-                    value={panel.followUpDate}
-                    onChange={e => onChange({ followUpDate: e.target.value })}
-                    style={{ display: 'block', marginTop: 8, padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: '#fff', fontFamily: 'inherit' }}
-                  />
-                )}
+            )}
+            {suggestions.length === 0 && (
+              <div style={{ paddingBottom: 20 }}>
+                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Suggested Connections</p>
+                <p style={{ fontSize: '0.8rem', color: '#9ca3af', margin: 0 }}>No shared tags or cities with other called alumni yet.</p>
               </div>
-
-              {/* Follow-up text */}
-              <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 14px' }}>
-                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', margin: '0 0 6px 0', letterSpacing: '0.04em' }}>Follow-Up Text Template</p>
-                <p style={{ fontSize: '0.8125rem', color: '#374151', margin: '0 0 10px 0', lineHeight: 1.5 }}>{followUpText}</p>
-                <button
-                  onClick={() => { try { navigator.clipboard.writeText(followUpText); } catch {} }}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'white', border: '1px solid #86efac', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600, color: '#15803d', cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                  <MessageSquare size={12} />
-                  Copy Text
-                </button>
-              </div>
-
-              {/* Save */}
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => onChange({ phase: 'actions' })} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: '#374151', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Back
-                </button>
-                <button
-                  onClick={onSaveLog}
-                  disabled={panel.saving}
-                  style={{ flex: 2, padding: '10px', borderRadius: 8, background: panel.saving ? '#e5e7eb' : '#0F172A', color: panel.saving ? '#9ca3af' : '#fff', fontSize: '0.875rem', fontWeight: 600, border: 'none', cursor: panel.saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit' }}
-                >
-                  {panel.saving ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />Saving...</> : 'Save & Close'}
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
 }
 
@@ -750,19 +1046,21 @@ function SlideOutPanel({ panel, currentUser, onClose, onStatusChange, onSaveLog,
 export default function ConnectsCenter() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedChapterId, setSelectedChapterId] = useState<string>('');
-  const [contacts, setContacts] = useState<AlumniContact[]>([]);
+  const [contacts, setContacts] = useState<MergedAlumni[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(true);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [activeView, setActiveView] = useState<ActiveView>('call_center');
 
-  // localStorage state — hydrated on mount
+  // localStorage state
   const [callLogs, setCallLogs] = useState<Record<string, CallLog>>({});
   const [claims, setClaims] = useState<Record<string, Claim>>({});
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [currentUser, setCurrentUserState] = useState<string>('Owen');
   const [todoCompleted, setTodoCompleted] = useState<string[]>([]);
 
-  // UI
-  const [slidePanel, setSlidePanel] = useState<SlidePanel | null>(null);
+  // UI state
+  const [callModal, setCallModal] = useState<MergedAlumni | null>(null);
+  const [loggingPanel, setLoggingPanel] = useState<LoggingState | null>(null);
 
   // Hydrate localStorage
   useEffect(() => {
@@ -773,7 +1071,7 @@ export default function ConnectsCenter() {
     setTodoCompleted(readTodoCompleted());
   }, []);
 
-  // Refresh claims every minute to auto-expire
+  // Refresh claims every 60s
   useEffect(() => {
     const id = setInterval(() => setClaims(readClaims()), 60_000);
     return () => clearInterval(id);
@@ -792,46 +1090,70 @@ export default function ConnectsCenter() {
     })();
   }, []);
 
-  // Load contacts
-  const loadContacts = useCallback(async (chapterId: string) => {
+  // Load contacts for a chapter (platform members only)
+  const loadContacts = useCallback(async (chapterId: string, chapterName?: string) => {
     setLoadingContacts(true);
     try {
-      const first = await fetch(`/api/alumni-contacts?chapter_id=${chapterId}&limit=1`);
-      const fj = await first.json();
-      const total: number = fj.data?.total ?? 500;
-      const ps = 500;
-      const all: AlumniContact[] = [];
-      for (let p = 0; p < Math.ceil(total / ps); p++) {
-        const res = await fetch(`/api/alumni-contacts?chapter_id=${chapterId}&limit=${ps}&offset=${p * ps}`);
-        const j = await res.json();
-        const batch: AlumniContact[] = j.data?.contacts ?? j.data ?? [];
-        all.push(...batch);
-        if (batch.length < ps) break;
+      if (chapterId === 'all') {
+        // Aggregate all chapters
+        const all: MergedAlumni[] = [];
+        const seen = new Set<string>();
+        await Promise.allSettled(
+          chapters.map(async ch => {
+            try {
+              const res = await fetch(`/api/chapters/${ch.id}/alumni?status=platform_joined&limit=1000&page=1`);
+              if (!res.ok) return;
+              const json = await res.json();
+              const members: MergedAlumni[] = json.members || [];
+              const cname = ch.fraternity || ch.chapter_name || '';
+              for (const m of members) {
+                if (!seen.has(m.id)) {
+                  seen.add(m.id);
+                  all.push({ ...m, chapter_name: cname });
+                }
+              }
+            } catch {}
+          })
+        );
+        setContacts(all);
+      } else {
+        const res = await fetch(`/api/chapters/${chapterId}/alumni?status=platform_joined&limit=1000&page=1`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const members: MergedAlumni[] = json.members || [];
+        setContacts(members.map(m => ({ ...m, chapter_name: chapterName })));
       }
-      setContacts(all);
     } catch (e) { console.error(e); }
     setLoadingContacts(false);
-  }, []);
+  }, [chapters]);
 
   useEffect(() => {
     if (selectedChapterId) {
-      setSlidePanel(null);
-      loadContacts(selectedChapterId);
+      const ch = chapters.find(c => c.id === selectedChapterId);
+      const name = ch ? (ch.fraternity || ch.chapter_name || '') : '';
+      setCallModal(null);
+      setLoggingPanel(null);
+      loadContacts(selectedChapterId, name);
     } else {
       setContacts([]);
     }
-  }, [selectedChapterId, loadContacts]);
+  }, [selectedChapterId, loadContacts, chapters]);
 
-  // Bucket contacts into columns
-  const cols: Record<ColumnStatus, AlumniContact[]> = { not_called: [], voicemail: [], called: [], declined: [] };
+  // Bucket contacts
+  const cols: Record<ColumnStatus, MergedAlumni[]> = { not_called: [], voicemail: [], called: [], declined: [] };
   for (const c of contacts) cols[getContactStatus(c, callLogs)].push(c);
 
-  // Open slide panel
-  function openPanel(contact: AlumniContact) {
-    const existing = callLogs[contact.id];
-    setSlidePanel({
-      contact,
-      phase: 'actions',
+  // Handle call button click
+  function handleCallClick(contact: MergedAlumni) {
+    setCallModal(contact);
+  }
+
+  // Handle "Answered" in call modal
+  function handleAnswered() {
+    if (!callModal) return;
+    const existing = callLogs[callModal.id];
+    setLoggingPanel({
+      contact: callModal,
       notes: existing?.notes || '',
       tags: existing?.tags || [],
       tagInput: '',
@@ -839,64 +1161,96 @@ export default function ConnectsCenter() {
       followUpDate: existing?.followUpDate || '',
       saving: false,
     });
+    setCallModal(null);
   }
 
-  // Quick status change (voicemail/declined — no notes needed)
-  async function handleStatusChange(status: ColumnStatus) {
-    if (!slidePanel) return;
-    const { contact } = slidePanel;
-    const log: CallLog = { contactId: contact.id, status, notes: '', tags: [], calledBy: currentUser, calledAt: new Date().toISOString() };
+  // Handle "Voicemail saved"
+  async function handleVoicemailSaved(note: string) {
+    if (!callModal) return;
+    const log: CallLog = {
+      contactId: callModal.id,
+      status: 'voicemail',
+      notes: note,
+      tags: [],
+      calledBy: currentUser,
+      calledAt: new Date().toISOString(),
+    };
     writeCallLog(log);
-    setCallLogs(prev => ({ ...prev, [contact.id]: log }));
-    setSlidePanel(null);
+    setCallLogs(prev => ({ ...prev, [callModal.id]: log }));
+    deleteClaim(callModal.id);
+    setCallModal(null);
     try {
-      await fetch(`/api/alumni-contacts/${contact.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ outreach_status: STATUS_MAP[status] }) });
-    } catch (e) { console.error(e); }
+      await fetch(`/api/alumni-contacts/${callModal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outreach_status: 'touch1_sent' }),
+      });
+    } catch {}
+  }
+
+  // Handle "Declined"
+  async function handleDeclined() {
+    if (!callModal) return;
+    const log: CallLog = {
+      contactId: callModal.id,
+      status: 'declined',
+      notes: '',
+      tags: [],
+      calledBy: currentUser,
+      calledAt: new Date().toISOString(),
+    };
+    writeCallLog(log);
+    setCallLogs(prev => ({ ...prev, [callModal.id]: log }));
+    deleteClaim(callModal.id);
+    setCallModal(null);
+    try {
+      await fetch(`/api/alumni-contacts/${callModal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outreach_status: 'opted_out' }),
+      });
+    } catch {}
   }
 
   // Save full call log (answered)
   async function saveLog() {
-    if (!slidePanel) return;
-    setSlidePanel(prev => prev ? { ...prev, saving: true } : prev);
-    const { contact } = slidePanel;
+    if (!loggingPanel) return;
+    setLoggingPanel(prev => prev ? { ...prev, saving: true } : prev);
+    const { contact } = loggingPanel;
+    const snapshot: ContactSnapshot = {
+      name: contact.full_name,
+      avatarUrl: contact.avatar_url,
+      location: contact.location,
+      gradYear: contact.grad_year,
+      memberStatus: contact.member_status,
+      chapterName: contact.chapter_name,
+    };
     const log: CallLog = {
       contactId: contact.id,
       status: 'called',
-      notes: slidePanel.notes,
-      tags: slidePanel.tags,
+      notes: loggingPanel.notes,
+      tags: loggingPanel.tags,
       calledBy: currentUser,
       calledAt: new Date().toISOString(),
-      followUpDate: slidePanel.followUp && slidePanel.followUpDate ? slidePanel.followUpDate : undefined,
+      followUpDate: loggingPanel.followUp && loggingPanel.followUpDate ? loggingPanel.followUpDate : undefined,
       followUpCompleted: false,
+      contactSnapshot: snapshot,
     };
     writeCallLog(log);
     setCallLogs(prev => ({ ...prev, [contact.id]: log }));
     deleteClaim(contact.id);
     setClaims(prev => { const n = { ...prev }; delete n[contact.id]; return n; });
-
     const tagsStr = log.tags.length ? `\nTags: ${log.tags.join(', ')}` : '';
     const fuStr = log.followUpDate ? `\nFollow-up: ${log.followUpDate}` : '';
     const responseText = `[answered] ${log.notes}${tagsStr}${fuStr}`.trim();
     try {
-      await fetch(`/api/alumni-contacts/${contact.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ outreach_status: STATUS_MAP['called'], response_text: responseText }) });
-    } catch (e) { console.error(e); }
-    setSlidePanel(null);
-  }
-
-  // Claim on phone tap
-  function handleStartCall() {
-    if (!slidePanel) return;
-    writeClaim(slidePanel.contact.id, currentUser);
-    setClaims(prev => ({ ...prev, [slidePanel.contact.id]: { contactId: slidePanel.contact.id, claimedBy: currentUser, claimedAt: new Date().toISOString() } }));
-  }
-
-  function handleAssignmentsUpdate(a: Assignment[]) {
-    writeAssignments(a);
-    setAssignments(a);
-  }
-
-  function handleTodoToggle(key: string) {
-    setTodoCompleted(toggleTodoDone(key));
+      await fetch(`/api/alumni-contacts/${contact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outreach_status: 'responded', response_text: responseText }),
+      });
+    } catch {}
+    setLoggingPanel(null);
   }
 
   function handleCurrentUserChange(name: string) {
@@ -916,124 +1270,148 @@ export default function ConnectsCenter() {
             </Link>
           </div>
           <div className="module-title-row">
-            <div className="module-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+            <div className="module-icon" style={{ backgroundColor: '#f0fdf4', color: '#15803d' }}>
               <Phone size={24} />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <h1>Connects Center</h1>
-                {/* Caller identity picker */}
+                {/* Calling as */}
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f9fafb', border: '1px solid #E5E7EB', borderRadius: 8, padding: '4px 10px' }}>
                   <User size={13} style={{ color: '#6b7280' }} />
                   <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Calling as:</span>
-                  <select
-                    value={currentUser}
-                    onChange={e => handleCurrentUserChange(e.target.value)}
+                  <select value={currentUser} onChange={e => handleCurrentUserChange(e.target.value)}
                     style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', background: 'none', border: 'none', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     {CALLER_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
+                {/* View Toggle */}
+                <div style={{ display: 'inline-flex', background: '#f3f4f6', borderRadius: 10, padding: 3, gap: 2 }}>
+                  <button onClick={() => setActiveView('call_center')}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: activeView === 'call_center' ? 'white' : 'transparent', color: activeView === 'call_center' ? '#111827' : '#6b7280', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer', fontFamily: 'inherit', boxShadow: activeView === 'call_center' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
+                  >
+                    📞 Call Center
+                  </button>
+                  <button onClick={() => setActiveView('web')}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: activeView === 'web' ? 'white' : 'transparent', color: activeView === 'web' ? '#111827' : '#6b7280', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer', fontFamily: 'inherit', boxShadow: activeView === 'web' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
+                  >
+                    🕸️ The Web
+                  </button>
+                </div>
               </div>
-              <p>Kanban call pipeline — log outcomes, build relationship intel, hit 100 calls/day.</p>
+              <p>Platform members only — one-tap calling, 4-column pipeline, 100 calls/day goal.</p>
             </div>
           </div>
         </div>
       </header>
 
       <main className="module-main">
+        {activeView === 'call_center' ? (
+          <>
+            {/* Goal Bar */}
+            <GoalBar callLogs={callLogs} assignments={assignments} />
 
-        {/* Goal Bar */}
-        <GoalBar callLogs={callLogs} assignments={assignments} />
+            {/* Assign Calls */}
+            <AssignCallsPanel assignments={assignments} callLogs={callLogs} onUpdate={a => { writeAssignments(a); setAssignments(a); }} />
 
-        {/* Assign Calls */}
-        <AssignCallsPanel assignments={assignments} callLogs={callLogs} onUpdate={handleAssignmentsUpdate} />
+            {/* Daily To-Do */}
+            {contacts.length > 0 && (
+              <DailyTodo contacts={contacts} callLogs={callLogs} currentUser={currentUser} assignments={assignments} completed={todoCompleted} onToggle={key => setTodoCompleted(toggleTodoDone(key))} />
+            )}
 
-        {/* Daily To-Do */}
-        {contacts.length > 0 && (
-          <DailyTodo
-            contacts={contacts}
-            callLogs={callLogs}
-            currentUser={currentUser}
-            assignments={assignments}
-            completed={todoCompleted}
-            onToggle={handleTodoToggle}
-          />
-        )}
-
-        {/* Chapter Selector */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px 0' }}>Select Chapter</p>
-          {loadingChapters ? (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {Array.from({ length: 4 }).map((_, i) => <div key={i} style={{ height: 56, width: 180, background: '#f3f4f6', borderRadius: 12, animation: 'pulse 1.5s infinite' }} />)}
+            {/* Chapter Selector */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px 0' }}>Select Chapter</p>
+              {loadingChapters ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {Array.from({ length: 4 }).map((_, i) => <div key={i} style={{ height: 56, width: 180, background: '#f3f4f6', borderRadius: 12, animation: 'pulse 1.5s infinite' }} />)}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {/* All Chapters */}
+                  <button
+                    onClick={() => setSelectedChapterId(selectedChapterId === 'all' ? '' : 'all')}
+                    style={{ padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${'all' === selectedChapterId ? '#0F172A' : '#E5E7EB'}`, background: 'all' === selectedChapterId ? '#0F172A' : 'white', color: 'all' === selectedChapterId ? 'white' : '#111827', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Globe size={15} style={{ opacity: 0.7 }} />
+                    <div>
+                      <div style={{ fontWeight: 700 }}>All Chapters</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: 1 }}>Aggregated view</div>
+                    </div>
+                  </button>
+                  {chapters.map(ch => (
+                    <button
+                      key={ch.id}
+                      onClick={() => setSelectedChapterId(ch.id === selectedChapterId ? '' : ch.id)}
+                      style={{ padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${ch.id === selectedChapterId ? '#0F172A' : '#E5E7EB'}`, background: ch.id === selectedChapterId ? '#0F172A' : 'white', color: ch.id === selectedChapterId ? 'white' : '#111827', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', textAlign: 'left' }}
+                    >
+                      <div style={{ fontWeight: 700 }}>{ch.fraternity || ch.chapter_name}</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: 2 }}>{ch.school}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {chapters.map(ch => (
-                <button
-                  key={ch.id}
-                  onClick={() => setSelectedChapterId(ch.id === selectedChapterId ? '' : ch.id)}
-                  style={{ padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${ch.id === selectedChapterId ? '#0F172A' : '#E5E7EB'}`, background: ch.id === selectedChapterId ? '#0F172A' : 'white', color: ch.id === selectedChapterId ? 'white' : '#111827', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', textAlign: 'left' }}
-                >
-                  <div style={{ fontWeight: 700 }}>{ch.fraternity || ch.chapter_name}</div>
-                  <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: 2 }}>{ch.school}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Kanban Board */}
-        {!selectedChapterId ? (
-          <div className="module-empty-state" style={{ marginTop: '3rem' }}>
-            <Phone size={48} />
-            <h3>Select a chapter to begin</h3>
-            <p>Choose a chapter above to load the call pipeline.</p>
-          </div>
-        ) : loadingContacts ? (
-          <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ height: 44, background: '#f3f4f6', borderRadius: 10, animation: 'pulse 1.5s infinite' }} />
-                {Array.from({ length: 5 }).map((_, j) => <div key={j} style={{ height: 76, background: '#f3f4f6', borderRadius: 12, animation: 'pulse 1.5s infinite' }} />)}
+            {/* Board */}
+            {!selectedChapterId ? (
+              <div className="module-empty-state" style={{ marginTop: '3rem' }}>
+                <Phone size={48} />
+                <h3>Select a chapter to begin</h3>
+                <p>Choose a chapter above to load platform members into the call pipeline.</p>
               </div>
-            ))}
-          </div>
-        ) : contacts.length === 0 ? (
-          <div className="module-empty-state">
-            <User size={48} />
-            <h3>No alumni contacts found</h3>
-            <p>This chapter doesn&apos;t have any alumni contacts yet.</p>
-          </div>
+            ) : loadingContacts ? (
+              <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ height: 44, background: '#f3f4f6', borderRadius: 10, animation: 'pulse 1.5s infinite' }} />
+                    {Array.from({ length: 4 }).map((__, j) => <div key={j} style={{ height: 120, background: '#f3f4f6', borderRadius: 12, animation: 'pulse 1.5s infinite' }} />)}
+                  </div>
+                ))}
+              </div>
+            ) : contacts.length === 0 ? (
+              <div className="module-empty-state">
+                <User size={48} />
+                <h3>No platform members found</h3>
+                <p>This chapter doesn&apos;t have any alumni who have signed up on the platform yet.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto', paddingBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 'max-content' }}>
+                  {(['not_called', 'voicemail', 'called', 'declined'] as ColumnStatus[]).map(status => (
+                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         ) : (
-          <div style={{ overflowX: 'auto', paddingBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 'max-content' }}>
-              {(['not_called', 'voicemail', 'called', 'declined'] as ColumnStatus[]).map(status => (
-                <KanbanColumn
-                  key={status}
-                  status={status}
-                  contacts={cols[status]}
-                  callLogs={callLogs}
-                  claims={claims}
-                  onCardClick={openPanel}
-                />
-              ))}
-            </div>
-          </div>
+          /* The Web */
+          <WebVisualization callLogs={callLogs} />
         )}
       </main>
 
-      {/* Slide-out panel */}
-      {slidePanel && (
-        <SlideOutPanel
-          panel={slidePanel}
+      {/* Call Prompt Modal */}
+      {callModal && (
+        <CallPromptModal
+          contact={callModal}
           currentUser={currentUser}
-          onClose={() => setSlidePanel(null)}
-          onStatusChange={handleStatusChange}
-          onSaveLog={saveLog}
-          onStartCall={handleStartCall}
-          onChange={u => setSlidePanel(prev => prev ? { ...prev, ...u } : prev)}
+          onAnswered={handleAnswered}
+          onVoicemailSaved={handleVoicemailSaved}
+          onDeclined={handleDeclined}
+          onClose={() => setCallModal(null)}
+        />
+      )}
+
+      {/* Logging Panel (Answered) */}
+      {loggingPanel && (
+        <LoggingPanel
+          panel={loggingPanel}
+          currentUser={currentUser}
+          onClose={() => setLoggingPanel(null)}
+          onSave={saveLog}
+          onChange={u => setLoggingPanel(prev => prev ? { ...prev, ...u } : prev)}
         />
       )}
     </div>
