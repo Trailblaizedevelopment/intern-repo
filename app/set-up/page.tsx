@@ -273,6 +273,7 @@ function SetUpPage() {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
     if (!form.orgName.trim()) newErrors.orgName = 'Organization name is required';
     if (!form.orgType) newErrors.orgType = 'Please select an org type';
+    if (!form.memberCount || parseInt(form.memberCount) <= 0) newErrors.memberCount = 'Member count is required';
     if (!form.leaderName.trim()) newErrors.leaderName = 'Name is required';
     if (!form.leaderEmail.trim()) newErrors.leaderEmail = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.leaderEmail)) newErrors.leaderEmail = 'Invalid email';
@@ -711,6 +712,16 @@ function SetUpPage() {
                   </button>
                 ))}
               </div>
+            </Field>
+
+            <Field label="Estimated Member Count *" error={errors.memberCount}>
+              <input
+                type="number"
+                value={form.memberCount}
+                onChange={(e) => updateForm('memberCount', e.target.value)}
+                placeholder="e.g. 150"
+                style={S.input(!!errors.memberCount)}
+              />
             </Field>
 
             <Field label="Your Name *" error={errors.leaderName}>
