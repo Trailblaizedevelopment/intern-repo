@@ -272,10 +272,8 @@ function SetUpPage() {
   function validateStep1(): boolean {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
     if (!form.orgName.trim()) newErrors.orgName = 'Organization name is required';
-    if (!form.school.trim()) newErrors.school = 'School / institution is required';
     if (!form.orgType) newErrors.orgType = 'Please select an org type';
-    if (!form.memberCount || Number(form.memberCount) < 1) newErrors.memberCount = 'Member count is required';
-    if (!form.leaderName.trim()) newErrors.leaderName = 'Leader name is required';
+    if (!form.leaderName.trim()) newErrors.leaderName = 'Name is required';
     if (!form.leaderEmail.trim()) newErrors.leaderEmail = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.leaderEmail)) newErrors.leaderEmail = 'Invalid email';
     if (!form.leaderPhone.trim()) newErrors.leaderPhone = 'Phone is required';
@@ -621,18 +619,18 @@ function SetUpPage() {
                 type="text"
                 value={form.orgName}
                 onChange={(e) => updateForm('orgName', e.target.value)}
-                placeholder="e.g. Sigma Chi, Campus Cycling Club"
+                placeholder="e.g. Kappa Alpha Order, UF Tennis Alumni, Dallas Young Professionals"
                 style={S.input(!!errors.orgName)}
               />
             </Field>
 
-            <Field label="School / Institution *" error={errors.school}>
+            <Field label="Associated Institution" hint="Optional">
               <input
                 type="text"
                 value={form.school}
                 onChange={(e) => updateForm('school', e.target.value)}
-                placeholder="e.g. University of Alabama"
-                style={S.input(!!errors.school)}
+                placeholder="e.g. University of Florida, Goldman Sachs, St. Mark's Academy"
+                style={S.input(false)}
               />
             </Field>
 
@@ -654,30 +652,7 @@ function SetUpPage() {
               </div>
             </Field>
 
-            <Field label="Chapter / Team Designation" hint="e.g. Alpha Beta, Varsity, etc.">
-              <input
-                type="text"
-                value={form.designation}
-                onChange={(e) => updateForm('designation', e.target.value)}
-                placeholder="Optional"
-                style={S.input(false)}
-              />
-            </Field>
-
-            <Field label="Total Member Count *" hint="Active + alumni combined — approximate is fine" error={errors.memberCount}>
-              <input
-                type="number"
-                min={1}
-                value={form.memberCount}
-                onChange={(e) => updateForm('memberCount', e.target.value)}
-                placeholder="e.g. 250"
-                style={S.input(!!errors.memberCount)}
-              />
-            </Field>
-
-            {/* Pricing shown on payment page, not here */}
-
-            <Field label="Leader Name *" hint="President / Captain / Director" error={errors.leaderName}>
+            <Field label="Your Name *" error={errors.leaderName}>
               <input
                 type="text"
                 value={form.leaderName}
@@ -687,7 +662,7 @@ function SetUpPage() {
               />
             </Field>
 
-            <Field label="Leader Email *" error={errors.leaderEmail}>
+            <Field label="Your Email *" error={errors.leaderEmail}>
               <input
                 type="email"
                 value={form.leaderEmail}
@@ -697,27 +672,14 @@ function SetUpPage() {
               />
             </Field>
 
-            <Field label="Leader Phone *" error={errors.leaderPhone}>
+            <Field label="Your Phone *" error={errors.leaderPhone}>
               <input
                 type="tel"
                 value={form.leaderPhone}
                 onChange={(e) => updateForm('leaderPhone', e.target.value)}
-                placeholder="+1 (555) 000-0000"
+                placeholder="(555) 555-5555"
                 style={S.input(!!errors.leaderPhone)}
               />
-            </Field>
-
-            <Field label="Instagram Handle" hint="Optional">
-              <div className="flex items-center">
-                <span className="px-3 py-2.5 bg-gray-100 text-gray-500 rounded-l-lg border border-gray-200 border-r-0 text-sm">@</span>
-                <input
-                  type="text"
-                  value={form.instagramHandle}
-                  onChange={(e) => updateForm('instagramHandle', e.target.value.replace('@', ''))}
-                  placeholder="yourchapter"
-                  className="flex-1 px-3 py-2.5 border border-gray-200 rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/20 focus:border-[#0F172A]"
-                />
-              </div>
             </Field>
           </div>
 
