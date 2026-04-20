@@ -200,7 +200,7 @@ function SetUpPage() {
 
     const bypassParam = searchParams.get('bypass');
     if (success === 'true' && bypassParam === '1') {
-      // Internal bypass — extract all params from URL
+      // Internal bypass - extract all params from URL
       setStep(5);
       const bypassData: Record<string, string> = {};
       searchParams.forEach((v, k) => { bypassData[k] = v; });
@@ -355,11 +355,11 @@ function SetUpPage() {
 
         {testMode && (
           <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '8px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#92400e' }}>
-            🧪 TEST MODE — No real charges will be made
+            🧪 TEST MODE - No real charges will be made
           </div>
         )}
 
-        {/* Nav — always visible */}
+        {/* Nav - always visible */}
         <nav style={{ padding: '0 32px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6', background: 'white', flexShrink: 0 }}>
           <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '44px' }} />
           <button
@@ -433,7 +433,7 @@ function SetUpPage() {
                   The alumni network for every organization.
                 </h1>
                 <p style={{ fontSize: '1.125rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '460px', margin: '0 auto' }}>
-                  A shared social network where organizations own their alumni community — without relying on LinkedIn or scattered group chats.
+                  A shared social network where organizations own their alumni community - without relying on LinkedIn or scattered group chats.
                 </p>
               </div>
             </div>
@@ -450,13 +450,13 @@ function SetUpPage() {
                   One place for everyone
                 </h2>
                 <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                  Your members, alumni, and leadership — connected in a single private network your organization actually owns.
+                  Your members, alumni, and leadership - connected in a single private network your organization actually owns.
                 </p>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '28px' }}>
                 {[
                   { icon: <Users size={18} color="#10B981" />, title: 'Private member directory', desc: 'Every member, past and present, in one searchable space.' },
-                  { icon: <MessageSquare size={18} color="#10B981" />, title: 'Instant messaging', desc: 'Message anyone directly — no scattered group chats.' },
+                  { icon: <MessageSquare size={18} color="#10B981" />, title: 'Instant messaging', desc: 'Message anyone directly - no scattered group chats.' },
                   { icon: <Shield size={18} color="#10B981" />, title: 'You control access', desc: 'Approve who joins, manage roles, keep your network clean.' },
                 ].map((card) => (
                   <div key={card.title} style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px' }}>
@@ -489,10 +489,10 @@ function SetUpPage() {
                     Real connections, not just contacts
                   </h2>
                   <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 12px' }}>
-                    Members find jobs, mentors, and friendships through your alumni network — matched by industry, city, and shared interests.
+                    Members find jobs, mentors, and friendships through your alumni network - matched by industry, city, and shared interests.
                   </p>
                   <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                    Whether you&apos;re a new grad looking for your first role or an alum giving back — Trailblaize makes the introduction.
+                    Whether you&apos;re a new grad looking for your first role or an alum giving back - Trailblaize makes the introduction.
                   </p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -518,7 +518,7 @@ function SetUpPage() {
                   Built for your organization
                 </h2>
                 <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                  Whether you&apos;re a Greek chapter, high school, or professional network — Trailblaize works for you.
+                  Whether you&apos;re a Greek chapter, high school, or professional network - Trailblaize works for you.
                 </p>
               </div>
               <div className="org-types-grid">
@@ -703,7 +703,7 @@ function SetUpPage() {
     );
   }
 
-  // ─── Step 2: Member Activation — Roll Out ────────────────────────
+  // ─── Step 2: Member Activation - Roll Out ────────────────────────
 
   if (step === 2) {
     return (
@@ -746,11 +746,15 @@ function SetUpPage() {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.08); }
           }
+          @keyframes nodeAppear {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
         `}</style>
 
         {testMode && (
           <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '8px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#92400e' }}>
-            🧪 TEST MODE — No real charges will be made
+            🧪 TEST MODE - No real charges will be made
           </div>
         )}
 
@@ -771,27 +775,39 @@ function SetUpPage() {
               Your Onboarding Plan
             </span>
             <h2 style={{ fontSize: 'clamp(1.875rem, 5vw, 2.75rem)', fontWeight: 400, color: 'white', margin: '0 0 16px', lineHeight: 1.15, fontFamily: '"Instrument Serif", Georgia, serif', letterSpacing: '-0.01em' }}>
-              Here’s how we launch your alumni network.
+              Here's how we launch your alumni network.
             </h2>
             <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
-              From day one, our team works alongside yours — every single step of the way.
+              From day one, our team works alongside yours - every single step of the way.
             </p>
           </div>
         </section>
 
-        {/* Section 1: Collaborative Launch — dark */}
+        {/* Section 1: Collaborative Launch - dark */}
         <section style={{ background: '#0F172A', padding: '56px 24px 72px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
             <div style={{ animation: 'fadeUp 0.7s ease 0.1s both' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease infinite' }}>
-                  <Rocket size={20} color="#10B981" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease infinite' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                      <circle cx="12" cy="12" r="4"/>
+                      <circle cx="17.5" cy="6.5" r="1.5" fill="#10B981" stroke="none"/>
+                    </svg>
+                  </div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16,185,129,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Rocket size={20} color="#10B981" />
+                  </div>
                 </div>
                 <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 1</span>
               </div>
               <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 12px', lineHeight: 1.2 }}>Collaborative Launch</h3>
               <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
-                We create a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>collaborative Instagram post with your chapter</strong> — driving early adopters to join from day one.
+                We create a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>collaborative Instagram post with your chapter</strong>, driving early adopters to join from day one.
+              </p>
+              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
+                Members DM us or comment on the post for a private sign-up link.
               </p>
               <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
                 Those early adopters become your ambassadors, bringing in the rest of your alumni through real word-of-mouth. The network effect starts here.
@@ -820,24 +836,33 @@ function SetUpPage() {
           </div>
         </section>
 
-        {/* Section 2: Activate Your Network — white */}
+        {/* Section 2: Activate Your Network - white */}
         <section style={{ background: 'white', padding: '72px 24px' }}>
           <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
-              <svg viewBox="0 0 260 160" width="260" height="160" style={{ overflow: 'visible' }}>
-                <circle cx="130" cy="80" r="22" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
-                <text x="130" y="85" textAnchor="middle" fill="white" fontSize="11" fontWeight="700">YOU</text>
+              <svg viewBox="0 0 280 200" width="280" height="200" style={{ overflow: 'visible' }}>
                 {[
-                  {cx:42,cy:32,label:'JD',d:'0.2s'},{cx:218,cy:32,label:'MK',d:'0.4s'},
-                  {cx:218,cy:128,label:'TR',d:'0.6s'},{cx:42,cy:128,label:'SL',d:'0.8s'},
-                  {cx:130,cy:14,label:'AB',d:'1.0s'},
-                ].map((p,i) => (
-                  <g key={i} style={{ animation: `orbitIn 0.5s ease ${p.d} both` }}>
-                    <line x1={p.cx} y1={p.cy} x2="130" y2="80" stroke="#E5E7EB" strokeWidth="1.5"
-                      strokeDasharray="200" strokeDashoffset="200"
-                      style={{ animation: `lineGrow 0.5s ease ${p.d} both` }} />
-                    <circle cx={p.cx} cy={p.cy} r="16" fill="#F3F4F6" stroke="#E5E7EB" strokeWidth="1.5" />
-                    <text x={p.cx} y={p.cy+4} textAnchor="middle" fill="#374151" fontSize="9" fontWeight="600">{p.label}</text>
+                  {cx:52,cy:52,d:0.25},{cx:228,cy:52,d:0.45},
+                  {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},
+                  {cx:140,cy:16,d:1.05},
+                ].map((n,i) => (
+                  <line key={`line-${i}`} x1="140" y1="100" x2={n.cx} y2={n.cy}
+                    stroke="#E5E7EB" strokeWidth="1.5"
+                    style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}
+                  />
+                ))}
+                <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
+                <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
+                {[
+                  {cx:52,cy:52,label:'Finance',color:'#10B981',d:0.3},
+                  {cx:228,cy:52,label:'NYC',color:'#6366F1',d:0.5},
+                  {cx:228,cy:148,label:'Tech',color:'#0EA5E9',d:0.7},
+                  {cx:52,cy:148,label:'Austin',color:'#F59E0B',d:0.9},
+                  {cx:140,cy:16,label:'Alumni',color:'#10B981',d:1.1},
+                ].map((n,i) => (
+                  <g key={`node-${i}`} style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}>
+                    <circle cx={n.cx} cy={n.cy} r="18" fill={n.color} />
+                    <text x={n.cx} y={n.cy + 4} textAnchor="middle" fill="white" fontSize="8" fontWeight="600">{n.label}</text>
                   </g>
                 ))}
               </svg>
@@ -851,10 +876,10 @@ function SetUpPage() {
               </div>
               <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Activate Your Network</h3>
               <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
-                We personally call your early adopters — connecting them with each other by industry, city, and shared interests.
+                We personally call your early adopters, connecting them with each other by industry, city, and shared interests.
               </p>
               <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                Looking for a job, a mentor, advice, or just curious who’s really in your network? We make those introductions happen.
+                Looking for a job, a mentor, advice, or just curious who's really in your network? We make those introductions happen.
               </p>
             </div>
           </div>
@@ -862,55 +887,72 @@ function SetUpPage() {
 
         {/* Section 3: Meet Alumni Where They Are — dark */}
         <section style={{ background: '#0F172A', padding: '72px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
-            <div style={{ animation: 'fadeUp 0.7s ease 0.1s both' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease 0.4s infinite' }}>
-                  <Radio size={20} color="#10B981" />
-                </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 3</span>
-              </div>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 12px', lineHeight: 1.2 }}>Meet Alumni Where They Are</h3>
-              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
-                We utilize any channels you already have — Facebook groups, LinkedIn, GroupMe — providing <strong style={{ color: 'rgba(255,255,255,0.85)' }}>custom flyers, blurbs, and a private sign-up link</strong> for each.
-              </p>
-              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
-                Alumni can also find your space on our mobile app and request access. You approve or reject — you’re always in control.
-              </p>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <div style={{ position: 'relative', width: '220px', height: '160px' }}>
-                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: '52px', height: '52px', borderRadius: '14px', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'hubPulse 2.5s ease infinite', zIndex: 2 }}>
-                  <Share2 size={22} color="white" />
-                </div>
-                {[
-                  {label:'f', bg:'#1877F2', top:'4px', left:'10px', d:'0.2s'},
-                  {label:'in', bg:'#0A66C2', top:'4px', right:'10px', d:'0.4s'},
-                  {label:'G', bg:'#25D366', bottom:'4px', left:'10px', d:'0.6s'},
-                  {label:'✉', bg:'#6366F1', bottom:'4px', right:'10px', d:'0.8s'},
-                  {label:'📱', bg:'#374151', top:'calc(50% - 20px)', right:'-2px', d:'1.0s'},
-                ].map((c,i) => (
-                  <div key={i} style={{
-                    position: 'absolute',
-                    ...(c.top !== undefined ? {top: c.top} : {}),
-                    ...(c.bottom !== undefined ? {bottom: c.bottom} : {}),
-                    ...(c.left !== undefined ? {left: c.left} : {}),
-                    ...(c.right !== undefined ? {right: c.right} : {}),
-                    width: '40px', height: '40px', borderRadius: '10px', background: c.bg,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'white', fontSize: '0.75rem', fontWeight: 700,
-                    animation: `orbitIn 0.5s ease ${c.d} both, floatY 3s ease ${i * 0.5}s infinite`,
-                    zIndex: 1,
-                  }}>
-                    {c.label}
+          <div style={{ maxWidth: '860px', margin: '0 auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center', marginBottom: '40px' }}>
+              <div style={{ animation: 'fadeUp 0.7s ease 0.1s both' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease 0.4s infinite' }}>
+                    <Radio size={20} color="#10B981" />
                   </div>
-                ))}
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 3</span>
+                </div>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 12px', lineHeight: 1.2 }}>Meet Alumni Where They Are</h3>
+                <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
+                  We utilize any channels you already have, including Facebook groups, LinkedIn, and GroupMe, providing <strong style={{ color: 'rgba(255,255,255,0.85)' }}>custom flyers, blurbs, and a private sign-up link</strong> for each.
+                </p>
+                <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
+                  Alumni can also find your space on our mobile app and request access. You approve or reject requests. You are always in control.
+                </p>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <div style={{ position: 'relative', width: '220px', height: '160px' }}>
+                  <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: '52px', height: '52px', borderRadius: '14px', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'hubPulse 2.5s ease infinite', zIndex: 2 }}>
+                    <Share2 size={22} color="white" />
+                  </div>
+                  {[
+                    {label:'f', bg:'#1877F2', top:'4px', left:'10px', d:'0.2s'},
+                    {label:'in', bg:'#0A66C2', top:'4px', right:'10px', d:'0.4s'},
+                    {label:'G', bg:'#25D366', bottom:'4px', left:'10px', d:'0.6s'},
+                    {label:'✉', bg:'#6366F1', bottom:'4px', right:'10px', d:'0.8s'},
+                    {label:'📱', bg:'#374151', top:'calc(50% - 20px)', right:'-2px', d:'1.0s'},
+                  ].map((c,i) => (
+                    <div key={i} style={{
+                      position: 'absolute',
+                      ...(c.top !== undefined ? {top: c.top} : {}),
+                      ...(c.bottom !== undefined ? {bottom: c.bottom} : {}),
+                      ...(c.left !== undefined ? {left: c.left} : {}),
+                      ...(c.right !== undefined ? {right: c.right} : {}),
+                      width: '40px', height: '40px', borderRadius: '10px', background: c.bg,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'white', fontSize: '0.75rem', fontWeight: 700,
+                      animation: `orbitIn 0.5s ease ${c.d} both, floatY 3s ease ${i * 0.5}s infinite`,
+                      zIndex: 1,
+                    }}>
+                      {c.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Product screenshots */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+              <img
+                src="/setup-screenshots/feed.png"
+                alt="Platform feed"
+                style={{ width: '100%', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'block' }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+              <img
+                src="/setup-screenshots/alumni.png"
+                alt="Alumni directory"
+                style={{ width: '100%', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'block' }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
             </div>
           </div>
         </section>
 
-        {/* Section 4: Database Outreach — white */}
+        {/* Section 4: Database Outreach - white */}
         <section style={{ background: 'white', padding: '72px 24px' }}>
           <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
@@ -953,7 +995,7 @@ function SetUpPage() {
           </div>
         </section>
 
-        {/* Section 5: Alumni Sign Up in Minutes — dark */}
+        {/* Section 5: Alumni Sign Up in Minutes - dark */}
         <section style={{ background: '#0F172A', padding: '72px 24px' }}>
           <div style={{ maxWidth: '860px', margin: '0 auto' }}>
             <div style={{ marginBottom: '36px', animation: 'fadeUp 0.7s ease both' }}>
@@ -971,7 +1013,7 @@ function SetUpPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               {[
                 {icon:<User size={22} color="#10B981" />, title:'Create Profile', desc:'Name, photo, industry, city, graduation year', d:'0.2s'},
-                {icon:<Users size={22} color="#10B981" />, title:'Join Your Space', desc:'Request access — admin approves in one tap', d:'0.5s'},
+                {icon:<Users size={22} color="#10B981" />, title:'Join Your Space', desc:'Request access - admin approves in one tap', d:'0.5s'},
                 {icon:<Check size={22} color="#10B981" />, title:'Fully Connected', desc:'Text & email alumni, store org info, accept donations', d:'0.8s'},
               ].map((s,i) => (
                 <div key={i} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '24px 20px', animation: `fadeUp 0.6s ease ${s.d} both` }}>
@@ -986,7 +1028,7 @@ function SetUpPage() {
           </div>
         </section>
 
-        {/* Section 6: Your Digital Community — white */}
+        {/* Section 6: Your Digital Community - white */}
         <section style={{ background: 'white', padding: '72px 24px' }}>
           <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
@@ -1029,7 +1071,7 @@ function SetUpPage() {
               </div>
               <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Your Digital Community</h3>
               <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
-                The digital space and community you’ve built for your entire organization. Network effect and word of mouth take over.
+                The digital space and community you've built for your entire organization. Network effect and word of mouth take over.
               </p>
               <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
                 Trailblaize becomes the <strong style={{ color: '#111827' }}>living, breathing alumni network</strong> your organization has always needed.
@@ -1045,7 +1087,7 @@ function SetUpPage() {
               Ready to build your network?
             </h3>
             <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.5)', margin: '0 0 32px', lineHeight: 1.6 }}>
-              Sign the agreement and you’re minutes away from a live alumni platform.
+              Sign the agreement and you're minutes away from a live alumni platform.
             </p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button onClick={() => goToStep(1)} style={{ ...S.backBtn, color: 'rgba(255,255,255,0.4)' }}>
@@ -1075,7 +1117,7 @@ function SetUpPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
             {[
-              { icon: <Zap size={18} color="#0F172A" />, title: "What you're getting", desc: "Access to the full Trailblaize platform — alumni directory, message board, engagement tools, and ongoing support." },
+              { icon: <Zap size={18} color="#0F172A" />, title: "What you're getting", desc: "Access to the full Trailblaize platform - alumni directory, message board, engagement tools, and ongoing support." },
               { icon: <Calendar size={18} color="#0F172A" />, title: 'Your commitment', desc: "12-month commitment starting today. After year one, cancel anytime with 30 days notice. No hidden fees." },
               { icon: <DollarSign size={18} color="#0F172A" />, title: 'What it costs', desc: price ? `$${price}/month · Billed monthly · Based on ${form.memberCount} members. Pricing reviewed at renewal.` : 'Pricing based on your member count.' },
               { icon: <Shield size={18} color="#0F172A" />, title: 'Your data', desc: "Your data belongs to you. We use it only to run the platform. Never sold. Export or delete anytime." },
@@ -1166,7 +1208,7 @@ function SetUpPage() {
             <div className="border-t border-gray-200 pt-3 mt-3">
               <Row
                 label="Monthly Price"
-                value={price ? `$${price}/month` : '—'}
+                value={price ? `$${price}/month` : '-'}
                 valueClass="text-[#0F172A] font-bold text-lg"
               />
             </div>
@@ -1175,7 +1217,7 @@ function SetUpPage() {
 
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <Shield size={16} className="text-gray-400" />
-            <span>Secured by Stripe — your payment info is never stored on our servers</span>
+            <span>Secured by Stripe - your payment info is never stored on our servers</span>
           </div>
 
           {checkoutError && (
@@ -1213,7 +1255,7 @@ function SetUpPage() {
         {confirmLoading ? (
           <div style={{ padding: '64px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
             <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: '#0F172A' }} />
-            <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: 0 }}>Setting up your account…</p>
+            <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: 0 }}>Setting up your account...</p>
           </div>
         ) : confirmError ? (
           <div style={{ padding: '48px 0', textAlign: 'center' }}>
@@ -1276,7 +1318,7 @@ function PageShell({ children, testMode }: { children: React.ReactNode; testMode
     <div style={{ background: '#F9FAFB', minHeight: '100vh' }}>
       {testMode && (
         <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '8px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#92400e' }}>
-          🧪 TEST MODE — Use card 4242 4242 4242 4242 · No real charges will be made
+          🧪 TEST MODE - Use card 4242 4242 4242 4242 · No real charges will be made
         </div>
       )}
       <nav style={{ background: 'white', borderBottom: '1px solid #F3F4F6', padding: '12px 24px', display: 'flex', alignItems: 'center' }}>
@@ -1349,7 +1391,7 @@ function NavButton({ onClick, disabled, children }: { onClick: () => void; disab
 }
 
 function inputCls(_hasError: boolean) {
-  // Legacy — kept for any remaining uses; new code uses S.input()
+  // Legacy - kept for any remaining uses; new code uses S.input()
   return '';
 }
 
