@@ -411,7 +411,7 @@ function SetUpPage() {
                   fontFamily: '"Instrument Serif", Georgia, serif',
                   letterSpacing: '-0.02em',
                 }}>
-                  What if every alumni in your organization was one tap away?
+                  What if every member and alumni in your organization were one tap away?
                 </h1>
               </div>
             </div>
@@ -909,6 +909,13 @@ function SetUpPage() {
           <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
               <svg viewBox="0 0 280 200" width="280" height="200" style={{ overflow: 'visible' }}>
+                <defs>
+                  {[{cx:52,cy:52},{cx:228,cy:52},{cx:228,cy:148},{cx:52,cy:148},{cx:140,cy:16}].map((n,i) => (
+                    <clipPath key={i} id={`s2-clip-${i}`}>
+                      <circle cx={n.cx} cy={n.cy} r={18} />
+                    </clipPath>
+                  ))}
+                </defs>
                 {[
                   {cx:52,cy:52,d:0.25},{cx:228,cy:52,d:0.45},
                   {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},
@@ -922,15 +929,16 @@ function SetUpPage() {
                 <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
                 <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
                 {[
-                  {cx:52,cy:52,label:'Finance',color:'#10B981',d:0.3},
-                  {cx:228,cy:52,label:'NYC',color:'#6366F1',d:0.5},
-                  {cx:228,cy:148,label:'Tech',color:'#0EA5E9',d:0.7},
-                  {cx:52,cy:148,label:'Austin',color:'#F59E0B',d:0.9},
-                  {cx:140,cy:16,label:'Alumni',color:'#10B981',d:1.1},
+                  {cx:52,cy:52,d:0.3,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg'},
+                  {cx:228,cy:52,d:0.5,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg'},
+                  {cx:228,cy:148,d:0.7,avatar:'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg'},
+                  {cx:52,cy:148,d:0.9,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg'},
+                  {cx:140,cy:16,d:1.1,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg'},
                 ].map((n,i) => (
                   <g key={`node-${i}`} style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}>
-                    <circle cx={n.cx} cy={n.cy} r="18" fill={n.color} />
-                    <text x={n.cx} y={n.cy + 4} textAnchor="middle" fill="white" fontSize="8" fontWeight="600">{n.label}</text>
+                    <image href={n.avatar} x={n.cx-18} y={n.cy-18} width={36} height={36}
+                      clipPath={`url(#s2-clip-${i})`} preserveAspectRatio="xMidYMid slice" />
+                    <circle cx={n.cx} cy={n.cy} r={18} fill="none" stroke="white" strokeWidth="2" />
                   </g>
                 ))}
               </svg>
@@ -1150,30 +1158,53 @@ function SetUpPage() {
           <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
               <svg viewBox="0 0 260 180" width="260" height="180" style={{ overflow: 'visible' }}>
+                <defs>
+                  {[{cx:86,cy:52},{cx:174,cy:52},{cx:174,cy:128},{cx:86,cy:128}].map((n,i) => (
+                    <clipPath key={i} id={`s6i-clip-${i}`}>
+                      <circle cx={n.cx} cy={n.cy} r={11} />
+                    </clipPath>
+                  ))}
+                  {[{cx:42,cy:38},{cx:218,cy:38},{cx:218,cy:142},{cx:42,cy:142},{cx:130,cy:12},{cx:130,cy:168}].map((n,i) => (
+                    <clipPath key={i} id={`s6o-clip-${i}`}>
+                      <circle cx={n.cx} cy={n.cy} r={7} />
+                    </clipPath>
+                  ))}
+                </defs>
                 <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
                 <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
                 {[
-                  {cx:86,cy:52,d:'0.2s'},{cx:174,cy:52,d:'0.4s'},
-                  {cx:174,cy:128,d:'0.6s'},{cx:86,cy:128,d:'0.8s'},
+                  {cx:86,cy:52,d:'0.2s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/20ba450e-709c-4a78-a963-7cbfb2de72ef-1776173885369.jpg'},
+                  {cx:174,cy:52,d:'0.4s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png'},
+                  {cx:174,cy:128,d:'0.6s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg'},
+                  {cx:86,cy:128,d:'0.8s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cd5b69be-83c4-4cf3-b961-abfb7a892d35-1776217083451.png'},
                 ].map((n,i) => (
                   <g key={i}>
                     <line x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
                       strokeDasharray="200" strokeDashoffset="200"
                       style={{ animation: `lineGrow 0.5s ease ${n.d} both` }} />
-                    <circle cx={n.cx} cy={n.cy} r="11" fill="#10B981"
+                    <image href={n.avatar} x={n.cx-11} y={n.cy-11} width={22} height={22}
+                      clipPath={`url(#s6i-clip-${i})`} preserveAspectRatio="xMidYMid slice"
+                      style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
+                    <circle cx={n.cx} cy={n.cy} r={11} fill="none" stroke="white" strokeWidth="1.5"
                       style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
                   </g>
                 ))}
                 {[
-                  {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s'},{cx:218,cy:38,fromX:174,fromY:52,d:'1.2s'},
-                  {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s'},{cx:42,cy:142,fromX:86,fromY:128,d:'1.6s'},
-                  {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s'},{cx:130,cy:168,fromX:130,fromY:90,d:'2.0s'},
+                  {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/dec7107c-53b3-4613-8929-1357413117f5-1776171340287.jpg'},
+                  {cx:218,cy:38,fromX:174,fromY:52,d:'1.2s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg'},
+                  {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg'},
+                  {cx:42,cy:142,fromX:86,fromY:128,d:'1.6s',avatar:'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg'},
+                  {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg'},
+                  {cx:130,cy:168,fromX:130,fromY:90,d:'2.0s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg'},
                 ].map((n,i) => (
                   <g key={i}>
                     <line x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
                       strokeDasharray="200" strokeDashoffset="200"
                       style={{ animation: `lineGrow 0.4s ease ${n.d} both` }} />
-                    <circle cx={n.cx} cy={n.cy} r="7" fill="#F3F4F6" stroke="#E5E7EB" strokeWidth="1.5"
+                    <image href={n.avatar} x={n.cx-7} y={n.cy-7} width={14} height={14}
+                      clipPath={`url(#s6o-clip-${i})`} preserveAspectRatio="xMidYMid slice"
+                      style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
+                    <circle cx={n.cx} cy={n.cy} r={7} fill="none" stroke="#E5E7EB" strokeWidth="1.5"
                       style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
                   </g>
                 ))}
