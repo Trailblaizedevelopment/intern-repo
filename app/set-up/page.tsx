@@ -155,6 +155,8 @@ function SetUpPage() {
   const [step, setStep] = useState(0);
   const [subStep, setSubStep] = useState(0);
   const [subStepVisible, setSubStepVisible] = useState(true);
+  const [launchSubStep, setLaunchSubStep] = useState(0);
+  const [launchVisible, setLaunchVisible] = useState(true);
   const [activeChapterCount, setActiveChapterCount] = useState<number | null>(null);
 
   // Form state
@@ -295,6 +297,18 @@ function SetUpPage() {
       } else {
         setSubStep((s) => s + 1);
         setSubStepVisible(true);
+      }
+    }, 220);
+  }
+
+  function advanceLaunchStep() {
+    setLaunchVisible(false);
+    setTimeout(() => {
+      if (launchSubStep >= 5) {
+        goToStep(3);
+      } else {
+        setLaunchSubStep((s) => s + 1);
+        setLaunchVisible(true);
       }
     }, 220);
   }
@@ -775,11 +789,12 @@ function SetUpPage() {
     );
   }
 
-  // ─── Step 2: Member Activation - Roll Out ────────────────────────
+  // ─── Step 2: Your Launch ─────────────────────────────────────────────────
 
   if (step === 2) {
+    const LAUNCH_TOTAL = 6;
     return (
-      <div style={{ fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100vh', background: 'white' }}>
+      <div style={{ fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100vh', background: 'white', display: 'flex', flexDirection: 'column' }}>
         <style>{`
           @keyframes nodePulse {
             0%, 100% { transform: scale(1); opacity: 0.85; }
@@ -822,6 +837,11 @@ function SetUpPage() {
             from { opacity: 0; }
             to { opacity: 1; }
           }
+          @media (max-width: 640px) {
+            .launch-grid { grid-template-columns: 1fr !important; }
+            .launch-cards-grid { grid-template-columns: 1fr !important; }
+            .launch-next-btn { width: 100% !important; justify-content: center !important; }
+          }
         `}</style>
 
         {testMode && (
@@ -840,424 +860,452 @@ function SetUpPage() {
           </div>
         </div>
 
-        {/* Hero */}
-        <section style={{ background: '#0F172A', padding: '64px 24px 52px', textAlign: 'center' }}>
-          <div style={{ maxWidth: '580px', margin: '0 auto', animation: 'fadeUp 0.7s ease both' }}>
-            <span style={{ display: 'inline-block', background: 'rgba(16,185,129,0.14)', color: '#10B981', borderRadius: '100px', padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '20px' }}>
-              Your Onboarding Plan
-            </span>
-            <h2 style={{ fontSize: 'clamp(1.875rem, 5vw, 2.75rem)', fontWeight: 400, color: 'white', margin: '0 0 16px', lineHeight: 1.15, fontFamily: '"Instrument Serif", Georgia, serif', letterSpacing: '-0.01em' }}>
-              Here's how we launch your alumni network.
-            </h2>
-            <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
-              From day one, our team works alongside yours - every single step of the way.
-            </p>
-          </div>
-        </section>
+        {/* Progress dots */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '14px 0', background: 'white', borderBottom: '1px solid #F3F4F6', flexShrink: 0 }}>
+          {Array.from({ length: LAUNCH_TOTAL }).map((_, i) => (
+            <div key={i} style={{
+              width: i === launchSubStep ? '22px' : '7px',
+              height: '7px',
+              borderRadius: '4px',
+              background: i === launchSubStep ? '#0F172A' : '#D1D5DB',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
 
-        {/* Section 1: Collaborative Launch - dark */}
-        <section style={{ background: '#0F172A', padding: '56px 24px 72px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
-            <div style={{ animation: 'fadeUp 0.7s ease 0.1s both' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease infinite' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                      <circle cx="12" cy="12" r="4"/>
-                      <circle cx="17.5" cy="6.5" r="1.5" fill="#10B981" stroke="none"/>
-                    </svg>
-                  </div>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16,185,129,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Rocket size={20} color="#10B981" />
-                  </div>
-                </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 1</span>
-              </div>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 12px', lineHeight: 1.2 }}>Collaborative Launch</h3>
-              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
-                We create a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>collaborative Instagram post with your chapter</strong>, driving early adopters to join from day one.
-              </p>
-              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
-                Members DM us or comment on the post for a private sign-up link.
-              </p>
-              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
-                Those early adopters become your ambassadors, bringing in the rest of your alumni through real word-of-mouth. The network effect starts here.
-              </p>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              {/* Instagram DM Mock */}
-              <div style={{ width: '230px', background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
-                <div style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5" fill="white" stroke="none"/></svg>
-                  </div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#111827' }}>Direct Messages</span>
-                </div>
-                <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#E5E7EB', flexShrink: 0 }} />
-                    <div style={{ background: '#F3F4F6', borderRadius: '12px 12px 12px 2px', padding: '8px 10px', maxWidth: '160px' }}>
-                      <p style={{ fontSize: '0.75rem', color: '#111827', margin: 0, lineHeight: 1.4 }}>Hey! I saw the post about your chapter on Trailblaize. How do I join?</p>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ background: '#0F172A', borderRadius: '12px 12px 2px 12px', padding: '8px 10px', maxWidth: '160px' }}>
-                      <p style={{ fontSize: '0.75rem', color: 'white', margin: 0, lineHeight: 1.4 }}>Here's your private link: trailblaize.net/join/alpha...</p>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <span style={{ fontSize: '0.6875rem', color: '#9CA3AF' }}>Seen</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* Transitioning content */}
+        <div style={{
+          flex: 1,
+          opacity: launchVisible ? 1 : 0,
+          transform: launchVisible ? 'translateY(0)' : 'translateY(20px)',
+          transition: 'opacity 0.22s ease, transform 0.22s ease',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
 
-        {/* Section 2: Activate Your Network - white */}
-        <section style={{ background: 'white', padding: '72px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
-              <svg viewBox="0 0 280 200" width="280" height="200" style={{ overflow: 'visible' }}>
-                <defs>
-                  {[{cx:52,cy:52},{cx:228,cy:52},{cx:228,cy:148},{cx:52,cy:148},{cx:140,cy:16}].map((n,i) => (
-                    <clipPath key={i} id={`s2-clip-${i}`}>
-                      <circle cx={n.cx} cy={n.cy} r={18} />
-                    </clipPath>
-                  ))}
-                </defs>
-                {[
-                  {cx:52,cy:52,d:0.25},{cx:228,cy:52,d:0.45},
-                  {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},
-                  {cx:140,cy:16,d:1.05},
-                ].map((n,i) => (
-                  <line key={`line-${i}`} x1="140" y1="100" x2={n.cx} y2={n.cy}
-                    stroke="#E5E7EB" strokeWidth="1.5"
-                    style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}
-                  />
-                ))}
-                <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
-                <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
-                {[
-                  {cx:52,cy:52,d:0.3,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg'},
-                  {cx:228,cy:52,d:0.5,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg'},
-                  {cx:228,cy:148,d:0.7,avatar:'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg'},
-                  {cx:52,cy:148,d:0.9,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg'},
-                  {cx:140,cy:16,d:1.1,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg'},
-                ].map((n,i) => (
-                  <g key={`node-${i}`} style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}>
-                    <image href={n.avatar} x={n.cx-18} y={n.cy-18} width={36} height={36}
-                      clipPath={`url(#s2-clip-${i})`} preserveAspectRatio="xMidYMid slice" />
-                    <circle cx={n.cx} cy={n.cy} r={18} fill="none" stroke="white" strokeWidth="2" />
-                  </g>
-                ))}
-              </svg>
-            </div>
-            <div style={{ order: 1, animation: 'fadeUp 0.7s ease 0.2s both' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Phone size={20} color="#0F172A" />
-                </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 2</span>
-              </div>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Activate Your Network</h3>
-              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
-                We personally call your early adopters, connecting them with each other by industry, city, and shared interests.
-              </p>
-              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                Looking for a job, a mentor, advice, or just curious who's really in your network? We make those introductions happen.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 3: Meet Alumni Where They Are — dark */}
-        <section style={{ background: '#0F172A', padding: '72px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center', marginBottom: '40px' }}>
-              <div style={{ animation: 'fadeUp 0.7s ease 0.1s both' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease 0.4s infinite' }}>
-                    <Radio size={20} color="#10B981" />
-                  </div>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 3</span>
-                </div>
-                <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 12px', lineHeight: 1.2 }}>Meet Alumni Where They Are</h3>
-                <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: '0 0 10px' }}>
-                  We utilize any channels you already have, including Facebook groups, LinkedIn, and GroupMe, providing <strong style={{ color: 'rgba(255,255,255,0.85)' }}>custom flyers, blurbs, and a private sign-up link</strong> for each.
-                </p>
-                <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0 }}>
-                  Alumni can also find your space on our mobile app and request access. You approve or reject requests. You are always in control.
-                </p>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <div style={{ position: 'relative', width: '220px', height: '160px' }}>
-                  <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: '52px', height: '52px', borderRadius: '14px', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'hubPulse 2.5s ease infinite', zIndex: 2 }}>
-                    <Share2 size={22} color="white" />
-                  </div>
-                  {[
-                    {label:'f', bg:'#1877F2', top:'4px', left:'10px', d:'0.2s'},
-                    {label:'in', bg:'#0A66C2', top:'4px', right:'10px', d:'0.4s'},
-                    {label:'G', bg:'#25D366', bottom:'4px', left:'10px', d:'0.6s'},
-                    {label:'✉', bg:'#6366F1', bottom:'4px', right:'10px', d:'0.8s'},
-                    {label:'📱', bg:'#374151', top:'calc(50% - 20px)', right:'-2px', d:'1.0s'},
-                  ].map((c,i) => (
-                    <div key={i} style={{
-                      position: 'absolute',
-                      ...(c.top !== undefined ? {top: c.top} : {}),
-                      ...(c.bottom !== undefined ? {bottom: c.bottom} : {}),
-                      ...(c.left !== undefined ? {left: c.left} : {}),
-                      ...(c.right !== undefined ? {right: c.right} : {}),
-                      width: '40px', height: '40px', borderRadius: '10px', background: c.bg,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'white', fontSize: '0.75rem', fontWeight: 700,
-                      animation: `orbitIn 0.5s ease ${c.d} both, floatY 3s ease ${i * 0.5}s infinite`,
-                      zIndex: 1,
-                    }}>
-                      {c.label}
+          {/* ── Sub-step 0: Collaborative Launch ── */}
+          {launchSubStep === 0 && (
+            <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease infinite' }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                          <circle cx="12" cy="12" r="4"/>
+                          <circle cx="17.5" cy="6.5" r="1.5" fill="#10B981" stroke="none"/>
+                        </svg>
+                      </div>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16,185,129,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Rocket size={20} color="#10B981" />
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {/* Messaging Hub Mock */}
-            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MessageSquare size={14} color="#10B981" />
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>Messages</span>
-                <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>Payne Parker</span>
-              </div>
-              {[
-                { initials: 'EH', name: 'Ethan Hill', preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas insurance - let me connect you.", time: '2m ago', unread: true, color: '#0F172A', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg' },
-                { initials: 'EF', name: 'Evan Foster', preview: 'Would love to chat about wealth management opportunities. Are you free this week?', time: '1h ago', unread: false, color: '#8B5CF6', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png' },
-                { initials: 'BK', name: 'Bryce Kallio', preview: "Great to see you on here. Let's catch up soon.", time: '3h ago', unread: false, color: '#0EA5E9', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cd5b69be-83c4-4cf3-b961-abfb7a892d35-1776217083451.png' },
-              ].map((m, i) => (
-                <div key={i} style={{ padding: '12px 16px', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <img src={m.avatar} alt={m.name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: m.color, display: 'none', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0 }}>{m.initials}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: m.unread ? 700 : 600, color: 'white' }}>{m.name}</span>
-                      <span style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{m.time}</span>
-                    </div>
-                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{m.preview}</p>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.09em' }}>Step 1</span>
                   </div>
-                  {m.unread && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />}
+                  <h3 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.5rem)', fontWeight: 700, color: '#111827', margin: '0 0 12px', lineHeight: 1.2 }}>Collaborative Launch</h3>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                    We create a <strong style={{ color: '#111827' }}>collaborative Instagram post with your chapter</strong>, driving early adopters to join from day one.
+                  </p>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                    Members DM us or comment on the post for a private sign-up link.
+                  </p>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                    Those early adopters become your ambassadors, bringing in the rest of your alumni through real word-of-mouth. The network effect starts here.
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Section 4: Database Outreach - white */}
-        <section style={{ background: 'white', padding: '72px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
-              <div style={{ width: '240px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px', overflow: 'hidden', animation: 'fadeUp 0.7s ease both' }}>
-                <div style={{ background: '#0F172A', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Database size={14} color="#10B981" />
-                  <span style={{ color: 'white', fontSize: '0.75rem', fontWeight: 600 }}>alumni_contacts.csv</span>
-                </div>
-                {[
-                  {name:'James D.', d:'0.2s'},{name:'Maria K.', d:'0.5s'},
-                  {name:'Tyler R.', d:'0.8s'},{name:'Sara L.', d:'1.1s'},{name:'Alex B.', d:'1.4s'},
-                ].map((row,i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: '1px solid #F3F4F6', animation: `rowFade 0.5s ease ${row.d} both` }}>
-                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>{row.name}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Mail size={12} color="#10B981" style={{ animation: `checkPop 0.4s ease ${parseFloat(row.d) + 0.3}s both`, opacity: 0 }} />
-                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: `checkPop 0.4s ease ${parseFloat(row.d) + 0.5}s both`, opacity: 0 }}>
-                        <Check size={9} color="#16a34a" strokeWidth={3} />
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  {/* Instagram DM Mock — keep dark bubble as product preview */}
+                  <div style={{ width: '230px', background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
+                    <div style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5" fill="white" stroke="none"/></svg>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#111827' }}>Direct Messages</span>
+                    </div>
+                    <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
+                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#E5E7EB', flexShrink: 0 }} />
+                        <div style={{ background: '#F3F4F6', borderRadius: '12px 12px 12px 2px', padding: '8px 10px', maxWidth: '160px' }}>
+                          <p style={{ fontSize: '0.75rem', color: '#111827', margin: 0, lineHeight: 1.4 }}>Hey! I saw the post about your chapter on Trailblaize. How do I join?</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ background: '#0F172A', borderRadius: '12px 12px 2px 12px', padding: '8px 10px', maxWidth: '160px' }}>
+                          <p style={{ fontSize: '0.75rem', color: 'white', margin: 0, lineHeight: 1.4 }}>Here&apos;s your private link: trailblaize.net/join/alpha...</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <span style={{ fontSize: '0.6875rem', color: '#9CA3AF' }}>Seen</span>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-            <div style={{ order: 1, animation: 'fadeUp 0.7s ease 0.2s both' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Database size={20} color="#0F172A" />
                 </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 4</span>
               </div>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Database Outreach</h3>
-              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
-                Have a spreadsheet of alumni contacts? We <strong style={{ color: '#111827' }}>email every alumni three times</strong> and personally text everyone via iMessage.
-              </p>
-              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                We verify contact info, clean up the data, and invite each one personally to join your platform.
-              </p>
             </div>
-          </div>
-        </section>
+          )}
 
-        {/* Section 5: Alumni Sign Up in Minutes - dark */}
-        <section style={{ background: '#0F172A', padding: '72px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '36px', animation: 'fadeUp 0.7s ease both' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease 0.6s infinite' }}>
-                  <Clock size={20} color="#10B981" />
+          {/* ── Sub-step 1: Activate Your Network ── */}
+          {launchSubStep === 1 && (
+            <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
+                  <svg viewBox="0 0 280 200" width="280" height="200" style={{ overflow: 'visible', maxWidth: '100%' }}>
+                    <defs>
+                      {[{cx:52,cy:52},{cx:228,cy:52},{cx:228,cy:148},{cx:52,cy:148},{cx:140,cy:16}].map((n,i) => (
+                        <clipPath key={i} id={`ls1-clip-${i}`}>
+                          <circle cx={n.cx} cy={n.cy} r={18} />
+                        </clipPath>
+                      ))}
+                    </defs>
+                    {[
+                      {cx:52,cy:52,d:0.25},{cx:228,cy:52,d:0.45},
+                      {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},
+                      {cx:140,cy:16,d:1.05},
+                    ].map((n,i) => (
+                      <line key={`line-${i}`} x1="140" y1="100" x2={n.cx} y2={n.cy}
+                        stroke="#E5E7EB" strokeWidth="1.5"
+                        style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}
+                      />
+                    ))}
+                    <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
+                    <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
+                    {[
+                      {cx:52,cy:52,d:0.3,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg'},
+                      {cx:228,cy:52,d:0.5,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg'},
+                      {cx:228,cy:148,d:0.7,avatar:'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg'},
+                      {cx:52,cy:148,d:0.9,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg'},
+                      {cx:140,cy:16,d:1.1,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg'},
+                    ].map((n,i) => (
+                      <g key={`node-${i}`} style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}>
+                        <image href={n.avatar} x={n.cx-18} y={n.cy-18} width={36} height={36}
+                          clipPath={`url(#ls1-clip-${i})`} preserveAspectRatio="xMidYMid slice" />
+                        <circle cx={n.cx} cy={n.cy} r={18} fill="none" stroke="#E5E7EB" strokeWidth="2" />
+                      </g>
+                    ))}
+                  </svg>
                 </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 5</span>
-              </div>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', margin: '0 0 10px', lineHeight: 1.2 }}>Alumni Sign Up in Minutes</h3>
-              <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, margin: 0, maxWidth: '480px' }}>
-                Once alumni receive the invite, joining is frictionless. Create a profile, join your space, done. Then the whole network opens up.
-              </p>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-              {/* Step 1: Create Profile */}
-              <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px', animation: 'fadeUp 0.6s ease 0.2s both' }}>
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 1</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '4px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2px' }}>
-                    <User size={18} color="rgba(255,255,255,0.4)" />
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Evan Foster</span>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Finance · Senior</span>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Nashville, TN</span>
-                  </div>
-                </div>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Create Profile</h4>
-                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Name, photo, industry, city, grad year</p>
-              </div>
-              {/* Step 2: Join Your Space */}
-              <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px', animation: 'fadeUp 0.6s ease 0.5s both' }}>
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 2</div>
-                <div style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', marginBottom: '4px' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10B981' }}>TB</span>
+                <div style={{ order: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Phone size={20} color="#0F172A" />
                     </div>
-                    <div>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'white' }}>Alpha Chapter</div>
-                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)' }}>247 members</div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.09em' }}>Step 2</span>
+                  </div>
+                  <h3 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.5rem)', fontWeight: 700, color: '#111827', margin: '0 0 12px', lineHeight: 1.2 }}>Activate Your Network</h3>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                    We personally call your early adopters, connecting them with each other by industry, city, and shared interests.
+                  </p>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                    Looking for a job, a mentor, advice, or just curious who&apos;s really in your network? We make those introductions happen.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step 2: Meet Alumni Where They Are ── */}
+          {launchSubStep === 2 && (
+            <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center', marginBottom: '32px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Radio size={20} color="#10B981" />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.09em' }}>Step 3</span>
+                  </div>
+                  <h3 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.5rem)', fontWeight: 700, color: '#111827', margin: '0 0 12px', lineHeight: 1.2 }}>Meet Alumni Where They Are</h3>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                    We utilize any channels you already have, including Facebook groups, LinkedIn, and GroupMe, providing <strong style={{ color: '#111827' }}>custom flyers, blurbs, and a private sign-up link</strong> for each.
+                  </p>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                    Alumni can also find your space on our mobile app and request access. You approve or reject requests. You are always in control.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', width: '220px', height: '160px' }}>
+                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: '52px', height: '52px', borderRadius: '14px', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'hubPulse 2.5s ease infinite', zIndex: 2 }}>
+                      <Share2 size={22} color="white" />
+                    </div>
+                    {[
+                      {label:'f', bg:'#1877F2', top:'4px', left:'10px', d:'0.2s'},
+                      {label:'in', bg:'#0A66C2', top:'4px', right:'10px', d:'0.4s'},
+                      {label:'G', bg:'#25D366', bottom:'4px', left:'10px', d:'0.6s'},
+                      {label:'✉', bg:'#6366F1', bottom:'4px', right:'10px', d:'0.8s'},
+                      {label:'📱', bg:'#374151', top:'calc(50% - 20px)', right:'-2px', d:'1.0s'},
+                    ].map((c,i) => (
+                      <div key={i} style={{
+                        position: 'absolute',
+                        ...(c.top !== undefined ? {top: c.top} : {}),
+                        ...(c.bottom !== undefined ? {bottom: c.bottom} : {}),
+                        ...(c.left !== undefined ? {left: c.left} : {}),
+                        ...(c.right !== undefined ? {right: c.right} : {}),
+                        width: '40px', height: '40px', borderRadius: '10px', background: c.bg,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontSize: '0.75rem', fontWeight: 700,
+                        animation: `orbitIn 0.5s ease ${c.d} both, floatY 3s ease ${i * 0.5}s infinite`,
+                        zIndex: 1,
+                      }}>
+                        {c.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Messaging Hub Mock — keep dark as product preview */}
+              <div style={{ background: 'rgba(15,23,42,0.97)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MessageSquare size={14} color="#10B981" />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>Messages</span>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>Payne Parker</span>
+                </div>
+                {[
+                  { initials: 'EH', name: 'Ethan Hill', preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas insurance - let me connect you.", time: '2m ago', unread: true, color: '#0F172A', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg' },
+                  { initials: 'EF', name: 'Evan Foster', preview: 'Would love to chat about wealth management opportunities. Are you free this week?', time: '1h ago', unread: false, color: '#8B5CF6', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png' },
+                  { initials: 'BK', name: 'Bryce Kallio', preview: "Great to see you on here. Let's catch up soon.", time: '3h ago', unread: false, color: '#0EA5E9', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cd5b69be-83c4-4cf3-b961-abfb7a892d35-1776217083451.png' },
+                ].map((m, i) => (
+                  <div key={i} style={{ padding: '12px 16px', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <img src={m.avatar} alt={m.name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: m.color, display: 'none', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0 }}>{m.initials}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: m.unread ? 700 : 600, color: 'white' }}>{m.name}</span>
+                        <span style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{m.time}</span>
+                      </div>
+                      <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{m.preview}</p>
+                    </div>
+                    {m.unread && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step 3: Database Outreach ── */}
+          {launchSubStep === 3 && (
+            <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
+                  <div style={{ width: '240px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px', overflow: 'hidden' }}>
+                    <div style={{ background: '#0F172A', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Database size={14} color="#10B981" />
+                      <span style={{ color: 'white', fontSize: '0.75rem', fontWeight: 600 }}>alumni_contacts.csv</span>
+                    </div>
+                    {[
+                      {name:'James D.', d:'0.2s'},{name:'Maria K.', d:'0.5s'},
+                      {name:'Tyler R.', d:'0.8s'},{name:'Sara L.', d:'1.1s'},{name:'Alex B.', d:'1.4s'},
+                    ].map((row,i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: '1px solid #F3F4F6', animation: `rowFade 0.5s ease ${row.d} both` }}>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>{row.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Mail size={12} color="#10B981" style={{ animation: `checkPop 0.4s ease ${parseFloat(row.d) + 0.3}s both`, opacity: 0 }} />
+                          <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: `checkPop 0.4s ease ${parseFloat(row.d) + 0.5}s both`, opacity: 0 }}>
+                            <Check size={9} color="#16a34a" strokeWidth={3} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ order: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Database size={20} color="#0F172A" />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.09em' }}>Step 4</span>
+                  </div>
+                  <h3 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.5rem)', fontWeight: 700, color: '#111827', margin: '0 0 12px', lineHeight: 1.2 }}>Database Outreach</h3>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                    Have a spreadsheet of alumni contacts? We <strong style={{ color: '#111827' }}>email every alumni three times</strong> and personally text everyone via iMessage.
+                  </p>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                    We verify contact info, clean up the data, and invite each one personally to join your platform.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step 4: Alumni Sign Up in Minutes ── */}
+          {launchSubStep === 4 && (
+            <div style={{ padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <div style={{ marginBottom: '28px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Clock size={20} color="#10B981" />
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.09em' }}>Step 5</span>
+                </div>
+                <h3 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.5rem)', fontWeight: 700, color: '#111827', margin: '0 0 10px', lineHeight: 1.2 }}>Alumni Sign Up in Minutes</h3>
+                <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0, maxWidth: '480px' }}>
+                  Once alumni receive the invite, joining is frictionless. Create a profile, join your space, done. Then the whole network opens up.
+                </p>
+              </div>
+              {/* Product mock cards — keep dark as in-app preview */}
+              <div className="launch-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                <div style={{ background: '#0F172A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px' }}>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 1</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '4px' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2px' }}>
+                      <User size={18} color="rgba(255,255,255,0.4)" />
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Evan Foster</span>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Finance · Senior</span>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Nashville, TN</span>
                     </div>
                   </div>
-                  <button style={{ width: '100%', padding: '7px', borderRadius: '7px', background: '#10B981', color: 'white', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Request to Join</button>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Create Profile</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Name, photo, industry, city, grad year</p>
                 </div>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Join Your Space</h4>
-                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Request access - admin approves in one tap</p>
-              </div>
-              {/* Step 3: Connected */}
-              <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px', animation: 'fadeUp 0.6s ease 0.8s both' }}>
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 3</div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0 8px' }}>
-                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(16,185,129,0.15)', border: '2px solid rgba(16,185,129,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px', animation: 'checkPop 0.5s ease 1.1s both' }}>
-                    <Check size={26} color="#10B981" strokeWidth={2.5} />
+                <div style={{ background: '#0F172A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px' }}>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 2</div>
+                  <div style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10B981' }}>TB</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'white' }}>Alpha Chapter</div>
+                        <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)' }}>247 members</div>
+                      </div>
+                    </div>
+                    <button style={{ width: '100%', padding: '7px', borderRadius: '7px', background: '#10B981', color: 'white', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Request to Join</button>
                   </div>
-                  <span style={{ fontSize: '1rem', fontWeight: 700, color: 'white' }}>You&apos;re in!</span>
-                  <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: '4px', textAlign: 'center' as const }}>Connected to Alpha Chapter</span>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Join Your Space</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Request access - admin approves in one tap</p>
                 </div>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Fully Connected</h4>
-                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Message alumni, explore the network, get opportunities</p>
+                <div style={{ background: '#0F172A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px' }}>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 3</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0 8px' }}>
+                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(16,185,129,0.15)', border: '2px solid rgba(16,185,129,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px', animation: 'checkPop 0.5s ease 0.3s both' }}>
+                      <Check size={26} color="#10B981" strokeWidth={2.5} />
+                    </div>
+                    <span style={{ fontSize: '1rem', fontWeight: 700, color: 'white' }}>You&apos;re in!</span>
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: '4px', textAlign: 'center' as const }}>Connected to Alpha Chapter</span>
+                  </div>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Fully Connected</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Message alumni, explore the network, get opportunities</p>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          )}
 
-        {/* Section 6: Your Digital Community - white */}
-        <section style={{ background: 'white', padding: '72px 24px' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
-              <svg viewBox="0 0 260 180" width="260" height="180" style={{ overflow: 'visible' }}>
-                <defs>
-                  {[{cx:86,cy:52},{cx:174,cy:52},{cx:174,cy:128},{cx:86,cy:128}].map((n,i) => (
-                    <clipPath key={i} id={`s6i-clip-${i}`}>
-                      <circle cx={n.cx} cy={n.cy} r={11} />
-                    </clipPath>
-                  ))}
-                  {[{cx:42,cy:38},{cx:218,cy:38},{cx:218,cy:142},{cx:42,cy:142},{cx:130,cy:12},{cx:130,cy:168}].map((n,i) => (
-                    <clipPath key={i} id={`s6o-clip-${i}`}>
-                      <circle cx={n.cx} cy={n.cy} r={7} />
-                    </clipPath>
-                  ))}
-                </defs>
-                <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
-                <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
-                {[
-                  {cx:86,cy:52,d:'0.2s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/20ba450e-709c-4a78-a963-7cbfb2de72ef-1776173885369.jpg'},
-                  {cx:174,cy:52,d:'0.4s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png'},
-                  {cx:174,cy:128,d:'0.6s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg'},
-                  {cx:86,cy:128,d:'0.8s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cd5b69be-83c4-4cf3-b961-abfb7a892d35-1776217083451.png'},
-                ].map((n,i) => (
-                  <g key={i}>
-                    <line x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
-                      strokeDasharray="200" strokeDashoffset="200"
-                      style={{ animation: `lineGrow 0.5s ease ${n.d} both` }} />
-                    <image href={n.avatar} x={n.cx-11} y={n.cy-11} width={22} height={22}
-                      clipPath={`url(#s6i-clip-${i})`} preserveAspectRatio="xMidYMid slice"
-                      style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
-                    <circle cx={n.cx} cy={n.cy} r={11} fill="none" stroke="white" strokeWidth="1.5"
-                      style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
-                  </g>
-                ))}
-                {[
-                  {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/dec7107c-53b3-4613-8929-1357413117f5-1776171340287.jpg'},
-                  {cx:218,cy:38,fromX:174,fromY:52,d:'1.2s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg'},
-                  {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg'},
-                  {cx:42,cy:142,fromX:86,fromY:128,d:'1.6s',avatar:'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg'},
-                  {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg'},
-                  {cx:130,cy:168,fromX:130,fromY:90,d:'2.0s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg'},
-                ].map((n,i) => (
-                  <g key={i}>
-                    <line x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
-                      strokeDasharray="200" strokeDashoffset="200"
-                      style={{ animation: `lineGrow 0.4s ease ${n.d} both` }} />
-                    <image href={n.avatar} x={n.cx-7} y={n.cy-7} width={14} height={14}
-                      clipPath={`url(#s6o-clip-${i})`} preserveAspectRatio="xMidYMid slice"
-                      style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
-                    <circle cx={n.cx} cy={n.cy} r={7} fill="none" stroke="#E5E7EB" strokeWidth="1.5"
-                      style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
-                  </g>
-                ))}
-              </svg>
-            </div>
-            <div style={{ order: 1, animation: 'fadeUp 0.7s ease 0.2s both' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Globe size={20} color="#0F172A" />
+          {/* ── Sub-step 5: Your Digital Community ── */}
+          {launchSubStep === 5 && (
+            <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
+                  <svg viewBox="0 0 260 180" width="260" height="180" style={{ overflow: 'visible', maxWidth: '100%' }}>
+                    <defs>
+                      {[{cx:86,cy:52},{cx:174,cy:52},{cx:174,cy:128},{cx:86,cy:128}].map((n,i) => (
+                        <clipPath key={i} id={`ls5i-clip-${i}`}>
+                          <circle cx={n.cx} cy={n.cy} r={11} />
+                        </clipPath>
+                      ))}
+                      {[{cx:42,cy:38},{cx:218,cy:38},{cx:218,cy:142},{cx:42,cy:142},{cx:130,cy:12},{cx:130,cy:168}].map((n,i) => (
+                        <clipPath key={i} id={`ls5o-clip-${i}`}>
+                          <circle cx={n.cx} cy={n.cy} r={7} />
+                        </clipPath>
+                      ))}
+                    </defs>
+                    <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
+                    <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
+                    {[
+                      {cx:86,cy:52,d:'0.2s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/20ba450e-709c-4a78-a963-7cbfb2de72ef-1776173885369.jpg'},
+                      {cx:174,cy:52,d:'0.4s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png'},
+                      {cx:174,cy:128,d:'0.6s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg'},
+                      {cx:86,cy:128,d:'0.8s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cd5b69be-83c4-4cf3-b961-abfb7a892d35-1776217083451.png'},
+                    ].map((n,i) => (
+                      <g key={i}>
+                        <line x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
+                          strokeDasharray="200" strokeDashoffset="200"
+                          style={{ animation: `lineGrow 0.5s ease ${n.d} both` }} />
+                        <image href={n.avatar} x={n.cx-11} y={n.cy-11} width={22} height={22}
+                          clipPath={`url(#ls5i-clip-${i})`} preserveAspectRatio="xMidYMid slice"
+                          style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
+                        <circle cx={n.cx} cy={n.cy} r={11} fill="none" stroke="#E5E7EB" strokeWidth="1.5"
+                          style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
+                      </g>
+                    ))}
+                    {[
+                      {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/dec7107c-53b3-4613-8929-1357413117f5-1776171340287.jpg'},
+                      {cx:218,cy:38,fromX:174,fromY:52,d:'1.2s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg'},
+                      {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg'},
+                      {cx:42,cy:142,fromX:86,fromY:128,d:'1.6s',avatar:'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg'},
+                      {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg'},
+                      {cx:130,cy:168,fromX:130,fromY:90,d:'2.0s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg'},
+                    ].map((n,i) => (
+                      <g key={i}>
+                        <line x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
+                          strokeDasharray="200" strokeDashoffset="200"
+                          style={{ animation: `lineGrow 0.4s ease ${n.d} both` }} />
+                        <image href={n.avatar} x={n.cx-7} y={n.cy-7} width={14} height={14}
+                          clipPath={`url(#ls5o-clip-${i})`} preserveAspectRatio="xMidYMid slice"
+                          style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
+                        <circle cx={n.cx} cy={n.cy} r={7} fill="none" stroke="#E5E7EB" strokeWidth="1.5"
+                          style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
+                      </g>
+                    ))}
+                  </svg>
                 </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Step 6</span>
+                <div style={{ order: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Globe size={20} color="#0F172A" />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.09em' }}>Step 6</span>
+                  </div>
+                  <h3 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.5rem)', fontWeight: 700, color: '#111827', margin: '0 0 12px', lineHeight: 1.2 }}>Your Digital Community</h3>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
+                    The digital space and community you&apos;ve built for your entire organization. Network effect and word of mouth take over.
+                  </p>
+                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
+                    Trailblaize becomes the <strong style={{ color: '#111827' }}>living, breathing alumni network</strong> your organization has always needed.
+                  </p>
+                </div>
               </div>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Your Digital Community</h3>
-              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 10px' }}>
-                The digital space and community you've built for your entire organization. Network effect and word of mouth take over.
-              </p>
-              <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                Trailblaize becomes the <strong style={{ color: '#111827' }}>living, breathing alumni network</strong> your organization has always needed.
-              </p>
             </div>
-          </div>
-        </section>
+          )}
 
-        {/* CTA */}
-        <section style={{ background: '#0F172A', padding: '56px 24px' }}>
-          <div style={{ maxWidth: '560px', margin: '0 auto', textAlign: 'center', animation: 'fadeUp 0.7s ease both' }}>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 400, color: 'white', margin: '0 0 10px', fontFamily: '"Instrument Serif", Georgia, serif' }}>
-              Ready to build your network?
-            </h3>
-            <p style={{ fontSize: '0.9375rem', color: 'rgba(255,255,255,0.5)', margin: '0 0 32px', lineHeight: 1.6 }}>
-              Sign the agreement and you're minutes away from a live alumni platform.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button onClick={() => goToStep(1)} style={{ ...S.backBtn, color: 'rgba(255,255,255,0.4)' }}>
-                ← Back
-              </button>
-              <NavButton onClick={() => goToStep(3)}>
-                Continue to Agreement <ChevronRight size={16} />
-              </NavButton>
-            </div>
+          {/* Bottom nav */}
+          <div style={{ maxWidth: '680px', margin: '0 auto', width: '100%', padding: '24px 16px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              onClick={() => goToStep(3)}
+              style={{ fontSize: '0.8125rem', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0, minHeight: '44px' }}
+            >
+              Skip to agreement →
+            </button>
+            <button
+              className="launch-next-btn"
+              onClick={advanceLaunchStep}
+              style={{
+                padding: '10px 28px',
+                borderRadius: '8px',
+                background: '#0F172A',
+                color: 'white',
+                fontWeight: 600,
+                fontSize: '0.9375rem',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                minHeight: '44px',
+              }}
+            >
+              {launchSubStep === 5 ? 'Continue to Agreement' : 'Next'}
+              {launchSubStep === 5 ? <ArrowRight size={16} /> : <ChevronRight size={16} />}
+            </button>
           </div>
-        </section>
+
+        </div>{/* end transitioning wrapper */}
       </div>
     );
   }
