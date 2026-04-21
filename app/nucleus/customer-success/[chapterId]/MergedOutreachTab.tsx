@@ -841,6 +841,7 @@ function ContactListSection({
         offset: String(offset),
         sort: 'outreach_status',
         sort_dir: 'asc',
+        has_phone: 'true',
       });
       if (statusFilter !== 'all') {
         params.set('outreach_status', statusFilter);

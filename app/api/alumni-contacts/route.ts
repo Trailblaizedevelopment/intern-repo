@@ -81,6 +81,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Filter to only contacts with phone numbers
+    const hasPhone = searchParams.get('has_phone');
+    if (hasPhone === 'true') {
+      query = query.not('phone_primary', 'is', null);
+    }
+
     if (searchParam && searchParam.trim()) {
       const s = searchParam.trim();
       query = query.or(`first_name.ilike.%${s}%,last_name.ilike.%${s}%,phone_primary.ilike.%${s}%`);
