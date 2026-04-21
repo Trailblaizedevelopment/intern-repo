@@ -283,7 +283,7 @@ function OutreachStatsSection({
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); return; }
       setPreview(json);
-      if (t1Limit === null) setT1Limit(json.t1.max_cap);
+      if (t1Limit === null) setT1Limit(Math.min(30, json.t1.max_cap));
       setShowPreview(true);
     } catch {
       showToast('Failed to load preview', 'error');
