@@ -168,9 +168,11 @@ export async function POST(request: NextRequest) {
     const t1CapRemaining = Object.values(remainingPerLine).reduce((a, b) => a + b, 0);
 
     // Apply user override, but never exceed remaining capacity
+    // Default to 30 T1s if no override provided (safe default for new launches)
+    const DEFAULT_T1 = 30;
     const t1Cap = (t1_limit != null && Number.isFinite(t1_limit))
       ? Math.min(Math.max(0, t1_limit), t1CapRemaining)
-      : t1CapRemaining;
+      : Math.min(DEFAULT_T1, t1CapRemaining);
 
     // T2+T3 cap = remaining slots after T1. Total batch capped at BATCH_TOTAL_CAP.
     // Chunked cron execution handles large batches — no single-request timeout risk.
