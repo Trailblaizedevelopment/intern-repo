@@ -636,7 +636,7 @@ function CompileTab({
   const school = chapter.school;
 
   const [step, setStep] = useState<CompileStep>('idle');
-  const [t1Limit, setT1Limit] = useState(30);
+  const [t1Limit, setT1Limit] = useState<number | null>(null);
   const [preview, setPreview] = useState<BatchPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [batch, setBatch] = useState<BatchSummary | null>(null);
@@ -717,7 +717,7 @@ function CompileTab({
       if (json.error) { showToast(json.error, 'error'); return; }
       setPreview(json);
       const maxCap = json.t1.max_cap ?? 30;
-      setT1Limit(l => l === 30 ? Math.min(30, maxCap) : l);
+      setT1Limit(l => l === null ? maxCap : l);
       setStep('preview');
     } catch {
       showToast('Failed to load preview', 'error');
@@ -753,7 +753,7 @@ function CompileTab({
       const res = await fetch('/api/outreach/compile-chapter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chapter_id: chapterId, date: today, t1_limit: t1Limit, force: true }),
+        body: JSON.stringify({ chapter_id: chapterId, date: today, t1_limit: t1Limit ?? undefined, force: true }),
       });
       const json = await res.json();
       if (json.error) {
@@ -909,19 +909,19 @@ function CompileTab({
                 type="range"
                 min={0}
                 max={preview?.t1.max_cap ?? 90}
-                value={t1Limit}
+                value={t1Limit ?? 0}
                 onChange={e => setT1Limit(parseInt(e.target.value))}
-                onMouseUp={() => { if (step === 'preview') fetchPreview(t1Limit); }}
-                onTouchEnd={() => { if (step === 'preview') fetchPreview(t1Limit); }}
+                onMouseUp={() => { if (step === 'preview') fetchPreview(t1Limit ?? undefined); }}
+                onTouchEnd={() => { if (step === 'preview') fetchPreview(t1Limit ?? undefined); }}
                 style={{ flex: 1, accentColor: C.primary, height: 6 }}
               />
               <input
                 type="number"
                 min={0}
                 max={preview?.t1.max_cap ?? 90}
-                value={t1Limit}
+                value={t1Limit ?? 0}
                 onChange={e => setT1Limit(Math.max(0, parseInt(e.target.value) || 0))}
-                onBlur={() => { if (step === 'preview') fetchPreview(t1Limit); }}
+                onBlur={() => { if (step === 'preview') fetchPreview(t1Limit ?? undefined); }}
                 style={{
                   width: 64, padding: '6px 10px', borderRadius: 8,
                   border: `1px solid ${C.border}`, fontSize: 14,
@@ -952,7 +952,7 @@ function CompileTab({
 
             {/* Preview button */}
             <button
-              onClick={() => fetchPreview(t1Limit)}
+              onClick={() => fetchPreview(t1Limit ?? undefined)}
               disabled={loadingPreview}
               style={{
                 marginTop: 16, display: 'flex', alignItems: 'center', gap: 8,
