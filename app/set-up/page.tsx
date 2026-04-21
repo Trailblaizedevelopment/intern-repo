@@ -174,6 +174,7 @@ function SetUpPage() {
 
   // Agreement state
   const [agreedName, setAgreedName] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [agreedAuthorized, setAgreedAuthorized] = useState(false);
   const [showFullAgreement, setShowFullAgreement] = useState(false);
   const [agreedAt] = useState(() => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
@@ -1332,10 +1333,9 @@ function SetUpPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
             {[
               { icon: <Zap size={18} color="#0F172A" />, title: "What you're getting", desc: "Access to the full Trailblaize platform - alumni directory, message board, engagement tools, and ongoing support." },
-              { icon: <Calendar size={18} color="#0F172A" />, title: 'Your commitment', desc: "12-month commitment starting today. After year one, cancel anytime with 30 days notice. No hidden fees." },
+              { icon: <Calendar size={18} color="#0F172A" />, title: 'Your commitment', desc: promoCode === 'SAE' ? '6-month commitment starting today. After six months, cancel anytime with 30 days notice. No hidden fees.' : '12-month commitment starting today. After year one, cancel anytime with 30 days notice. No hidden fees.' },
               { icon: <DollarSign size={18} color="#0F172A" />, title: 'What it costs', desc: price ? `$${price}/month · Billed monthly · Based on ${form.memberCount} members. Pricing reviewed at renewal.` : 'Pricing based on your member count.' },
               { icon: <Shield size={18} color="#0F172A" />, title: 'Your data', desc: "Your data belongs to you. We use it only to run the platform. Never sold. Export or delete anytime." },
-              { icon: <X size={18} color="#6B7280" />, title: 'Cancellation', desc: "Cancel after year one with 30 days written notice. Outstanding fees due at cancellation." },
             ].map((card) => (
               <div key={card.title} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px 20px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
                 <div style={{ flexShrink: 0, marginTop: '1px' }}>{card.icon}</div>
@@ -1355,7 +1355,17 @@ function SetUpPage() {
 
           {showFullAgreement && (
             <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', marginBottom: '20px', maxHeight: '240px', overflowY: 'auto' }}>
-              <pre style={{ fontSize: '0.6875rem', color: '#6B7280', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>{FULL_AGREEMENT}</pre>
+              <pre style={{ fontSize: '0.6875rem', color: '#6B7280', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>{promoCode === 'SAE' ? FULL_AGREEMENT.replace('twelve (12) months', 'six (6) months').replace('Initial Term', 'Initial Term (6 months)') : FULL_AGREEMENT}</pre>
+              <div style={{ marginTop: '12px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                  placeholder="Code"
+                  style={{ width: '120px', padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'inherit', color: '#9CA3AF' }}
+                />
+                {promoCode === 'SAE' && <span style={{ fontSize: '0.7rem', color: '#10B981', marginLeft: '8px', fontWeight: 600 }}>6-month commitment applied</span>}
+              </div>
             </div>
           )}
 
