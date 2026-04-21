@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trailblaize Product Roadmap</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Inter, system-ui, sans-serif; background: #F9FAFB; color: #111827; }
+  .header { background: #0F172A; color: white; padding: 24px 32px; position: sticky; top: 0; z-index: 10; }
+  .header h1 { font-size: 20px; font-weight: 700; }
+  .header p { font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+  .controls { padding: 16px 32px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; background: white; border-bottom: 1px solid #E5E7EB; }
+  .btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #E5E7EB; background: white; cursor: pointer; font-size: 13px; font-weight: 500; font-family: inherit; }
+  .btn:hover { background: #F3F4F6; }
+  .btn.active { background: #0F172A; color: white; border-color: #0F172A; }
+  .btn.add { background: #10B981; color: white; border-color: #10B981; }
+  .btn.add:hover { background: #059669; }
+  .board { display: flex; gap: 16px; padding: 24px 32px; overflow-x: auto; min-height: calc(100vh - 160px); }
+  .lane { min-width: 300px; flex: 1; background: white; border-radius: 12px; border: 1px solid #E5E7EB; display: flex; flex-direction: column; }
+  .lane-header { padding: 14px 16px; border-bottom: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: space-between; }
+  .lane-title { font-size: 14px; font-weight: 700; }
+  .lane-count { font-size: 12px; color: white; background: #0F172A; border-radius: 10px; padding: 2px 8px; }
+  .lane-body { padding: 12px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .card { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.15s; }
+  .card:hover { border-color: #0F172A; }
+  .card.p0 { border-left: 3px solid #EF4444; }
+  .card.p1 { border-left: 3px solid #F59E0B; }
+  .card.p2 { border-left: 3px solid #3B82F6; }
+  .card.p3 { border-left: 3px solid #9CA3AF; }
+  .card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .card-desc { font-size: 12px; color: #6B7280; line-height: 1.4; }
+  .card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+  .tag { font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 600; }
+  .tag.product { background: #DBEAFE; color: #1E40AF; }
+  .tag.sales { background: #D1FAE5; color: #065F46; }
+  .tag.growth { background: #FEF3C7; color: #92400E; }
+  .tag.infra { background: #E5E7EB; color: #374151; }
+  .tag.p0 { background: #FEE2E2; color: #991B1B; }
+  .tag.p1 { background: #FEF3C7; color: #92400E; }
+  .tag.owner-forge { background: #EDE9FE; color: #5B21B6; }
+  .tag.owner-devin { background: #FCE7F3; color: #9D174D; }
+  .tag.owner-tony { background: #CFFAFE; color: #155E75; }
+
+  .shipped { padding: 24px 32px; }
+  .shipped h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #111827; }
+  .shipped-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  .shipped-card { background: white; border: 1px solid #D1FAE5; border-radius: 10px; padding: 10px 12px; }
+  .shipped-card .card-title { color: #059669; }
+  .shipped-card .card-desc { font-size: 11px; }
+
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 20; align-items: center; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal { background: white; border-radius: 16px; padding: 24px; max-width: 480px; width: 90%; max-height: 80vh; overflow-y: auto; }
+  .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .modal label { font-size: 12px; font-weight: 600; color: #6B7280; display: block; margin-bottom: 4px; margin-top: 12px; }
+  .modal input, .modal textarea, .modal select { width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; font-size: 13px; font-family: inherit; }
+  .modal textarea { min-height: 60px; resize: vertical; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+  @media (max-width: 768px) {
+    .board { flex-direction: column; }
+    .lane { min-width: unset; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Trailblaize Product Roadmap</h1>
+  <p>Interactive session - April 21, 2026</p>
+</div>
+
+<div class="controls">
+  <button class="btn active" onclick="showView('board')">Board View</button>
+  <button class="btn" onclick="showView('shipped')">Shipped This Week</button>
+  <button class="btn add" onclick="openModal()">+ Add Item</button>
+  <span style="margin-left:auto; font-size:12px; color:#6B7280;" id="item-count"></span>
+</div>
+
+<div id="board-view" class="board"></div>
+
+<div id="shipped-view" class="shipped" style="display:none;">
+  <h2>Shipped This Week (April 14-21)</h2>
+  <div class="shipped-grid" id="shipped-grid"></div>
+</div>
+
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Add Roadmap Item</h3>
+    <label>Title</label>
+    <input type="text" id="m-title" placeholder="Feature or task name">
+    <label>Description</label>
+    <textarea id="m-desc" placeholder="What needs to be built?"></textarea>
+    <label>Priority</label>
+    <select id="m-priority">
+      <option value="p0">P0 - Critical</option>
+      <option value="p1" selected>P1 - This Week</option>
+      <option value="p2">P2 - This Sprint</option>
+      <option value="p3">P3 - Backlog</option>
+    </select>
+    <label>Category</label>
+    <select id="m-category">
+      <option value="product">Product</option>
+      <option value="sales">Sales Tools</option>
+      <option value="growth">Growth</option>
+      <option value="infra">Infrastructure</option>
+    </select>
+    <label>Owner</label>
+    <select id="m-owner">
+      <option value="forge">Forge</option>
+      <option value="devin">Devin</option>
+      <option value="tony">Tony</option>
+    </select>
+    <label>Lane</label>
+    <select id="m-lane">
+      <option value="backlog">Backlog</option>
+      <option value="up-next">Up Next</option>
+      <option value="in-progress">In Progress</option>
+      <option value="review">Needs Review</option>
+    </select>
+    <input type="hidden" id="m-edit-id" value="">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn" style="background:#0F172A;color:white;border-color:#0F172A;" onclick="saveItem()">Save</button>
+      <button class="btn" id="delete-btn" style="background:#EF4444;color:white;border-color:#EF4444;display:none;" onclick="deleteItem()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LANES = ['backlog', 'up-next', 'in-progress', 'review'];
+const LANE_LABELS = { 'backlog': 'Backlog', 'up-next': 'Up Next', 'in-progress': 'In Progress', 'review': 'Needs Review' };
+
+const DEFAULT_ITEMS = [
+  // FROM CURRENT BACKLOG + NEW ITEMS
+  { id: '1', title: 'War Room Campaign Restructure', desc: 'Turn campaigns into prospect-level tracking with status pipeline (Not Contacted → T1 → T2 → T3 → Replied → Demo → Closed). Import Power 5 database.', priority: 'p0', category: 'sales', owner: 'forge', lane: 'up-next' },
+  { id: '2', title: 'Connects Center V3 → Supabase', desc: 'Migrate call logs, tags, notes from localStorage to Supabase. The Web network graph needs persistent storage.', priority: 'p1', category: 'product', owner: 'forge', lane: 'up-next' },
+  { id: '3', title: 'Set-Up Flow Polish', desc: 'Mobile responsiveness fixes, screenshot updates from alpha chapter, agreement + payment flow testing end-to-end.', priority: 'p1', category: 'product', owner: 'forge', lane: 'in-progress' },
+  { id: '4', title: 'Marketing Website Build', desc: 'Full marketing site: Homepage, How It Works, For Chapters, For IFC, For Nationals, Pricing, About, Blog. Match trailblaize.net branding.', priority: 'p1', category: 'growth', owner: 'forge', lane: 'backlog' },
+  { id: '5', title: 'Email Outreach Automation', desc: 'Build sending queue for Power 5 outreach. 50-60 emails/day, spaced 8-10 min. 3-touch cadence with auto follow-up. Track opens/clicks.', priority: 'p0', category: 'sales', owner: 'forge', lane: 'up-next' },
+  { id: '6', title: 'Finance Dashboard', desc: 'MRR/ARR tracking, pipeline ARR, Stripe payouts. Read-only bookkeeper view. Needs STRIPE_SECRET_KEY.', priority: 'p2', category: 'product', owner: 'forge', lane: 'backlog' },
+  { id: '7', title: 'Deal Last-Activity Tracking', desc: 'Add last_activity_at field. Surface "X days since last contact" on deal cards. Schema change needed.', priority: 'p2', category: 'sales', owner: 'forge', lane: 'backlog' },
+  { id: '8', title: 'Batch Execution Progress Bar', desc: 'Polling endpoint + live progress bar for outreach batches. Currently shows nothing during 5+ min sends.', priority: 'p2', category: 'product', owner: 'forge', lane: 'backlog' },
+  { id: '9', title: 'Context API for Greg', desc: '/api/context endpoint built and deployed. Greg (MacBook Air) can pull pipeline, chapters, deals, metrics.', priority: 'p1', category: 'infra', owner: 'tony', lane: 'review' },
+  { id: '10', title: '11-Line Linq Architecture', desc: 'All 9 lines in UI, line badges on conversation cards, line filter dropdown. Deployed 4/17.', priority: 'p1', category: 'product', owner: 'forge', lane: 'review' },
+  { id: '11', title: 'Space Targeting System', desc: 'Automate the Space Targeting playbook: input a person → map their orgs → create Spaces → outreach to org admins. Requires new data model.', priority: 'p2', category: 'growth', owner: 'forge', lane: 'backlog' },
+  { id: '12', title: 'Granola Integration (All 3 Keys)', desc: 'Owen + Ford + Adam Granola API keys added to Vercel. Meeting notes now pull from all 3.', priority: 'p1', category: 'infra', owner: 'tony', lane: 'review' },
+  { id: '13', title: 'Growth Intern Dashboard Polish', desc: 'My Deals default, campaign association on deal creation, simplified nav.', priority: 'p2', category: 'product', owner: 'forge', lane: 'in-progress' },
+  { id: '14', title: 'Platform Mobile App Improvements', desc: 'Devin scope - mobile app UX, push notifications, profile completion flow.', priority: 'p1', category: 'product', owner: 'devin', lane: 'backlog' },
+  { id: '15', title: 'Headhunting Matching Engine', desc: 'Auto-suggest alumni-to-active matches based on industry, city, interests. "Ethan Hill (Finance, Dallas) → connect with Evan Foster (wants WM in Dallas)."', priority: 'p2', category: 'product', owner: 'forge', lane: 'backlog' },
+  { id: '16', title: 'Donation/Dues System', desc: 'Monthly subscription donations from alumni + one-time donations. Stripe integration per chapter.', priority: 'p2', category: 'product', owner: 'devin', lane: 'backlog' },
+  { id: '17', title: 'Instagram Outreach Integration', desc: 'Connect @jointrailblaize IG. Track DMs sent, replies, conversions. Feed into campaign tracking.', priority: 'p2', category: 'growth', owner: 'tony', lane: 'backlog' },
+  { id: '18', title: 'Cron Job Reliability', desc: 'Fix timing out crons: morning-chapter-brief (8 consecutive failures), sales-brief-morning (timeout). Slim queries.', priority: 'p1', category: 'infra', owner: 'tony', lane: 'up-next' },
+];
+
+const SHIPPED = [
+  { title: '/set-up Flow: Member Activation Step', desc: '6-section "Your Launch" page with animations, real avatar data from alpha chapter' },
+  { title: '/set-up Overview Click-Through', desc: 'Hook → Hero → Features → Connections → Org Types → CTA. Fade transitions, progress dots.' },
+  { title: '/set-up Org Info Simplified', desc: '6 fields only. Member count restored for pricing.' },
+  { title: 'Connects Center V3', desc: 'Kanban pipeline, platform members only, simplified call flow, The Web network graph.' },
+  { title: 'Linq 11-Line Support', desc: 'All 9 lines in filter dropdown, line badges, 3-column responsive grid.' },
+  { title: 'Email Campaign System', desc: 'SAM Miami 1,115 emails sent. Webhook tracking. Chunked sending. Founder notifications.' },
+  { title: '/api/context for Greg', desc: 'Unified API endpoint for external agents. Pipeline, chapters, deals, metrics.' },
+  { title: 'Real Avatar Photos in Set-Up', desc: 'Pulled from Supabase storage. Feed, alumni cards, messaging hub, network animations.' },
+  { title: 'Growth Intern My Deals Default', desc: 'Flipped dashboard default so interns see their deals first.' },
+  { title: 'UCF Sorority Follow-Ups', desc: '11 follow-up emails sent with social proof. Spaced, casual tone.' },
+  { title: 'Space Targeting Pitch Deck', desc: '18-slide deck with 10 people mapped. 70+ orgs. $3M+ ARR potential.' },
+  { title: 'Power 5 Contact Database', desc: '1,500+ chapters across 48 schools. SEC, Big 12, ACC, Big Ten.' },
+  { title: 'Monday Meeting Briefs', desc: '6 demo briefs with contacts, talking points, social proof angles.' },
+  { title: 'Weekly Planner Email', desc: 'Hour-by-hour block schedule for Mon-Fri. Auto-generated from calendar.' },
+];
+
+let items = JSON.parse(localStorage.getItem('roadmap_items') || 'null') || DEFAULT_ITEMS;
+
+function save() { localStorage.setItem('roadmap_items', JSON.stringify(items)); }
+
+function render() {
+  const board = document.getElementById('board-view');
+  board.innerHTML = '';
+  LANES.forEach(lane => {
+    const laneItems = items.filter(i => i.lane === lane);
+    const div = document.createElement('div');
+    div.className = 'lane';
+    div.innerHTML = `<div class="lane-header"><span class="lane-title">${LANE_LABELS[lane]}</span><span class="lane-count">${laneItems.length}</span></div>`;
+    const body = document.createElement('div');
+    body.className = 'lane-body';
+    body.setAttribute('data-lane', lane);
+    body.addEventListener('dragover', e => { e.preventDefault(); body.style.background = '#F0FDF4'; });
+    body.addEventListener('dragleave', () => { body.style.background = ''; });
+    body.addEventListener('drop', e => { e.preventDefault(); body.style.background = ''; const id = e.dataTransfer.getData('text/plain'); const item = items.find(i => i.id === id); if (item) { item.lane = lane; save(); render(); } });
+    laneItems.forEach(item => {
+      const card = document.createElement('div');
+      card.className = `card ${item.priority}`;
+      card.draggable = true;
+      card.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', item.id));
+      card.addEventListener('click', () => editItem(item.id));
+      card.innerHTML = `<div class="card-title">${item.title}</div><div class="card-desc">${item.desc}</div><div class="card-tags"><span class="tag ${item.category}">${item.category}</span><span class="tag ${item.priority}">${item.priority.toUpperCase()}</span><span class="tag owner-${item.owner}">${item.owner}</span></div>`;
+      body.appendChild(card);
+    });
+    div.appendChild(body);
+    board.appendChild(div);
+  });
+  document.getElementById('item-count').textContent = `${items.length} items`;
+
+  // Shipped
+  const sg = document.getElementById('shipped-grid');
+  sg.innerHTML = '';
+  SHIPPED.forEach(s => {
+    sg.innerHTML += `<div class="shipped-card"><div class="card-title">✅ ${s.title}</div><div class="card-desc">${s.desc}</div></div>`;
+  });
+}
+
+function showView(v) {
+  document.getElementById('board-view').style.display = v === 'board' ? 'flex' : 'none';
+  document.getElementById('shipped-view').style.display = v === 'shipped' ? 'block' : 'none';
+  document.querySelectorAll('.controls .btn:not(.add)').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+function openModal() {
+  document.getElementById('modal-title').textContent = 'Add Roadmap Item';
+  document.getElementById('m-title').value = '';
+  document.getElementById('m-desc').value = '';
+  document.getElementById('m-priority').value = 'p1';
+  document.getElementById('m-category').value = 'product';
+  document.getElementById('m-owner').value = 'forge';
+  document.getElementById('m-lane').value = 'backlog';
+  document.getElementById('m-edit-id').value = '';
+  document.getElementById('delete-btn').style.display = 'none';
+  document.getElementById('modal').classList.add('open');
+}
+
+function editItem(id) {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('modal-title').textContent = 'Edit Item';
+  document.getElementById('m-title').value = item.title;
+  document.getElementById('m-desc').value = item.desc;
+  document.getElementById('m-priority').value = item.priority;
+  document.getElementById('m-category').value = item.category;
+  document.getElementById('m-owner').value = item.owner;
+  document.getElementById('m-lane').value = item.lane;
+  document.getElementById('m-edit-id').value = id;
+  document.getElementById('delete-btn').style.display = 'inline-block';
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function saveItem() {
+  const editId = document.getElementById('m-edit-id').value;
+  const data = {
+    title: document.getElementById('m-title').value,
+    desc: document.getElementById('m-desc').value,
+    priority: document.getElementById('m-priority').value,
+    category: document.getElementById('m-category').value,
+    owner: document.getElementById('m-owner').value,
+    lane: document.getElementById('m-lane').value,
+  };
+  if (!data.title) return;
+  if (editId) {
+    const item = items.find(i => i.id === editId);
+    Object.assign(item, data);
+  } else {
+    items.push({ id: Date.now().toString(), ...data });
+  }
+  save(); closeModal(); render();
+}
+
+function deleteItem() {
+  const id = document.getElementById('m-edit-id').value;
+  items = items.filter(i => i.id !== id);
+  save(); closeModal(); render();
+}
+
+render();
+</script>
+</body>
+</html>
