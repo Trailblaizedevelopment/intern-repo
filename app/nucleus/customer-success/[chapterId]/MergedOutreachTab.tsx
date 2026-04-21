@@ -1133,6 +1133,19 @@ function CompileTab({
             </div>
           </div>
 
+          {/* T1 Message Preview */}
+          <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, background: '#FFFBEB' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+              Message Preview - What will be sent
+            </div>
+            <div style={{ background: 'white', border: '1px solid #FCD34D', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: C.heading, lineHeight: 1.5 }}>
+              &quot;Hey <span style={{ fontWeight: 700 }}>[First Name]</span>, is this you? Just verifying we have the right number for the <span style={{ fontWeight: 700 }}>{chapter?.fraternity || 'chapter'}</span> alumni list at <span style={{ fontWeight: 700 }}>{chapter?.school || 'your school'}</span>.&quot;
+            </div>
+            <div style={{ fontSize: 11, color: '#B45309', marginTop: 6 }}>
+              This exact message goes to every T1 contact with their real first name.
+            </div>
+          </div>
+
           {/* Contact list from batch */}
           {batchContacts.length > 0 && (
             <div style={{ borderBottom: `1px solid ${C.border}`, maxHeight: 280, overflowY: 'auto' }}>
