@@ -22,6 +22,8 @@ const OUR_LINES = [
   { line_number: 7, label: 'Line 7', phone: '+19725590438', daily_limit: 45 },
   { line_number: 8, label: 'Line 8', phone: '+15042234218', daily_limit: 45 },
   { line_number: 9, label: 'Line 9', phone: '+15042236050', daily_limit: 45 },
+  { line_number: 10, label: 'Line 10', phone: '+12817773280', daily_limit: 45 },
+  { line_number: 11, label: 'Line 11', phone: '+12817452268', daily_limit: 45 },
 ];
 
 interface LinqLineResponse {

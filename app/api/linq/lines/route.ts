@@ -20,6 +20,8 @@ const DEFAULT_LINES = [
   { line_number: 7, label: 'Line 7', line_phone: '+19725590438', daily_limit: 45 },
   { line_number: 8, label: 'Line 8', line_phone: '+15042234218', daily_limit: 45 },
   { line_number: 9, label: 'Line 9', line_phone: '+15042236050', daily_limit: 45 },
+  { line_number: 10, label: 'Line 10', line_phone: '+12817773280', daily_limit: 45 },
+  { line_number: 11, label: 'Line 11', line_phone: '+12817452268', daily_limit: 45 },
 ];
 
 export async function GET(request: NextRequest) {
@@ -39,9 +41,24 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // Auto-seed any missing lines from DEFAULT_LINES
+  const existingNumbers = new Set((data || []).map((l: Record<string, unknown>) => l.line_number));
+  const missing = DEFAULT_LINES.filter(l => !existingNumbers.has(l.line_number));
+  if (missing.length > 0) {
+    await supabase.from('linq_line_config').upsert(
+      missing.map(l => ({ ...l, is_paused: false, is_warmed_up: true, round_robin_sequence: 0 })),
+      { onConflict: 'line_number' }
+    );
+  }
+
+  // Re-fetch after seed
+  const { data: freshData } = missing.length > 0
+    ? await supabase.from('linq_line_config').select('*').order('line_number')
+    : { data };
+
   // Base DB data
-  const baseData = (data && data.length > 0)
-    ? data
+  const baseData = (freshData && freshData.length > 0)
+    ? freshData
     : DEFAULT_LINES.map(l => ({ ...l, is_paused: false, pause_reason: null }));
 
   // ── Merge with live Linq line-health ──────────────────────────────────────
