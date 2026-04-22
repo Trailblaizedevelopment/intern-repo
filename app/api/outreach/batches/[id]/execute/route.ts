@@ -46,7 +46,7 @@ function getLineT1Cap(line: {
 
 // T1 — identity verify ONLY. No link, no pitch.
 function buildT1Message(firstName: string, fraternityName: string, school: string): string {
-  return `Hey ${firstName}, is this you? Just verifying we have the right number for the ${fraternityName} alumni list at ${school}.`;
+  return `Hey ${firstName}, this is Ford from Trailblaize. I'm reaching out to verify your phone number on the ${school} ${fraternityName} alumni list. Do I have the right number?`;
 }
 
 // Track A — they confirmed identity (touch1_confirmed)
