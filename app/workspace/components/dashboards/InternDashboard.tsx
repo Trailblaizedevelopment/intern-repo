@@ -12,6 +12,7 @@ import {
   Flame,
   Snowflake,
   Minus,
+  CheckSquare,
 } from 'lucide-react';
 import { useGoogleIntegration } from '../../hooks/useGoogleIntegration';
 import { UseWorkspaceDataReturn } from '../../hooks/useWorkspaceData';
@@ -553,6 +554,326 @@ function SchoolsWidget({
   );
 }
 
+/* ─── Tasks Section ─────────────────────────────────────────────────────── */
+
+interface Task {
+  id: string;
+  text: string;
+  dueDate: string;
+  linkedTo?: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+const TASKS_KEY = 'intern_tasks_v1';
+
+const _inputStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  border: '1px solid #E5E7EB',
+  borderRadius: 8,
+  fontSize: 13,
+  color: '#111827',
+  background: '#fff',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+};
+
+const _btnPrimary: React.CSSProperties = {
+  padding: '6px 16px',
+  background: '#0F172A',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: 'pointer',
+};
+
+const _btnSecondary: React.CSSProperties = {
+  padding: '6px 16px',
+  background: '#fff',
+  color: '#374151',
+  border: '1px solid #E5E7EB',
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: 'pointer',
+};
+
+function formatDueDate(date: string): string {
+  if (!date) return '';
+  const d = new Date(date + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.floor((d.getTime() - today.getTime()) / 86400000);
+  if (diff < 0) return `${Math.abs(diff)}d overdue`;
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function isTaskOverdue(date: string): boolean {
+  if (!date) return false;
+  return new Date(date + 'T23:59:59') < new Date();
+}
+
+function TasksSection() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [showForm, setShowForm] = useState(false);
+  const [formText, setFormText] = useState('');
+  const [formDue, setFormDue] = useState('');
+  const [formLinked, setFormLinked] = useState('');
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TASKS_KEY);
+      if (raw) setTasks(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, []);
+
+  function saveTasks(updated: Task[]) {
+    setTasks(updated);
+    localStorage.setItem(TASKS_KEY, JSON.stringify(updated));
+  }
+
+  function addTask() {
+    if (!formText.trim()) return;
+    const newTask: Task = {
+      id: Date.now().toString(),
+      text: formText.trim(),
+      dueDate: formDue,
+      linkedTo: formLinked.trim() || undefined,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    saveTasks([...tasks, newTask]);
+    setFormText('');
+    setFormDue('');
+    setFormLinked('');
+    setShowForm(false);
+  }
+
+  function toggleTask(id: string) {
+    saveTasks(tasks.map(t => (t.id === id ? { ...t, completed: !t.completed } : t)));
+  }
+
+  const filtered = tasks.filter(t => {
+    if (filter === 'pending') return !t.completed;
+    if (filter === 'completed') return t.completed;
+    return true;
+  });
+
+  const pendingCount = tasks.filter(t => !t.completed).length;
+
+  return (
+    <div className="idb-card" style={{ marginTop: 16 }}>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 16,
+          flexWrap: 'wrap',
+          gap: 10,
+        }}
+      >
+        <div>
+          <div className="idb-widget-label">TASKS</div>
+          <h2 className="idb-pipeline-title" style={{ margin: 0 }}>
+            My Tasks
+            {pendingCount > 0 && (
+              <span className="idb-deal-count">{pendingCount}</span>
+            )}
+          </h2>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Filter pills */}
+          {(['all', 'pending', 'completed'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{
+                padding: '4px 12px',
+                borderRadius: 99,
+                border: filter === f ? '1px solid #0F172A' : '1px solid #E5E7EB',
+                background: filter === f ? '#0F172A' : '#fff',
+                color: filter === f ? '#fff' : '#6B7280',
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+
+          {/* Add Task button */}
+          <button
+            onClick={() => setShowForm(v => !v)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '6px 14px',
+              background: '#0F172A',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={14} /> Add Task
+          </button>
+        </div>
+      </div>
+
+      {/* Inline add form */}
+      {showForm && (
+        <div
+          style={{
+            background: '#F9FAFB',
+            border: '1px solid #E5E7EB',
+            borderRadius: 10,
+            padding: 14,
+            marginBottom: 14,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          <input
+            placeholder="Task description…"
+            value={formText}
+            onChange={e => setFormText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addTask()}
+            autoFocus
+            style={_inputStyle}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="date"
+              value={formDue}
+              onChange={e => setFormDue(e.target.value)}
+              style={{ ..._inputStyle, flex: 1 }}
+            />
+            <input
+              placeholder="Linked deal or campaign (optional)"
+              value={formLinked}
+              onChange={e => setFormLinked(e.target.value)}
+              style={{ ..._inputStyle, flex: 2 }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => setShowForm(false)} style={_btnSecondary}>
+              Cancel
+            </button>
+            <button onClick={addTask} style={_btnPrimary}>
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Task list */}
+      {filtered.length === 0 ? (
+        <div
+          className="idb-table-empty"
+          style={{ padding: '24px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        >
+          <CheckSquare size={16} color="#9CA3AF" />
+          <span>{filter === 'all' ? 'No tasks yet — add one!' : `No ${filter} tasks.`}</span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {filtered.map((task, idx) => (
+            <div
+              key={task.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '10px 4px',
+                borderBottom: idx < filtered.length - 1 ? '1px solid #F3F4F6' : 'none',
+              }}
+            >
+              {/* Checkbox */}
+              <input
+                type="checkbox"
+                checked={task.completed}
+                onChange={() => toggleTask(task.id)}
+                style={{
+                  width: 16,
+                  height: 16,
+                  cursor: 'pointer',
+                  accentColor: '#0F172A',
+                  flexShrink: 0,
+                }}
+              />
+
+              {/* Text + linked */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span
+                  style={{
+                    fontSize: 14,
+                    color: task.completed ? '#9CA3AF' : '#111827',
+                    textDecoration: task.completed ? 'line-through' : 'none',
+                  }}
+                >
+                  {task.text}
+                </span>
+                {task.linkedTo && (
+                  <span style={{ fontSize: 11, color: '#6B7280', marginLeft: 8 }}>
+                    ↗ {task.linkedTo}
+                  </span>
+                )}
+              </div>
+
+              {/* Due date */}
+              {task.dueDate && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    color:
+                      !task.completed && isTaskOverdue(task.dueDate)
+                        ? '#EF4444'
+                        : '#6B7280',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {formatDueDate(task.dueDate)}
+                </span>
+              )}
+
+              {/* Status badge */}
+              <span
+                style={{
+                  display: 'inline-block',
+                  padding: '2px 8px',
+                  borderRadius: 99,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: task.completed ? '#10B98118' : '#F59E0B18',
+                  color: task.completed ? '#10B981' : '#F59E0B',
+                  border: `1px solid ${task.completed ? '#10B98130' : '#F59E0B30'}`,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {task.completed ? 'done' : 'pending'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main Dashboard ─────────────────────────────────────────────────────── */
 
 interface InternDashboardProps {
@@ -606,6 +927,9 @@ export function InternDashboard({ data }: InternDashboardProps) {
         activeSchool={schoolFilter}
         onSelectSchool={setSchoolFilter}
       />
+
+      {/* Tasks */}
+      <TasksSection />
 
       {/* New Deal Modal */}
       {modalOpen && (
