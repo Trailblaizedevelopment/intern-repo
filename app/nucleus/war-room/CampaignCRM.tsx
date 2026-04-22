@@ -1137,6 +1137,51 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
       .catch(err => console.error('[campaign-crm] schools error:', err));
   }, []);
 
+  // ── Power 5 prospect import ──────────────────────────────────────────────
+  useEffect(() => {
+    if (campaigns.length === 0 || loading) return;
+    if (localStorage.getItem('p5_prospects_seeded_v1')) return;
+    (async () => {
+      try {
+        const res = await fetch('/p5-prospects-seed.json');
+        if (!res.ok) return;
+        const seedData = await res.json();
+        const existing = loadProspects();
+        const campaignBySchool: Record<string, string> = {};
+        campaigns.forEach((c: Campaign) => {
+          const name = (c.name || '').toLowerCase().trim();
+          campaignBySchool[name] = c.id;
+          // Also index by school field if different
+          const school = ((c as any).school || '').toLowerCase().trim();
+          if (school) campaignBySchool[school] = c.id;
+        });
+        let added = 0;
+        for (const p of seedData) {
+          const schoolLower = (p.school || '').toLowerCase().trim();
+          let campaignId = campaignBySchool[schoolLower];
+          if (!campaignId) {
+            for (const [cName, cId] of Object.entries(campaignBySchool)) {
+              if (schoolLower.includes(cName) || cName.includes(schoolLower)) {
+                campaignId = cId; break;
+              }
+            }
+          }
+          if (campaignId && !existing[p.id]) {
+            p.campaignId = campaignId;
+            existing[p.id] = p;
+            added++;
+          }
+        }
+        if (added > 0) {
+          localStorage.setItem(LS_KEY, JSON.stringify(existing));
+          setProspects({ ...existing });
+        }
+        localStorage.setItem('p5_prospects_seeded_v1', '1');
+        console.log(`[p5-seed] Imported ${added} prospects from Power 5 database`);
+      } catch (err) { console.error('[p5-seed]', err); }
+    })();
+  }, [campaigns, loading]);
+
   // Auto-seed from pipeline stats if no campaigns
   useEffect(() => {
     if (loading || seededRef.current || !stats?.recentDeals?.length) return;
