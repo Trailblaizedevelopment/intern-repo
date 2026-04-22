@@ -11,7 +11,7 @@ import Link from 'next/link';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type ColumnStatus = 'not_called' | 'voicemail' | 'called' | 'declined';
+type ColumnStatus = 'not_called' | 'voicemail' | 'called' | 'declined' | 'pending_connect' | 'connected';
 type ActiveView = 'call_center' | 'web';
 
 interface MergedAlumni {
@@ -59,6 +59,35 @@ interface CallLog {
   followUpDate?: string;
   followUpCompleted?: boolean;
   contactSnapshot?: ContactSnapshot;
+}
+
+interface PendingConnectEntry {
+  id: string;
+  personName: string;
+  connectWithName: string;
+  connectType: 'Job' | 'Mentoring' | 'Advice' | 'Networking';
+  createdAt: string;
+  createdBy: string;
+}
+
+interface ConnectedEntry {
+  id: string;
+  person1Name: string;
+  person2Name: string;
+  connectType: 'Job' | 'Mentoring' | 'Advice' | 'Networking';
+  connectedAt: string;
+}
+
+interface SeedEntry {
+  name: string;
+  chapter: string;
+  status: string;
+  outcome: 'answered' | 'voicemail' | 'declined';
+  calledBy: string;
+  calledAt: string;
+  notes: string;
+  tags: string[];
+  followUp: string | null;
 }
 
 interface Claim {
@@ -113,7 +142,9 @@ const COLUMN_CONFIG: Record<ColumnStatus, {
   not_called: { label: 'Not Called',     borderColor: '#d1d5db', badgeBg: '#f3f4f6', badgeColor: '#6b7280', headerBg: '#f9fafb' },
   voicemail:  { label: 'Voicemail Sent', borderColor: '#93c5fd', badgeBg: '#dbeafe', badgeColor: '#1d4ed8', headerBg: '#eff6ff' },
   called:     { label: 'Called / Logged',borderColor: '#86efac', badgeBg: '#dcfce7', badgeColor: '#15803d', headerBg: '#f0fdf4' },
-  declined:   { label: 'Declined',       borderColor: '#fca5a5', badgeBg: '#fee2e2', badgeColor: '#b91c1c', headerBg: '#fff1f2' },
+  declined:        { label: 'Declined',          borderColor: '#fca5a5', badgeBg: '#fee2e2', badgeColor: '#b91c1c', headerBg: '#fff1f2' },
+  pending_connect: { label: 'Pending Connects',   borderColor: '#8B5CF6', badgeBg: '#ede9fe', badgeColor: '#7c3aed', headerBg: '#f5f3ff' },
+  connected:       { label: 'Connected',           borderColor: '#10B981', badgeBg: '#d1fae5', badgeColor: '#065f46', headerBg: '#ecfdf5' },
 };
 
 const PREDEFINED_TAGS: { label: string; color: string; bg: string }[] = [
@@ -145,12 +176,15 @@ const EDGE_COLORS: Record<'industry' | 'city' | 'interest', string> = {
 // ─── localStorage ─────────────────────────────────────────────────────────────
 
 const LS = {
-  callLogs:      'connects_call_logs_v3',
-  claims:        'connects_claims_v3',
-  assignments:   'connects_assignments_v3',
-  currentUser:   'connects_current_user',
-  todoCompleted: 'connects_todo_completed_v3',
+  callLogs:       'connects_call_logs_v3',
+  claims:         'connects_claims_v3',
+  assignments:    'connects_assignments_v3',
+  currentUser:    'connects_current_user',
+  todoCompleted:  'connects_todo_completed_v3',
+  pendingConnects:'connects_pending_v3',
+  connected:      'connects_connected_v3',
 };
+const SEED_FLAG = 'connects_seeded_v3';
 
 function readCallLogs(): Record<string, CallLog> {
   try { return JSON.parse(localStorage.getItem(LS.callLogs) || '{}'); } catch { return {}; }
@@ -194,6 +228,19 @@ function toggleTodoDone(key: string): string[] {
   if (idx >= 0) all.splice(idx, 1); else all.push(key);
   localStorage.setItem(LS.todoCompleted, JSON.stringify(all));
   return [...all];
+}
+
+function readPendingConnects(): PendingConnectEntry[] {
+  try { return JSON.parse(localStorage.getItem(LS.pendingConnects) || '[]'); } catch { return []; }
+}
+function writePendingConnects(entries: PendingConnectEntry[]) {
+  localStorage.setItem(LS.pendingConnects, JSON.stringify(entries));
+}
+function readConnected(): ConnectedEntry[] {
+  try { return JSON.parse(localStorage.getItem(LS.connected) || '[]'); } catch { return []; }
+}
+function writeConnected(entries: ConnectedEntry[]) {
+  localStorage.setItem(LS.connected, JSON.stringify(entries));
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -735,6 +782,147 @@ function LoggingPanel({ panel, currentUser, onClose, onSave, onChange }: {
   );
 }
 
+// ─── Pending Connect Card ────────────────────────────────────────────────────
+
+const CONNECT_TYPE_STYLES: Record<string, { color: string; bg: string }> = {
+  Job:        { color: '#15803d', bg: '#dcfce7' },
+  Mentoring:  { color: '#1d4ed8', bg: '#dbeafe' },
+  Advice:     { color: '#d97706', bg: '#fef3c7' },
+  Networking: { color: '#7c3aed', bg: '#ede9fe' },
+};
+function getConnectTypeStyle(t: string) { return CONNECT_TYPE_STYLES[t] ?? { color: '#6b7280', bg: '#f3f4f6' }; }
+
+function PendingConnectCard({ entry, onPromote }: { entry: PendingConnectEntry; onPromote: () => void }) {
+  const tc = getConnectTypeStyle(entry.connectType);
+  return (
+    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px', transition: 'border-color 0.15s' }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = '#9ca3af')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = '#E5E7EB')}
+    >
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+        <AvatarImg avatarUrl={null} name={entry.personName} size={40} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827', lineHeight: 1.3 }}>{entry.personName}</div>
+          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 2 }}>wants to connect with</div>
+          <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginTop: 1 }}>{entry.connectWithName}</div>
+        </div>
+        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: tc.color, background: tc.bg, padding: '3px 8px', borderRadius: 9999, flexShrink: 0 }}>{entry.connectType}</span>
+      </div>
+      <button
+        onClick={onPromote}
+        style={{ width: '100%', padding: '9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)', color: 'white', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+      >
+        ✓ Mark Connected
+      </button>
+    </div>
+  );
+}
+
+// ─── Connected Card ───────────────────────────────────────────────────────────
+
+function ConnectedCard({ entry }: { entry: ConnectedEntry }) {
+  const tc = getConnectTypeStyle(entry.connectType);
+  const dateStr = new Date(entry.connectedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return (
+    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <AvatarImg avatarUrl={null} name={entry.person1Name} size={32} />
+        <span style={{ fontSize: '1rem', color: '#10b981', fontWeight: 700 }}>↔</span>
+        <AvatarImg avatarUrl={null} name={entry.person2Name} size={32} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.person1Name} &amp; {entry.person2Name}</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: tc.color, background: tc.bg, padding: '3px 8px', borderRadius: 9999 }}>{entry.connectType}</span>
+        <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>📅 {dateStr}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Pending Connect Column ───────────────────────────────────────────────────
+
+function PendingConnectColumn({ entries, onAdd, onPromote }: {
+  entries: PendingConnectEntry[];
+  onAdd: (data: Omit<PendingConnectEntry, 'id' | 'createdAt' | 'createdBy'>) => void;
+  onPromote: (id: string) => void;
+}) {
+  const cfg = COLUMN_CONFIG['pending_connect'];
+  const [showForm, setShowForm] = useState(false);
+  const [personName, setPersonName] = useState('');
+  const [connectWithName, setConnectWithName] = useState('');
+  const [connectType, setConnectType] = useState<'Job' | 'Mentoring' | 'Advice' | 'Networking'>('Networking');
+
+  function submit() {
+    if (!personName.trim() || !connectWithName.trim()) return;
+    onAdd({ personName: personName.trim(), connectWithName: connectWithName.trim(), connectType });
+    setPersonName(''); setConnectWithName(''); setShowForm(false);
+  }
+
+  return (
+    <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ background: cfg.headerBg, border: `1px solid ${cfg.borderColor}`, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>{cfg.label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: cfg.badgeColor, background: cfg.badgeBg, padding: '2px 8px', borderRadius: 9999 }}>{entries.length}</span>
+          <button
+            onClick={() => setShowForm(f => !f)}
+            title="Add pending connect"
+            style={{ background: cfg.badgeBg, border: 'none', cursor: 'pointer', color: cfg.badgeColor, fontWeight: 700, fontSize: '0.9rem', width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1 }}
+          >+</button>
+        </div>
+      </div>
+      {showForm && (
+        <div style={{ background: 'white', border: `1.5px solid ${cfg.borderColor}`, borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input type="text" value={personName} onChange={e => setPersonName(e.target.value)} placeholder="Member name" style={{ padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.8125rem', outline: 'none', fontFamily: 'inherit' }} />
+          <input type="text" value={connectWithName} onChange={e => setConnectWithName(e.target.value)} placeholder="Connect with..." style={{ padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.8125rem', outline: 'none', fontFamily: 'inherit' }} />
+          <select value={connectType} onChange={e => setConnectType(e.target.value as 'Job' | 'Mentoring' | 'Advice' | 'Networking')} style={{ padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.8125rem', outline: 'none', fontFamily: 'inherit', background: 'white' }}>
+            <option value="Job">Job</option>
+            <option value="Mentoring">Mentoring</option>
+            <option value="Advice">Advice</option>
+            <option value="Networking">Networking</option>
+          </select>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid #E5E7EB', background: '#fff', color: '#374151', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+            <button onClick={submit} style={{ flex: 2, padding: '6px', borderRadius: 6, border: 'none', background: '#7c3aed', color: 'white', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Add</button>
+          </div>
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', maxHeight: 'calc(100vh - 380px)', paddingBottom: 8 }}>
+        {entries.length === 0 ? (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: '#d1d5db', fontSize: '0.8125rem' }}>No pending connects</div>
+        ) : entries.map(entry => (
+          <PendingConnectCard key={entry.id} entry={entry} onPromote={() => onPromote(entry.id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Connected Column ─────────────────────────────────────────────────────────
+
+function ConnectedColumn({ entries }: { entries: ConnectedEntry[] }) {
+  const cfg = COLUMN_CONFIG['connected'];
+  return (
+    <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ background: cfg.headerBg, border: `1px solid ${cfg.borderColor}`, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>{cfg.label}</span>
+        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: cfg.badgeColor, background: cfg.badgeBg, padding: '2px 8px', borderRadius: 9999 }}>{entries.length}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', maxHeight: 'calc(100vh - 380px)', paddingBottom: 8 }}>
+        {entries.length === 0 ? (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: '#d1d5db', fontSize: '0.8125rem' }}>No connections yet</div>
+        ) : entries.map(entry => (
+          <ConnectedCard key={entry.id} entry={entry} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 
 function KanbanColumn({ status, contacts, callLogs, claims, onCallClick }: {
@@ -1057,6 +1245,8 @@ export default function ConnectsCenter() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [currentUser, setCurrentUserState] = useState<string>('Owen');
   const [todoCompleted, setTodoCompleted] = useState<string[]>([]);
+  const [pendingConnects, setPendingConnects] = useState<PendingConnectEntry[]>([]);
+  const [connected, setConnected] = useState<ConnectedEntry[]>([]);
 
   // UI state
   const [callModal, setCallModal] = useState<MergedAlumni | null>(null);
@@ -1069,6 +1259,54 @@ export default function ConnectsCenter() {
     setAssignments(readAssignments());
     setCurrentUserState(readCurrentUser());
     setTodoCompleted(readTodoCompleted());
+    setPendingConnects(readPendingConnects());
+    setConnected(readConnected());
+  }, []);
+
+  // Auto-seed historical call data (runs once per device)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem(SEED_FLAG)) return;
+    (async () => {
+      try {
+        const res = await fetch('/connects-seed-data.json');
+        if (!res.ok) return;
+        const data: SeedEntry[] = await res.json();
+        const outcomeMap: Record<string, ColumnStatus> = {
+          answered: 'called',
+          voicemail: 'voicemail',
+          declined: 'declined',
+        };
+        const all = readCallLogs();
+        for (const entry of data) {
+          const status: ColumnStatus = outcomeMap[entry.outcome] ?? 'called';
+          const contactId = entry.name;
+          all[contactId] = {
+            contactId,
+            status,
+            notes: entry.notes || '',
+            tags: entry.tags || [],
+            calledBy: entry.calledBy || 'Owen',
+            calledAt: entry.calledAt,
+            followUpDate: entry.followUp ?? undefined,
+            followUpCompleted: false,
+            contactSnapshot: {
+              name: entry.name,
+              avatarUrl: null,
+              location: null,
+              gradYear: null,
+              memberStatus: null,
+              chapterName: entry.chapter,
+            },
+          };
+        }
+        localStorage.setItem(LS.callLogs, JSON.stringify(all));
+        localStorage.setItem(SEED_FLAG, '1');
+        setCallLogs({ ...all });
+      } catch (e) {
+        console.error('Seed failed:', e);
+      }
+    })();
   }, []);
 
   // Refresh claims every 60s
@@ -1140,7 +1378,7 @@ export default function ConnectsCenter() {
   }, [selectedChapterId, loadContacts, chapters]);
 
   // Bucket contacts
-  const cols: Record<ColumnStatus, MergedAlumni[]> = { not_called: [], voicemail: [], called: [], declined: [] };
+  const cols: Record<ColumnStatus, MergedAlumni[]> = { not_called: [], voicemail: [], called: [], declined: [], pending_connect: [], connected: [] };
   for (const c of contacts) cols[getContactStatus(c, callLogs)].push(c);
 
   // Handle call button click
@@ -1251,6 +1489,37 @@ export default function ConnectsCenter() {
       });
     } catch {}
     setLoggingPanel(null);
+  }
+
+  function handleAddPendingConnect(data: Omit<PendingConnectEntry, 'id' | 'createdAt' | 'createdBy'>) {
+    const entry: PendingConnectEntry = {
+      id: `pc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      ...data,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser,
+    };
+    const all = readPendingConnects();
+    all.push(entry);
+    writePendingConnects(all);
+    setPendingConnects(all);
+  }
+
+  function handlePromoteToConnected(pendingId: string) {
+    const entry = pendingConnects.find(e => e.id === pendingId);
+    if (!entry) return;
+    const conn: ConnectedEntry = {
+      id: `cn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      person1Name: entry.personName,
+      person2Name: entry.connectWithName,
+      connectType: entry.connectType,
+      connectedAt: new Date().toISOString(),
+    };
+    const newPending = pendingConnects.filter(e => e.id !== pendingId);
+    const newConnected = [...readConnected(), conn];
+    writePendingConnects(newPending);
+    writeConnected(newConnected);
+    setPendingConnects(newPending);
+    setConnected(newConnected);
   }
 
   function handleCurrentUserChange(name: string) {
@@ -1379,9 +1648,15 @@ export default function ConnectsCenter() {
             ) : (
               <div style={{ overflowX: 'auto', paddingBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 'max-content' }}>
-                  {(['not_called', 'voicemail', 'called', 'declined'] as ColumnStatus[]).map(status => (
+                  {(['not_called', 'voicemail', 'called', 'declined'] as const).map(status => (
                     <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} />
                   ))}
+                  <PendingConnectColumn
+                    entries={pendingConnects}
+                    onAdd={handleAddPendingConnect}
+                    onPromote={handlePromoteToConnected}
+                  />
+                  <ConnectedColumn entries={connected} />
                 </div>
               </div>
             )}
