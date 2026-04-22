@@ -130,13 +130,16 @@ export async function POST(request: NextRequest) {
       : DEFAULT_LINES;
 
     const activeLines = lines.filter(l => !l.is_paused);
-    const activeCount = activeLines.length;
+
+    // Lines 1 (Owen) and 3 (Ford) are reserved for Connects Center — exclude from outreach
+    const outreachLines = activeLines.filter(l => l.line_number !== 1 && l.line_number !== 3);
+    const activeCount = outreachLines.length;
 
     if (activeCount === 0) {
       return NextResponse.json({ total: 0, message: 'All lines are paused — resume at least one line first.' });
     }
 
-    const t1CapMax = activeLines.reduce((sum, l) => sum + getLineT1Cap(l), 0);
+    const t1CapMax = outreachLines.reduce((sum, l) => sum + getLineT1Cap(l), 0);
 
     // ── 2b. Check how many T1s already sent TODAY across ALL chapters ─────────
     // This is the cross-chapter oversend guard. Each line has a daily limit.
@@ -160,7 +163,7 @@ export async function POST(request: NextRequest) {
 
     // Remaining capacity per line
     const remainingPerLine: Record<number, number> = {};
-    for (const line of activeLines) {
+    for (const line of outreachLines) {
       const cap = getLineT1Cap(line);
       const used = sentTodayPerLine[line.line_number] || 0;
       remainingPerLine[line.line_number] = Math.max(0, cap - used);
@@ -289,7 +292,7 @@ export async function POST(request: NextRequest) {
     const needsAllocation = t1Contacts.filter(c => !c.linq_chat_id && c.phone_primary);
 
     // Round-robin line assignment (oldest last_used_at first)
-    const sortedLines = [...activeLines].sort((a, b) => {
+    const sortedLines = [...outreachLines].sort((a, b) => {
       if (a.last_used_at === null) return -1;
       if (b.last_used_at === null) return 1;
       return new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime();

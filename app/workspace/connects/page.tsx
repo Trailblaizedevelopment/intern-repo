@@ -101,6 +101,26 @@ interface Assignment {
   count: number;
 }
 
+interface LinqMessageClient {
+  id: string;
+  is_from_me: boolean;
+  text: string;
+  created_at: string;
+}
+
+interface TextingState {
+  contact: MergedAlumni;
+  selectedLine: 'Owen' | 'Ford';
+  template: 'welcome' | 'followup' | 'checkin' | 'custom';
+  message: string;
+  sending: boolean;
+  sent: boolean;
+  chatId: string | null;
+  messages: LinqMessageClient[];
+  loadingHistory: boolean;
+  error: string | null;
+}
+
 interface LoggingState {
   contact: MergedAlumni;
   notes: string;
@@ -487,11 +507,12 @@ function DailyTodo({ contacts, callLogs, currentUser, assignments, completed, on
 
 // ─── Contact Card (V3) ────────────────────────────────────────────────────────
 
-function ContactCard({ contact, log, claim, onCallClick }: {
+function ContactCard({ contact, log, claim, onCallClick, onTextClick }: {
   contact: MergedAlumni;
   log: CallLog | undefined;
   claim: Claim | undefined;
   onCallClick: () => void;
+  onTextClick: () => void;
 }) {
   const overdueFollowUp = log?.followUpDate && !log.followUpCompleted && isOverdue(log.followUpDate);
   return (
@@ -537,16 +558,305 @@ function ContactCard({ contact, log, claim, onCallClick }: {
       {/* Claim badge */}
       {claim && <div style={{ fontSize: '0.7rem', color: '#6b7280', fontStyle: 'italic', marginBottom: 8 }}>🔒 Claimed by {claim.claimedBy} — {Math.round((Date.now() - new Date(claim.claimedAt).getTime()) / 60000)}m ago</div>}
 
-      {/* THE Call Button */}
-      <button
-        onClick={onCallClick}
-        style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
-        onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-      >
-        <Phone size={16} /> Call
-      </button>
+      {/* Action Buttons */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={onCallClick}
+          style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+        >
+          <Phone size={16} /> Call
+        </button>
+        <button
+          onClick={onTextClick}
+          style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: '#0F172A', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+        >
+          <MessageSquare size={16} /> Text
+        </button>
+      </div>
     </div>
+  );
+}
+
+// ─── Texting Panel ───────────────────────────────────────────────────────────
+
+const LINE_PHONES: Record<'Owen' | 'Ford', string> = {
+  Owen: '+16462101111',
+  Ford: '+16462442696',
+};
+const LINE_NUMBERS_MAP: Record<'Owen' | 'Ford', number> = {
+  Owen: 1,
+  Ford: 3,
+};
+
+function TextingPanel({ contact, currentUser, onClose }: {
+  contact: MergedAlumni;
+  currentUser: string;
+  onClose: () => void;
+}) {
+  const defaultLine: 'Owen' | 'Ford' = currentUser === 'Ford' ? 'Ford' : 'Owen';
+  const [selectedLine, setSelectedLine] = useState<'Owen' | 'Ford'>(defaultLine);
+  const [template, setTemplate] = useState<'welcome' | 'followup' | 'checkin' | 'custom'>('welcome');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<LinqMessageClient[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  function buildMessage(tmpl: string, line: 'Owen' | 'Ford'): string {
+    const firstName = contact.first_name || contact.full_name.split(' ')[0];
+    const org = contact.chapter_name || 'your org';
+    switch (tmpl) {
+      case 'welcome':
+        return `Hey ${firstName}, this is ${line} from Trailblaize. Welcome to ${org}\'s network! Let us know if you need anything getting started.`;
+      case 'followup':
+        return `Hey ${firstName}, just checking in. Have you had a chance to explore the platform? Happy to help if you have questions.`;
+      case 'checkin':
+        return `Hey ${firstName}, wanted to touch base. Anything we can help with on the platform?`;
+      default:
+        return '';
+    }
+  }
+
+  // Set message when template or line changes
+  useEffect(() => {
+    if (template !== 'custom') {
+      setMessage(buildMessage(template, selectedLine));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template, selectedLine]);
+
+  // Initialize message on mount
+  useEffect(() => {
+    setMessage(buildMessage('welcome', defaultLine));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load conversation history when panel opens or line changes
+  useEffect(() => {
+    if (!contact.phone) return;
+    setLoadingHistory(true);
+    setChatId(null);
+    setMessages([]);
+
+    const lineNum = LINE_NUMBERS_MAP[selectedLine];
+    const searchQ = contact.phone.replace(/\D/g, '').slice(-10);
+
+    fetch(`/api/linq/conversations?line=${lineNum}&search=${encodeURIComponent(searchQ)}`)
+      .then(r => r.json())
+      .then(async (json) => {
+        if (json.error || !json.data) return;
+        const chats = json.data as Array<{ chat_id: string; phone: string | null; line_number: number }>;
+        const normalized = contact.phone!.replace(/\D/g, '').slice(-10);
+        const match = chats.find(c => {
+          const cphone = (c.phone || '').replace(/\D/g, '').slice(-10);
+          return cphone === normalized;
+        });
+        if (match) {
+          setChatId(match.chat_id);
+          const msgRes = await fetch(`/api/linq/messages?chat_id=${match.chat_id}&limit=30`);
+          const msgJson = await msgRes.json();
+          if (msgJson.data) {
+            const parsed: LinqMessageClient[] = (msgJson.data as Array<{
+              id: string;
+              is_from_me: boolean;
+              parts: Array<{ type: string; value: string }>;
+              created_at: string;
+            }>).map(m => ({
+              id: m.id,
+              is_from_me: m.is_from_me,
+              text: m.parts?.find(p => p.type === 'text')?.value || '',
+              created_at: m.created_at,
+            }));
+            setMessages(parsed);
+          }
+        }
+      })
+      .catch(e => console.error('[texting] history fetch error:', e))
+      .finally(() => setLoadingHistory(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contact.phone, selectedLine]);
+
+  // Scroll to bottom when messages load
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  async function handleSend() {
+    const trimmed = message.trim();
+    if (!trimmed || !contact.phone) return;
+    setSending(true);
+    setError(null);
+    try {
+      const body: Record<string, string> = chatId
+        ? { chat_id: chatId, message: trimmed }
+        : { line_phone: LINE_PHONES[selectedLine], contact_phone: contact.phone, message: trimmed };
+
+      const res = await fetch('/api/linq/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+
+      if (json.error) {
+        setError(json.error);
+      } else {
+        setSent(true);
+        if (!chatId && json.data?.chat_id) setChatId(json.data.chat_id);
+        const sentMsg: LinqMessageClient = {
+          id: `local_${Date.now()}`,
+          is_from_me: true,
+          text: trimmed,
+          created_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, sentMsg]);
+        setMessage('');
+        setTemplate('custom');
+        setTimeout(() => setSent(false), 3000);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const TEMPLATE_OPTIONS = [
+    { key: 'welcome', label: 'Welcome' },
+    { key: 'followup', label: 'Follow-up' },
+    { key: 'checkin', label: 'Check-in' },
+    { key: 'custom', label: 'Custom' },
+  ] as const;
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 49 }} />
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, maxWidth: '100vw', background: 'white', zIndex: 50, boxShadow: '-4px 0 32px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0, background: 'white', position: 'sticky', top: 0, zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <AvatarImg avatarUrl={contact.avatar_url} name={contact.full_name} size={44} />
+              <div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', margin: '0 0 2px' }}>{contact.full_name}</h2>
+                {contact.phone && <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{fmtPhone(contact.phone)}</div>}
+                {contact.chapter_name && <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>🏛️ {contact.chapter_name}</div>}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#9ca3af', display: 'flex', flexShrink: 0 }}><X size={20} /></button>
+          </div>
+          <div style={{ marginTop: 10, padding: '5px 12px', background: '#eff6ff', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <MessageSquare size={13} style={{ color: '#1d4ed8' }} />
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d4ed8' }}>Linq iMessage — Connects Center</span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Line selector */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Send From</label>
+            <div style={{ display: 'inline-flex', background: '#f3f4f6', borderRadius: 10, padding: 3, gap: 2 }}>
+              {(['Owen', 'Ford'] as const).map(name => (
+                <button key={name} onClick={() => setSelectedLine(name)}
+                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: selectedLine === name ? '#0F172A' : 'transparent', color: selectedLine === name ? 'white' : '#6b7280', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
+                >
+                  {name}
+                  <span style={{ fontSize: '0.68rem', opacity: 0.6 }}>{name === 'Owen' ? 'line 1' : 'line 3'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Template pills */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Template</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {TEMPLATE_OPTIONS.map(t => (
+                <button key={t.key} onClick={() => setTemplate(t.key)}
+                  style={{ padding: '6px 14px', borderRadius: 9999, border: 'none', background: template === t.key ? '#0F172A' : '#F3F4F6', color: template === t.key ? 'white' : '#374151', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Message textarea */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Message</label>
+            <textarea
+              value={message}
+              onChange={e => { setMessage(e.target.value); if (template !== 'custom') setTemplate('custom'); }}
+              placeholder="Write your message..."
+              rows={5}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', color: '#111827', background: '#fff', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>{message.length} chars</span>
+              {error && <span style={{ fontSize: '0.7rem', color: '#b91c1c' }}>{error}</span>}
+            </div>
+          </div>
+
+          {/* Send button */}
+          <button
+            onClick={handleSend}
+            disabled={sending || !message.trim() || !contact.phone}
+            style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: sent ? '#10b981' : (sending || !message.trim() ? '#E5E7EB' : '#0F172A'), color: sent ? 'white' : (sending || !message.trim() ? '#9ca3af' : 'white'), fontWeight: 700, fontSize: '0.9375rem', cursor: (sending || !message.trim()) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'all 0.2s' }}
+          >
+            <MessageSquare size={16} />
+            {sent ? '✓ Sent!' : sending ? 'Sending...' : `Send via ${selectedLine}`}
+          </button>
+
+          {!contact.phone && (
+            <div style={{ textAlign: 'center', fontSize: '0.8rem', color: '#b91c1c', padding: '8px', background: '#fee2e2', borderRadius: 8 }}>No phone number on file — can&apos;t text this contact.</div>
+          )}
+
+          {/* Conversation history */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Conversation History</label>
+            {loadingHistory ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 0', color: '#9ca3af', fontSize: '0.8rem', gap: 6 }}>
+                <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading history...
+              </div>
+            ) : messages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#d1d5db', fontSize: '0.8rem' }}>
+                No previous messages on this line
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {messages.map(msg => (
+                  <div key={msg.id} style={{ display: 'flex', justifyContent: msg.is_from_me ? 'flex-end' : 'flex-start' }}>
+                    <div style={{
+                      maxWidth: '80%', padding: '8px 12px',
+                      borderRadius: msg.is_from_me ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                      background: msg.is_from_me ? '#0F172A' : '#F3F4F6',
+                      color: msg.is_from_me ? 'white' : '#111827',
+                      fontSize: '0.8125rem', lineHeight: 1.5,
+                    }}>
+                      <div>{msg.text}</div>
+                      <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: 3, textAlign: msg.is_from_me ? 'right' : 'left' }}>
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -925,12 +1235,13 @@ function ConnectedColumn({ entries }: { entries: ConnectedEntry[] }) {
 
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 
-function KanbanColumn({ status, contacts, callLogs, claims, onCallClick }: {
+function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextClick }: {
   status: ColumnStatus;
   contacts: MergedAlumni[];
   callLogs: Record<string, CallLog>;
   claims: Record<string, Claim>;
   onCallClick: (c: MergedAlumni) => void;
+  onTextClick: (c: MergedAlumni) => void;
 }) {
   const cfg = COLUMN_CONFIG[status];
   return (
@@ -943,7 +1254,7 @@ function KanbanColumn({ status, contacts, callLogs, claims, onCallClick }: {
         {contacts.length === 0 ? (
           <div style={{ padding: '24px 0', textAlign: 'center', color: '#d1d5db', fontSize: '0.8125rem' }}>No contacts</div>
         ) : contacts.map(c => (
-          <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} onCallClick={() => onCallClick(c)} />
+          <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} onCallClick={() => onCallClick(c)} onTextClick={() => onTextClick(c)} />
         ))}
       </div>
     </div>
@@ -1251,6 +1562,7 @@ export default function ConnectsCenter() {
   // UI state
   const [callModal, setCallModal] = useState<MergedAlumni | null>(null);
   const [loggingPanel, setLoggingPanel] = useState<LoggingState | null>(null);
+  const [textingContact, setTextingContact] = useState<MergedAlumni | null>(null);
 
   // Hydrate localStorage
   useEffect(() => {
@@ -1384,6 +1696,11 @@ export default function ConnectsCenter() {
   // Handle call button click
   function handleCallClick(contact: MergedAlumni) {
     setCallModal(contact);
+  }
+
+  // Handle text button click
+  function handleTextClick(contact: MergedAlumni) {
+    setTextingContact(contact);
   }
 
   // Handle "Answered" in call modal
@@ -1649,7 +1966,7 @@ export default function ConnectsCenter() {
               <div style={{ overflowX: 'auto', paddingBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 'max-content' }}>
                   {(['not_called', 'voicemail', 'called', 'declined'] as const).map(status => (
-                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} />
+                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} onTextClick={handleTextClick} />
                   ))}
                   <PendingConnectColumn
                     entries={pendingConnects}
@@ -1687,6 +2004,15 @@ export default function ConnectsCenter() {
           onClose={() => setLoggingPanel(null)}
           onSave={saveLog}
           onChange={u => setLoggingPanel(prev => prev ? { ...prev, ...u } : prev)}
+        />
+      )}
+
+      {/* Texting Panel */}
+      {textingContact && (
+        <TextingPanel
+          contact={textingContact}
+          currentUser={currentUser}
+          onClose={() => setTextingContact(null)}
         />
       )}
     </div>
