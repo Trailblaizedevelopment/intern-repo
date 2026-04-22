@@ -488,6 +488,7 @@ function ContactsTab({
   const [sending, setSending] = useState(false);
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkSending, setBulkSending] = useState(false);
+  const [bulkLimit, setBulkLimit] = useState<number | undefined>(undefined);
 
   const fetchContacts = useCallback(async () => {
     setLoading(true);
@@ -551,7 +552,7 @@ function ContactsTab({
       const res = await fetch('/api/outreach/send-bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chapter_id: chapterId, touch: 'T1', limit: 150 }),
+        body: JSON.stringify({ chapter_id: chapterId, touch: 'T1', limit: bulkLimit ?? notContactedCount }),
       });
       const json = await res.json();
       if (json.success) {
@@ -588,9 +589,9 @@ function ContactsTab({
             Alumni with Phone Numbers
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {notContactedCount > 0 && (
+            {notContactedCount > 0 && (<>
               <button
-                onClick={() => setBulkConfirm(true)}
+                onClick={() => { setBulkLimit(undefined); setBulkConfirm(true); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
@@ -602,7 +603,25 @@ function ContactsTab({
               >
                 <Send size={13} /> Send All T1 ({notContactedCount})
               </button>
-            )}
+              {[25, 50, 200, 250].map(n => (
+                <button
+                  key={n}
+                  disabled={notContactedCount === 0}
+                  onClick={() => { setBulkLimit(n); setBulkConfirm(true); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    padding: '6px 10px', borderRadius: 8, cursor: notContactedCount === 0 ? 'default' : 'pointer',
+                    border: `1px solid ${C.border}`,
+                    background: C.card,
+                    color: notContactedCount === 0 ? '#9CA3AF' : C.heading,
+                    fontSize: 12, fontWeight: 600, minHeight: 32,
+                    opacity: notContactedCount === 0 ? 0.5 : 1,
+                  }}
+                >
+                  {Math.min(n, notContactedCount)}
+                </button>
+              ))}
+            </>)}
             <button
               onClick={fetchContacts}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.body, padding: 4 }}
