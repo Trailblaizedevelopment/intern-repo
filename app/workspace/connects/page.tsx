@@ -150,8 +150,8 @@ interface WebNode {
 interface WebEdge {
   from: string;
   to: string;
-  type: 'industry' | 'city' | 'interest' | 'university' | 'org';
-  sharedTag: string;
+  degree: 1 | 2 | 3;
+  sharedContext: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -187,12 +187,10 @@ function getTagStyle(tag: string): { color: string; bg: string } {
 
 const INDUSTRY_TAGS = ['Hiring', 'Industry Expert', 'Mentoring'];
 const CALLER_NAMES = ['Owen', 'Ford', 'Adam', 'Katie', 'Hyatt', 'Zach', 'Other'];
-const EDGE_COLORS: Record<'industry' | 'city' | 'interest' | 'university' | 'org', string> = {
-  industry: '#10b981',
-  city: '#3b82f6',
-  interest: '#8b5cf6',
-  university: '#F59E0B',
-  org: '#0F172A',
+const DEGREE_COLORS: Record<1 | 2 | 3, string> = {
+  1: '#EF4444', // 1st degree — same chapter (red)
+  2: '#F59E0B', // 2nd degree — same school or org (amber)
+  3: '#3B82F6', // 3rd degree — shared network (blue)
 };
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
@@ -1315,43 +1313,98 @@ function computeWebGraph(callLogs: Record<string, CallLog>): { nodes: WebNode[];
     notes: log.notes,
   }));
 
-  // Compute edges
-  const edges: WebEdge[] = [];
-  for (let i = 0; i < nodeData.length; i++) {
-    for (let j = i + 1; j < nodeData.length; j++) {
-      const a = nodeData[i], b = nodeData[j];
-      // Tag / city connections
-      let tagAdded = false;
-      for (const tag of a.tags) {
-        if (!tagAdded && b.tags.includes(tag)) {
-          const type: 'industry' | 'interest' = INDUSTRY_TAGS.includes(tag) ? 'industry' : 'interest';
-          edges.push({ from: a.id, to: b.id, type, sharedTag: tag });
-          tagAdded = true;
-          break;
-        }
-      }
-      if (!tagAdded && a.location && b.location) {
+  // Pre-parse chapters
+  const parsed = nodeData.map(nd => ({
+    ...nd,
+    ...parseChapterField(nd.chapterName),
+  }));
+
+  const INDUSTRY_TAGS_SET = new Set(INDUSTRY_TAGS);
+
+  function pairKey(a: string, b: string) {
+    return a < b ? `${a}::${b}` : `${b}::${a}`;
+  }
+
+  // Build 1st and 2nd degree direct edges
+  const directEdges: WebEdge[] = [];
+  const connectedPairs = new Set<string>();
+
+  for (let i = 0; i < parsed.length; i++) {
+    for (let j = i + 1; j < parsed.length; j++) {
+      const a = parsed[i], b = parsed[j];
+      const key = pairKey(a.id, b.id);
+      if (connectedPairs.has(key)) continue;
+
+      const orgA = a.org?.toLowerCase() ?? null;
+      const orgB = b.org?.toLowerCase() ?? null;
+      const schoolA = a.school?.toLowerCase() ?? null;
+      const schoolB = b.school?.toLowerCase() ?? null;
+
+      const sameOrg = !!(orgA && orgB && orgA === orgB);
+      const sameSchool = !!(schoolA && schoolB && schoolA === schoolB);
+
+      if (sameOrg && sameSchool) {
+        // 1st degree: same chapter (same org + same school)
+        directEdges.push({ from: a.id, to: b.id, degree: 1, sharedContext: `${a.org} @ ${a.school}` });
+        connectedPairs.add(key);
+      } else if (sameSchool || sameOrg) {
+        // 2nd degree: same school different org, or same org different school
+        const ctx = sameSchool ? `Both at ${a.school}` : `Both in ${a.org}`;
+        directEdges.push({ from: a.id, to: b.id, degree: 2, sharedContext: ctx });
+        connectedPairs.add(key);
+      } else if (a.location && b.location) {
+        // 2nd degree: same city + both have industry tags
         const cityA = a.location.split(',')[0].trim().toLowerCase();
         const cityB = b.location.split(',')[0].trim().toLowerCase();
-        if (cityA && cityA === cityB) edges.push({ from: a.id, to: b.id, type: 'city', sharedTag: cityA });
-      }
-      // University + org connections
-      const { school: schoolA, org: orgA } = parseChapterField(a.chapterName);
-      const { school: schoolB, org: orgB } = parseChapterField(b.chapterName);
-      const sameSchool = schoolA && schoolB && schoolA.toLowerCase() === schoolB.toLowerCase();
-      const sameOrg = orgA && orgB && orgA.toLowerCase() === orgB.toLowerCase();
-      if (sameSchool) {
-        edges.push({ from: a.id, to: b.id, type: 'university', sharedTag: schoolA! });
-      }
-      if (sameOrg && !sameSchool) {
-        edges.push({ from: a.id, to: b.id, type: 'org', sharedTag: orgA! });
+        if (cityA && cityA === cityB) {
+          const aIndustry = a.tags.some(t => INDUSTRY_TAGS_SET.has(t));
+          const bIndustry = b.tags.some(t => INDUSTRY_TAGS_SET.has(t));
+          if (aIndustry && bIndustry) {
+            directEdges.push({ from: a.id, to: b.id, degree: 2, sharedContext: `Same city & industry (${a.location.split(',')[0]})` });
+            connectedPairs.add(key);
+          }
+        }
       }
     }
   }
 
+  // Build adjacency map from direct edges
+  const adjacency: Record<string, Set<string>> = {};
+  nodeData.forEach(nd => { adjacency[nd.id] = new Set(); });
+  directEdges.forEach(e => {
+    adjacency[e.from].add(e.to);
+    adjacency[e.to].add(e.from);
+  });
+
+  // 3rd degree: A↔B (1/2nd), B↔C (1/2nd) → A↔C if not already connected
+  const thirdEdges: WebEdge[] = [];
+  for (let i = 0; i < nodeData.length; i++) {
+    for (let j = i + 1; j < nodeData.length; j++) {
+      const aId = nodeData[i].id;
+      const bId = nodeData[j].id;
+      const key = pairKey(aId, bId);
+      if (connectedPairs.has(key)) continue;
+      // Check for common direct neighbor
+      for (const mid of adjacency[aId]) {
+        if (adjacency[bId].has(mid)) {
+          const midName = nodeData.find(n => n.id === mid)?.name ?? 'network';
+          thirdEdges.push({ from: aId, to: bId, degree: 3, sharedContext: `Connected through ${midName}` });
+          connectedPairs.add(key);
+          break;
+        }
+      }
+    }
+  }
+
+  const allEdges = [...directEdges, ...thirdEdges];
+
+  // Count total connections per node (all degrees)
   const connCount: Record<string, number> = {};
   nodeData.forEach(nd => { connCount[nd.id] = 0; });
-  edges.forEach(e => { connCount[e.from] = (connCount[e.from] || 0) + 1; connCount[e.to] = (connCount[e.to] || 0) + 1; });
+  allEdges.forEach(e => {
+    connCount[e.from] = (connCount[e.from] || 0) + 1;
+    connCount[e.to] = (connCount[e.to] || 0) + 1;
+  });
 
   const sorted = [...nodeData].sort((a, b) => (connCount[b.id] || 0) - (connCount[a.id] || 0));
   const total = sorted.length;
@@ -1371,17 +1424,18 @@ function computeWebGraph(callLogs: Record<string, CallLog>): { nodes: WebNode[];
     ring.forEach((nd, i) => {
       const angle = ring.length === 1 ? -Math.PI / 2 : (i / ring.length) * 2 * Math.PI - Math.PI / 2;
       const r = ringRadii[rIdx];
+      const count = connCount[nd.id] || 0;
       nodes.push({
         ...nd,
         x: cx + r * Math.cos(angle),
         y: cy + r * Math.sin(angle),
-        radius: Math.min(22, 12 + (nd.tags.length * 2)),
-        connectionCount: connCount[nd.id] || 0,
+        radius: Math.min(28, 12 + Math.min(count, 8) * 2),
+        connectionCount: count,
       });
     });
   });
 
-  return { nodes, edges };
+  return { nodes, edges: allEdges };
 }
 
 function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
@@ -1389,10 +1443,22 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
   const [copied, setCopied] = useState('');
   const { nodes, edges } = useMemo(() => computeWebGraph(callLogs), [callLogs]);
 
-  const suggestions = useMemo(() => {
-    if (!selectedNode) return [];
-    return nodes.filter(n => n.id !== selectedNode.id && n.tags.some(t => selectedNode.tags.includes(t)));
-  }, [selectedNode, nodes]);
+  // Compute connections grouped by degree for the selected node
+  const connectionsByDegree = useMemo(() => {
+    if (!selectedNode) return { d1: [] as WebNode[], d2: [] as WebNode[], d3: [] as WebNode[] };
+    const d1: WebNode[] = [], d2: WebNode[] = [], d3: WebNode[] = [];
+    for (const edge of edges) {
+      if (edge.from === selectedNode.id || edge.to === selectedNode.id) {
+        const otherId = edge.from === selectedNode.id ? edge.to : edge.from;
+        const other = nodes.find(n => n.id === otherId);
+        if (!other) continue;
+        if (edge.degree === 1) d1.push(other);
+        else if (edge.degree === 2) d2.push(other);
+        else d3.push(other);
+      }
+    }
+    return { d1, d2, d3 };
+  }, [selectedNode, edges, nodes]);
 
   if (nodes.length === 0) {
     return (
@@ -1414,7 +1480,6 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
       {/* SVG Canvas */}
       <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
         <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', height: 600, display: 'block' }}>
-          {/* All clip paths */}
           <defs>
             {nodes.map((n, i) => (
               <clipPath key={`web-clip-${i}`} id={`web-clip-${i}`}>
@@ -1423,17 +1488,20 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
             ))}
           </defs>
 
-          {/* Edges */}
+          {/* Edges — styled by degree */}
           {edges.map((edge, i) => {
             const fn = nodes.find(n => n.id === edge.from);
             const tn = nodes.find(n => n.id === edge.to);
             if (!fn || !tn) return null;
-            const hi = selectedNode && (selectedNode.id === edge.from || selectedNode.id === edge.to);
+            const hi = !!(selectedNode && (selectedNode.id === edge.from || selectedNode.id === edge.to));
+            const color = DEGREE_COLORS[edge.degree];
+            const baseWidth = edge.degree === 1 ? 3 : edge.degree === 2 ? 2 : 1;
             return (
               <line key={i} x1={fn.x} y1={fn.y} x2={tn.x} y2={tn.y}
-                stroke={EDGE_COLORS[edge.type]} strokeWidth={hi ? 2 : 1}
-                strokeOpacity={hi ? 0.8 : 0.2}
-                strokeDasharray={edge.type === 'org' ? '5 4' : undefined}
+                stroke={color}
+                strokeWidth={hi ? baseWidth + 1 : baseWidth}
+                strokeOpacity={hi ? 0.9 : 0.2}
+                strokeDasharray={edge.degree === 3 ? '5 4' : undefined}
               />
             );
           })}
@@ -1446,11 +1514,16 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
           {/* Nodes */}
           {nodes.map((node, i) => {
             const isSel = selectedNode?.id === node.id;
+            const isHub = node.connectionCount >= 5;
             const bgColors = ['#0F172A', '#1d4ed8', '#0d9488', '#7c3aed', '#db2777'];
             const bg = bgColors[(node.name.charCodeAt(0) || 0) % bgColors.length];
             const initials = getInitials(node.name);
             return (
               <g key={node.id} onClick={() => setSelectedNode(isSel ? null : node)} style={{ cursor: 'pointer' }}>
+                {/* Hub double ring — amber glow for highly connected nodes */}
+                {isHub && (
+                  <circle cx={node.x} cy={node.y} r={node.radius + 5} fill="none" stroke="#F59E0B" strokeWidth={1.5} strokeOpacity={0.5} />
+                )}
                 {/* Initials background */}
                 <circle cx={node.x} cy={node.y} r={node.radius} fill={bg} />
                 <text x={node.x} y={node.y + node.radius * 0.35} textAnchor="middle" fill="white" fontSize={node.radius * 0.7} fontWeight="600" style={{ pointerEvents: 'none', userSelect: 'none' }}>{initials}</text>
@@ -1476,22 +1549,20 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
           })}
         </svg>
 
-        {/* Legend */}
+        {/* Degrees of Separation Legend */}
         <div style={{ position: 'absolute', bottom: 16, left: 16, display: 'flex', gap: 12, flexWrap: 'wrap', background: 'rgba(255,255,255,0.95)', padding: '8px 14px', borderRadius: 10, border: '1px solid #E5E7EB', boxShadow: '0 1px 8px rgba(0,0,0,0.06)', maxWidth: 'calc(100% - 32px)' }}>
-          {[
-            { type: 'industry', label: 'Industry', dashed: false },
-            { type: 'city', label: 'City', dashed: false },
-            { type: 'interest', label: 'Interest', dashed: false },
-            { type: 'university', label: 'University', dashed: false },
-            { type: 'org', label: 'Nat&apos;l Org', dashed: true },
-          ].map(leg => (
-            <div key={leg.type} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: '#374151', fontWeight: 600 }}>
+          {([
+            { degree: 1 as const, label: '1st Degree — Same chapter', dashed: false },
+            { degree: 2 as const, label: '2nd Degree — Same school or org', dashed: false },
+            { degree: 3 as const, label: '3rd Degree — Shared network', dashed: true },
+          ]).map(leg => (
+            <div key={leg.degree} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: '#374151', fontWeight: 600 }}>
               {leg.dashed ? (
                 <svg width="20" height="4" style={{ flexShrink: 0 }}>
-                  <line x1="0" y1="2" x2="20" y2="2" stroke={EDGE_COLORS[leg.type as keyof typeof EDGE_COLORS]} strokeWidth="2" strokeDasharray="5 4" />
+                  <line x1="0" y1="2" x2="20" y2="2" stroke={DEGREE_COLORS[leg.degree]} strokeWidth="2" strokeDasharray="5 4" />
                 </svg>
               ) : (
-                <div style={{ width: 20, height: 2, background: EDGE_COLORS[leg.type as keyof typeof EDGE_COLORS], borderRadius: 1, flexShrink: 0 }} />
+                <div style={{ width: 20, height: leg.degree === 1 ? 3 : 2, background: DEGREE_COLORS[leg.degree], borderRadius: 1, flexShrink: 0 }} />
               )}
               {leg.label}
             </div>
@@ -1511,6 +1582,7 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
       {selectedNode && (
         <div style={{ width: 320, borderLeft: '1px solid #E5E7EB', overflowY: 'auto', maxHeight: 600, flexShrink: 0 }}>
           <div style={{ padding: '20px 20px 0' }}>
+            {/* Profile header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                 <AvatarImg avatarUrl={selectedNode.avatarUrl} name={selectedNode.name} size={48} />
@@ -1535,7 +1607,7 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
               </div>
             )}
 
-            {/* Notes */}
+            {/* Call Notes */}
             {selectedNode.notes && (
               <div style={{ marginBottom: 16 }}>
                 <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Call Notes</p>
@@ -1543,57 +1615,60 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
               </div>
             )}
 
-            {/* Connections stat */}
-            <div style={{ marginBottom: 16, padding: '8px 12px', background: '#f9fafb', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Share2 size={14} style={{ color: '#10b981' }} />
-              <span style={{ fontSize: '0.8rem', color: '#374151', fontWeight: 600 }}>{selectedNode.connectionCount} connection{selectedNode.connectionCount !== 1 ? 's' : ''} in the Web</span>
-            </div>
-
-            {/* Suggested connections */}
-            {suggestions.length > 0 && (
-              <div style={{ paddingBottom: 20 }}>
-                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px' }}>Suggested Connections ({suggestions.length})</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {suggestions.slice(0, 8).map(s => {
-                    const sharedTags = s.tags.filter(t => selectedNode.tags.includes(t));
-                    const sharedCity = s.location && selectedNode.location &&
-                      s.location.split(',')[0].trim().toLowerCase() === selectedNode.location.split(',')[0].trim().toLowerCase();
-                    const context = sharedTags.length > 0 ? `in ${sharedTags[0]}` : sharedCity ? `in ${s.location?.split(',')[0]}` : 'as Trailblaize alumni';
-                    const cityCtx = sharedCity ? ` in ${s.location?.split(',')[0]}` : '';
-                    const introMsg = `Hey ${selectedNode.name.split(' ')[0]}, I think you should connect with ${s.name} — you're both ${context}${cityCtx}. Would love to make that intro!`;
-                    const isCopied = copied === s.id;
-                    return (
-                      <div key={s.id} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: 10, border: '1px solid #E5E7EB' }}>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                          <AvatarImg avatarUrl={s.avatarUrl} name={s.name} size={28} />
+            {/* Connections by degree */}
+            {([
+              { key: 'd1' as const, degree: 1, label: '1st Degree', color: '#EF4444', bg: '#FEF2F2', canIntro: true },
+              { key: 'd2' as const, degree: 2, label: '2nd Degree', color: '#F59E0B', bg: '#FFFBEB', canIntro: true },
+              { key: 'd3' as const, degree: 3, label: '3rd Degree', color: '#3B82F6', bg: '#EFF6FF', canIntro: false },
+            ]).map(({ key, degree, label, color, bg, canIntro }) => {
+              const degNodes = connectionsByDegree[key];
+              if (degNodes.length === 0) return null;
+              return (
+                <div key={degree} style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: '0.68rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                    {label} ({degNodes.length})
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {degNodes.map(dn => {
+                      const copyKey = `${selectedNode.id}::${dn.id}`;
+                      const isCopied = copied === copyKey;
+                      const introMsg = `Hey ${selectedNode.name.split(' ')[0]}, I think you should connect with ${dn.name} — you have a ${label.toLowerCase()} connection through Trailblaize${dn.chapterName ? ` (${dn.chapterName})` : ''}. Want me to make that intro?`;
+                      return (
+                        <div key={dn.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: bg, borderRadius: 8, border: `1px solid ${color}25` }}>
+                          <AvatarImg avatarUrl={dn.avatarUrl} name={dn.name} size={28} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827' }}>{s.name}</div>
-                            {sharedTags.length > 0 && <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Shared: {sharedTags.join(', ')}</div>}
-                            {sharedCity && !sharedTags.length && <div style={{ fontSize: '0.7rem', color: '#3b82f6' }}>Same city: {s.location?.split(',')[0]}</div>}
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dn.name}</div>
+                            {dn.chapterName && <div style={{ fontSize: '0.68rem', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏛️ {dn.chapterName}</div>}
                           </div>
+                          {canIntro && (
+                            <button
+                              onClick={() => {
+                                try { navigator.clipboard.writeText(introMsg); } catch {}
+                                setCopied(copyKey);
+                                setTimeout(() => setCopied(''), 2500);
+                              }}
+                              title="Copy intro message"
+                              style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 6, border: `1px solid ${isCopied ? '#86efac' : color}50`, background: isCopied ? '#f0fdf4' : 'white', color: isCopied ? '#15803d' : color, fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
+                            >
+                              {isCopied ? '✓' : '🤝 Intro'}
+                            </button>
+                          )}
                         </div>
-                        <button
-                          onClick={() => {
-                            try { navigator.clipboard.writeText(introMsg); } catch {}
-                            setCopied(s.id);
-                            setTimeout(() => setCopied(''), 2500);
-                          }}
-                          style={{ width: '100%', padding: '6px', borderRadius: 6, border: `1px solid ${isCopied ? '#86efac' : '#d1d5db'}`, background: isCopied ? '#f0fdf4' : '#fff', color: isCopied ? '#15803d' : '#374151', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
-                        >
-                          {isCopied ? '✓ Message copied!' : '🤝 Introduce'}
-                        </button>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
+              );
+            })}
+
+            {connectionsByDegree.d1.length === 0 && connectionsByDegree.d2.length === 0 && connectionsByDegree.d3.length === 0 && (
+              <div style={{ paddingBottom: 16 }}>
+                <p style={{ fontSize: '0.8rem', color: '#9ca3af', margin: 0 }}>No connections found yet. Log more calls to build the network.</p>
               </div>
             )}
-            {suggestions.length === 0 && (
-              <div style={{ paddingBottom: 20 }}>
-                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Suggested Connections</p>
-                <p style={{ fontSize: '0.8rem', color: '#9ca3af', margin: 0 }}>No shared tags or cities with other called alumni yet.</p>
-              </div>
-            )}
+
+            <div style={{ height: 20 }} />
           </div>
         </div>
       )}
