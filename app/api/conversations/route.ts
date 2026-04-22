@@ -127,19 +127,20 @@ export async function GET(req: NextRequest) {
           query = query.eq('status', 'flagged');
           break;
         case 'touch1':
-          query = query.eq('touch_stage', 'T1').eq('status', 'active');
+          // touch_stage may not be populated; fall back to outreach_status
+          query = query.or('touch_stage.eq.T1,outreach_status.eq.touch1_sent').eq('status', 'active');
           break;
         case 'touch2':
-          query = query.eq('touch_stage', 'T2').eq('status', 'active');
+          query = query.or('touch_stage.eq.T2,outreach_status.eq.touch2_sent').eq('status', 'active');
           break;
         case 'touch3':
-          query = query.eq('touch_stage', 'T3').eq('status', 'active');
+          query = query.or('touch_stage.eq.T3,outreach_status.eq.touch3_sent').eq('status', 'active');
           break;
         case 'signed_up':
           query = query.eq('outreach_status', 'signed_up');
           break;
         case 'confirmed':
-          query = query.eq('outreach_status', 'touch1_confirmed');
+          query = query.or('outreach_status.eq.touch1_confirmed,touch_stage.eq.confirmed');
           break;
         case 'no_response':
           query = query.eq('outreach_status', 'no_response');

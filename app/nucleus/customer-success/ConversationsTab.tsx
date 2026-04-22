@@ -82,6 +82,62 @@ const OUTREACH_META: Record<string, { bg: string; text: string; label: string }>
   pitched:          { bg: '#dbeafe', text: '#1d4ed8',  label: 'Pitched' },
 };
 
+// ── Client-side filter ────────────────────────────────────────────────────
+
+/**
+ * Applies the tab filter on top of whatever the server already returned.
+ * This ensures tabs work even if server-side filtering is incomplete.
+ */
+function applyClientFilter(convs: LinqConversation[], filter: FilterKey): LinqConversation[] {
+  switch (filter) {
+    case 'all':
+      return convs;
+
+    case 'needs_reply':
+      return convs.filter(
+        c => c.has_unread_reply || c.last_message_direction === 'inbound'
+      );
+
+    case 'touch1':
+      // T1 Pending: touch1 sent but not yet confirmed — still active
+      return convs.filter(
+        c =>
+          c.status === 'active' &&
+          (
+            c.outreach_status === 'touch1_sent' ||
+            c.touch_stage === 'T1'
+          )
+      );
+
+    case 'confirmed':
+      // T1 Confirmed
+      return convs.filter(
+        c =>
+          c.outreach_status === 'touch1_confirmed' ||
+          c.touch_stage === 'confirmed'
+      );
+
+    case 'touch2':
+      // T2 Sent
+      return convs.filter(
+        c =>
+          c.status === 'active' &&
+          (
+            c.outreach_status === 'touch2_sent' ||
+            c.touch_stage === 'T2'
+          )
+      );
+
+    case 'handled':
+      return convs.filter(
+        c => c.status === 'handled' || c.status === 'archived'
+      );
+
+    default:
+      return convs;
+  }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string | null): string {
@@ -692,6 +748,9 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
 
   // ── Layout ─────────────────────────────────────────────────────────────
 
+  // Client-side filter on top of server results (safety net for mismatched field names)
+  const filteredConvs = applyClientFilter(convs, filter);
+
   const totalPages = Math.ceil(total / LIMIT);
 
   const containerStyle: React.CSSProperties = {
@@ -775,13 +834,13 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
             <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
             <span style={{ fontSize: '0.8rem' }}>Loading…</span>
           </div>
-        ) : convs.length === 0 ? (
+        ) : filteredConvs.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', gap: 10 }}>
             <MessageSquare size={28} style={{ opacity: 0.2 }} />
             <span style={{ fontSize: '0.8rem' }}>No conversations</span>
           </div>
         ) : (
-          convs.map(c => (
+          filteredConvs.map(c => (
             <ConvRow
               key={c.id}
               conv={c}
