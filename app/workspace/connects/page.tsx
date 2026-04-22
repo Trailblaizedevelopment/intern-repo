@@ -206,7 +206,7 @@ const LS = {
   pendingConnects:'connects_pending_v3',
   connected:      'connects_connected_v3',
 };
-const SEED_FLAG = 'connects_seeded_v4';
+const SEED_FLAG = 'connects_seeded_v5';
 
 function readCallLogs(): Record<string, CallLog> {
   try { return JSON.parse(localStorage.getItem(LS.callLogs) || '{}'); } catch { return {}; }
@@ -277,7 +277,11 @@ function fmtPhone(p: string | null): string {
 function isOverdue(dateStr?: string): boolean { return !!dateStr && new Date(dateStr) < new Date(); }
 function today(): string { return new Date().toISOString().slice(0, 10); }
 function getContactStatus(c: MergedAlumni, logs: Record<string, CallLog>): ColumnStatus {
-  return logs[c.id]?.status ?? 'not_called';
+  // Check by ID first, then by name (seed data uses name as key)
+  if (logs[c.id]) return logs[c.id].status;
+  const fullName = [c.first_name, c.last_name].filter(Boolean).join(' ');
+  if (fullName && logs[fullName]) return logs[fullName].status;
+  return 'not_called';
 }
 function getInitials(name: string): string {
   const p = name.trim().split(' ');
