@@ -83,6 +83,10 @@ interface LinqMessage {
   from: string;
   parts: LinqMessagePart[];
   created_at: string;
+  // iMessage tapback / reaction fields (see lib/linq.ts for details)
+  effect?: string | null;
+  reactions?: Array<{ type: string; value: string; sender?: string }> | null;
+  message_type?: string | null;
 }
 
 // ---- Provider implementation ----
@@ -227,16 +231,27 @@ export class LinqProvider implements MessagingProvider {
       const data = await res.json();
       const messages: LinqMessage[] = data.messages || [];
 
-      return messages.map(m => ({
-        id: m.id,
-        conversation_id: m.chat_id,
-        direction: this.isOurLine(m.from) ? 'outbound' as const : 'inbound' as const,
-        body: m.parts.map(p => p.value).join(''),
-        sent_at: m.created_at,
-        delivery_status: 'sent' as const,
-        service: 'imessage' as const, // Linq is iMessage platform
-        sender_line: m.from,
-      }));
+      return messages.map(m => {
+        const isReaction = this.isReaction(m);
+        const reactionValue = isReaction ? this.reactionValue(m) : undefined;
+        const body = isReaction
+          ? (reactionValue ? `(iMessage reaction: ${reactionValue})` : '(iMessage reaction)')
+          : m.parts.filter(p => p.type === 'text').map(p => p.value).join('');
+
+        return {
+          id: m.id,
+          conversation_id: m.chat_id,
+          direction: this.isOurLine(m.from) ? 'outbound' as const : 'inbound' as const,
+          body,
+          sent_at: m.created_at,
+          delivery_status: 'sent' as const,
+          service: 'imessage' as const,
+          sender_line: m.from,
+          is_reaction: isReaction || undefined,
+          reaction_value: reactionValue,
+          raw_provider_data: m,
+        };
+      });
     } catch {
       return [];
     }
@@ -312,7 +327,26 @@ export class LinqProvider implements MessagingProvider {
 
   /** Check if a phone number is one of our sending lines */
   private isOurLine(phone: string): boolean {
-    const OUR_LINES = ['+16462408056', '+16462668785', '+16462442696'];
+    const OUR_LINES = ['+16462101111', '+16462178274', '+16462442696'];
     return OUR_LINES.includes(phone);
+  }
+
+  /** Detect if a LinqMessage is an iMessage tapback reaction */
+  private isReaction(m: LinqMessage): boolean {
+    if (m.effect) return true;
+    if (m.reactions && m.reactions.length > 0) return true;
+    if (m.message_type === 'reaction' || m.message_type === 'tapback' || m.message_type === 'effect') return true;
+    if (m.parts?.some(p => p.type === 'effect' || p.type === 'reaction' || p.type === 'tapback')) return true;
+    return false;
+  }
+
+  /** Extract the raw reaction/effect value from a LinqMessage, if present */
+  private reactionValue(m: LinqMessage): string | undefined {
+    return (
+      m.effect ??
+      m.reactions?.[0]?.value ??
+      m.parts?.find(p => p.type === 'effect' || p.type === 'reaction' || p.type === 'tapback')?.value ??
+      undefined
+    );
   }
 }

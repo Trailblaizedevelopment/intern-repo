@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { getMessages } from '@/lib/linq';
+import { getMessages, isLinqReaction, getLinqReactionLabel } from '@/lib/linq';
 import { runSyncAll } from '../sync-all/route';
 
 const AUTH_TOKEN = process.env.INTERNAL_API_KEY || '';
@@ -39,7 +39,13 @@ export async function POST(req: NextRequest) {
   if (!contacts?.length) return NextResponse.json({ detected: 0, scanned: 0 });
 
   let detected = 0;
-  const updates: { id: string; response_text: string; last_response_at: string }[] = [];
+  const updates: {
+    id: string;
+    response_text: string;
+    last_response_at: string;
+    is_reaction: boolean;
+    current_status: string | null;
+  }[] = [];
   const errors: string[] = [];
 
   // Process in parallel batches of 5
@@ -57,16 +63,25 @@ export async function POST(req: NextRequest) {
 
         if (inbound.length > 0) {
           const latestReply = inbound[0];
-          const text = latestReply.parts
-            .filter(p => p.type === 'text')
-            .map(p => p.value)
-            .join(' ')
-            .trim();
+          const isReaction = isLinqReaction(latestReply);
+
+          let text: string;
+          if (isReaction) {
+            text = getLinqReactionLabel(latestReply);
+          } else {
+            text = latestReply.parts
+              .filter(p => p.type === 'text')
+              .map(p => p.value)
+              .join(' ')
+              .trim() || '(media/no text)';
+          }
 
           updates.push({
             id: contact.id,
-            response_text: text || '(media/no text)',
+            response_text: text,
             last_response_at: latestReply.created_at,
+            is_reaction: isReaction,
+            current_status: contact.outreach_status,
           });
           detected++;
         }
@@ -76,14 +91,25 @@ export async function POST(req: NextRequest) {
     }));
   }
 
-  // Batch update detected contacts — only last_response_at and response_text
+  // Batch update detected contacts
   for (const update of updates) {
+    const fields: Record<string, unknown> = {
+      last_response_at: update.last_response_at,
+      response_text: update.response_text,
+    };
+
+    // iMessage reactions are unambiguous T1 confirmations — promote to touch1_confirmed
+    // so the next compile picks Track A T2 ("great! here's the link").
+    // Exception to the normal "no status change in sync" rule: reactions are a
+    // press-button signal that can't be misclassified like text replies.
+    if (update.is_reaction && update.current_status === 'touch1_sent') {
+      fields.outreach_status = 'touch1_confirmed';
+      fields.response_classification = 'confirmed';
+    }
+
     await supabase
       .from('alumni_contacts')
-      .update({
-        last_response_at: update.last_response_at,
-        response_text: update.response_text,
-      })
+      .update(fields)
       .eq('id', update.id);
   }
 

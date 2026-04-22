@@ -16,6 +16,10 @@ export interface Message {
   delivery_status: DeliveryStatus;
   service: MessageService;
   sender_line: string;
+  /** True when this message is an iMessage tapback reaction rather than a text reply. */
+  is_reaction?: boolean;
+  /** Raw reaction/effect value from the provider (e.g. "thumbsup", "heart"). */
+  reaction_value?: string;
   raw_provider_data?: unknown;
 }
 

@@ -41,6 +41,43 @@ export interface LinqMessage {
   sent_at?: string | null;
   is_delivered?: boolean;
   is_read?: boolean;
+  // iMessage tapback / reaction fields.
+  // One or more of these will be set when the recipient sends a tapback reaction
+  // (heart ❤️, thumbs up 👍, ha ha 😂, !! or ? etc.) instead of a text reply.
+  // TODO: Verify exact field names by logging a live Linq API response for a reacted message.
+  effect?: string | null;                                // e.g. "thumbsup", "heart", "haha", "question", "exclamation"
+  reactions?: Array<{ type: string; value: string; sender?: string }> | null;
+  message_type?: string | null;                          // may be "reaction" | "tapback" | "effect" for tapbacks
+}
+
+/**
+ * Returns true if a LinqMessage represents an iMessage tapback/reaction rather than
+ * a normal text reply. Checks all known API response shapes because Linq's reaction
+ * format is not publicly documented.
+ */
+export function isLinqReaction(msg: LinqMessage): boolean {
+  if (msg.effect) return true;
+  if (msg.reactions && msg.reactions.length > 0) return true;
+  if (
+    msg.message_type === 'reaction' ||
+    msg.message_type === 'tapback' ||
+    msg.message_type === 'effect'
+  ) return true;
+  if (msg.parts?.some(p => p.type === 'effect' || p.type === 'reaction' || p.type === 'tapback'))
+    return true;
+  return false;
+}
+
+/**
+ * Returns a human-readable reaction label suitable for storage as response_text.
+ * e.g. "(iMessage reaction: thumbsup)" or "(iMessage reaction)" if value unknown.
+ */
+export function getLinqReactionLabel(msg: LinqMessage): string {
+  const label =
+    msg.effect ??
+    msg.reactions?.[0]?.value ??
+    msg.parts?.find(p => p.type === 'effect' || p.type === 'reaction' || p.type === 'tapback')?.value;
+  return label ? `(iMessage reaction: ${label})` : '(iMessage reaction)';
 }
 
 export async function createChat(fromPhone: string, toPhone: string, message?: string): Promise<LinqChat> {

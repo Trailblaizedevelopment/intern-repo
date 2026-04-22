@@ -238,6 +238,12 @@ export function createMessagingService(provider: MessagingProvider) {
               if (newestTime <= lastProcessed) return null;
             }
 
+            // iMessage reactions (tapbacks) are unambiguous confirmation signals —
+            // skip behavioral flag logic entirely for them.
+            if (newest.is_reaction) {
+              return { contact, message: newest, hasBehavioralFlag: false, inboundCount: inbound.length, isReaction: true };
+            }
+
             // Behavioral flags (independent of keyword classification):
             // 1. Long message (> 150 chars) — likely nuanced, needs human eye
             // 2. Multiple inbound messages (2+) — ongoing back-and-forth
@@ -249,13 +255,34 @@ export function createMessagingService(provider: MessagingProvider) {
               inbound.length >= 2 ||
               isLastMsgUnanswered;
 
-            return { contact, message: newest, hasBehavioralFlag, inboundCount: inbound.length };
+            return { contact, message: newest, hasBehavioralFlag, inboundCount: inbound.length, isReaction: false };
           })
         );
 
         for (const result of batchResults) {
           if (!result) continue;
           newResponses++;
+
+          // iMessage reactions are unambiguous T1 confirmations — no keyword classification needed.
+          // Treat as "confirmed" and promote to touch1_confirmed so the next batch sends Track A T2.
+          if (result.isReaction) {
+            const reactionStatus =
+              result.contact.outreach_status === 'touch1_sent' ? 'touch1_confirmed'
+              : result.contact.outreach_status; // don't downgrade if already further along
+
+            classifications['confirmed'] = (classifications['confirmed'] || 0) + 1;
+
+            await supabase
+              .from('alumni_contacts')
+              .update({
+                last_response_at: result.message.sent_at,
+                response_text: result.message.body.slice(0, 500), // already set to "(iMessage reaction: ...)" by provider
+                response_classification: 'confirmed',
+                outreach_status: reactionStatus,
+              })
+              .eq('id', result.contact.id);
+            continue;
+          }
 
           const { classification, needs_human_review, reason } = classifyResponse(result.message.body);
           classifications[classification] = (classifications[classification] || 0) + 1;
@@ -279,11 +306,12 @@ export function createMessagingService(provider: MessagingProvider) {
           }
 
           // Map classification to outreach_status
+          // "confirmed" → touch1_confirmed so next compile picks Track A T2 ("great! here's the link")
           const statusMap: Record<string, string> = {
             wrong_number: 'wrong_number',
             declined: 'opted_out',
             signed_up: 'signed_up',
-            confirmed: 'responded',
+            confirmed: 'touch1_confirmed',
             question: 'responded',
           };
 
