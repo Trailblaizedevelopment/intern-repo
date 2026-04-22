@@ -18,6 +18,7 @@ import {
   ArrowLeft, LayoutDashboard, FileUp, Edit3,
 } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
+import { CampaignCRM } from './CampaignCRM';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2074,7 +2075,7 @@ export default function WarRoomPage() {
       {/* Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
         {tab === 'dashboard'  && <DashboardTab stats={stats} onOpenDeal={openDeal} />}
-        {tab === 'campaigns'  && <CampaignsTab stats={stats} openDeal={openDeal} />}
+        {tab === 'campaigns'  && <CampaignCRM stats={stats} openDeal={openDeal} />}
       </div>
 
       {/* Deal Edit Panel — slide-in from right */}
