@@ -1,7 +1,8 @@
 /**
  * lib/linq-recovery.ts
- * Full Linq conversation recovery: pulls all chats across all lines,
- * matches to alumni_contacts, upserts linq_conversations, backfills linq_chat_id.
+ * Full Linq conversation recovery: pulls ALL chats across all lines (full pagination),
+ * fetches last messages to populate content fields, matches to alumni_contacts,
+ * and upserts linq_conversations.
  *
  * Server-side only — never import from client components.
  */
@@ -9,11 +10,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { listChats, getMessages, LinqChat, LinqMessage } from '@/lib/linq';
 
-// ── Line config (source of truth for line locking) ─────────────────────────
+// ── Line config — all 9 active lines ──────────────────────────────────────
 export const LINQ_LINES: { phone: string; label: string }[] = [
   { phone: '+16462101111', label: 'Owen' },
-  { phone: '+16462668785', label: 'Adam' },
+  { phone: '+16462178274', label: 'Adam' },
   { phone: '+16462442696', label: 'Ford' },
+  { phone: '+14044239427', label: 'Line 4' },
+  { phone: '+14045428435', label: 'Line 5' },
+  { phone: '+19725590427', label: 'Line 6' },
+  { phone: '+19725590438', label: 'Line 7' },
+  { phone: '+15042234218', label: 'Line 8' },
+  { phone: '+15042236050', label: 'Line 9' },
 ];
 
 export interface LinqConversation {
@@ -46,12 +53,6 @@ function getSupabaseAdmin() {
   return createClient(url, key);
 }
 
-function getLinqToken(): string {
-  const token = process.env.LINQ_API_TOKEN;
-  if (!token) throw new Error('LINQ_API_TOKEN not set');
-  return token;
-}
-
 /** Fetch all chats for a given line phone, paginating fully. */
 async function fetchAllChatsForLine(phone: string): Promise<LinqChat[]> {
   const all: LinqChat[] = [];
@@ -64,14 +65,19 @@ async function fetchAllChatsForLine(phone: string): Promise<LinqChat[]> {
   return all;
 }
 
-/** Get the last message for a chat. Returns null if no messages. */
-async function getLastMessage(chatId: string): Promise<LinqMessage | null> {
-  try {
-    const msgs = await getMessages(chatId, 1);
-    return msgs.length > 0 ? msgs[0] : null;
-  } catch {
-    return null;
+/** Run concurrently in batches to respect rate limits. */
+async function runInBatches<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<Array<{ status: 'fulfilled'; value: R } | { status: 'rejected'; reason: unknown }>> {
+  const results: Array<{ status: 'fulfilled'; value: R } | { status: 'rejected'; reason: unknown }> = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.allSettled(batch.map(fn));
+    results.push(...batchResults);
   }
+  return results;
 }
 
 export interface RecoveryResult {
@@ -83,8 +89,9 @@ export interface RecoveryResult {
 }
 
 /**
- * Main recovery function. Pulls all chats across all lines,
- * enriches with contact data from Supabase, upserts linq_conversations.
+ * Main recovery function. Pulls ALL chats across all lines with full pagination,
+ * fetches last messages for each chat, enriches with contact data, upserts
+ * linq_conversations.
  */
 export async function runLinqRecovery(): Promise<RecoveryResult> {
   const supabase = getSupabaseAdmin();
@@ -94,7 +101,7 @@ export async function runLinqRecovery(): Promise<RecoveryResult> {
   let upserted = 0;
   let backfilled = 0;
 
-  // ── Step 1: Fetch all chats across all lines ───────────────────────────
+  // ── Step 1: Fetch ALL chats across all lines (full pagination) ─────────
   const allChats: Array<{ chat: LinqChat; line: typeof LINQ_LINES[number] }> = [];
 
   await Promise.allSettled(
@@ -141,17 +148,21 @@ export async function runLinqRecovery(): Promise<RecoveryResult> {
   let contacts: ContactRow[] = [];
 
   if (recipientPhones.length > 0) {
-    const orClauses = recipientPhones
-      .map(p => `phone_primary.eq.${p},phone_secondary.eq.${p}`)
-      .join(',');
-    const { data, error } = await supabase
-      .from('alumni_contacts')
-      .select('id, first_name, last_name, phone_primary, phone_secondary, chapter_id, outreach_status, touch_stage')
-      .or(orClauses);
-    if (error) {
-      errors.push(`Contact lookup failed: ${error.message}`);
-    } else {
-      contacts = (data || []) as ContactRow[];
+    const PHONE_BATCH = 50;
+    for (let i = 0; i < recipientPhones.length; i += PHONE_BATCH) {
+      const batch = recipientPhones.slice(i, i + PHONE_BATCH);
+      const orClauses = batch
+        .map(p => `phone_primary.eq.${p},phone_secondary.eq.${p}`)
+        .join(',');
+      const { data, error } = await supabase
+        .from('alumni_contacts')
+        .select('id, first_name, last_name, phone_primary, phone_secondary, chapter_id, outreach_status, touch_stage')
+        .or(orClauses);
+      if (error) {
+        errors.push(`Contact lookup batch failed: ${error.message}`);
+      } else {
+        contacts.push(...((data || []) as ContactRow[]));
+      }
     }
   }
 
@@ -172,19 +183,57 @@ export async function runLinqRecovery(): Promise<RecoveryResult> {
     for (const ch of chapters || []) chapterMap.set(ch.id, ch.chapter_name);
   }
 
-  // ── Step 5: Upsert linq_conversations in batches ──────────────────────
+  // ── Step 5: Fetch last messages for each chat (batched, 15 concurrent) ─
+  // This is the critical fix — without this, last_message_text stays null.
+  type ChatWithMessages = {
+    chat: LinqChat;
+    line: typeof LINQ_LINES[number];
+    lastMsg: LinqMessage | null;
+    msgs: LinqMessage[];
+  };
+
+  const CONCURRENCY = 15;
+  const chatWithMsgsResults = await runInBatches(
+    allChats,
+    CONCURRENCY,
+    async ({ chat, line }) => {
+      try {
+        const msgs = await getMessages(chat.id, 20);
+        const lastMsg = msgs.length > 0 ? msgs[0] : null;
+        return { chat, line, lastMsg, msgs };
+      } catch {
+        // Fall back to empty messages — at least we'll have the chat metadata
+        return { chat, line, lastMsg: null, msgs: [] };
+      }
+    }
+  );
+
+  const chatsWithMessages: ChatWithMessages[] = [];
+  for (const result of chatWithMsgsResults) {
+    if (result.status === 'fulfilled') {
+      chatsWithMessages.push(result.value);
+    } else {
+      errors.push(`Message fetch failed: ${String(result.reason)}`);
+    }
+  }
+
+  // ── Step 6: Build upsert rows ──────────────────────────────────────────
   const BATCH = 50;
   const rows: Record<string, unknown>[] = [];
 
-  for (const { chat, line } of allChats) {
+  for (const { chat, line, lastMsg } of chatsWithMessages) {
     const recipientHandle = chat.handles.find(h => !h.is_me);
     const phone = recipientHandle?.handle || null;
     const contact = phone ? (phoneToContact.get(phone) ?? null) : null;
 
-    // Try to get last message from chat updated_at — we'll set last_message_at
-    // from the chat's updated_at as a proxy (avoid N+1 for recovery; sync route does detail)
-    const now48hAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    const isUrgent = false; // set during sync, not recovery
+    const lastMessageAt = lastMsg?.created_at ?? chat.updated_at;
+    const lastMessageText = lastMsg
+      ? (lastMsg.parts?.find(p => p.type === 'text')?.value ?? null)
+      : null;
+    const lastMessageDirection = lastMsg
+      ? (lastMsg.is_from_me ? 'outbound' : 'inbound')
+      : null;
+    const hasUnreadReply = lastMsg ? !lastMsg.is_from_me : false;
 
     rows.push({
       linq_chat_id: chat.id,
@@ -201,13 +250,16 @@ export async function runLinqRecovery(): Promise<RecoveryResult> {
         : null,
       outreach_status: contact?.outreach_status ?? null,
       touch_stage: contact?.touch_stage ?? null,
-      last_message_at: chat.updated_at,
-      is_urgent: isUrgent,
+      last_message_at: lastMessageAt,
+      last_message_text: lastMessageText,
+      last_message_direction: lastMessageDirection,
+      has_unread_reply: hasUnreadReply,
+      is_urgent: false,
       updated_at: new Date().toISOString(),
     });
   }
 
-  // Batch upsert
+  // ── Step 7: Batch upsert ───────────────────────────────────────────────
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
     const { error } = await supabase
@@ -220,26 +272,40 @@ export async function runLinqRecovery(): Promise<RecoveryResult> {
     }
   }
 
-  // ── Step 6: Backfill alumni_contacts.linq_chat_id where null ──────────
-  for (const { chat, line: _line } of allChats) {
+  // ── Step 8: Backfill alumni_contacts.linq_chat_id where null ──────────
+  const backfillUpdates: Array<{ contactId: string; chatId: string }> = [];
+
+  for (const { chat } of chatsWithMessages) {
     const recipientHandle = chat.handles.find(h => !h.is_me);
     const phone = recipientHandle?.handle || null;
     const contact = phone ? (phoneToContact.get(phone) ?? null) : null;
-    if (!contact) continue;
+    if (contact) {
+      backfillUpdates.push({ contactId: contact.id, chatId: chat.id });
+    }
+  }
 
-    // Only backfill if not already set
-    const { data: existing } = await supabase
+  if (backfillUpdates.length > 0) {
+    // Fetch existing linq_chat_ids in bulk
+    const contactIds = backfillUpdates.map(u => u.contactId);
+    const { data: existingContacts } = await supabase
       .from('alumni_contacts')
-      .select('linq_chat_id')
-      .eq('id', contact.id)
-      .single();
+      .select('id, linq_chat_id')
+      .in('id', contactIds);
 
-    if (existing && !existing.linq_chat_id) {
-      const { error } = await supabase
-        .from('alumni_contacts')
-        .update({ linq_chat_id: chat.id })
-        .eq('id', contact.id);
-      if (!error) backfilled++;
+    const existingMap = new Map<string, string | null>();
+    for (const c of existingContacts ?? []) {
+      existingMap.set(c.id, c.linq_chat_id);
+    }
+
+    // Only update contacts that don't have a linq_chat_id yet
+    for (const { contactId, chatId } of backfillUpdates) {
+      if (!existingMap.get(contactId)) {
+        const { error } = await supabase
+          .from('alumni_contacts')
+          .update({ linq_chat_id: chatId })
+          .eq('id', contactId);
+        if (!error) backfilled++;
+      }
     }
   }
 
