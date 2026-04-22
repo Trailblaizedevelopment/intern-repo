@@ -1,49 +1,708 @@
 [
-  {"name":"Jim Riney","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-14","notes":"Talent Acquisition, Freese & Nichols, Fort Worth. Actively hiring.","tags":["Hiring","Industry Expert"],"followUp":null},
-  {"name":"Steve Mott","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-14","notes":"Outside Sales, Howard Technology. Willing to help.","tags":["Wants to Help"],"followUp":null},
-  {"name":"Kevin Knuckley","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-14","notes":"Owner, Witch Equipment Co. Already spreading sign-up link.","tags":["Referred Someone"],"followUp":null},
-  {"name":"Johnston Walker","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-14","notes":"Senior Trial Attorney, USALegal. Loves the platform, will help actives.","tags":["Mentoring","Wants to Help"],"followUp":null},
-  {"name":"Russell Smith","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-14","notes":"Pason Systems. Willing to help.","tags":["Wants to Help"],"followUp":null},
-  {"name":"Lee Beauchamp","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-14","notes":"Past Grand Consul, Sigma Chi International. BIG ONE. Google Meet with Owen + Ford this month. Nationals conversation potential.","tags":["Industry Expert","Event Interest"],"followUp":"2026-04-28"},
-  {"name":"John Sawyer","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-14","notes":"Area Env Manager, Republic Services. ACTIVELY HIRING.","tags":["Hiring"],"followUp":null},
-  {"name":"Dan Parsley","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-14","notes":"Managing Partner, GPG Ventures.","tags":["Industry Expert"],"followUp":null},
-  {"name":"Connor Bailey","chapter":"Sigma Chi Ole Miss","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-15","notes":"Going to make a post on the platform. Willing to give advice + talk dev route. Based in Nashville. Graduated 2013.","tags":["Advice","Posted on Platform"],"followUp":null},
-  {"name":"Kirkland Heinz","chapter":"Sigma Chi Ole Miss","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-15","notes":"Burns & Wilcox, producer. Checking with hiring manager about Oxford internship.","tags":["Hiring"],"followUp":"2026-04-21"},
-  {"name":"Kim Turner","chapter":"TAMU Sigma Chi","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-15","notes":"Retired. Said he might post on the feed after the Sigma Chi 50th anniversary event.","tags":[],"followUp":"2026-04-21"},
-  {"name":"Robert Rigney","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-15","notes":"Retired, deer farming outside Houston. Class 1979. May miss the 50th.","tags":[],"followUp":null},
-  {"name":"Matt Moriarty","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-15","notes":"Owner, Moriarty Construction LLC, Houston. Warm but busy.","tags":["Hiring"],"followUp":null},
-  {"name":"Bob Flowers","chapter":"TAMU Sigma Chi","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-15","notes":"Principal, Endurance Builders, Houston. Construction.","tags":[],"followUp":null},
-  {"name":"Jimmy Wallingford","chapter":"TAMU Sigma Chi","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-15","notes":"Dentist, Wallingford Dentistry, Montgomery TX.","tags":[],"followUp":null},
-  {"name":"Robert Jacobs","chapter":"TAMU Sigma Chi","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-15","notes":"EVP, JS of Houston, Real Estate. Class 2011.","tags":[],"followUp":null},
-  {"name":"Lucas Deshon","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-15","notes":"Consultant, Campfire. Class 2024. Would give CS/SWE interviews to actives. Agreed to forward join link to pledge brothers.","tags":["Hiring","Referred Someone","Mentoring"],"followUp":null},
-  {"name":"Michael Lynn Bell","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-16","notes":"President, NLLE Construction CE. Offshore/oil & gas, Houston TX. Not very helpful.","tags":[],"followUp":null},
-  {"name":"Kevin Jackson","chapter":"TAMU Sigma Chi","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-16","notes":"Retired. Class 1979.","tags":[],"followUp":null},
-  {"name":"Evan Greenburg","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-16","notes":"Said he'd call Ford back.","tags":[],"followUp":"2026-04-16"},
-  {"name":"Jim Russ","chapter":"TAMU Sigma Chi","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-16","notes":"Thomas & McKay.","tags":[],"followUp":null},
-  {"name":"Chip Nemeth","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-16","notes":"Sales, Houston. Class 1989. Great call. Loves platform. Suggested Trailblaize feature at 50th anniversary event.","tags":["Event Interest","Wants to Help"],"followUp":null},
-  {"name":"Clayton Taylor","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-16","notes":"Investment Banking. Going to log onto the platform and add his job.","tags":["Posted on Platform"],"followUp":null},
-  {"name":"Mason Greenwald","chapter":"ATO Ole Miss","status":"called","outcome":"answered","calledBy":"Owen","calledAt":"2026-04-16","notes":"Legislative Assistant, U.S. House of Representatives. DC. Class 2024. Happy to help ANY Ole Miss guy.","tags":["Industry Expert","Mentoring"],"followUp":null},
-  {"name":"Nicholas Will","chapter":"ATO Ole Miss","status":"called","outcome":"answered","calledBy":"Owen","calledAt":"2026-04-16","notes":"CEO, Cinder & Crown. AI-native implementation for businesses. Dallas. HUGE potential.","tags":["Industry Expert","Hiring"],"followUp":null},
-  {"name":"Blake Belcher","chapter":"ATO Ole Miss","status":"called","outcome":"answered","calledBy":"Owen","calledAt":"2026-04-16","notes":"Owner, Concept Marketing & Branding. Dallas. Swamped but said he'd post.","tags":["Posted on Platform"],"followUp":null},
-  {"name":"Thomas Schildhammer","chapter":"ATO Ole Miss","status":"called","outcome":"answered","calledBy":"Owen","calledAt":"2026-04-16","notes":"AE, Technologent. Tech sales, Atlanta. Happy to help.","tags":["Wants to Help"],"followUp":null},
-  {"name":"Parker Davidson","chapter":"ATO Ole Miss","status":"called","outcome":"answered","calledBy":"Owen","calledAt":"2026-04-16","notes":"VP, Smith Blind & Awning + new company in Jackson MS. Starting new company, will need to hire.","tags":["Hiring","Looking to Connect"],"followUp":null},
-  {"name":"Joshua Estess","chapter":"Sigma Chi Ole Miss","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-17","notes":"KPMG. Class 2022. Brief call.","tags":[],"followUp":null},
-  {"name":"Matthew Miley","chapter":"Sigma Chi Ole Miss","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-17","notes":"Franchise owner, Fox's Pizza Den (Tupelo/New Albany/Oxford). ALWAYS HIRING. Going to post on platform.","tags":["Hiring","Posted on Platform"],"followUp":null},
-  {"name":"Walter Dennis","chapter":"Sigma Chi Ole Miss","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-17","notes":"Sales, moving to Denver for a new sales job. Will update his profile with new role.","tags":["Looking to Connect"],"followUp":null},
-  {"name":"Jack Watson","chapter":"TAMU Sigma Chi","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-17","notes":"UBS, Dallas TX. Class 2024. Has a big UBS licensing/wealth management program for recent grads. Going to post on the platform.","tags":["Hiring","Posted on Platform"],"followUp":"2026-04-20"},
-  {"name":"Gavin Caras","chapter":"SAM Miami","status":"called","outcome":"answered","calledBy":"Owen","calledAt":"2026-04-17","notes":"Data analytics at Global Payments, Cincinnati. Wants to consult for Trailblaize.","tags":["Industry Expert","Wants to Help"],"followUp":null},
-  {"name":"Michael Steinbuch","chapter":"SAM Miami","status":"called","outcome":"answered","calledBy":"Owen","calledAt":"2026-04-17","notes":"Manufacturing, Cincinnati. Asked for email with sign-in links.","tags":[],"followUp":null},
-  {"name":"Brennan Gillespie","chapter":"SAM Miami","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-20","notes":"IT. Joined the platform today. Got 4 emails (bug). No internship opportunities right now.","tags":[],"followUp":null},
-  {"name":"Glenn Kohner","chapter":"SAM Miami","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-20","notes":"CEO, Tough Customer (tech). California. Already working with alumni chair to provide job opportunities for actives. Hard to reach.","tags":["Hiring","Industry Expert"],"followUp":null},
-  {"name":"Jak Groedel","chapter":"SAM Miami","status":"declined","outcome":"declined","calledBy":"Ford","calledAt":"2026-04-20","notes":"Director of Provider Relations, Provide A Ride. Declined the call.","tags":[],"followUp":null},
-  {"name":"Jacob Helm","chapter":"SAM Miami","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-20","notes":"Healthcare.","tags":[],"followUp":null},
-  {"name":"Rich Vetstein","chapter":"SAM Miami","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-20","notes":"Attorney.","tags":[],"followUp":null},
-  {"name":"Leland Manders","chapter":"SAM Miami","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-20","notes":"CEO, Real Estate (retired). Texted back saying he's retired.","tags":[],"followUp":null},
-  {"name":"Hayden Demos","chapter":"SAM Miami","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-20","notes":"Politics/Political Affairs. IFF. Former chapter president. Class 2020. Super supportive. Still connected with SAM Nationals. Going to loop Ford in with national organization.","tags":["Industry Expert","Wants to Help","Event Interest"],"followUp":null},
-  {"name":"Adam Burau","chapter":"SAM Miami","status":"called","outcome":"answered","calledBy":"Ford","calledAt":"2026-04-21","notes":"Real Estate, Detroit MI. Class 2019. Bad timing, going to call Ford back.","tags":[],"followUp":"2026-04-22"},
-  {"name":"Craig Chaitoff","chapter":"SAM Miami","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-21","notes":"Senior Director, Cisco Systems. Sales. Class 1981.","tags":[],"followUp":null},
-  {"name":"Don Canoe","chapter":"SAM Miami","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-21","notes":"Partner, Desk Consulting. Energy & Utilities. Class 1975. Ohio.","tags":[],"followUp":null},
-  {"name":"Steven Newman","chapter":"SAM Miami","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-21","notes":"Retired, Real Estate. Class 1977.","tags":[],"followUp":null},
-  {"name":"Peter Rubin","chapter":"SAM Miami","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-21","notes":"Managing Partner, G2 Partners. Sales. Silverthorne, CO.","tags":[],"followUp":null},
-  {"name":"Brian Pierce","chapter":"Phi Delt Texas Tech","status":"voicemail","outcome":"voicemail","calledBy":"Ford","calledAt":"2026-04-21","notes":"EVP, Vista Bank. Class 1993. New platform user.","tags":[],"followUp":null}
+  {
+    "name": "Jim Riney",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-14",
+    "notes": "Talent Acquisition, Freese & Nichols, Fort Worth. Actively hiring.",
+    "tags": [
+      "Hiring",
+      "Industry Expert"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Steve Mott",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-14",
+    "notes": "Outside Sales, Howard Technology. Willing to help.",
+    "tags": [
+      "Wants to Help"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Kevin Knuckley",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-14",
+    "notes": "Owner, Witch Equipment Co. Already spreading sign-up link.",
+    "tags": [
+      "Referred Someone"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Johnston Walker",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-14",
+    "notes": "Senior Trial Attorney, USALegal. Loves the platform, will help actives.",
+    "tags": [
+      "Mentoring",
+      "Wants to Help"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Russell Smith",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-14",
+    "notes": "Pason Systems. Willing to help.",
+    "tags": [
+      "Wants to Help"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Lee Beauchamp",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-14",
+    "notes": "Past Grand Consul, Sigma Chi International. BIG ONE. Google Meet with Owen + Ford this month. Nationals conversation potential.",
+    "tags": [
+      "Industry Expert",
+      "Event Interest"
+    ],
+    "followUp": "2026-04-28"
+  },
+  {
+    "name": "John Sawyer",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-14",
+    "notes": "Area Env Manager, Republic Services. ACTIVELY HIRING.",
+    "tags": [
+      "Hiring"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Dan Parsley",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-14",
+    "notes": "Managing Partner, GPG Ventures.",
+    "tags": [
+      "Industry Expert"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Connor Bailey",
+    "chapter": "Sigma Chi Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "Going to make a post on the platform. Willing to give advice + talk dev route. Based in Nashville. Graduated 2013.",
+    "tags": [
+      "Advice",
+      "Posted on Platform"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Kirkland Heinz",
+    "chapter": "Sigma Chi Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "Burns & Wilcox, producer. Checking with hiring manager about Oxford internship.",
+    "tags": [
+      "Hiring"
+    ],
+    "followUp": "2026-04-21"
+  },
+  {
+    "name": "Kim Turner",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "Retired. Said he might post on the feed after the Sigma Chi 50th anniversary event.",
+    "tags": [],
+    "followUp": "2026-04-21"
+  },
+  {
+    "name": "Robert Rigney",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "Retired, deer farming outside Houston. Class 1979. May miss the 50th.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Matt Moriarty",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "Owner, Moriarty Construction LLC, Houston. Warm but busy.",
+    "tags": [
+      "Hiring"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Bob Flowers",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "Principal, Endurance Builders, Houston. Construction.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Jimmy Wallingford",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "Dentist, Wallingford Dentistry, Montgomery TX.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Robert Jacobs",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "EVP, JS of Houston, Real Estate. Class 2011.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Lucas Deshon",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-15",
+    "notes": "Consultant, Campfire. Class 2024. Would give CS/SWE interviews to actives. Agreed to forward join link to pledge brothers.",
+    "tags": [
+      "Hiring",
+      "Referred Someone",
+      "Mentoring"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Michael Lynn Bell",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "President, NLLE Construction CE. Offshore/oil & gas, Houston TX. Not very helpful.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Kevin Jackson",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "Retired. Class 1979.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Evan Greenburg",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "Said he'd call Ford back.",
+    "tags": [],
+    "followUp": "2026-04-16"
+  },
+  {
+    "name": "Jim Russ",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "Thomas & McKay.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Chip Nemeth",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "Sales, Houston. Class 1989. Great call. Loves platform. Suggested Trailblaize feature at 50th anniversary event.",
+    "tags": [
+      "Event Interest",
+      "Wants to Help"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Clayton Taylor",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "Investment Banking. Going to log onto the platform and add his job.",
+    "tags": [
+      "Posted on Platform"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Mason Greenwald",
+    "chapter": "ATO Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "Legislative Assistant, U.S. House of Representatives. DC. Class 2024. Happy to help ANY Ole Miss guy.",
+    "tags": [
+      "Industry Expert",
+      "Mentoring"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Nicholas Will",
+    "chapter": "ATO Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "CEO, Cinder & Crown. AI-native implementation for businesses. Dallas. HUGE potential.",
+    "tags": [
+      "Industry Expert",
+      "Hiring"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Blake Belcher",
+    "chapter": "ATO Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "Owner, Concept Marketing & Branding. Dallas. Swamped but said he'd post.",
+    "tags": [
+      "Posted on Platform"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Thomas Schildhammer",
+    "chapter": "ATO Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "AE, Technologent. Tech sales, Atlanta. Happy to help.",
+    "tags": [
+      "Wants to Help"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Parker Davidson",
+    "chapter": "ATO Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "VP, Smith Blind & Awning + new company in Jackson MS. Starting new company, will need to hire.",
+    "tags": [
+      "Hiring",
+      "Looking to Connect"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Joshua Estess",
+    "chapter": "Sigma Chi Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-17",
+    "notes": "KPMG. Class 2022. Brief call.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Matthew Miley",
+    "chapter": "Sigma Chi Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-17",
+    "notes": "Franchise owner, Fox's Pizza Den (Tupelo/New Albany/Oxford). ALWAYS HIRING. Going to post on platform.",
+    "tags": [
+      "Hiring",
+      "Posted on Platform"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Walter Dennis",
+    "chapter": "Sigma Chi Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-17",
+    "notes": "Sales, moving to Denver for a new sales job. Will update his profile with new role.",
+    "tags": [
+      "Looking to Connect"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Jack Watson",
+    "chapter": "TAMU Sigma Chi",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-17",
+    "notes": "UBS, Dallas TX. Class 2024. Has a big UBS licensing/wealth management program for recent grads. Going to post on the platform.",
+    "tags": [
+      "Hiring",
+      "Posted on Platform"
+    ],
+    "followUp": "2026-04-20"
+  },
+  {
+    "name": "Gavin Caras",
+    "chapter": "SAM Miami",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-17",
+    "notes": "Data analytics at Global Payments, Cincinnati. Wants to consult for Trailblaize.",
+    "tags": [
+      "Industry Expert",
+      "Wants to Help"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Michael Steinbuch",
+    "chapter": "SAM Miami",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-17",
+    "notes": "Manufacturing, Cincinnati. Asked for email with sign-in links.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Brennan Gillespie",
+    "chapter": "SAM Miami",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-20",
+    "notes": "IT. Joined the platform today. Got 4 emails (bug). No internship opportunities right now.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Glenn Kohner",
+    "chapter": "SAM Miami",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-20",
+    "notes": "CEO, Tough Customer (tech). California. Already working with alumni chair to provide job opportunities for actives. Hard to reach.",
+    "tags": [
+      "Hiring",
+      "Industry Expert"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Jak Groedel",
+    "chapter": "SAM Miami",
+    "status": "declined",
+    "outcome": "declined",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-20",
+    "notes": "Director of Provider Relations, Provide A Ride. Declined the call.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Jacob Helm",
+    "chapter": "SAM Miami",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-20",
+    "notes": "Healthcare.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Rich Vetstein",
+    "chapter": "SAM Miami",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-20",
+    "notes": "Attorney.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Leland Manders",
+    "chapter": "SAM Miami",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-20",
+    "notes": "CEO, Real Estate (retired). Texted back saying he's retired.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Hayden Demos",
+    "chapter": "SAM Miami",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-20",
+    "notes": "Politics/Political Affairs. IFF. Former chapter president. Class 2020. Super supportive. Still connected with SAM Nationals. Going to loop Ford in with national organization.",
+    "tags": [
+      "Industry Expert",
+      "Wants to Help",
+      "Event Interest"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Adam Burau",
+    "chapter": "SAM Miami",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-21",
+    "notes": "Real Estate, Detroit MI. Class 2019. Bad timing, going to call Ford back.",
+    "tags": [],
+    "followUp": "2026-04-22"
+  },
+  {
+    "name": "Craig Chaitoff",
+    "chapter": "SAM Miami",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-21",
+    "notes": "Senior Director, Cisco Systems. Sales. Class 1981.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Don Canoe",
+    "chapter": "SAM Miami",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-21",
+    "notes": "Partner, Desk Consulting. Energy & Utilities. Class 1975. Ohio.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Steven Newman",
+    "chapter": "SAM Miami",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-21",
+    "notes": "Retired, Real Estate. Class 1977.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Peter Rubin",
+    "chapter": "SAM Miami",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-21",
+    "notes": "Managing Partner, G2 Partners. Sales. Silverthorne, CO.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Brian Pierce",
+    "chapter": "Phi Delt Texas Tech",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-21",
+    "notes": "EVP, Vista Bank. Class 1993. New platform user.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Tom Daily",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "AWS Sales, Dallas TX. Class 1999.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Troy Cavazos",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "Trinity Consulting, Houston TX. Class 2024.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Chris Lynch Armstrong Lindstrom",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-16",
+    "notes": "DLL Law Group, Legal, Houston TX. Class 1997.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "John Kyle Davis",
+    "chapter": "ATO Ole Miss",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "ISM, C Spire. Mississippi. Class 2013.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Roman Mancini",
+    "chapter": "ATO Ole Miss",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "Dir BD, Mancini Foods. Food & Bev. Florida. Class 2019.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "AJ Kozman",
+    "chapter": "ATO Ole Miss",
+    "status": "called",
+    "outcome": "answered",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "Med student, Memphis TN. Class 2024. Going to make a post on the platform.",
+    "tags": [
+      "Posted on Platform"
+    ],
+    "followUp": null
+  },
+  {
+    "name": "Ron Door",
+    "chapter": "TAMU Sigma Chi",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Owen",
+    "calledAt": "2026-04-16",
+    "notes": "Real estate, likely retired. Class 1978.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Scott Mahalko",
+    "chapter": "SAM Miami",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-20",
+    "notes": "Healthcare, National Hospital Sales Director. Class 1988.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Austin Melton",
+    "chapter": "Sigma Chi Ole Miss",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-17",
+    "notes": "Zurich North America, Dallas. Class 2020.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Collin Curtin",
+    "chapter": "Sigma Chi Ole Miss",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-17",
+    "notes": "WSO, F-18 Super Hornet, US Navy, Fresno CA. Class 2019.",
+    "tags": [],
+    "followUp": null
+  },
+  {
+    "name": "Matt Froelich",
+    "chapter": "Sigma Chi Ole Miss",
+    "status": "voicemail",
+    "outcome": "voicemail",
+    "calledBy": "Ford",
+    "calledAt": "2026-04-17",
+    "notes": "Environmental Engineer, LA. Class 2015.",
+    "tags": [],
+    "followUp": null
+  }
 ]

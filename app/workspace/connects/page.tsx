@@ -150,7 +150,7 @@ interface WebNode {
 interface WebEdge {
   from: string;
   to: string;
-  type: 'industry' | 'city' | 'interest';
+  type: 'industry' | 'city' | 'interest' | 'university' | 'org';
   sharedTag: string;
 }
 
@@ -187,10 +187,12 @@ function getTagStyle(tag: string): { color: string; bg: string } {
 
 const INDUSTRY_TAGS = ['Hiring', 'Industry Expert', 'Mentoring'];
 const CALLER_NAMES = ['Owen', 'Ford', 'Adam', 'Katie', 'Hyatt', 'Zach', 'Other'];
-const EDGE_COLORS: Record<'industry' | 'city' | 'interest', string> = {
+const EDGE_COLORS: Record<'industry' | 'city' | 'interest' | 'university' | 'org', string> = {
   industry: '#10b981',
   city: '#3b82f6',
   interest: '#8b5cf6',
+  university: '#F59E0B',
+  org: '#0F172A',
 };
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
@@ -204,7 +206,7 @@ const LS = {
   pendingConnects:'connects_pending_v3',
   connected:      'connects_connected_v3',
 };
-const SEED_FLAG = 'connects_seeded_v3';
+const SEED_FLAG = 'connects_seeded_v4';
 
 function readCallLogs(): Record<string, CallLog> {
   try { return JSON.parse(localStorage.getItem(LS.callLogs) || '{}'); } catch { return {}; }
@@ -1261,6 +1263,36 @@ function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextC
   );
 }
 
+// ─── Chapter Field Parser ────────────────────────────────────────────────────
+
+function parseChapterField(chapter: string | undefined): { school: string | null; org: string | null } {
+  if (!chapter) return { school: null, org: null };
+  // Greek letter words + common shorthand
+  const GREEK_WORDS = new Set([
+    'alpha','beta','gamma','delta','epsilon','zeta','eta','theta','iota','kappa',
+    'lambda','mu','nu','xi','pi','rho','sigma','tau','upsilon','phi','chi','psi','omega',
+    'delt','sig','pike','tke',
+  ]);
+  // Known school abbreviations (first-word)
+  const SCHOOL_ABBREVS = new Set(['tamu','fsu','uf','lsu','ut','ou','osu','asu','usc','ucla','uva','unc','duke','penn']);
+  const words = chapter.trim().split(/\s+/);
+  // If first word(s) are Greek → org comes first
+  let orgEnd = 0;
+  for (const w of words) {
+    if (GREEK_WORDS.has(w.toLowerCase())) orgEnd++;
+    else break;
+  }
+  if (orgEnd > 0) {
+    return { org: words.slice(0, orgEnd).join(' '), school: words.slice(orgEnd).join(' ') || null };
+  }
+  // First word is non-Greek — check if it's a known school abbreviation
+  if (SCHOOL_ABBREVS.has(words[0].toLowerCase())) {
+    return { school: words[0], org: words.slice(1).join(' ') || null };
+  }
+  // Otherwise treat first all-caps token(s) as org abbreviation, rest as school
+  return { org: words[0], school: words.slice(1).join(' ') || null };
+}
+
 // ─── The Web: Network Visualization ──────────────────────────────────────────
 
 function computeWebGraph(callLogs: Record<string, CallLog>): { nodes: WebNode[]; edges: WebEdge[] } {
@@ -1284,19 +1316,31 @@ function computeWebGraph(callLogs: Record<string, CallLog>): { nodes: WebNode[];
   for (let i = 0; i < nodeData.length; i++) {
     for (let j = i + 1; j < nodeData.length; j++) {
       const a = nodeData[i], b = nodeData[j];
-      let added = false;
+      // Tag / city connections
+      let tagAdded = false;
       for (const tag of a.tags) {
-        if (!added && b.tags.includes(tag)) {
+        if (!tagAdded && b.tags.includes(tag)) {
           const type: 'industry' | 'interest' = INDUSTRY_TAGS.includes(tag) ? 'industry' : 'interest';
           edges.push({ from: a.id, to: b.id, type, sharedTag: tag });
-          added = true;
+          tagAdded = true;
           break;
         }
       }
-      if (!added && a.location && b.location) {
+      if (!tagAdded && a.location && b.location) {
         const cityA = a.location.split(',')[0].trim().toLowerCase();
         const cityB = b.location.split(',')[0].trim().toLowerCase();
         if (cityA && cityA === cityB) edges.push({ from: a.id, to: b.id, type: 'city', sharedTag: cityA });
+      }
+      // University + org connections
+      const { school: schoolA, org: orgA } = parseChapterField(a.chapterName);
+      const { school: schoolB, org: orgB } = parseChapterField(b.chapterName);
+      const sameSchool = schoolA && schoolB && schoolA.toLowerCase() === schoolB.toLowerCase();
+      const sameOrg = orgA && orgB && orgA.toLowerCase() === orgB.toLowerCase();
+      if (sameSchool) {
+        edges.push({ from: a.id, to: b.id, type: 'university', sharedTag: schoolA! });
+      }
+      if (sameOrg && !sameSchool) {
+        edges.push({ from: a.id, to: b.id, type: 'org', sharedTag: orgA! });
       }
     }
   }
@@ -1368,8 +1412,8 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
         <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', height: 600, display: 'block' }}>
           {/* All clip paths */}
           <defs>
-            {nodes.map(n => (
-              <clipPath key={`clip-${n.id}`} id={`clip-${n.id}`}>
+            {nodes.map((n, i) => (
+              <clipPath key={`web-clip-${i}`} id={`web-clip-${i}`}>
                 <circle cx={n.x} cy={n.y} r={n.radius} />
               </clipPath>
             ))}
@@ -1385,6 +1429,7 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
               <line key={i} x1={fn.x} y1={fn.y} x2={tn.x} y2={tn.y}
                 stroke={EDGE_COLORS[edge.type]} strokeWidth={hi ? 2 : 1}
                 strokeOpacity={hi ? 0.8 : 0.2}
+                strokeDasharray={edge.type === 'org' ? '5 4' : undefined}
               />
             );
           })}
@@ -1395,7 +1440,7 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
           <text x={cx} y={cy + 9} textAnchor="middle" fill="white" fontSize={11} fontWeight="700">blaize</text>
 
           {/* Nodes */}
-          {nodes.map(node => {
+          {nodes.map((node, i) => {
             const isSel = selectedNode?.id === node.id;
             const bgColors = ['#0F172A', '#1d4ed8', '#0d9488', '#7c3aed', '#db2777'];
             const bg = bgColors[(node.name.charCodeAt(0) || 0) % bgColors.length];
@@ -1405,9 +1450,9 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
                 {/* Initials background */}
                 <circle cx={node.x} cy={node.y} r={node.radius} fill={bg} />
                 <text x={node.x} y={node.y + node.radius * 0.35} textAnchor="middle" fill="white" fontSize={node.radius * 0.7} fontWeight="600" style={{ pointerEvents: 'none', userSelect: 'none' }}>{initials}</text>
-                {/* Avatar on top (fails silently if CORS) */}
+                {/* Avatar (overrides initials when available) */}
                 {node.avatarUrl && (
-                  <image href={node.avatarUrl} x={node.x - node.radius} y={node.y - node.radius} width={node.radius * 2} height={node.radius * 2} clipPath={`url(#clip-${node.id})`} />
+                  <image href={node.avatarUrl} x={node.x - node.radius} y={node.y - node.radius} width={node.radius * 2} height={node.radius * 2} clipPath={`url(#web-clip-${i})`} preserveAspectRatio="xMidYMid slice" />
                 )}
                 {/* Border ring */}
                 <circle cx={node.x} cy={node.y} r={node.radius} fill="none" stroke={isSel ? '#0F172A' : 'white'} strokeWidth={isSel ? 3 : 2} />
@@ -1428,10 +1473,22 @@ function WebVisualization({ callLogs }: { callLogs: Record<string, CallLog> }) {
         </svg>
 
         {/* Legend */}
-        <div style={{ position: 'absolute', bottom: 16, left: 16, display: 'flex', gap: 16, background: 'rgba(255,255,255,0.95)', padding: '8px 14px', borderRadius: 10, border: '1px solid #E5E7EB', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
-          {[{ type: 'industry', label: 'Industry' }, { type: 'city', label: 'City' }, { type: 'interest', label: 'Interest' }].map(leg => (
+        <div style={{ position: 'absolute', bottom: 16, left: 16, display: 'flex', gap: 12, flexWrap: 'wrap', background: 'rgba(255,255,255,0.95)', padding: '8px 14px', borderRadius: 10, border: '1px solid #E5E7EB', boxShadow: '0 1px 8px rgba(0,0,0,0.06)', maxWidth: 'calc(100% - 32px)' }}>
+          {[
+            { type: 'industry', label: 'Industry', dashed: false },
+            { type: 'city', label: 'City', dashed: false },
+            { type: 'interest', label: 'Interest', dashed: false },
+            { type: 'university', label: 'University', dashed: false },
+            { type: 'org', label: 'Nat&apos;l Org', dashed: true },
+          ].map(leg => (
             <div key={leg.type} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: '#374151', fontWeight: 600 }}>
-              <div style={{ width: 20, height: 2, background: EDGE_COLORS[leg.type as keyof typeof EDGE_COLORS], borderRadius: 1 }} />
+              {leg.dashed ? (
+                <svg width="20" height="4" style={{ flexShrink: 0 }}>
+                  <line x1="0" y1="2" x2="20" y2="2" stroke={EDGE_COLORS[leg.type as keyof typeof EDGE_COLORS]} strokeWidth="2" strokeDasharray="5 4" />
+                </svg>
+              ) : (
+                <div style={{ width: 20, height: 2, background: EDGE_COLORS[leg.type as keyof typeof EDGE_COLORS], borderRadius: 1, flexShrink: 0 }} />
+              )}
               {leg.label}
             </div>
           ))}
