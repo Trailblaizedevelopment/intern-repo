@@ -143,7 +143,6 @@ export async function runLinqRecovery(): Promise<RecoveryResult> {
     phone_secondary: string | null;
     chapter_id: string | null;
     outreach_status: string | null;
-    touch_stage: string | null;
   };
   let contacts: ContactRow[] = [];
 
@@ -156,7 +155,7 @@ export async function runLinqRecovery(): Promise<RecoveryResult> {
         .join(',');
       const { data, error } = await supabase
         .from('alumni_contacts')
-        .select('id, first_name, last_name, phone_primary, phone_secondary, chapter_id, outreach_status, touch_stage')
+        .select('id, first_name, last_name, phone_primary, phone_secondary, chapter_id, outreach_status')
         .or(orClauses);
       if (error) {
         errors.push(`Contact lookup batch failed: ${error.message}`);
@@ -249,7 +248,6 @@ export async function runLinqRecovery(): Promise<RecoveryResult> {
         ? (chapterMap.get(contact.chapter_id) ?? null)
         : null,
       outreach_status: contact?.outreach_status ?? null,
-      touch_stage: contact?.touch_stage ?? null,
       last_message_at: lastMessageAt,
       last_message_text: lastMessageText,
       last_message_direction: lastMessageDirection,
