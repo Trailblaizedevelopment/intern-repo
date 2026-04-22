@@ -5,7 +5,7 @@ import {
   Phone, PhoneCall, Voicemail,
   ChevronDown, ChevronUp, RefreshCw, CheckSquare, Square,
   X, LayoutDashboard, User, Users, AlertCircle,
-  MessageSquare, Bell, Share2, Globe,
+  MessageSquare, Bell, Share2, Globe, Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -76,6 +76,7 @@ interface ConnectedEntry {
   person2Name: string;
   connectType: 'Job' | 'Mentoring' | 'Advice' | 'Networking';
   connectedAt: string;
+  outcome?: string;
 }
 
 interface SeedEntry {
@@ -511,12 +512,14 @@ function DailyTodo({ contacts, callLogs, currentUser, assignments, completed, on
 
 // ─── Contact Card (V3) ────────────────────────────────────────────────────────
 
-function ContactCard({ contact, log, claim, onCallClick, onTextClick }: {
+function ContactCard({ contact, log, claim, status, onCallClick, onTextClick, onStatusClick }: {
   contact: MergedAlumni;
   log: CallLog | undefined;
   claim: Claim | undefined;
+  status: ColumnStatus;
   onCallClick: () => void;
   onTextClick: () => void;
+  onStatusClick?: () => void;
 }) {
   const overdueFollowUp = log?.followUpDate && !log.followUpCompleted && isOverdue(log.followUpDate);
   return (
@@ -563,25 +566,268 @@ function ContactCard({ contact, log, claim, onCallClick, onTextClick }: {
       {claim && <div style={{ fontSize: '0.7rem', color: '#6b7280', fontStyle: 'italic', marginBottom: 8 }}>🔒 Claimed by {claim.claimedBy} — {Math.round((Date.now() - new Date(claim.claimedAt).getTime()) / 60000)}m ago</div>}
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={onCallClick}
-          style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-        >
-          <Phone size={16} /> Call
-        </button>
-        <button
-          onClick={onTextClick}
-          style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: '#0F172A', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-        >
-          <MessageSquare size={16} /> Text
-        </button>
-      </div>
+      {status === 'declined' ? null : (
+        <div style={{ display: 'flex', gap: 8 }}>
+          {status === 'called' ? (
+            <button
+              onClick={onStatusClick}
+              style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              <Eye size={16} /> Status
+            </button>
+          ) : (
+            <button
+              onClick={onCallClick}
+              style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              <Phone size={16} /> {status === 'voicemail' ? 'Retry Call' : 'Call'}
+            </button>
+          )}
+          <button
+            onClick={onTextClick}
+            style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: '#0F172A', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >
+            <MessageSquare size={16} /> Text
+          </button>
+        </div>
+      )}
     </div>
+  );
+}
+
+// ─── Status Panel (Called / Logged) ─────────────────────────────────────────
+
+function StatusPanel({ contact, log, onClose, onMoveToPending }: {
+  contact: MergedAlumni;
+  log: CallLog | undefined;
+  onClose: () => void;
+  onMoveToPending: (connectWithName: string, connectType: 'Job' | 'Mentoring' | 'Advice' | 'Networking') => void;
+}) {
+  const [showPendingForm, setShowPendingForm] = useState(false);
+  const [connectWithName, setConnectWithName] = useState('');
+  const [connectType, setConnectType] = useState<'Job' | 'Mentoring' | 'Advice' | 'Networking'>('Networking');
+
+  function submitPending() {
+    if (!connectWithName.trim()) return;
+    onMoveToPending(connectWithName.trim(), connectType);
+    onClose();
+  }
+
+  const calledAtStr = log?.calledAt
+    ? new Date(log.calledAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 49 }} />
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 440, maxWidth: '100vw', background: 'white', zIndex: 50, boxShadow: '-4px 0 32px rgba(0,0,0,0.14)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0, background: 'white', position: 'sticky', top: 0, zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <AvatarImg avatarUrl={contact.avatar_url} name={contact.full_name} size={44} />
+              <div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', margin: '0 0 2px' }}>{contact.full_name}</h2>
+                {contact.grad_year && <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Class of &apos;{String(contact.grad_year).slice(-2)}</div>}
+                {contact.location && <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>📍 {contact.location}</div>}
+                {contact.chapter_name && <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>🏛️ {contact.chapter_name}</div>}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#9ca3af', display: 'flex', flexShrink: 0 }}><X size={20} /></button>
+          </div>
+          <div style={{ marginTop: 10, padding: '6px 12px', background: '#f0fdf4', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <PhoneCall size={14} style={{ color: '#15803d' }} />
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d' }}>Called / Logged</span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Contact Info */}
+          <div style={{ background: '#f9fafb', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {contact.phone && <div style={{ fontSize: '0.85rem', color: '#374151', fontWeight: 500 }}>📞 {fmtPhone(contact.phone)}</div>}
+            {contact.member_status && <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>👤 {contact.member_status}</div>}
+            {contact.email && <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>✉️ {contact.email}</div>}
+          </div>
+
+          {/* Call Info */}
+          {log && (
+            <div>
+              <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Call Info</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {calledAtStr && (
+                  <span style={{ fontSize: '0.78rem', color: '#374151', background: '#f3f4f6', padding: '4px 10px', borderRadius: 8 }}>📅 {calledAtStr}</span>
+                )}
+                {log.calledBy && (
+                  <span style={{ fontSize: '0.78rem', color: '#374151', background: '#f3f4f6', padding: '4px 10px', borderRadius: 8 }}>👤 Called by {log.calledBy}</span>
+                )}
+                {log.followUpDate && (
+                  <span style={{ fontSize: '0.78rem', fontWeight: 600, background: isOverdue(log.followUpDate) ? '#fef3c7' : '#f0fdf4', color: isOverdue(log.followUpDate) ? '#92400e' : '#15803d', padding: '4px 10px', borderRadius: 8 }}>
+                    {isOverdue(log.followUpDate) ? '⚠️' : '📅'} Follow-up: {log.followUpDate}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tags */}
+          {log?.tags && log.tags.length > 0 && (
+            <div>
+              <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Tags</p>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {log.tags.map(t => <TagPill key={t} tag={t} />)}
+              </div>
+            </div>
+          )}
+
+          {/* Call Notes */}
+          {log?.notes && (
+            <div>
+              <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Call Notes</p>
+              <p style={{ fontSize: '0.875rem', color: '#374151', margin: 0, fontStyle: 'italic', lineHeight: 1.6, background: '#f9fafb', padding: '12px 14px', borderRadius: 8, borderLeft: '3px solid #86efac' }}>
+                {log.notes}
+              </p>
+            </div>
+          )}
+
+          {/* Move to Pending Connect */}
+          {!showPendingForm ? (
+            <button
+              onClick={() => setShowPendingForm(true)}
+              style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: '#8B5CF6', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              → Pending Connect
+            </button>
+          ) : (
+            <div style={{ border: '1.5px solid #8B5CF6', borderRadius: 12, padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Move to Pending Connect</p>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.73rem', fontWeight: 600, color: '#6b7280', marginBottom: 5 }}>Connect {contact.first_name} with...</label>
+                <input
+                  type="text"
+                  value={connectWithName}
+                  onChange={e => setConnectWithName(e.target.value)}
+                  placeholder="Name of person to connect with"
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.73rem', fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Connection Type</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {(['Job', 'Mentoring', 'Advice', 'Networking'] as const).map(type => {
+                    const tc = getConnectTypeStyle(type);
+                    const sel = connectType === type;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => setConnectType(type)}
+                        style={{ padding: '6px 14px', borderRadius: 9999, border: sel ? `2px solid ${tc.color}` : '1.5px solid #E5E7EB', background: sel ? tc.bg : '#fff', color: sel ? tc.color : '#6b7280', fontSize: '0.8125rem', fontWeight: sel ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}
+                      >
+                        {sel && '✓ '}{type}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setShowPendingForm(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: '#374151', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button
+                  onClick={submitPending}
+                  disabled={!connectWithName.trim()}
+                  style={{ flex: 2, padding: '10px', borderRadius: 8, background: connectWithName.trim() ? '#8B5CF6' : '#E5E7EB', color: connectWithName.trim() ? 'white' : '#9ca3af', fontSize: '0.875rem', fontWeight: 700, border: 'none', cursor: connectWithName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+                >
+                  Save → Pending
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Outcome Modal ─────────────────────────────────────────────────────────────
+
+const OUTCOME_PRESETS = [
+  'Got an interview',
+  'Started mentoring',
+  'Exchanged contact info',
+  'Had a call',
+  'No follow-through',
+];
+
+function OutcomeModal({ entry, onConfirm, onClose }: {
+  entry: PendingConnectEntry;
+  onConfirm: (outcome: string) => void;
+  onClose: () => void;
+}) {
+  const [outcome, setOutcome] = useState('');
+  const tc = getConnectTypeStyle(entry.connectType);
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 49 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: 'white', borderRadius: 20, padding: '28px 28px 24px', width: 420, maxWidth: '92vw', zIndex: 50, boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+          <div>
+            <h3 style={{ margin: '0 0 6px', fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>Mark as Connected ✓</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>{entry.personName}</span>
+              <span style={{ color: '#10b981', fontWeight: 700 }}>↔</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>{entry.connectWithName}</span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: tc.color, background: tc.bg, padding: '2px 8px', borderRadius: 9999 }}>{entry.connectType}</span>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}><X size={20} /></button>
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>What was the outcome?</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+            {OUTCOME_PRESETS.map(preset => (
+              <button
+                key={preset}
+                onClick={() => setOutcome(preset)}
+                style={{ padding: '6px 12px', borderRadius: 9999, border: outcome === preset ? '2px solid #10b981' : '1.5px solid #E5E7EB', background: outcome === preset ? '#d1fae5' : '#fff', color: outcome === preset ? '#065f46' : '#6b7280', fontSize: '0.78rem', fontWeight: outcome === preset ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}
+              >
+                {outcome === preset && '✓ '}{preset}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={outcome}
+            onChange={e => setOutcome(e.target.value)}
+            placeholder="Or type a custom outcome..."
+            style={{ width: '100%', padding: '8px 12px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: '#374151', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+          <button
+            onClick={() => onConfirm(outcome)}
+            style={{ flex: 2, padding: '10px', borderRadius: 8, background: '#10b981', color: 'white', fontSize: '0.875rem', fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            ✓ Mark Connected
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1141,7 +1387,7 @@ function ConnectedCard({ entry }: { entry: ConnectedEntry }) {
   const dateStr = new Date(entry.connectedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   return (
     <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: entry.outcome ? 8 : 10 }}>
         <AvatarImg avatarUrl={null} name={entry.person1Name} size={32} />
         <span style={{ fontSize: '1rem', color: '#10b981', fontWeight: 700 }}>↔</span>
         <AvatarImg avatarUrl={null} name={entry.person2Name} size={32} />
@@ -1149,6 +1395,11 @@ function ConnectedCard({ entry }: { entry: ConnectedEntry }) {
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.person1Name} &amp; {entry.person2Name}</div>
         </div>
       </div>
+      {entry.outcome && (
+        <div style={{ fontSize: '0.78rem', color: '#374151', background: '#f0fdf4', padding: '6px 10px', borderRadius: 6, marginBottom: 8, borderLeft: '2px solid #10b981' }}>
+          {entry.outcome}
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '0.68rem', fontWeight: 700, color: tc.color, background: tc.bg, padding: '3px 8px', borderRadius: 9999 }}>{entry.connectType}</span>
         <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>📅 {dateStr}</span>
@@ -1239,13 +1490,14 @@ function ConnectedColumn({ entries }: { entries: ConnectedEntry[] }) {
 
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 
-function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextClick }: {
+function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextClick, onStatusClick }: {
   status: ColumnStatus;
   contacts: MergedAlumni[];
   callLogs: Record<string, CallLog>;
   claims: Record<string, Claim>;
   onCallClick: (c: MergedAlumni) => void;
   onTextClick: (c: MergedAlumni) => void;
+  onStatusClick: (c: MergedAlumni) => void;
 }) {
   const cfg = COLUMN_CONFIG[status];
   return (
@@ -1258,7 +1510,7 @@ function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextC
         {contacts.length === 0 ? (
           <div style={{ padding: '24px 0', textAlign: 'center', color: '#d1d5db', fontSize: '0.8125rem' }}>No contacts</div>
         ) : contacts.map(c => (
-          <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} onCallClick={() => onCallClick(c)} onTextClick={() => onTextClick(c)} />
+          <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} status={status} onCallClick={() => onCallClick(c)} onTextClick={() => onTextClick(c)} onStatusClick={() => onStatusClick(c)} />
         ))}
       </div>
     </div>
@@ -1699,6 +1951,8 @@ export default function ConnectsCenter() {
   const [callModal, setCallModal] = useState<MergedAlumni | null>(null);
   const [loggingPanel, setLoggingPanel] = useState<LoggingState | null>(null);
   const [textingContact, setTextingContact] = useState<MergedAlumni | null>(null);
+  const [statusPanel, setStatusPanel] = useState<{ contact: MergedAlumni; log: CallLog | undefined } | null>(null);
+  const [promotingEntry, setPromotingEntry] = useState<PendingConnectEntry | null>(null);
 
   // Hydrate localStorage
   useEffect(() => {
@@ -1944,6 +2198,19 @@ export default function ConnectsCenter() {
     setLoggingPanel(null);
   }
 
+  function handleStatusClick(contact: MergedAlumni) {
+    setStatusPanel({ contact, log: callLogs[contact.id] });
+  }
+
+  function handleMoveToPendingFromStatus(connectWithName: string, connectType: 'Job' | 'Mentoring' | 'Advice' | 'Networking') {
+    if (!statusPanel) return;
+    handleAddPendingConnect({
+      personName: statusPanel.contact.full_name,
+      connectWithName,
+      connectType,
+    });
+  }
+
   function handleAddPendingConnect(data: Omit<PendingConnectEntry, 'id' | 'createdAt' | 'createdBy'>) {
     const entry: PendingConnectEntry = {
       id: `pc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -1957,7 +2224,7 @@ export default function ConnectsCenter() {
     setPendingConnects(all);
   }
 
-  function handlePromoteToConnected(pendingId: string) {
+  function handlePromoteToConnected(pendingId: string, outcome: string) {
     const entry = pendingConnects.find(e => e.id === pendingId);
     if (!entry) return;
     const conn: ConnectedEntry = {
@@ -1966,6 +2233,7 @@ export default function ConnectsCenter() {
       person2Name: entry.connectWithName,
       connectType: entry.connectType,
       connectedAt: new Date().toISOString(),
+      outcome: outcome || undefined,
     };
     const newPending = pendingConnects.filter(e => e.id !== pendingId);
     const newConnected = [...readConnected(), conn];
@@ -1973,6 +2241,7 @@ export default function ConnectsCenter() {
     writeConnected(newConnected);
     setPendingConnects(newPending);
     setConnected(newConnected);
+    setPromotingEntry(null);
   }
 
   function handleCurrentUserChange(name: string) {
@@ -2102,12 +2371,15 @@ export default function ConnectsCenter() {
               <div style={{ overflowX: 'auto', paddingBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 'max-content' }}>
                   {(['not_called', 'voicemail', 'called', 'declined'] as const).map(status => (
-                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} onTextClick={handleTextClick} />
+                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} onTextClick={handleTextClick} onStatusClick={handleStatusClick} />
                   ))}
                   <PendingConnectColumn
                     entries={pendingConnects}
                     onAdd={handleAddPendingConnect}
-                    onPromote={handlePromoteToConnected}
+                    onPromote={(id) => {
+                      const entry = pendingConnects.find(e => e.id === id);
+                      if (entry) setPromotingEntry(entry);
+                    }}
                   />
                   <ConnectedColumn entries={connected} />
                 </div>
@@ -2149,6 +2421,28 @@ export default function ConnectsCenter() {
           contact={textingContact}
           currentUser={currentUser}
           onClose={() => setTextingContact(null)}
+        />
+      )}
+
+      {/* Status Panel (Called/Logged) */}
+      {statusPanel && (
+        <StatusPanel
+          contact={statusPanel.contact}
+          log={statusPanel.log}
+          onClose={() => setStatusPanel(null)}
+          onMoveToPending={(connectWithName, connectType) => {
+            handleMoveToPendingFromStatus(connectWithName, connectType);
+            setStatusPanel(null);
+          }}
+        />
+      )}
+
+      {/* Outcome Modal (Promote Pending → Connected) */}
+      {promotingEntry && (
+        <OutcomeModal
+          entry={promotingEntry}
+          onConfirm={(outcome) => handlePromoteToConnected(promotingEntry.id, outcome)}
+          onClose={() => setPromotingEntry(null)}
         />
       )}
     </div>
