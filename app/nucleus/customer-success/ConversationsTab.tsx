@@ -423,12 +423,13 @@ function getStatusesForCategory(cat: ConvCategory): string[] | null {
 }
 
 interface AlumniContactsListProps {
+  onSelectContact?: (contact: AlumniContactRow) => void;
   chapterId: string;
   category: ConvCategory;
   search: string;
 }
 
-function AlumniContactsList({ chapterId, category, search }: AlumniContactsListProps) {
+function AlumniContactsList({ chapterId, category, search, onSelectContact }: AlumniContactsListProps) {
   const [contacts, setContacts] = useState<AlumniContactRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -482,11 +483,16 @@ function AlumniContactsList({ chapterId, category, search }: AlumniContactsListP
         return (
           <div
             key={c.id}
+            onClick={() => { if (onSelectContact) onSelectContact(c); }}
             style={{
               padding: '10px 14px',
               borderBottom: '1px solid #f0f0f0',
               background: '#fafafa',
+              cursor: 'pointer',
+              transition: 'background 0.1s',
             }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f0f4ff'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fafafa'; }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
               <div style={{
@@ -1823,6 +1829,13 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
             chapterId={selectedChapter.id ?? ''}
             category={selectedCategory}
             search={categorySearch}
+            onSelectContact={(contact) => {
+              // Try to find matching Linq conversation for this contact
+              const match = convs.find(cv => cv.contact_phone === contact.phone_primary);
+              if (match) {
+                setSelectedConv(match);
+              }
+            }}
           />
         ) : (
         /* Conv list */
