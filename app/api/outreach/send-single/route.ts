@@ -5,9 +5,17 @@ import { createChat } from '@/lib/linq';
 // Lines 1 (Owen) and 3 (Ford) are EXCLUDED from outreach sends.
 // Only line 2 (Adam) is used for chapter outreach.
 const OUTREACH_LINE_PHONES: Record<number, string> = {
+  4: "+14044239427",
+  5: "+14045428435",
+  6: "+19725590427",
+  7: "+19725590438",
+  8: "+15042234218",
+  9: "+15042236050",
+  10: "+12817773280",
+  11: "+12817452268",
   2: '+16462178274', // Adam — outreach line
 };
-const OUTREACH_LINE_NUMBERS = [2];
+const OUTREACH_LINE_NUMBERS = [2, 4, 5, 6, 7, 8, 9, 10, 11];
 
 // ── Message builders ──────────────────────────────────────────────────────────
 
