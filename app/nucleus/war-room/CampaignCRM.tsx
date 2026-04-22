@@ -1383,8 +1383,36 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   );
 
   const selectedProspects = useMemo(
-    () => selectedCampaignId ? prospects.filter(p => p.campaignId === selectedCampaignId) : [],
-    [prospects, selectedCampaignId]
+    () => {
+      if (!selectedCampaignId) return [];
+      // Merge localStorage prospects with API campaign rows
+      const lsProspects = prospects.filter(p => p.campaignId === selectedCampaignId);
+      const campaign = campaigns.find(c => c.id === selectedCampaignId);
+      const apiRows = (campaign as any)?.rows ?? [];
+      const existingOrgs = new Set(lsProspects.map(p => p.orgName.toLowerCase()));
+      const fromApi: CampaignProspect[] = apiRows
+        .filter((r: any) => r.chapterName && !existingOrgs.has(r.chapterName.toLowerCase()))
+        .map((r: any) => ({
+          id: r.id || `api-${Math.random().toString(36).slice(2)}`,
+          campaignId: selectedCampaignId,
+          orgName: r.chapterName || '',
+          school: (campaign as any)?.school || '',
+          contactName: r.contactName || '',
+          contactEmail: r.contactInfo || '',
+          contactPhone: '',
+          contactIg: '',
+          channel: (r.method as any) || '',
+          status: r.status === 'demo_booked' ? 'demo_booked' : r.status === 'closed_won' ? 'closed_won' : r.meetingBooked ? 'demo_booked' : r.method ? 'contacted' : 'not_contacted',
+          outreachDate: null,
+          lastActivityDate: null,
+          assignedTo: '',
+          notes: '',
+          dealId: null,
+          createdAt: ((campaign as any)?.created_at) || new Date().toISOString(),
+        } as CampaignProspect));
+      return [...lsProspects, ...fromApi];
+    },
+    [prospects, selectedCampaignId, campaigns]
   );
 
   // ── Campaign Detail View ──
@@ -1477,7 +1505,13 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
             <CampaignListCard
               key={campaign.id}
               campaign={campaign}
-              prospects={prospects.filter(p => p.campaignId === campaign.id)}
+              prospects={[
+                ...prospects.filter(p => p.campaignId === campaign.id),
+                ...((campaign as any)?.rows ?? []).filter((r: any) => r.chapterName).map((r: any) => ({
+                  id: r.id, campaignId: campaign.id, orgName: r.chapterName,
+                  status: r.meetingBooked ? 'demo_booked' : r.method ? 'contacted' : 'not_contacted',
+                } as CampaignProspect))
+              ]}
               onClick={() => setSelectedCampaignId(campaign.id)}
               onDelete={handleDeleteCampaign}
             />
