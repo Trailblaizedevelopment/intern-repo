@@ -397,7 +397,10 @@ function AssetLibrary() {
 
                 {/* Link + actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {asset.url && (
+                  {asset.url && asset.url.startsWith('data:image') && (
+                    <img src={asset.url} alt={asset.name} style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8, marginBottom: 8, border: '1px solid #E5E7EB' }} />
+                  )}
+                  {asset.url && !asset.url.startsWith('data:') && (
                     <a href={asset.url} target="_blank" rel="noopener noreferrer" style={{
                       flex: 1, display: 'flex', alignItems: 'center', gap: 4,
                       fontSize: '0.75rem', color: '#3b82f6', textDecoration: 'none',
@@ -435,7 +438,18 @@ function AssetLibrary() {
               </select>
             </FormRow>
             <FormRow label="URL / Link *">
-              <input type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="https://drive.google.com/..." style={inputStyle} />
+              <input type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="Paste a link or upload a file below" style={inputStyle} />
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.gif,.mp4,.mov,.svg,.webp" onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const dataUrl = reader.result as string;
+                    setForm(f => ({ ...f, url: dataUrl, name: f.name || file.name }));
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }} style={{ fontSize: '0.8125rem', color: '#6B7280', marginTop: 4 }} />
             </FormRow>
             <FormRow label="Added By">
               <input type="text" value={form.addedBy} onChange={e => setForm(f => ({ ...f, addedBy: e.target.value }))} placeholder="e.g. Katie" style={inputStyle} />
