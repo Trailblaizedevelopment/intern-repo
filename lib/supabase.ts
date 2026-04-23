@@ -35,16 +35,20 @@ export type EmployeeRole =
   | 'engineer' 
   | 'sales_intern'
   | 'marketing_intern'
-  | 'operations';
+  | 'operations'
+  | 'ambassador_leader'
+  | 'ambassador';
 
 export type EmployeeSeniority = 1 | 2 | 3 | 4 | 5;
 
 export const ROLE_HIERARCHY: Record<EmployeeRole, number> = {
+  ambassador: 1,
   growth_intern: 1,
   sales_intern: 1,
   marketing_intern: 1,
   engineer: 2,
   operations: 3,
+  ambassador_leader: 3,
   cofounder: 5,
   founder: 6,
 };
@@ -57,6 +61,8 @@ export const ROLE_LABELS: Record<EmployeeRole, string> = {
   sales_intern: 'Sales Intern',
   marketing_intern: 'Marketing Intern',
   operations: 'Operations',
+  ambassador_leader: 'Ambassador Leader',
+  ambassador: 'Ambassador',
 };
 
 // Specific permissions for each role
@@ -108,6 +114,17 @@ export const ROLE_PERMISSIONS: Record<EmployeeRole, string[]> = {
     'customers_view',
     'announcements',
     'team',
+  ],
+
+  // Ambassador Leader - Manages ambassador program, reviews applications
+  ambassador_leader: [
+    'ambassadors',
+    'ambassador_applications',
+  ],
+
+  // Ambassador - Can log in and view their portal
+  ambassador: [
+    'ambassador_portal',
   ],
 };
 

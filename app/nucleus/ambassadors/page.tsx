@@ -60,6 +60,10 @@ export default function AmbassadorsModule() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null }>({ show: false, id: null });
   const [saving, setSaving] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [approvedCredentials, setApprovedCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [credentialsCopied, setCredentialsCopied] = useState(false);
+
+  const DEFAULT_AMBASSADOR_PASSWORD = 'Trailblaize2026!';
   const [formData, setFormData] = useState({
     name: '',
     school: '',
@@ -103,6 +107,10 @@ export default function AmbassadorsModule() {
   async function approveAmbassador(id: string) {
     setApprovingId(id);
     try {
+      // Find the ambassador record to get their info
+      const amb = ambassadors.find((a) => a.id === id);
+
+      // 1. Mark as active
       const res = await fetch(`/api/ambassadors/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -111,9 +119,40 @@ export default function AmbassadorsModule() {
       const result = await res.json();
       if (result.error) {
         console.error('Error approving ambassador:', result.error);
-      } else {
-        fetchAmbassadors();
+        setApprovingId(null);
+        return;
       }
+
+      // 2. Create employee login account
+      if (amb && amb.contact) {
+        let extra: Record<string, string> = {};
+        try { extra = JSON.parse(amb.notes || '{}'); } catch (_e) {}
+        const phone = extra.phone || '';
+        const instagram = extra.instagram || '';
+
+        await fetch('/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: amb.contact,
+            password: DEFAULT_AMBASSADOR_PASSWORD,
+            name: amb.name,
+            role: 'ambassador',
+            seniority: 1,
+            department: amb.school || '',
+            status: 'active',
+            start_date: new Date().toISOString().split('T')[0],
+          }),
+        });
+
+        setApprovedCredentials({
+          name: amb.name,
+          email: amb.contact,
+          password: DEFAULT_AMBASSADOR_PASSWORD,
+        });
+      }
+
+      fetchAmbassadors();
     } catch (err) {
       console.error('Error approving:', err);
     }
@@ -146,11 +185,11 @@ export default function AmbassadorsModule() {
           school: app.school || '',
           contact: app.email,
           status: 'active',
-          notes: [
-            app.phone ? `Phone: ${app.phone}` : '',
-            app.instagram ? `IG: ${app.instagram}` : '',
-            app.why ? `Why: ${app.why}` : '',
-          ].filter(Boolean).join(' | '),
+          notes: JSON.stringify({
+            phone: app.phone || '',
+            instagram: app.instagram || '',
+            why: app.why || '',
+          }),
         }),
       });
       const result = await res.json();
@@ -161,6 +200,29 @@ export default function AmbassadorsModule() {
         try {
           localStorage.setItem('tb_ambassador_applications', JSON.stringify(updated));
         } catch (_e) {}
+
+        // Create employee login account
+        await fetch('/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: app.email,
+            password: DEFAULT_AMBASSADOR_PASSWORD,
+            name: app.name,
+            role: 'ambassador',
+            seniority: 1,
+            department: app.school || '',
+            status: 'active',
+            start_date: new Date().toISOString().split('T')[0],
+          }),
+        });
+
+        setApprovedCredentials({
+          name: app.name,
+          email: app.email,
+          password: DEFAULT_AMBASSADOR_PASSWORD,
+        });
+
         fetchAmbassadors();
       }
     } catch (err) {
@@ -844,6 +906,58 @@ export default function AmbassadorsModule() {
         onConfirm={() => deleteConfirm.id && deleteAmbassador(deleteConfirm.id)}
         onCancel={() => setDeleteConfirm({ show: false, id: null })}
       />
+
+      {/* Ambassador Approved Credentials Modal */}
+      {approvedCredentials && (
+        <ModalOverlay className="module-modal-overlay" onClose={() => setApprovedCredentials(null)}>
+          <div className="module-modal credentials-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="module-modal-header">
+              <h2>✅ Ambassador Approved!</h2>
+              <button className="module-modal-close" onClick={() => setApprovedCredentials(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="module-modal-body">
+              <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: '0 0 16px' }}>
+                <strong>{approvedCredentials.name}</strong> has been approved and a login account has been created.
+                Share these credentials with them — the password can be changed after first login.
+              </p>
+              <div className="credentials-box">
+                <div className="credential-row">
+                  <span className="credential-label">Login URL:</span>
+                  <span className="credential-value">trailblaize.space</span>
+                </div>
+                <div className="credential-row">
+                  <span className="credential-label">Email:</span>
+                  <span className="credential-value">{approvedCredentials.email}</span>
+                </div>
+                <div className="credential-row">
+                  <span className="credential-label">Password:</span>
+                  <span className="credential-value">{approvedCredentials.password}</span>
+                </div>
+              </div>
+              <button
+                className="copy-credentials-btn"
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    `Login: trailblaize.space\nEmail: ${approvedCredentials.email}\nPassword: ${approvedCredentials.password}`
+                  );
+                  setCredentialsCopied(true);
+                  setTimeout(() => setCredentialsCopied(false), 2000);
+                }}
+              >
+                {credentialsCopied ? <CheckCircle2 size={16} /> : <ClipboardList size={16} />}
+                {credentialsCopied ? 'Copied!' : 'Copy Credentials'}
+              </button>
+            </div>
+            <div className="module-modal-footer">
+              <button className="module-primary-btn" onClick={() => setApprovedCredentials(null)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
     </div>
   );
 }

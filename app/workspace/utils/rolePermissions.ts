@@ -1,6 +1,6 @@
 import { EmployeeRole, ROLE_PERMISSIONS, ROLE_LABELS, ROLE_HIERARCHY } from '@/lib/supabase';
 
-export type WorkspaceRole = 'founder' | 'engineer' | 'growth_intern';
+export type WorkspaceRole = 'founder' | 'engineer' | 'growth_intern' | 'ambassador_leader' | 'ambassador';
 
 /**
  * Maps employee roles to workspace view types
@@ -12,6 +12,10 @@ export function getWorkspaceRole(role: EmployeeRole): WorkspaceRole {
       return 'founder';
     case 'engineer':
       return 'engineer';
+    case 'ambassador_leader':
+      return 'ambassador_leader';
+    case 'ambassador':
+      return 'ambassador';
     case 'growth_intern':
     case 'sales_intern':
     case 'marketing_intern':
@@ -107,6 +111,19 @@ export function getRoleFeatures(role: EmployeeRole): RoleFeatures {
         showStrategicPlanning: false,
         showTeamSwitcher: false,
       };
+    case 'ambassador_leader':
+    case 'ambassador':
+      return {
+        showWhiteboard: false,
+        showLeads: false,
+        showEngineering: false,
+        showTeamOverview: false,
+        showBusinessMetrics: false,
+        showFocusTimer: false,
+        showCollaborationFeed: false,
+        showStrategicPlanning: false,
+        showTeamSwitcher: false,
+      };
     case 'growth_intern':
     default:
       return {
@@ -163,6 +180,15 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
+      ];
+    case 'ambassador_leader':
+      return [
+        { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
+        { name: 'Ambassadors', href: '/nucleus/ambassadors', icon: 'Star' },
+      ];
+    case 'ambassador':
+      return [
+        { name: 'Portal', href: '/ambassador', icon: 'Star' },
       ];
     case 'growth_intern':
     default: {

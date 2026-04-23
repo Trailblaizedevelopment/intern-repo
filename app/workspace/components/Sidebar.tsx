@@ -129,6 +129,8 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   // Mobile bottom tabs — role-aware
   const isFounderRole = role === 'founder' || role === 'cofounder';
   const isInternRole = role === 'growth_intern' || role === 'sales_intern' || role === 'marketing_intern';
+  const isAmbassadorLeaderRole = role === 'ambassador_leader';
+  const isAmbassadorRole = role === 'ambassador';
 
   const bottomTabItems = isFounderRole
     ? [
@@ -144,6 +146,15 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
         { name: 'War Room', href: '/nucleus/war-room', icon: 'Tv', badge: 0 },
         { name: 'Connects', href: '/workspace/connects', icon: 'Phone', badge: 0 },
         { name: 'Team', href: '/workspace/team', icon: 'Users', badge: 0 },
+      ]
+    : isAmbassadorLeaderRole
+    ? [
+        { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
+        { name: 'Ambassadors', href: '/nucleus/ambassadors', icon: 'Star', badge: 0 },
+      ]
+    : isAmbassadorRole
+    ? [
+        { name: 'Portal', href: '/ambassador', icon: 'Star', badge: 0 },
       ]
     : [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },

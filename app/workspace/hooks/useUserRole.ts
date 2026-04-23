@@ -21,6 +21,8 @@ export interface UseUserRoleReturn {
   isFounder: boolean;
   isEngineer: boolean;
   isIntern: boolean;
+  isAmbassadorLeader: boolean;
+  isAmbassador: boolean;
   canAccessNucleus: boolean;
   canManageLeads: boolean;
   canViewTeamWorkspaces: boolean;
@@ -44,6 +46,8 @@ export function useUserRole(): UseUserRoleReturn {
     isFounder: workspaceRole === 'founder',
     isEngineer: workspaceRole === 'engineer',
     isIntern: workspaceRole === 'growth_intern',
+    isAmbassadorLeader: workspaceRole === 'ambassador_leader',
+    isAmbassador: workspaceRole === 'ambassador',
     canAccessNucleus: canAccessNucleus(role),
     canManageLeads: canManageLeads(role),
     canViewTeamWorkspaces: canViewTeamWorkspaces(role),

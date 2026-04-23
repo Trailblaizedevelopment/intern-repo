@@ -935,6 +935,8 @@ export default function EmployeesModule() {
                     <option value="sales_intern">Sales Intern</option>
                     <option value="marketing_intern">Marketing Intern</option>
                     <option value="operations">Operations</option>
+                    <option value="ambassador_leader">Ambassador Leader</option>
+                    <option value="ambassador">Ambassador</option>
                   </select>
                 </div>
                 <div className="module-form-group">
