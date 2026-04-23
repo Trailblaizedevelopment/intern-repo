@@ -711,6 +711,7 @@ function ContentCalendar() {
 
 function ChapterCollabs() {
   const [collabs, setCollabs] = useState<ChapterCollab[]>([]);
+  const [activeChapters, setActiveChapters] = useState<{id: string; name: string; school: string}[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingCollab, setEditingCollab] = useState<ChapterCollab | null>(null);
   const [form, setForm] = useState<Omit<ChapterCollab, 'id'>>({
@@ -720,6 +721,14 @@ function ChapterCollabs() {
 
   useEffect(() => {
     try { const s = localStorage.getItem('tb_studio_collabs'); if (s) setCollabs(JSON.parse(s)); } catch {}
+    // Fetch active chapters from Customer Success
+    fetch('/api/chapters?status=active', { headers: { Authorization: `Bearer ${localStorage.getItem('tb_api_key') || 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h'}` } })
+      .then(r => r.json())
+      .then((raw: unknown) => {
+        const arr = Array.isArray(raw) ? raw : ((raw as Record<string, unknown>)?.data as unknown[] ?? []);
+        setActiveChapters(arr.map((c: any) => ({ id: c.id, name: c.chapter_name || c.name || '', school: c.school || c.school_name || '' })));
+      })
+      .catch(() => {});
     // Also try to auto-populate from CS data
     try {
       const csData = localStorage.getItem('tb_cs_clients');
@@ -939,7 +948,19 @@ function ChapterCollabs() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <FormRow label="Chapter Name *">
-                <input autoFocus type="text" value={form.chapterName} onChange={e => setForm(f => ({ ...f, chapterName: e.target.value }))} placeholder="e.g. Alpha Beta Pi" style={inputStyle} />
+                <select value={form.chapterName} onChange={e => {
+                  const selected = activeChapters.find(c => c.name === e.target.value);
+                  setForm(f => ({ ...f, chapterName: e.target.value, school: selected?.school || f.school }));
+                }} style={inputStyle}>
+                  <option value="">Select a chapter...</option>
+                  {activeChapters.map(ch => (
+                    <option key={ch.id} value={ch.name}>{ch.name} - {ch.school}</option>
+                  ))}
+                  <option value="__custom">Other (type manually)</option>
+                </select>
+                {form.chapterName === '__custom' && (
+                  <input type="text" value="" onChange={e => setForm(f => ({ ...f, chapterName: e.target.value }))} placeholder="Type chapter name" style={{ ...inputStyle, marginTop: 4 }} />
+                )}
               </FormRow>
               <FormRow label="School">
                 <input type="text" value={form.school} onChange={e => setForm(f => ({ ...f, school: e.target.value }))} placeholder="e.g. University of Georgia" style={inputStyle} />
