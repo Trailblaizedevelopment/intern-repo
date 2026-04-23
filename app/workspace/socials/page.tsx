@@ -405,6 +405,12 @@ function AssetLibrary() {
                   {asset.url && asset.url.startsWith('data:image') && (
                     <img src={asset.url} alt={asset.name} style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8, marginBottom: 8, border: '1px solid #E5E7EB' }} />
                   )}
+                  {asset.url && asset.url.startsWith('data:application/pdf') && (
+                    <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: '0.75rem', color: '#92400E', fontWeight: 500 }}>📄 PDF uploaded</div>
+                  )}
+                  {asset.url && asset.url.startsWith('data:') && !asset.url.startsWith('data:image') && !asset.url.startsWith('data:application/pdf') && (
+                    <div style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: '0.75rem', color: '#6B7280', fontWeight: 500 }}>📎 File uploaded</div>
+                  )}
                   {asset.url && !asset.url.startsWith('data:') && (
                     <a href={asset.url} target="_blank" rel="noopener noreferrer" style={{
                       flex: 1, display: 'flex', alignItems: 'center', gap: 4,
@@ -413,7 +419,7 @@ function AssetLibrary() {
                     }}>
                       <ExternalLink size={12} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {asset.url}
+                        {asset.url.length > 60 ? asset.url.slice(0, 60) + '...' : asset.url}
                       </span>
                     </a>
                   )}
