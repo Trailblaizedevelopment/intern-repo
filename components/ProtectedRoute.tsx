@@ -28,10 +28,14 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
       '/nucleus/war-room',
     ];
     const isInternAllowedNucleusRoute = isGrowthIntern && internAllowedRoutes.some(r => pathname.startsWith(r));
+
+    // Ambassador leaders can access the ambassadors page
+    const isAmbassadorLeader = profile.role === 'ambassador_leader';
+    const isAmbassadorLeaderAllowed = isAmbassadorLeader && pathname.startsWith('/nucleus/ambassadors');
     
     // Non-admins trying to access /nucleus get redirected to /workspace
-    // Exception: growth_intern can access pipeline + war room
-    if (isNucleusRoute && !isAdmin && !isInternAllowedNucleusRoute) {
+    // Exceptions: growth_intern (war room), ambassador_leader (ambassadors)
+    if (isNucleusRoute && !isAdmin && !isInternAllowedNucleusRoute && !isAmbassadorLeaderAllowed) {
       console.log('Redirecting non-admin to workspace. Role:', profile.role);
       router.replace('/workspace');
     }
@@ -75,7 +79,9 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
   const isGrowthIntern = profile.role === 'growth_intern';
   const internNucleusAllowed = ['/nucleus/war-room'];
   const isInternAllowedNucleusRoute = isGrowthIntern && internNucleusAllowed.some(r => pathname.startsWith(r));
-  if (isNucleusRoute && !isAdmin && !isInternAllowedNucleusRoute) {
+  const isAmbLeader = profile.role === 'ambassador_leader';
+  const isAmbLeaderAllowed = isAmbLeader && pathname.startsWith('/nucleus/ambassadors');
+  if (isNucleusRoute && !isAdmin && !isInternAllowedNucleusRoute && !isAmbLeaderAllowed) {
     return (
       <div className="nucleus-loading-screen">
         <div className="nucleus-loading-content">

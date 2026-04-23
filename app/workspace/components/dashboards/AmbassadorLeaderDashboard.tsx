@@ -121,7 +121,7 @@ export function AmbassadorLeaderDashboard() {
       {/* Welcome Banner */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #0F172A 0%, #1e293b 100%)',
+          background: '#0F172A',
           borderRadius: '16px',
           padding: '28px 32px',
           color: 'white',
