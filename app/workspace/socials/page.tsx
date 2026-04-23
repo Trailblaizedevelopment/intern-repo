@@ -137,10 +137,6 @@ const POST_STATUS_COLORS: Record<PostStatus, { bg: string; color: string }> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function uid() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
 function formatDate(dateStr: string): string {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');
@@ -232,10 +228,27 @@ const selectStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
+function LoadingSpinner() {
+  return (
+    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#9ca3af' }}>
+      <div style={{
+        width: 32, height: 32, border: '3px solid #E5E7EB',
+        borderTopColor: '#0F172A', borderRadius: '50%',
+        animation: 'spin 0.7s linear infinite',
+        margin: '0 auto 12px',
+      }} />
+      <p style={{ margin: 0, fontSize: '0.875rem' }}>Loading...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
 // ─── Tab 1: Asset Library ─────────────────────────────────────────────────────
 
 function AssetLibrary() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [filterCategory, setFilterCategory] = useState<AssetCategory | 'All'>('All');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -244,18 +257,14 @@ function AssetLibrary() {
     name: '', category: 'Brand Kit', url: '', addedBy: '', notes: '',
   });
 
+  // Load from Supabase on mount
   useEffect(() => {
-    try { const s = localStorage.getItem('tb_studio_assets'); if (s) setAssets(JSON.parse(s)); } catch {}
-  }, []);
-
-  const save = useCallback((next: Asset[]) => {
-    setAssets(next);
-    try {
-      localStorage.setItem('tb_studio_assets', JSON.stringify(next));
-    } catch (e) {
-      alert('Storage full. Some assets may not save. Try using links instead of file uploads for large files.');
-      console.error('localStorage save failed:', e);
-    }
+    setLoading(true);
+    fetch('/api/studio/assets')
+      .then(r => r.json())
+      .then((data: Asset[]) => setAssets(Array.isArray(data) ? data : []))
+      .catch(() => alert('Failed to load assets.'))
+      .finally(() => setLoading(false));
   }, []);
 
   function openAdd() {
@@ -270,19 +279,46 @@ function AssetLibrary() {
     setShowForm(true);
   }
 
-  function submit() {
+  async function submit() {
     if (!form.name.trim() || !form.url.trim()) return;
-    if (editingAsset) {
-      save(assets.map(a => a.id === editingAsset.id ? { ...a, ...form } : a));
-    } else {
-      save([...assets, { id: uid(), addedAt: new Date().toISOString().slice(0, 10), ...form }]);
+    setSaving(true);
+    try {
+      if (editingAsset) {
+        const res = await fetch('/api/studio/assets', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingAsset.id, ...form }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
+        const updated: Asset = await res.json();
+        setAssets(prev => prev.map(a => a.id === updated.id ? updated : a));
+      } else {
+        const res = await fetch('/api/studio/assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Create failed');
+        const created: Asset = await res.json();
+        setAssets(prev => [created, ...prev]);
+      }
+      setShowForm(false);
+      setEditingAsset(null);
+    } catch (e: unknown) {
+      alert(`Failed to save asset: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
     }
-    setShowForm(false);
-    setEditingAsset(null);
   }
 
-  function remove(id: string) {
-    save(assets.filter(a => a.id !== id));
+  async function remove(id: string) {
+    try {
+      const res = await fetch(`/api/studio/assets?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+      setAssets(prev => prev.filter(a => a.id !== id));
+    } catch (e: unknown) {
+      alert(`Failed to delete asset: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
   }
 
   const filtered = assets.filter(a => {
@@ -290,6 +326,8 @@ function AssetLibrary() {
     const matchSearch = !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.addedBy.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div>
@@ -406,7 +444,16 @@ function AssetLibrary() {
                     <img src={asset.url} alt={asset.name} style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8, marginBottom: 8, border: '1px solid #E5E7EB' }} />
                   )}
                   {asset.url && asset.url.startsWith('data:application/pdf') && (
-                    <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: '0.75rem', color: '#92400E', fontWeight: 500 }}>📄 PDF uploaded</div>
+                    <a
+                      href={asset.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: '0.75rem', color: '#92400E', fontWeight: 500, cursor: 'pointer' }}>
+                        📄 View PDF
+                      </div>
+                    </a>
                   )}
                   {asset.url && asset.url.startsWith('data:') && !asset.url.startsWith('data:image') && !asset.url.startsWith('data:application/pdf') && (
                     <div style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: '0.75rem', color: '#6B7280', fontWeight: 500 }}>📎 File uploaded</div>
@@ -449,12 +496,15 @@ function AssetLibrary() {
               </select>
             </FormRow>
             <FormRow label="URL / Link *">
-              <input type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="Paste a link or upload a file below" style={inputStyle} />
+              <input type="url" value={form.url.startsWith('data:') ? '' : form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="Paste a link or upload a file below" style={inputStyle} />
+              {form.url.startsWith('data:') && (
+                <div style={{ fontSize: '0.75rem', color: '#059669', marginTop: 2 }}>✓ File selected</div>
+              )}
               <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.gif,.mp4,.mov,.svg,.webp" onChange={e => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                if (file.size > 2 * 1024 * 1024) {
-                  alert('File too large for local storage (max 2MB). Please paste a link to the file instead (Google Drive, Dropbox, etc).');
+                if (file.size > 10 * 1024 * 1024) {
+                  alert('File too large (max 10MB). Please paste a link to the file instead (Google Drive, Dropbox, etc).');
                   return;
                 }
                 const reader = new FileReader();
@@ -467,7 +517,7 @@ function AssetLibrary() {
                 };
                 reader.readAsDataURL(file);
               }} style={{ fontSize: '0.8125rem', color: '#6B7280', marginTop: 4 }} />
-              <p style={{ fontSize: '0.6875rem', color: '#9CA3AF', margin: '4px 0 0' }}>Max 2MB for direct upload. For larger files, paste a Google Drive or Dropbox link above.</p>
+              <p style={{ fontSize: '0.6875rem', color: '#9CA3AF', margin: '4px 0 0' }}>Max 10MB for direct upload. For larger files, paste a Google Drive or Dropbox link above.</p>
             </FormRow>
             <FormRow label="Added By">
               <input type="text" value={form.addedBy} onChange={e => setForm(f => ({ ...f, addedBy: e.target.value }))} placeholder="e.g. Katie" style={inputStyle} />
@@ -480,13 +530,13 @@ function AssetLibrary() {
                 padding: '8px 16px', background: '#F9FAFB', color: '#374151',
                 border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', cursor: 'pointer',
               }}>Cancel</button>
-              <button onClick={submit} disabled={!form.name.trim() || !form.url.trim()} style={{
-                padding: '8px 20px', background: form.name.trim() && form.url.trim() ? '#0F172A' : '#e5e7eb',
-                color: form.name.trim() && form.url.trim() ? '#fff' : '#9ca3af',
+              <button onClick={submit} disabled={saving || !form.name.trim() || !form.url.trim()} style={{
+                padding: '8px 20px', background: !saving && form.name.trim() && form.url.trim() ? '#0F172A' : '#e5e7eb',
+                color: !saving && form.name.trim() && form.url.trim() ? '#fff' : '#9ca3af',
                 border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600,
-                cursor: form.name.trim() && form.url.trim() ? 'pointer' : 'default',
+                cursor: !saving && form.name.trim() && form.url.trim() ? 'pointer' : 'default',
               }}>
-                {editingAsset ? 'Update' : 'Add Asset'}
+                {saving ? 'Saving…' : editingAsset ? 'Update' : 'Add Asset'}
               </button>
             </div>
           </div>
@@ -503,6 +553,8 @@ function ContentCalendar() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null);
@@ -510,13 +562,14 @@ function ContentCalendar() {
     date: '', title: '', platform: 'Instagram', status: 'Draft', link: '', notes: '',
   });
 
+  // Load all entries on mount (client-side filter for current month view)
   useEffect(() => {
-    try { const s = localStorage.getItem('tb_studio_calendar'); if (s) setEntries(JSON.parse(s)); } catch {}
-  }, []);
-
-  const save = useCallback((next: CalendarEntry[]) => {
-    setEntries(next);
-    localStorage.setItem('tb_studio_calendar', JSON.stringify(next));
+    setLoading(true);
+    fetch('/api/studio/calendar')
+      .then(r => r.json())
+      .then((data: CalendarEntry[]) => setEntries(Array.isArray(data) ? data : []))
+      .catch(() => alert('Failed to load calendar.'))
+      .finally(() => setLoading(false));
   }, []);
 
   const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -556,22 +609,51 @@ function ContentCalendar() {
     setShowForm(true);
   }
 
-  function submit() {
+  async function submit() {
     if (!form.title.trim()) return;
-    if (editingEntry) {
-      save(entries.map(e => e.id === editingEntry.id ? { ...e, ...form } : e));
-    } else {
-      save([...entries, { id: uid(), ...form }]);
+    setSaving(true);
+    try {
+      if (editingEntry) {
+        const res = await fetch('/api/studio/calendar', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingEntry.id, ...form }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
+        const updated: CalendarEntry = await res.json();
+        setEntries(prev => prev.map(e => e.id === updated.id ? updated : e));
+      } else {
+        const res = await fetch('/api/studio/calendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Create failed');
+        const created: CalendarEntry = await res.json();
+        setEntries(prev => [...prev, created]);
+      }
+      setShowForm(false);
+      setEditingEntry(null);
+    } catch (e: unknown) {
+      alert(`Failed to save entry: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
     }
-    setShowForm(false);
-    setEditingEntry(null);
   }
 
-  function remove(id: string) {
-    save(entries.filter(e => e.id !== id));
+  async function remove(id: string) {
+    try {
+      const res = await fetch(`/api/studio/calendar?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+      setEntries(prev => prev.filter(e => e.id !== id));
+    } catch (e: unknown) {
+      alert(`Failed to delete entry: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
   }
 
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div>
@@ -714,8 +796,8 @@ function ContentCalendar() {
 
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowForm(false); setEditingEntry(null); }} style={{ padding: '8px 16px', background: '#F9FAFB', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={submit} disabled={!form.title.trim()} style={{ padding: '8px 20px', background: form.title.trim() ? '#0F172A' : '#e5e7eb', color: form.title.trim() ? '#fff' : '#9ca3af', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: form.title.trim() ? 'pointer' : 'default' }}>
-                {editingEntry ? 'Update' : 'Add to Calendar'}
+              <button onClick={submit} disabled={saving || !form.title.trim()} style={{ padding: '8px 20px', background: !saving && form.title.trim() ? '#0F172A' : '#e5e7eb', color: !saving && form.title.trim() ? '#fff' : '#9ca3af', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: !saving && form.title.trim() ? 'pointer' : 'default' }}>
+                {saving ? 'Saving…' : editingEntry ? 'Update' : 'Add to Calendar'}
               </button>
             </div>
           </div>
@@ -729,6 +811,8 @@ function ContentCalendar() {
 
 function ChapterCollabs() {
   const [collabs, setCollabs] = useState<ChapterCollab[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [activeChapters, setActiveChapters] = useState<{id: string; name: string; school: string}[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingCollab, setEditingCollab] = useState<ChapterCollab | null>(null);
@@ -738,46 +822,22 @@ function ChapterCollabs() {
   });
 
   useEffect(() => {
-    try { const s = localStorage.getItem('tb_studio_collabs'); if (s) setCollabs(JSON.parse(s)); } catch {}
+    // Load collabs from Supabase
+    setLoading(true);
+    fetch('/api/studio/collabs')
+      .then(r => r.json())
+      .then((data: ChapterCollab[]) => setCollabs(Array.isArray(data) ? data : []))
+      .catch(() => alert('Failed to load collabs.'))
+      .finally(() => setLoading(false));
+
     // Fetch active chapters from Customer Success
-    fetch('/api/chapters?status=active', { headers: { Authorization: `Bearer ${localStorage.getItem('tb_api_key') || 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h'}` } })
+    fetch('/api/chapters?status=active', { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'hvfv81fuy3vi76f23uyvdo834634gy1o87234grb1347d63o48tfgv23uf4234g535g443hb2345h'}` } })
       .then(r => r.json())
       .then((raw: unknown) => {
         const arr = Array.isArray(raw) ? raw : ((raw as Record<string, unknown>)?.data as unknown[] ?? []);
-        setActiveChapters(arr.map((c: any) => ({ id: c.id, name: c.chapter_name || c.name || '', school: c.school || c.school_name || '' })));
+        setActiveChapters(arr.map((c: Record<string, unknown>) => ({ id: c.id as string, name: (c.chapter_name || c.name || '') as string, school: (c.school || c.school_name || '') as string })));
       })
       .catch(() => {});
-    // Also try to auto-populate from CS data
-    try {
-      const csData = localStorage.getItem('tb_cs_clients');
-      if (csData) {
-        const clients = JSON.parse(csData);
-        const existing = JSON.parse(localStorage.getItem('tb_studio_collabs') || '[]') as ChapterCollab[];
-        const existingNames = new Set(existing.map((c: ChapterCollab) => c.chapterName.toLowerCase()));
-        const newCollabs: ChapterCollab[] = [];
-        for (const client of clients) {
-          if (client.status === 'active' && client.name && !existingNames.has(client.name.toLowerCase())) {
-            newCollabs.push({
-              id: uid(),
-              chapterName: client.name,
-              school: client.school || '',
-              status: 'Not Started',
-              postDate: '', igLink: '', likes: 0, comments: 0, notes: '',
-            });
-          }
-        }
-        if (newCollabs.length > 0) {
-          const merged = [...existing, ...newCollabs];
-          setCollabs(merged);
-          localStorage.setItem('tb_studio_collabs', JSON.stringify(merged));
-        }
-      }
-    } catch {}
-  }, []);
-
-  const save = useCallback((next: ChapterCollab[]) => {
-    setCollabs(next);
-    localStorage.setItem('tb_studio_collabs', JSON.stringify(next));
   }, []);
 
   function openAdd() {
@@ -792,25 +852,67 @@ function ChapterCollabs() {
     setShowForm(true);
   }
 
-  function submit() {
+  async function submit() {
     if (!form.chapterName.trim()) return;
-    if (editingCollab) {
-      save(collabs.map(c => c.id === editingCollab.id ? { ...c, ...form } : c));
-    } else {
-      save([...collabs, { id: uid(), ...form }]);
+    setSaving(true);
+    try {
+      if (editingCollab) {
+        const res = await fetch('/api/studio/collabs', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingCollab.id, ...form }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
+        const updated: ChapterCollab = await res.json();
+        setCollabs(prev => prev.map(c => c.id === updated.id ? updated : c));
+      } else {
+        const res = await fetch('/api/studio/collabs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Create failed');
+        const created: ChapterCollab = await res.json();
+        setCollabs(prev => [created, ...prev]);
+      }
+      setShowForm(false);
+      setEditingCollab(null);
+    } catch (e: unknown) {
+      alert(`Failed to save collab: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
     }
-    setShowForm(false);
-    setEditingCollab(null);
   }
 
-  function remove(id: string) {
-    save(collabs.filter(c => c.id !== id));
+  async function remove(id: string) {
+    try {
+      const res = await fetch(`/api/studio/collabs?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+      setCollabs(prev => prev.filter(c => c.id !== id));
+    } catch (e: unknown) {
+      alert(`Failed to delete collab: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
   }
 
-  function cycleStatus(collab: ChapterCollab) {
+  async function cycleStatus(collab: ChapterCollab) {
     const idx = COLLAB_STATUSES.indexOf(collab.status);
-    const next = COLLAB_STATUSES[(idx + 1) % COLLAB_STATUSES.length];
-    save(collabs.map(c => c.id === collab.id ? { ...c, status: next } : c));
+    const nextStatus = COLLAB_STATUSES[(idx + 1) % COLLAB_STATUSES.length];
+    // Optimistic update
+    setCollabs(prev => prev.map(c => c.id === collab.id ? { ...c, status: nextStatus } : c));
+    try {
+      const res = await fetch('/api/studio/collabs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...collab, status: nextStatus }),
+      });
+      if (!res.ok) {
+        // Revert on failure
+        setCollabs(prev => prev.map(c => c.id === collab.id ? collab : c));
+        throw new Error((await res.json()).error || 'Update failed');
+      }
+    } catch (e: unknown) {
+      alert(`Failed to update status: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
   }
 
   const notPosted = collabs.filter(c => c.status !== 'Posted');
@@ -822,6 +924,8 @@ function ChapterCollabs() {
     if (status === 'In Design') return <AlertCircle size={14} color="#92400e" />;
     return <AlertCircle size={14} color="#6b7280" />;
   };
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div>
@@ -1010,8 +1114,8 @@ function ChapterCollabs() {
             </FormRow>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowForm(false); setEditingCollab(null); }} style={{ padding: '8px 16px', background: '#F9FAFB', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={submit} disabled={!form.chapterName.trim()} style={{ padding: '8px 20px', background: form.chapterName.trim() ? '#0F172A' : '#e5e7eb', color: form.chapterName.trim() ? '#fff' : '#9ca3af', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: form.chapterName.trim() ? 'pointer' : 'default' }}>
-                {editingCollab ? 'Update' : 'Add Collab'}
+              <button onClick={submit} disabled={saving || !form.chapterName.trim()} style={{ padding: '8px 20px', background: !saving && form.chapterName.trim() ? '#0F172A' : '#e5e7eb', color: !saving && form.chapterName.trim() ? '#fff' : '#9ca3af', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: !saving && form.chapterName.trim() ? 'pointer' : 'default' }}>
+                {saving ? 'Saving…' : editingCollab ? 'Update' : 'Add Collab'}
               </button>
             </div>
           </div>
@@ -1025,6 +1129,8 @@ function ChapterCollabs() {
 
 function Campaigns() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [form, setForm] = useState<Omit<Campaign, 'id'>>({
@@ -1033,12 +1139,12 @@ function Campaigns() {
   });
 
   useEffect(() => {
-    try { const s = localStorage.getItem('tb_studio_campaigns'); if (s) setCampaigns(JSON.parse(s)); } catch {}
-  }, []);
-
-  const save = useCallback((next: Campaign[]) => {
-    setCampaigns(next);
-    localStorage.setItem('tb_studio_campaigns', JSON.stringify(next));
+    setLoading(true);
+    fetch('/api/studio/campaigns')
+      .then(r => r.json())
+      .then((data: Campaign[]) => setCampaigns(Array.isArray(data) ? data : []))
+      .catch(() => alert('Failed to load campaigns.'))
+      .finally(() => setLoading(false));
   }, []);
 
   function openAdd() {
@@ -1053,19 +1159,46 @@ function Campaigns() {
     setShowForm(true);
   }
 
-  function submit() {
+  async function submit() {
     if (!form.name.trim()) return;
-    if (editingCampaign) {
-      save(campaigns.map(c => c.id === editingCampaign.id ? { ...c, ...form } : c));
-    } else {
-      save([...campaigns, { id: uid(), ...form }]);
+    setSaving(true);
+    try {
+      if (editingCampaign) {
+        const res = await fetch('/api/studio/campaigns', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingCampaign.id, ...form }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
+        const updated: Campaign = await res.json();
+        setCampaigns(prev => prev.map(c => c.id === updated.id ? updated : c));
+      } else {
+        const res = await fetch('/api/studio/campaigns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Create failed');
+        const created: Campaign = await res.json();
+        setCampaigns(prev => [created, ...prev]);
+      }
+      setShowForm(false);
+      setEditingCampaign(null);
+    } catch (e: unknown) {
+      alert(`Failed to save campaign: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
     }
-    setShowForm(false);
-    setEditingCampaign(null);
   }
 
-  function remove(id: string) {
-    save(campaigns.filter(c => c.id !== id));
+  async function remove(id: string) {
+    try {
+      const res = await fetch(`/api/studio/campaigns?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+      setCampaigns(prev => prev.filter(c => c.id !== id));
+    } catch (e: unknown) {
+      alert(`Failed to delete campaign: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
   }
 
   function togglePlatform(platform: Platform) {
@@ -1079,6 +1212,8 @@ function Campaigns() {
 
   const active = campaigns.filter(c => c.status === 'Active');
   const others = campaigns.filter(c => c.status !== 'Active');
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div>
@@ -1212,8 +1347,8 @@ function Campaigns() {
             </FormRow>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowForm(false); setEditingCampaign(null); }} style={{ padding: '8px 16px', background: '#F9FAFB', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={submit} disabled={!form.name.trim()} style={{ padding: '8px 20px', background: form.name.trim() ? '#0F172A' : '#e5e7eb', color: form.name.trim() ? '#fff' : '#9ca3af', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: form.name.trim() ? 'pointer' : 'default' }}>
-                {editingCampaign ? 'Update Campaign' : 'Create Campaign'}
+              <button onClick={submit} disabled={saving || !form.name.trim()} style={{ padding: '8px 20px', background: !saving && form.name.trim() ? '#0F172A' : '#e5e7eb', color: !saving && form.name.trim() ? '#fff' : '#9ca3af', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: !saving && form.name.trim() ? 'pointer' : 'default' }}>
+                {saving ? 'Saving…' : editingCampaign ? 'Update Campaign' : 'Create Campaign'}
               </button>
             </div>
           </div>
