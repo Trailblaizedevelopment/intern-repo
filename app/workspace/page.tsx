@@ -6,6 +6,8 @@ import { useUserRole } from './hooks/useUserRole';
 import { useWorkspaceData } from './hooks/useWorkspaceData';
 import { CommandCenter } from './components/CommandCenter';
 import { InternDashboard } from './components/dashboards/InternDashboard';
+import { FounderDashboard } from './components/dashboards/FounderDashboard';
+import { AmbassadorLeaderDashboard } from './components/dashboards/AmbassadorLeaderDashboard';
 
 /**
  * Main Workspace Page
@@ -14,7 +16,7 @@ import { InternDashboard } from './components/dashboards/InternDashboard';
  */
 export default function WorkspacePage() {
   const { profile } = useAuth();
-  const { loading: roleLoading, isIntern } = useUserRole();
+  const { loading: roleLoading, isIntern, isAmbassadorLeader } = useUserRole();
   const workspaceData = useWorkspaceData();
 
   const firstName = profile?.name?.split(' ')[0] || 'there';
@@ -38,6 +40,15 @@ export default function WorkspacePage() {
     );
   }
 
+  // Ambassador Leader — only sees their ambassador dashboard
+  if (isAmbassadorLeader) {
+    return (
+      <div className="ws-page">
+        <AmbassadorLeaderDashboard />
+      </div>
+    );
+  }
+
   // Growth interns get their own focused dashboard
   if (isIntern) {
     return (
@@ -50,13 +61,12 @@ export default function WorkspacePage() {
     );
   }
 
-  // Founders and engineers get the existing CommandCenter dashboard (unchanged)
+  // Founders get calendar + inbox only
   return (
     <div className="ws-page">
-      <CommandCenter
+      <FounderDashboard
         data={workspaceData}
         teamMembers={workspaceData.teamMembers}
-        firstName={firstName}
       />
     </div>
   );
