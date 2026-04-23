@@ -15,7 +15,9 @@ const LINQ_BASE = 'https://api.linqapp.com/api/partner/v3';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { chat_id, message, line_phone, contact_phone } = body;
+    const { chat_id, message, line_phone, contact_phone: rawPhone } = body;
+    // Normalize phone to E.164 format
+    const contact_phone = rawPhone ? '+1' + rawPhone.replace(/\D/g, '').replace(/^1/, '').slice(-10) : undefined;
 
     const trimmed = (message || '').trim();
     if (!trimmed) {
