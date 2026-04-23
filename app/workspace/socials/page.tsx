@@ -250,7 +250,12 @@ function AssetLibrary() {
 
   const save = useCallback((next: Asset[]) => {
     setAssets(next);
-    localStorage.setItem('tb_studio_assets', JSON.stringify(next));
+    try {
+      localStorage.setItem('tb_studio_assets', JSON.stringify(next));
+    } catch (e) {
+      alert('Storage full. Some assets may not save. Try using links instead of file uploads for large files.');
+      console.error('localStorage save failed:', e);
+    }
   }, []);
 
   function openAdd() {
@@ -441,15 +446,22 @@ function AssetLibrary() {
               <input type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="Paste a link or upload a file below" style={inputStyle} />
               <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.gif,.mp4,.mov,.svg,.webp" onChange={e => {
                 const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const dataUrl = reader.result as string;
-                    setForm(f => ({ ...f, url: dataUrl, name: f.name || file.name }));
-                  };
-                  reader.readAsDataURL(file);
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) {
+                  alert('File too large for local storage (max 2MB). Please paste a link to the file instead (Google Drive, Dropbox, etc).');
+                  return;
                 }
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const dataUrl = reader.result as string;
+                  setForm(f => ({ ...f, url: dataUrl, name: f.name || file.name }));
+                };
+                reader.onerror = () => {
+                  alert('Failed to read file. Try pasting a link instead.');
+                };
+                reader.readAsDataURL(file);
               }} style={{ fontSize: '0.8125rem', color: '#6B7280', marginTop: 4 }} />
+              <p style={{ fontSize: '0.6875rem', color: '#9CA3AF', margin: '4px 0 0' }}>Max 2MB for direct upload. For larger files, paste a Google Drive or Dropbox link above.</p>
             </FormRow>
             <FormRow label="Added By">
               <input type="text" value={form.addedBy} onChange={e => setForm(f => ({ ...f, addedBy: e.target.value }))} placeholder="e.g. Katie" style={inputStyle} />
