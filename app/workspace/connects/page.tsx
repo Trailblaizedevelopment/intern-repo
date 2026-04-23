@@ -1599,9 +1599,9 @@ function computeWebGraph(callLogs: Record<string, CallLog>): { nodes: WebNode[];
         // 1st degree: same chapter (same org + same school)
         directEdges.push({ from: a.id, to: b.id, degree: 1, sharedContext: `${a.org} @ ${a.school}` });
         connectedPairs.add(key);
-      } else if (sameSchool || sameOrg) {
-        // 2nd degree: same school different org, or same org different school
-        const ctx = sameSchool ? `Both at ${a.school}` : `Both in ${a.org}`;
+      } else if (sameSchool) {
+        // 2nd degree: same school different org
+        const ctx = `Both at ${a.school}`;
         directEdges.push({ from: a.id, to: b.id, degree: 2, sharedContext: ctx });
         connectedPairs.add(key);
       } else if (a.location && b.location) {
