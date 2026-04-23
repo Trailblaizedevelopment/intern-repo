@@ -1273,6 +1273,17 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   }
 
   function handleUpdateProspect(id: string, updates: Partial<CampaignProspect>) {
+    // If this prospect came from API rows (not in localStorage yet), copy it first
+    const existing = prospects.find(p => p.id === id);
+    if (!existing) {
+      // Find in the merged campaignProspects (which includes API rows)
+      const fromMerged = selectedProspects.find(p => p.id === id);
+      if (fromMerged) {
+        const newProspect = { ...fromMerged, ...updates };
+        persistProspects([...prospects, newProspect]);
+        return;
+      }
+    }
     const updated = prospects.map(p => p.id === id ? { ...p, ...updates } : p);
     persistProspects(updated);
   }
