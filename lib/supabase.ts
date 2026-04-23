@@ -1053,7 +1053,7 @@ export const MEMBER_STATUS_CONFIG: Record<MemberStatus, { label: string; color: 
 // Ambassador Types
 // ============================================
 
-export type AmbassadorStatus = 'active' | 'inactive' | 'prospect';
+export type AmbassadorStatus = 'active' | 'inactive' | 'prospect' | 'pending';
 
 export interface Ambassador {
   id: string;
