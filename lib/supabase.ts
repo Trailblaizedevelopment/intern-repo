@@ -35,6 +35,7 @@ export type EmployeeRole =
   | 'engineer' 
   | 'sales_intern'
   | 'marketing_intern'
+  | 'marketing_director'
   | 'operations'
   | 'ambassador_leader'
   | 'ambassador';
@@ -49,6 +50,7 @@ export const ROLE_HIERARCHY: Record<EmployeeRole, number> = {
   engineer: 2,
   operations: 3,
   ambassador_leader: 3,
+  marketing_director: 3,
   cofounder: 5,
   founder: 6,
 };
@@ -60,6 +62,7 @@ export const ROLE_LABELS: Record<EmployeeRole, string> = {
   engineer: 'Engineer',
   sales_intern: 'Sales Intern',
   marketing_intern: 'Marketing Intern',
+  marketing_director: 'Marketing Director',
   operations: 'Operations',
   ambassador_leader: 'Ambassador Leader',
   ambassador: 'Ambassador',
@@ -114,6 +117,15 @@ export const ROLE_PERMISSIONS: Record<EmployeeRole, string[]> = {
     'customers_view',
     'announcements',
     'team',
+  ],
+
+  // Marketing Director - Creative Studio, asset management, campaigns
+  marketing_director: [
+    'creative_studio',
+    'content',
+    'campaigns',
+    'assets',
+    'announcements',
   ],
 
   // Ambassador Leader - Manages ambassador program, reviews applications

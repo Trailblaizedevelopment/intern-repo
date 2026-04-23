@@ -7,6 +7,7 @@ import { FounderDashboard } from './dashboards/FounderDashboard';
 import { EngineerDashboard } from './dashboards/EngineerDashboard';
 import { InternDashboard } from './dashboards/InternDashboard';
 import { AmbassadorLeaderDashboard } from './dashboards/AmbassadorLeaderDashboard';
+import { MarketingDirectorDashboard } from './dashboards/MarketingDirectorDashboard';
 import { Employee } from '@/lib/supabase';
 
 interface DashboardProps {
@@ -28,6 +29,8 @@ export function Dashboard({ data, teamMembers }: DashboardProps) {
       return <EngineerDashboard data={data} teamMembers={teamMembers} />;
     case 'ambassador_leader':
       return <AmbassadorLeaderDashboard />;
+    case 'marketing_director':
+      return <MarketingDirectorDashboard />;
     case 'ambassador':
     case 'growth_intern':
     default:

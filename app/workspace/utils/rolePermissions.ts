@@ -1,6 +1,6 @@
 import { EmployeeRole, ROLE_PERMISSIONS, ROLE_LABELS, ROLE_HIERARCHY } from '@/lib/supabase';
 
-export type WorkspaceRole = 'founder' | 'engineer' | 'growth_intern' | 'ambassador_leader' | 'ambassador';
+export type WorkspaceRole = 'founder' | 'engineer' | 'growth_intern' | 'ambassador_leader' | 'marketing_director' | 'ambassador';
 
 /**
  * Maps employee roles to workspace view types
@@ -14,6 +14,8 @@ export function getWorkspaceRole(role: EmployeeRole): WorkspaceRole {
       return 'engineer';
     case 'ambassador_leader':
       return 'ambassador_leader';
+    case 'marketing_director':
+      return 'marketing_director';
     case 'ambassador':
       return 'ambassador';
     case 'growth_intern':
@@ -111,6 +113,18 @@ export function getRoleFeatures(role: EmployeeRole): RoleFeatures {
         showStrategicPlanning: false,
         showTeamSwitcher: false,
       };
+    case 'marketing_director':
+      return {
+        showWhiteboard: false,
+        showLeads: false,
+        showEngineering: false,
+        showTeamOverview: false,
+        showBusinessMetrics: false,
+        showFocusTimer: false,
+        showCollaborationFeed: false,
+        showStrategicPlanning: false,
+        showTeamSwitcher: false,
+      };
     case 'ambassador_leader':
     case 'ambassador':
       return {
@@ -171,7 +185,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
         { name: 'Connects', href: '/workspace/connects', icon: 'Phone' },
         { name: 'Mission Control', href: '/nucleus/mission-control', icon: 'Radar' },
-        { name: 'Socials', href: '/workspace/socials', icon: 'Share2' },
+        { name: 'Creative Studio', href: '/workspace/socials', icon: 'Palette' },
       ];
     case 'engineer':
       return [
@@ -186,6 +200,11 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
         { name: 'Ambassadors', href: '/nucleus/ambassadors', icon: 'Star' },
       ];
+    case 'marketing_director':
+      return [
+        { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
+        { name: 'Creative Studio', href: '/workspace/socials', icon: 'Palette' },
+      ];
     case 'ambassador':
       return [
         { name: 'Portal', href: '/ambassador', icon: 'Star' },
@@ -199,9 +218,9 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'Connects', href: '/workspace/connects', icon: 'Phone' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
       ];
-      // Marketing interns also get the Socials page
+      // Marketing interns also get the Creative Studio page
       if (role === 'marketing_intern') {
-        internItems.push({ name: 'Socials', href: '/workspace/socials', icon: 'Share2' });
+        internItems.push({ name: 'Creative Studio', href: '/workspace/socials', icon: 'Palette' });
       }
       return internItems;
     }

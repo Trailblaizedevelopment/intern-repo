@@ -934,6 +934,7 @@ export default function EmployeesModule() {
                     <option value="engineer">Engineer</option>
                     <option value="sales_intern">Sales Intern</option>
                     <option value="marketing_intern">Marketing Intern</option>
+                    <option value="marketing_director">Marketing Director</option>
                     <option value="operations">Operations</option>
                     <option value="ambassador_leader">Ambassador Leader</option>
                     <option value="ambassador">Ambassador</option>

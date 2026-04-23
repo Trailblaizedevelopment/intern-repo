@@ -35,6 +35,7 @@ import {
   Tv,
   Share2,
   Phone,
+  Palette,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -62,6 +63,7 @@ const iconMap: Record<string, LucideIcon> = {
   Tv,
   Share2,
   Phone,
+  Palette,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
@@ -130,6 +132,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const isFounderRole = role === 'founder' || role === 'cofounder';
   const isInternRole = role === 'growth_intern' || role === 'sales_intern' || role === 'marketing_intern';
   const isAmbassadorLeaderRole = role === 'ambassador_leader';
+  const isMarketingDirectorRole = role === 'marketing_director';
   const isAmbassadorRole = role === 'ambassador';
 
   const bottomTabItems = isFounderRole
@@ -151,6 +154,11 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     ? [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
         { name: 'Ambassadors', href: '/nucleus/ambassadors', icon: 'Star', badge: 0 },
+      ]
+    : isMarketingDirectorRole
+    ? [
+        { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard', badge: 0 },
+        { name: 'Creative Studio', href: '/workspace/socials', icon: 'Palette', badge: 0 },
       ]
     : isAmbassadorRole
     ? [
