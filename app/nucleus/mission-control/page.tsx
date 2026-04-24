@@ -166,15 +166,15 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const AGENT_COLOR_MAP: Record<string, { bg: string; text: string }> = {
-  violet: { bg: '#f5f3ff', text: '#6d28d9' },
-  amber:  { bg: '#fffbeb', text: '#b45309' },
+  violet: { bg: '#F3F4F6', text: '#0F172A' },
+  amber:  { bg: '#F3F4F6', text: '#0F172A' },
   emerald:{ bg: '#ecfdf5', text: '#065f46' },
   blue:   { bg: '#eff6ff', text: '#1d4ed8' },
   teal:   { bg: '#f0fdfa', text: '#0f766e' },
   indigo: { bg: '#eef2ff', text: '#4338ca' },
   pink:   { bg: '#fdf2f8', text: '#be185d' },
   cyan:   { bg: '#ecfeff', text: '#0e7490' },
-  slate:  { bg: '#f8fafc', text: '#475569' },
+  slate:  { bg: '#F3F4F6', text: '#475569' },
 };
 
 function fmtTime(iso: string | null) {
@@ -518,7 +518,7 @@ function MissionControlInner() {
             </Link>
           </div>
           <div className="module-title-row">
-            <div className="module-icon" style={{ backgroundColor: '#7c3aed15', color: '#7c3aed' }}>
+            <div className="module-icon" style={{ backgroundColor: '#F3F4F6', color: '#0F172A' }}>
               <Radar size={24} />
             </div>
             <div>
@@ -565,7 +565,7 @@ function MissionControlInner() {
                   key={sub}
                   onClick={() => setOutreachSub(sub)}
                   className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
-                    outreachSub === sub ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280] hover:text-[#0F172A]'
+                    outreachSub === sub ? 'bg-white text-[#0F172A]' : 'text-[#6B7280] hover:text-[#0F172A]'
                   }`}
                 >
                   {sub === 'outreach' ? 'Outreach Dashboard' : 'Alumni Contacts'}
@@ -640,7 +640,7 @@ function MissionControlInner() {
         <div className="fixed inset-0 z-50 flex" onClick={() => setSoulAgent(null)}>
           <div className="flex-1" />
           <div
-            className="w-full max-w-lg h-full bg-white border-l border-[#E5E7EB] overflow-y-auto shadow-2xl"
+            className="w-full max-w-lg h-full bg-white border-l border-[#E5E7EB] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E7EB]">
@@ -1044,7 +1044,7 @@ function AgentsSection({
           <button
             onClick={() => onViewMode('hierarchy')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'hierarchy' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
+              viewMode === 'hierarchy' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
             }`}
           >
             <Network size={14} /> Hierarchy
@@ -1052,7 +1052,7 @@ function AgentsSection({
           <button
             onClick={() => onViewMode('grid')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'grid' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
+              viewMode === 'grid' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
             }`}
           >
             <LayoutGrid size={14} /> Grid
@@ -1106,10 +1106,9 @@ function AgentCard({ agent, onViewSoul, isMain }: {
   return (
     <div style={{
       background: 'white',
-      border: `1px solid ${isMain ? '#c4b5fd' : '#E5E7EB'}`,
+      border: '1px solid #E5E7EB',
       borderRadius: 12,
       padding: '1rem',
-      boxShadow: isMain ? '0 1px 4px rgba(109,40,217,0.08)' : undefined,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -1137,7 +1136,7 @@ function AgentCard({ agent, onViewSoul, isMain }: {
         {isMain && (
           <span style={{
             fontSize: '0.72rem', padding: '2px 8px', borderRadius: 9999,
-            background: '#f5f3ff', color: '#6d28d9', border: '1px solid #c4b5fd', fontWeight: 600,
+            background: '#F3F4F6', color: '#0F172A', border: '1px solid #E5E7EB', fontWeight: 600,
           }}>
             Chief
           </span>
@@ -1228,7 +1227,7 @@ function CronsSection({
             <button
               onClick={() => setView('list')}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                view === 'list' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
+                view === 'list' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
               }`}
             >
               <Activity size={12} /> All Jobs
@@ -1236,7 +1235,7 @@ function CronsSection({
             <button
               onClick={() => setView('schedule')}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                view === 'schedule' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
+                view === 'schedule' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
               }`}
             >
               <Calendar size={12} /> Daily Schedule
@@ -1720,7 +1719,7 @@ function MemorySection({
         <button
           onClick={() => onSub('daily')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            sub === 'daily' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
+            sub === 'daily' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
           }`}
         >
           <Calendar size={14} /> Daily Notes
@@ -1728,7 +1727,7 @@ function MemorySection({
         <button
           onClick={() => onSub('longterm')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            sub === 'longterm' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#6B7280]'
+            sub === 'longterm' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
           }`}
         >
           <FileText size={14} /> Long-term Memory
@@ -1764,7 +1763,7 @@ function MemorySection({
                 onClick={() => onSelect(selected?.date === entry.date ? null : entry)}
                 className={`w-full text-left p-3 rounded-xl border transition-all ${
                   selected?.date === entry.date
-                    ? 'border-violet-200 bg-violet-50'
+                    ? 'border-[#0F172A] bg-[#F3F4F6]'
                     : 'border-[#E5E7EB] bg-white hover:bg-[#F9FAFB]'
                 }`}
               >
