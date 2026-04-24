@@ -1,8 +1,4 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
 
 interface RawSchedule {
   kind: 'cron' | 'every' | 'at';
@@ -45,22 +41,34 @@ function formatScheduleString(schedule: RawSchedule | undefined): string {
 }
 
 export async function GET() {
-  try {
-    const { stdout } = await execAsync(
-      '/opt/homebrew/bin/openclaw cron list --json',
-      { timeout: 10_000 }
-    );
+  const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL;
+  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN;
 
-    let raw: { jobs?: RawJob[] };
-    try {
-      raw = JSON.parse(stdout);
-    } catch {
-      return NextResponse.json(
-        { jobs: [], total: 0, error: 'Failed to parse cron list output' },
-        { status: 500, headers: { 'Cache-Control': 'no-store' } }
-      );
+  if (!gatewayUrl) {
+    return NextResponse.json(
+      {
+        jobs: [],
+        total: 0,
+        error: 'Configure OPENCLAW_GATEWAY_URL to connect to your OpenClaw instance.',
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
+  try {
+    const headers: Record<string, string> = {};
+    if (gatewayToken) headers['Authorization'] = `Bearer ${gatewayToken}`;
+
+    const res = await fetch(`${gatewayUrl}/api/crons`, {
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Gateway returned ${res.status} ${res.statusText}`);
     }
 
+    const raw: { jobs?: RawJob[] } = await res.json();
     const rawJobs: RawJob[] = Array.isArray(raw.jobs) ? raw.jobs : [];
 
     const jobs = rawJobs.map((j) => ({
@@ -89,12 +97,11 @@ export async function GET() {
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // Graceful fallback — exec fails on Vercel (no local openclaw binary)
     return NextResponse.json(
       {
         jobs: [],
         total: 0,
-        error: 'Cron data is only available when running locally on the Mac mini.',
+        error: `Could not reach OpenClaw gateway at ${gatewayUrl}. Make sure it's running and reachable.`,
         detail: msg,
       },
       { status: 200, headers: { 'Cache-Control': 'no-store' } }
