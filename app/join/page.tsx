@@ -25,7 +25,7 @@ const SCREENS = [
     type: 'text' as const,
     headline: null,
     body: [
-      'Your fraternity brothers. Your college teammates. Your study group. Your church group. Your startup co-founders.',
+      'Your college teammates. Your club members. Your study group. Your church group. Your fraternity brothers.',
       '',
       'These are the people who matter. But there\'s no platform designed to keep those connections alive after you leave.',
     ],
