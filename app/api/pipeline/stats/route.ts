@@ -6,15 +6,14 @@ export async function GET() {
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
 
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
 
-  const plus7 = new Date(today);
-  plus7.setDate(plus7.getDate() + 7);
-  const plus7Str = plus7.toISOString().split('T')[0];
+  const minus7 = new Date(today);
+  minus7.setDate(minus7.getDate() - 7);
+  const minus7Str = minus7.toISOString();
 
-  const plus14 = new Date(today);
-  plus14.setDate(plus14.getDate() + 14);
-  const plus14Str = plus14.toISOString().split('T')[0];
+  const minus14 = new Date(today);
+  minus14.setDate(minus14.getDate() - 14);
+  const minus14Str = minus14.toISOString();
 
   // Fetch all deals with org+school joined
   const { data: allDeals, error } = await admin
@@ -35,49 +34,57 @@ export async function GET() {
   const totalClosedValue = closedWon.reduce((sum: number, d) => sum + (d.value || 0), 0);
   const mrr = Math.round(totalClosedValue / 12);
 
-  // Active deals (exclude closed_lost and hold_off)
+  // Closed deal count + chapter names
+  const closedDealCount = closedWon.length;
+  const closedChapters = closedWon
+    .map((d) => d.organization?.name || '')
+    .filter(Boolean) as string[];
+
+  // Schools in Conversation: distinct schools where stage != 'closed_lost' AND stage != 'lost'
+  // (includes hold_off and all active stages)
+  const EXCLUDED_FROM_CONVO = ['closed_lost', 'lost'];
+  const convoDeals = deals.filter((d) => !EXCLUDED_FROM_CONVO.includes(d.stage));
+  const convoSchoolIds = new Set<string>();
+  for (const d of convoDeals) {
+    const sid = d.organization?.school?.id;
+    if (sid) convoSchoolIds.add(sid);
+  }
+  const schoolsInConversation = convoSchoolIds.size;
+
+  // Active deals (for conference tracker + map)
   const INACTIVE_STAGES = ['closed_lost', 'hold_off'];
   const activeDeals = deals.filter((d) => !INACTIVE_STAGES.includes(d.stage));
 
-  // Schools in conversation: unique schools with at least 1 active deal
-  const schoolIds = new Set<string>();
+  // Demos LAST 7/14 days: stage IN ('demo_booked', 'first_demo') AND updated_at >= cutoff
+  const DEMO_STAGES = ['demo_booked', 'first_demo', 'demo_completed'];
+  const demosLast7 = deals.filter(
+    (d) =>
+      DEMO_STAGES.includes(d.stage) &&
+      d.updated_at &&
+      d.updated_at >= minus7Str
+  ).length;
+
+  const demosLast14 = deals.filter(
+    (d) =>
+      DEMO_STAGES.includes(d.stage) &&
+      d.updated_at &&
+      d.updated_at >= minus14Str
+  ).length;
+
+  // Decision Calls: schools with MORE THAN ONE deal AND at least one deal in a decision stage
+  const DECISION_STAGES = ['second_call', 'negotiation', 'contract_sent'];
+  const schoolDealMap = new Map<string, { count: number; hasDecision: boolean }>();
   for (const d of activeDeals) {
     const sid = d.organization?.school?.id;
-    if (sid) schoolIds.add(sid);
+    if (!sid) continue;
+    const existing = schoolDealMap.get(sid) || { count: 0, hasDecision: false };
+    schoolDealMap.set(sid, {
+      count: existing.count + 1,
+      hasDecision: existing.hasDecision || DECISION_STAGES.includes(d.stage),
+    });
   }
-  const schoolsInConversation = schoolIds.size;
-
-  // Demos: stage IN ('demo_booked','first_demo') AND next_followup <= today+7 or +14
-  const DEMO_STAGES = ['demo_booked', 'first_demo'];
-  const demosNext7 = deals.filter(
-    (d) =>
-      DEMO_STAGES.includes(d.stage) &&
-      d.next_followup &&
-      d.next_followup >= todayStr &&
-      d.next_followup <= plus7Str
-  ).length;
-  const demosNext14 = deals.filter(
-    (d) =>
-      DEMO_STAGES.includes(d.stage) &&
-      d.next_followup &&
-      d.next_followup >= todayStr &&
-      d.next_followup <= plus14Str
-  ).length;
-
-  // Decisions: stage = 'second_call' AND next_followup within range
-  const decisionsNext7 = deals.filter(
-    (d) =>
-      d.stage === 'second_call' &&
-      d.next_followup &&
-      d.next_followup >= todayStr &&
-      d.next_followup <= plus7Str
-  ).length;
-  const decisionsNext14 = deals.filter(
-    (d) =>
-      d.stage === 'second_call' &&
-      d.next_followup &&
-      d.next_followup >= todayStr &&
-      d.next_followup <= plus14Str
+  const decisionCalls = Array.from(schoolDealMap.values()).filter(
+    (s) => s.count > 1 && s.hasDecision
   ).length;
 
   // By conference: group active deals by conference
@@ -97,18 +104,20 @@ export async function GET() {
     .map(([conference, stats]) => ({ conference, ...stats }))
     .sort((a, b) => b.dealCount - a.dealCount);
 
-  // Closed deal count (visible to all roles)
-  const closedDealCount = closedWon.length;
-
   return NextResponse.json({
     mrr,
     mrrGoal: 10000,
     closedDealCount,
+    closedChapters,
     schoolsInConversation,
-    demosNext7,
-    demosNext14,
-    decisionsNext7,
-    decisionsNext14,
+    demosLast7,
+    demosLast14,
+    decisionCalls,
+    // Legacy fields (kept for compatibility)
+    demosNext7: demosLast7,
+    demosNext14: demosLast14,
+    decisionsNext7: decisionCalls,
+    decisionsNext14: decisionCalls,
     byConference,
     recentDeals: activeDeals,
   });

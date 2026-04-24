@@ -68,11 +68,16 @@ interface PipelineStats {
   mrr: number;
   mrrGoal: number;
   closedDealCount?: number;
+  closedChapters?: string[];
   schoolsInConversation: number;
-  demosNext7: number;
-  demosNext14: number;
-  decisionsNext7: number;
-  decisionsNext14: number;
+  demosLast7: number;
+  demosLast14: number;
+  decisionCalls: number;
+  // Legacy compat
+  demosNext7?: number;
+  demosNext14?: number;
+  decisionsNext7?: number;
+  decisionsNext14?: number;
   byConference: ConferenceStats[];
   recentDeals: Deal[];
 }
@@ -534,64 +539,57 @@ function DashboardTab({ stats, onOpenDeal: _onOpenDeal }: { stats: PipelineStats
   }
 
   const closedCount = stats.closedDealCount ?? 0;
-  const closedGoal = 20; // internal milestone
-  const closedPct = Math.min(100, Math.round((closedCount / closedGoal) * 100));
+  const closedChapters = stats.closedChapters ?? [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Closed Deals Hero Card */}
-      <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
-          <div>
-            <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6B7280', margin: '0 0 8px 0' }}>
-              Closed Deals
-            </p>
-            <p style={{ fontSize: '2.5rem', fontWeight: 700, color: '#111827', lineHeight: 1.1, margin: 0 }}>
-              {closedCount}
-            </p>
-            <p style={{ fontSize: '0.875rem', color: '#6B7280', marginTop: '6px' }}>
-              <span style={{ color: '#0F172A', fontWeight: 600 }}>{closedGoal - closedCount} to go</span>{' '}to next milestone
-            </p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Progress</p>
-            <p style={{ fontSize: '2rem', fontWeight: 700, color: '#111827' }}>{closedPct}%</p>
-          </div>
+
+      {/* 1. Stats Row — most prominent */}
+      <div className="module-stats-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        {/* Schools in Conversation */}
+        <div className="module-stat">
+          <span className="module-stat-value" style={{ fontSize: '2.25rem' }}>{stats.schoolsInConversation}</span>
+          <span className="module-stat-label">Schools in Conversation</span>
         </div>
-        <div style={{ background: '#F3F4F6', borderRadius: '9999px', height: '8px', overflow: 'hidden' }}>
-          <div style={{ height: '8px', borderRadius: '9999px', background: '#0F172A', width: `${closedPct}%`, transition: 'width 0.7s ease' }} />
+
+        {/* Demos Last 7 Days — blue badge */}
+        <div className="module-stat" style={{ position: 'relative' }}>
+          <span style={{
+            position: 'absolute', top: '10px', right: '10px',
+            fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px',
+            borderRadius: '9999px', background: '#dbeafe', color: '#1d4ed8',
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+          }}>Demo</span>
+          <span className="module-stat-value" style={{ fontSize: '2.25rem' }}>{stats.demosLast7}</span>
+          <span className="module-stat-label">Demos · Last 7 Days</span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0F172A' }}>{closedCount} closed</span>
-          <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Milestone: {closedGoal}</span>
+
+        {/* Demos Last 14 Days — blue badge */}
+        <div className="module-stat" style={{ position: 'relative' }}>
+          <span style={{
+            position: 'absolute', top: '10px', right: '10px',
+            fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px',
+            borderRadius: '9999px', background: '#dbeafe', color: '#1d4ed8',
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+          }}>Demo</span>
+          <span className="module-stat-value" style={{ fontSize: '2.25rem' }}>{stats.demosLast14}</span>
+          <span className="module-stat-label">Demos · Last 14 Days</span>
+        </div>
+
+        {/* Decision Calls — amber badge */}
+        <div className="module-stat" style={{ position: 'relative' }}>
+          <span style={{
+            position: 'absolute', top: '10px', right: '10px',
+            fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px',
+            borderRadius: '9999px', background: '#fef3c7', color: '#d97706',
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+          }}>Decision</span>
+          <span className="module-stat-value" style={{ fontSize: '2.25rem' }}>{stats.decisionCalls}</span>
+          <span className="module-stat-label">Decision Calls</span>
         </div>
       </div>
 
-      {/* KPI Stats Row */}
-      <div className="module-stats-row" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-        <div className="module-stat">
-          <span className="module-stat-value">{stats.schoolsInConversation}</span>
-          <span className="module-stat-label">Schools in Convo</span>
-        </div>
-        <div className="module-stat">
-          <span className="module-stat-value">{stats.demosNext7}</span>
-          <span className="module-stat-label">Demos · 7 Days</span>
-        </div>
-        <div className="module-stat">
-          <span className="module-stat-value">{stats.demosNext14}</span>
-          <span className="module-stat-label">Demos · 14 Days</span>
-        </div>
-        <div className="module-stat">
-          <span className="module-stat-value">{stats.decisionsNext7}</span>
-          <span className="module-stat-label">Decisions · 7d</span>
-        </div>
-        <div className="module-stat">
-          <span className="module-stat-value">{stats.decisionsNext14}</span>
-          <span className="module-stat-label">Decisions · 14d</span>
-        </div>
-      </div>
-
-      {/* Conference Tracker */}
+      {/* 2. Conference Tracker */}
       {stats.byConference.length > 0 && (
         <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '20px' }}>
           <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280', marginBottom: '16px' }}>
@@ -609,7 +607,7 @@ function DashboardTab({ stats, onOpenDeal: _onOpenDeal }: { stats: PipelineStats
         </div>
       )}
 
-      {/* US Pipeline Map */}
+      {/* 3. US Pipeline Map */}
       <USPipelineMap schools={mapSchools} selectedState={selectedState} onStateClick={handleStateClick} />
 
       {/* State Deal Slide-out Panel */}
@@ -620,6 +618,34 @@ function DashboardTab({ stats, onOpenDeal: _onOpenDeal }: { stats: PipelineStats
           onClose={() => { setShowStatePanel(false); setSelectedState(null); }}
         />
       )}
+
+      {/* 4. Closed Deals — small box below map */}
+      <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: closedChapters.length > 0 ? '12px' : 0 }}>
+          <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7280', margin: 0 }}>
+            Closed Deals
+          </p>
+          <span style={{
+            fontSize: '0.75rem', fontWeight: 700, padding: '2px 10px',
+            borderRadius: '9999px', background: '#d1fae5', color: '#065f46',
+          }}>{closedCount}</span>
+        </div>
+        {closedChapters.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {closedChapters.map((name, i) => (
+              <span key={i} style={{
+                fontSize: '0.8125rem', fontWeight: 500,
+                color: '#374151', background: '#F9FAFB',
+                border: '1px solid #E5E7EB', borderRadius: '8px',
+                padding: '4px 10px',
+              }}>{name}</span>
+            ))}
+          </div>
+        )}
+        {closedCount === 0 && (
+          <p style={{ fontSize: '0.875rem', color: '#9ca3af', margin: 0 }}>No closed deals yet</p>
+        )}
+      </div>
     </div>
   );
 }
