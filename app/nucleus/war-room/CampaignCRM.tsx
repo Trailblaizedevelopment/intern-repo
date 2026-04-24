@@ -148,7 +148,13 @@ function loadProspects(): CampaignProspect[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(LS_KEY);
-    return raw ? (JSON.parse(raw) as CampaignProspect[]) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Guard against corrupted state (e.g., stored as object instead of array)
+    if (Array.isArray(parsed)) return parsed;
+    // Recover: if it's an object map, extract values
+    if (parsed && typeof parsed === 'object') return Object.values(parsed) as CampaignProspect[];
+    return [];
   } catch { return []; }
 }
 
@@ -1100,6 +1106,9 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'recent' | 'alpha' | 'prospects' | 'deals'>('recent');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [visibleCount, setVisibleCount] = useState(20);
   const seededRef = useRef(false);
 
   // Load prospects from localStorage on mount
@@ -1146,16 +1155,16 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
         const res = await fetch('/p5-prospects-seed.json');
         if (!res.ok) return;
         const seedData = await res.json();
-        const existing = loadProspects();
+        const existing = loadProspects(); // always returns array
+        const existingIds = new Set(existing.map((p: CampaignProspect) => p.id));
         const campaignBySchool: Record<string, string> = {};
         campaigns.forEach((c: Campaign) => {
           const name = (c.name || '').toLowerCase().trim();
           campaignBySchool[name] = c.id;
-          // Also index by school field if different
           const school = ((c as any).school || '').toLowerCase().trim();
           if (school) campaignBySchool[school] = c.id;
         });
-        let added = 0;
+        const newProspects: CampaignProspect[] = [];
         for (const p of seedData) {
           const schoolLower = (p.school || '').toLowerCase().trim();
           let campaignId = campaignBySchool[schoolLower];
@@ -1166,18 +1175,18 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
               }
             }
           }
-          if (campaignId && !existing[p.id]) {
-            p.campaignId = campaignId;
-            existing[p.id] = p;
-            added++;
+          if (campaignId && !existingIds.has(p.id)) {
+            newProspects.push({ ...p, campaignId });
+            existingIds.add(p.id);
           }
         }
-        if (added > 0) {
-          localStorage.setItem(LS_KEY, JSON.stringify(existing));
-          setProspects({ ...existing });
+        if (newProspects.length > 0) {
+          const updated = [...existing, ...newProspects];
+          saveProspects(updated);
+          setProspects(updated);
+          console.log(`[p5-seed] Imported ${newProspects.length} prospects from Power 5 database`);
         }
         localStorage.setItem('p5_prospects_seeded_v1', '1');
-        console.log(`[p5-seed] Imported ${added} prospects from Power 5 database`);
       } catch (err) { console.error('[p5-seed]', err); }
     })();
   }, [campaigns, loading]);
@@ -1229,10 +1238,11 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
     }).catch(err => console.error('[campaign-crm] seed error:', err));
   }, [loading, stats]);
 
-  // Persist prospects to localStorage
+  // Persist prospects to localStorage — always ensure array
   function persistProspects(updated: CampaignProspect[]) {
-    setProspects(updated);
-    saveProspects(updated);
+    const safeUpdated = Array.isArray(updated) ? updated : [];
+    setProspects(safeUpdated);
+    saveProspects(safeUpdated);
   }
 
   // Persist campaign to API
@@ -1273,31 +1283,35 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   }
 
   function handleUpdateProspect(id: string, updates: Partial<CampaignProspect>) {
+    const safeArr = Array.isArray(prospects) ? prospects : [];
     // If this prospect came from API rows (not in localStorage yet), copy it first
-    const existing = prospects.find(p => p.id === id);
+    const existing = safeArr.find(p => p.id === id);
     if (!existing) {
       // Find in the merged campaignProspects (which includes API rows)
       const fromMerged = selectedProspects.find(p => p.id === id);
       if (fromMerged) {
         const newProspect = { ...fromMerged, ...updates };
-        persistProspects([...prospects, newProspect]);
+        persistProspects([...safeArr, newProspect]);
         return;
       }
     }
-    const updated = prospects.map(p => p.id === id ? { ...p, ...updates } : p);
+    const updated = safeArr.map(p => p.id === id ? { ...p, ...updates } : p);
     persistProspects(updated);
   }
 
   function handleDeleteProspect(id: string) {
-    persistProspects(prospects.filter(p => p.id !== id));
+    const safeArr = Array.isArray(prospects) ? prospects : [];
+    persistProspects(safeArr.filter(p => p.id !== id));
   }
 
   function handleAddProspect(prospect: CampaignProspect) {
-    persistProspects([...prospects, prospect]);
+    const safeArr = Array.isArray(prospects) ? prospects : [];
+    persistProspects([...safeArr, prospect]);
   }
 
   function handleImportProspects(newProspects: CampaignProspect[]) {
-    persistProspects([...prospects, ...newProspects]);
+    const safeArr = Array.isArray(prospects) ? prospects : [];
+    persistProspects([...safeArr, ...newProspects]);
   }
 
   async function handleConvertToDeal(prospectId: string) {
@@ -1372,9 +1386,9 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
     }
   }
 
-  // Filtered campaign list
+  // Filtered + sorted campaign list
   const filteredCampaigns = useMemo(() => {
-    let list = campaigns;
+    let list = Array.isArray(campaigns) ? campaigns : [];
     if (typeFilter !== 'all') list = list.filter(c => c.type === typeFilter);
     if (statusFilter !== 'all') list = list.filter(c => c.status === statusFilter);
     if (search.trim()) {
@@ -1382,11 +1396,23 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
       list = list.filter(c => c.name.toLowerCase().includes(q) || c.school.toLowerCase().includes(q));
     }
     return [...list].sort((a, b) => {
+      if (sortBy === 'alpha') return a.name.localeCompare(b.name);
+      if (sortBy === 'prospects') {
+        const aP = prospects.filter(p => p.campaignId === a.id).length + (a.rows?.length ?? 0);
+        const bP = prospects.filter(p => p.campaignId === b.id).length + (b.rows?.length ?? 0);
+        return bP - aP;
+      }
+      if (sortBy === 'deals') {
+        const aD = (a.rows ?? []).filter(r => r.dealId).length;
+        const bD = (b.rows ?? []).filter(r => r.dealId).length;
+        return bD - aD;
+      }
+      // Default: active first, then most recent
       if (a.status === 'active' && b.status !== 'active') return -1;
       if (a.status !== 'active' && b.status === 'active') return 1;
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-  }, [campaigns, typeFilter, statusFilter, search]);
+  }, [campaigns, typeFilter, statusFilter, search, sortBy, prospects]);
 
   const selectedCampaign = useMemo(
     () => campaigns.find(c => c.id === selectedCampaignId) ?? null,
@@ -1452,18 +1478,22 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
     );
   }
 
+  const safeProspects = Array.isArray(prospects) ? prospects : [];
+  const pagedCampaigns = filteredCampaigns.slice(0, visibleCount);
+
   // ── Campaign List View ──
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Filter bar */}
-      <div className="module-actions-bar">
-        <div className="module-search">
+      {/* Search bar — prominent at top */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="module-search" style={{ flex: 1 }}>
           <Search size={18} />
           <input
             type="text"
-            placeholder="Search campaigns…"
+            placeholder="Search campaigns by name or school…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setVisibleCount(20); }}
+            autoFocus={false}
           />
           {search && (
             <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0 }}>
@@ -1471,30 +1501,78 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
             </button>
           )}
         </div>
-        <div className="module-actions">
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-            style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 12px', fontSize: '0.875rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
-            <option value="all">All Types</option>
-            <option value="founder_led">Founder-Led</option>
-            <option value="intern_led">Intern-Led</option>
-            <option value="instagram">Instagram</option>
-            <option value="ambassador">Ambassador</option>
-            <option value="marketing">Marketing</option>
-          </select>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-            style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 12px', fontSize: '0.875rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="paused">Paused</option>
-            <option value="completed">Completed</option>
-          </select>
-          <button onClick={() => setShowCreateDrawer(true)} className="module-primary-btn">
-            <Plus size={15} /> New Campaign
-          </button>
+        <button onClick={() => setShowCreateDrawer(true)} className="module-primary-btn" style={{ flexShrink: 0 }}>
+          <Plus size={15} /> New Campaign
+        </button>
+      </div>
+
+      {/* Filter + sort + view mode bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {/* Status filter pills */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['all', 'active', 'paused', 'completed'] as const).map(s => (
+            <button key={s} onClick={() => { setStatusFilter(s); setVisibleCount(20); }}
+              style={{
+                padding: '5px 12px', fontSize: '0.8rem', borderRadius: 9999, fontWeight: 600,
+                border: '1px solid',
+                borderColor: statusFilter === s ? '#0F172A' : '#E5E7EB',
+                background: statusFilter === s ? '#0F172A' : '#ffffff',
+                color: statusFilter === s ? '#ffffff' : '#6B7280',
+                cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+              }}
+            >
+              {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ width: 1, height: 20, background: '#E5E7EB', flexShrink: 0 }} />
+
+        {/* Type filter */}
+        <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setVisibleCount(20); }}
+          style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '5px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
+          <option value="all">All Types</option>
+          <option value="founder_led">Founder-Led</option>
+          <option value="intern_led">Intern-Led</option>
+          <option value="instagram">Instagram</option>
+          <option value="ambassador">Ambassador</option>
+          <option value="marketing">Marketing</option>
+        </select>
+
+        {/* Sort */}
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '5px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
+          <option value="recent">Most Recent</option>
+          <option value="alpha">A → Z</option>
+          <option value="prospects">Most Prospects</option>
+          <option value="deals">Most Deals</option>
+        </select>
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+            {filteredCampaigns.length} campaign{filteredCampaigns.length !== 1 ? 's' : ''}
+          </span>
+          {/* Card / List toggle */}
+          <div style={{ display: 'flex', background: '#F3F4F6', borderRadius: 8, padding: 2 }}>
+            <button
+              onClick={() => setViewMode('cards')}
+              title="Card view"
+              style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: viewMode === 'cards' ? '#ffffff' : 'transparent', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: viewMode === 'cards' ? '#111827' : '#6B7280', fontFamily: 'inherit', boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.1s' }}
+            >
+              Cards
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              title="List view"
+              style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: viewMode === 'list' ? '#ffffff' : 'transparent', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: viewMode === 'list' ? '#111827' : '#6B7280', fontFamily: 'inherit', boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.1s' }}
+            >
+              List
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Campaign cards */}
+      {/* Campaign content */}
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 20px', color: '#9ca3af', gap: 8 }}>
           <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading campaigns…
@@ -1510,14 +1588,74 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
             <Plus size={15} /> New Campaign
           </button>
         </div>
+      ) : viewMode === 'list' ? (
+        /* ── Compact list view ── */
+        <div className="module-table-container" style={{ borderRadius: 14, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+                {['Campaign', 'Type', 'Status', 'Deals', 'Prospects', 'Last Activity', ''].map(h => (
+                  <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pagedCampaigns.map(campaign => {
+                const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type];
+                const statusBadge = { active: { label: 'Active', color: '#065f46', bg: '#d1fae5' }, paused: { label: 'Paused', color: '#b45309', bg: '#fef3c7' }, completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' } }[campaign.status];
+                const dealCount = (campaign.rows ?? []).filter(r => r.dealId).length;
+                const prospectCount = safeProspects.filter(p => p.campaignId === campaign.id).length + (campaign.rows?.length ?? 0);
+                const updatedDate = new Date(campaign.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return (
+                  <tr key={campaign.id}
+                    style={{ borderBottom: '1px solid #F3F4F6', cursor: 'pointer', background: '#ffffff', transition: 'background 0.1s' }}
+                    onClick={() => setSelectedCampaignId(campaign.id)}
+                    onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#F9FAFB'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#ffffff'; }}
+                  >
+                    <td style={{ padding: '10px 14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: 9999, background: typeBadge.color, flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>{campaign.name}</div>
+                          {campaign.school && campaign.school !== campaign.name && (
+                            <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{campaign.school}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg }}>{CAMPAIGN_TYPE_LABELS[campaign.type]}</span>
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: statusBadge.color, background: statusBadge.bg }}>{statusBadge.label}</span>
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.875rem', fontWeight: 700, color: dealCount > 0 ? '#1d4ed8' : '#9ca3af' }}>{dealCount || '—'}</td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.875rem', color: '#374151' }}>{prospectCount || '—'}</td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>{updatedDate}</td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDeleteCampaign(campaign.id); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4 }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
+        /* ── Card view ── */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {filteredCampaigns.map(campaign => (
+          {pagedCampaigns.map(campaign => (
             <CampaignListCard
               key={campaign.id}
               campaign={campaign}
               prospects={[
-                ...prospects.filter(p => p.campaignId === campaign.id),
+                ...safeProspects.filter(p => p.campaignId === campaign.id),
                 ...((campaign as any)?.rows ?? []).filter((r: any) => r.chapterName).map((r: any) => ({
                   id: r.id, campaignId: campaign.id, orgName: r.chapterName,
                   status: r.meetingBooked ? 'demo_booked' : r.method ? 'contacted' : 'not_contacted',
@@ -1528,6 +1666,16 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
             />
           ))}
         </div>
+      )}
+
+      {/* Load more */}
+      {!loading && filteredCampaigns.length > visibleCount && (
+        <button
+          onClick={() => setVisibleCount(v => v + 20)}
+          style={{ alignSelf: 'center', padding: '8px 20px', fontSize: '0.875rem', fontWeight: 500, color: '#374151', border: '1px solid #E5E7EB', borderRadius: 9999, background: '#ffffff', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          Load more ({filteredCampaigns.length - visibleCount} remaining)
+        </button>
       )}
 
       {showCreateDrawer && (
