@@ -266,7 +266,7 @@ const STATUS_STYLES: Record<string, { color: string; bg: string }> = {
   not_contacted:   { color: '#6b7280', bg: '#f3f4f6' },
   touch1_sent:     { color: '#1d4ed8', bg: '#dbeafe' },
   touch1_confirmed:{ color: '#b45309', bg: '#fef3c7' },
-  touch2_sent:     { color: '#6d28d9', bg: '#ede9fe' },
+  touch2_sent:     { color: '#0F172A', bg: '#F3F4F6' },
   touch3_sent:     { color: '#4338ca', bg: '#e0e7ff' },
   responded:       { color: '#065f46', bg: '#d1fae5' },
   signed_up:       { color: '#064e3b', bg: '#a7f3d0' },
@@ -708,7 +708,7 @@ function AlumniSection({
   const stats = [
     { label: 'Total', value: total, icon: <Users size={14} className="text-slate-500" />, color: 'bg-slate-50' },
     { label: 'T1 Sent', value: sc.touch1_sent ?? 0, icon: <MessageSquare size={14} className="text-blue-500" />, color: 'bg-blue-50' },
-    { label: 'T2 Sent', value: sc.touch2_sent ?? 0, icon: <MessageSquare size={14} className="text-violet-500" />, color: 'bg-violet-50' },
+    { label: 'T2 Sent', value: sc.touch2_sent ?? 0, icon: <MessageSquare size={14} className="text-[#0F172A]" />, color: 'bg-[#F3F4F6]' },
     { label: 'T3 Sent', value: sc.touch3_sent ?? 0, icon: <MessageSquare size={14} className="text-indigo-500" />, color: 'bg-indigo-50' },
     { label: 'Confirmed', value: sc.touch1_confirmed ?? 0, icon: <CheckCircle2 size={14} className="text-amber-500" />, color: 'bg-amber-50' },
     { label: 'Signed Up', value: sc.signed_up ?? 0, icon: <TrendingUp size={14} className="text-emerald-500" />, color: 'bg-emerald-50' },
@@ -921,7 +921,7 @@ function OutreachSection({
           <h3 className="text-base font-semibold text-[#0F172A] mb-3">Today&apos;s Activity</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <StatCard label="T1 Sent" value={stats.t1_sent} icon={<MessageSquare size={14} className="text-blue-500" />} color="bg-blue-50" />
-            <StatCard label="T2 Sent" value={stats.t2_sent} icon={<MessageSquare size={14} className="text-violet-500" />} color="bg-violet-50" />
+            <StatCard label="T2 Sent" value={stats.t2_sent} icon={<MessageSquare size={14} className="text-[#0F172A]" />} color="bg-[#F3F4F6]" />
             <StatCard label="T3 Sent" value={stats.t3_sent} icon={<MessageSquare size={14} className="text-indigo-500" />} color="bg-indigo-50" />
             <StatCard label="Total Sent" value={stats.sent} icon={<TrendingUp size={14} className="text-emerald-500" />} color="bg-emerald-50" />
             <StatCard label="Failed" value={stats.failed} icon={<AlertCircle size={14} className="text-red-500" />} color="bg-red-50" />
@@ -945,7 +945,7 @@ function OutreachSection({
                     { label: 'Has Phone', value: ch.have_phone, color: 'bg-blue-200' },
                     { label: 'iMessage', value: ch.imessage, color: 'bg-blue-300' },
                     { label: 'Contacted', value: ch.contacted, color: 'bg-amber-200' },
-                    { label: 'Responded', value: ch.responded, color: 'bg-violet-200' },
+                    { label: 'Responded', value: ch.responded, color: 'bg-[#E5E7EB]' },
                     { label: 'Signed Up', value: ch.signed_up, color: 'bg-emerald-300' },
                   ].map((row) => (
                     <div key={row.label} className="flex items-center gap-2">
@@ -1183,8 +1183,8 @@ function CronsSection({
     alumni: 'bg-blue-50 text-blue-700',
     success: 'bg-teal-50 text-teal-700',
     gtm: 'bg-amber-50 text-amber-700',
-    main: 'bg-violet-50 text-violet-700',
-    tony: 'bg-violet-50 text-violet-700',
+    main: 'bg-[#F3F4F6] text-[#0F172A]',
+    tony: 'bg-[#F3F4F6] text-[#0F172A]',
     sales: 'bg-emerald-50 text-emerald-700',
   };
 
@@ -1272,7 +1272,7 @@ function CronsSection({
                 return (
                   <div key={job.id} className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3 hover:bg-[#F9FAFB]">
                     <div className="w-24 flex-shrink-0">
-                      <div className={`text-xs font-semibold ${ isToday ? 'text-violet-600' : 'text-[#6B7280]' }`}>{dayLabel}</div>
+                      <div className={`text-xs font-semibold ${ isToday ? 'text-[#0F172A]' : 'text-[#6B7280]' }`}>{dayLabel}</div>
                       <div className="text-sm font-mono text-[#0F172A]">{timeLabel}</div>
                     </div>
                     <div className="w-px h-10 bg-[#E5E7EB] flex-shrink-0" />
@@ -1373,7 +1373,7 @@ function CronsSection({
                         </span>
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className={`text-xs font-medium ${ job.nextRun && new Date(job.nextRun).getTime() - now < 3600000 ? 'text-violet-600' : 'text-[#6B7280]' }`}>
+                        <span className={`text-xs font-medium ${ job.nextRun && new Date(job.nextRun).getTime() - now < 3600000 ? 'text-[#0F172A]' : 'text-[#6B7280]' }`}>
                           {fmtNextRun(job.nextRun)}
                         </span>
                       </td>
