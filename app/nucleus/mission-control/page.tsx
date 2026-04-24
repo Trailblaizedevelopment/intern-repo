@@ -35,7 +35,7 @@ class MissionControlErrorBoundary extends React.Component<
       return (
         <div style={{ padding: '2rem', textAlign: 'center', color: '#991b1b' }}>
           <AlertCircle size={32} style={{ margin: '0 auto 1rem' }} />
-          <h2 style={{ marginBottom: "0.5rem" }}>Mission Control crashed</h2>
+          <h2 style={{ marginBottom: '0.5rem' }}>Mission Control crashed</h2>
           <pre style={{ fontSize: '0.8rem', background: '#fee2e2', padding: '1rem', borderRadius: 8, textAlign: 'left', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
             {this.state.error}
           </pre>
@@ -214,7 +214,6 @@ function humanSchedule(cron: string): string {
     const h12 = hourNum % 12 === 0 ? 12 : hourNum % 12;
     return `Daily at ${h12}:${String(minNum).padStart(2, '0')} ${suffix} CST`;
   }
-  // */N pattern for minutes
   if (min.startsWith('*/') && hour.includes('-')) {
     const interval = min.replace('*/', '');
     const [startH, endH] = hour.split('-').map(Number);
@@ -297,7 +296,7 @@ function StatCard({ label, value, icon, color }: {
   label: string;
   value: number | string;
   icon: React.ReactNode;
-  color: string; // kept for backward compat but unused
+  color: string;
 }) {
   void color;
   return (
@@ -529,16 +528,21 @@ function MissionControlInner() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mt-5 px-6 pb-1">
+        <div style={{ display: 'flex', gap: 4, marginTop: 20, padding: '0 24px 4px' }}>
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all border-b-2 ${
-                activeTab === t.key
-                  ? 'border-[#0F172A] text-[#0F172A]'
-                  : 'border-transparent text-[#6B7280] hover:text-[#0F172A]'
-              }`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px',
+                fontSize: '0.875rem', fontWeight: 500,
+                background: 'none', cursor: 'pointer',
+                borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                borderBottom: activeTab === t.key ? '2px solid #0F172A' : '2px solid transparent',
+                color: activeTab === t.key ? '#0F172A' : '#6B7280',
+                transition: 'color 0.15s, border-color 0.15s',
+              }}
             >
               {t.icon}
               {t.label}
@@ -559,14 +563,19 @@ function MissionControlInner() {
         {activeTab === 'alumni' && (
           <div>
             {/* Sub-tabs */}
-            <div className="flex gap-1 mb-6 bg-[#F3F4F6] rounded-xl p-1 w-fit">
+            <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: '#F3F4F6', borderRadius: 12, padding: 4, width: 'fit-content' }}>
               {(['outreach', 'alumni'] as OutreachSubTab[]).map((sub) => (
                 <button
                   key={sub}
                   onClick={() => setOutreachSub(sub)}
-                  className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
-                    outreachSub === sub ? 'bg-white text-[#0F172A]' : 'text-[#6B7280] hover:text-[#0F172A]'
-                  }`}
+                  style={{
+                    padding: '8px 20px', borderRadius: 8,
+                    fontSize: '0.875rem', fontWeight: 500,
+                    border: 'none', cursor: 'pointer',
+                    background: outreachSub === sub ? 'white' : 'transparent',
+                    color: outreachSub === sub ? '#0F172A' : '#6B7280',
+                    transition: 'all 0.15s',
+                  }}
                 >
                   {sub === 'outreach' ? 'Outreach Dashboard' : 'Alumni Contacts'}
                 </button>
@@ -637,37 +646,48 @@ function MissionControlInner() {
 
       {/* Soul Drawer */}
       {soulAgent && (
-        <div className="fixed inset-0 z-50 flex" onClick={() => setSoulAgent(null)}>
-          <div className="flex-1" />
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}
+          onClick={() => setSoulAgent(null)}
+        >
+          <div style={{ flex: 1 }} />
           <div
-            className="w-full max-w-lg h-full bg-white border-l border-[#E5E7EB] overflow-y-auto"
+            style={{
+              width: '100%', maxWidth: 512, height: '100%',
+              background: 'white', borderLeft: '1px solid #E5E7EB',
+              overflowY: 'auto',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E7EB]">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{soulAgent.emoji}</span>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '16px 20px', borderBottom: '1px solid #E5E7EB',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: '1.5rem' }}>{soulAgent.emoji}</span>
                 <div>
-                  <div className="font-semibold text-[#0F172A]">
-                    {soulAgent.name}
-                  </div>
-                  <div className="text-xs text-[#6B7280]">SOUL.md</div>
+                  <div style={{ fontWeight: 600, color: '#0F172A' }}>{soulAgent.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>SOUL.md</div>
                 </div>
               </div>
-              <button onClick={() => setSoulAgent(null)} className="text-[#6B7280] hover:text-[#0F172A]">
+              <button
+                onClick={() => setSoulAgent(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', padding: 4 }}
+              >
                 <X size={18} />
               </button>
             </div>
-            <div className="p-5">
+            <div style={{ padding: 20 }}>
               {soulLoading ? (
-                <div className="flex items-center gap-2 text-[#6B7280]">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#6B7280' }}>
                   <Loader2 size={16} className="animate-spin" /> Loading soul…
                 </div>
               ) : soulContent ? (
-                <div className="prose prose-sm max-w-none text-[#0F172A]">
+                <div className="prose prose-sm max-w-none" style={{ color: '#0F172A' }}>
                   <ReactMarkdown>{soulContent}</ReactMarkdown>
                 </div>
               ) : (
-                <div className="text-[#6B7280] text-sm italic">No SOUL.md found for this agent.</div>
+                <div style={{ color: '#6B7280', fontSize: '0.875rem', fontStyle: 'italic' }}>No SOUL.md found for this agent.</div>
               )}
             </div>
           </div>
@@ -706,13 +726,13 @@ function AlumniSection({
   const total = Object.values(sc).reduce((a, b) => a + b, 0);
 
   const stats = [
-    { label: 'Total', value: total, icon: <Users size={14} className="text-slate-500" />, color: 'bg-slate-50' },
-    { label: 'T1 Sent', value: sc.touch1_sent ?? 0, icon: <MessageSquare size={14} className="text-blue-500" />, color: 'bg-blue-50' },
-    { label: 'T2 Sent', value: sc.touch2_sent ?? 0, icon: <MessageSquare size={14} className="text-[#0F172A]" />, color: 'bg-[#F3F4F6]' },
-    { label: 'T3 Sent', value: sc.touch3_sent ?? 0, icon: <MessageSquare size={14} className="text-indigo-500" />, color: 'bg-indigo-50' },
-    { label: 'Confirmed', value: sc.touch1_confirmed ?? 0, icon: <CheckCircle2 size={14} className="text-amber-500" />, color: 'bg-amber-50' },
-    { label: 'Signed Up', value: sc.signed_up ?? 0, icon: <TrendingUp size={14} className="text-emerald-500" />, color: 'bg-emerald-50' },
-    { label: 'Declined', value: sc.declined ?? 0, icon: <X size={14} className="text-red-500" />, color: 'bg-red-50' },
+    { label: 'Total',     value: total,                   icon: <Users size={14} style={{ color: '#6B7280' }} />,    color: '' },
+    { label: 'T1 Sent',   value: sc.touch1_sent ?? 0,     icon: <MessageSquare size={14} style={{ color: '#1D4ED8' }} />, color: '' },
+    { label: 'T2 Sent',   value: sc.touch2_sent ?? 0,     icon: <MessageSquare size={14} style={{ color: '#0F172A' }} />, color: '' },
+    { label: 'T3 Sent',   value: sc.touch3_sent ?? 0,     icon: <MessageSquare size={14} style={{ color: '#4338CA' }} />, color: '' },
+    { label: 'Confirmed', value: sc.touch1_confirmed ?? 0, icon: <CheckCircle2 size={14} style={{ color: '#B45309' }} />, color: '' },
+    { label: 'Signed Up', value: sc.signed_up ?? 0,       icon: <TrendingUp size={14} style={{ color: '#10B981' }} />,   color: '' },
+    { label: 'Declined',  value: sc.declined ?? 0,        icon: <X size={14} style={{ color: '#EF4444' }} />,           color: '' },
   ];
 
   const totalPages = Math.ceil((data?.count ?? 0) / (data?.limit ?? 50));
@@ -856,8 +876,8 @@ function OutreachSection({
 }) {
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center py-20 text-[#6B7280]">
-        <Loader2 size={20} className="animate-spin mr-2" /> Loading outreach data…
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0', color: '#6B7280' }}>
+        <Loader2 size={20} className="animate-spin" style={{ marginRight: 8 }} /> Loading outreach data…
       </div>
     );
   }
@@ -871,10 +891,15 @@ function OutreachSection({
   return (
     <div className="space-y-6">
       {/* Refresh */}
-      <div className="flex justify-end">
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button
           onClick={onRefresh}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E7EB] text-sm text-[#6B7280] hover:bg-white transition-colors"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', borderRadius: 8,
+            border: '1px solid #E5E7EB', background: 'white',
+            fontSize: '0.875rem', color: '#6B7280', cursor: 'pointer',
+          }}
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           Refresh
@@ -883,32 +908,35 @@ function OutreachSection({
 
       {/* Line Health */}
       <div>
-        <h3 className="text-base font-semibold text-[#0F172A] mb-3">Line Health</h3>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', marginBottom: 12 }}>Line Health</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {lines.map((line) => {
             const sentToday = line.sent_today ?? 0;
             const pct = Math.min(100, Math.round((sentToday / (line.daily_limit || 1)) * 100));
             const isActive = line.linq_status === 'active' || (!line.is_paused && line.linq_status !== 'inactive');
+            const statusBg = line.is_paused ? '#FEF2F2' : isActive ? '#ECFDF5' : '#FFFBEB';
+            const statusColor = line.is_paused ? '#DC2626' : isActive ? '#059669' : '#B45309';
+            const statusLabel = line.is_paused ? 'Paused' : isActive ? 'Active' : 'Idle';
             return (
-              <div key={line.line_number} className="bg-white border border-[#E5E7EB] rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-semibold text-[#0F172A]">{line.label}</div>
-                  <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
-                    line.is_paused ? 'bg-red-50 text-red-600' :
-                    isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                  }`}>
+              <div key={line.line_number} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600, color: '#0F172A' }}>{line.label}</div>
+                  <span style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: '0.75rem', padding: '2px 8px', borderRadius: 9999,
+                    background: statusBg, color: statusColor,
+                  }}>
                     <Circle size={6} fill="currentColor" />
-                    {line.is_paused ? 'Paused' : isActive ? 'Active' : 'Idle'}
+                    {statusLabel}
                   </span>
                 </div>
-                <div className="text-xs text-[#6B7280] mb-2">{sentToday} / {line.daily_limit} today</div>
-                <div className="h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
+                <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: 8 }}>{sentToday} / {line.daily_limit} today</div>
+                <div style={{ height: 6, background: '#F3F4F6', borderRadius: 9999, overflow: 'hidden' }}>
                   <div
-                    className="h-full rounded-full bg-emerald-400 transition-all"
-                    style={{ width: `${pct}%` }}
+                    style={{ height: '100%', borderRadius: 9999, background: '#10B981', width: `${pct}%`, transition: 'width 0.3s' }}
                   />
                 </div>
-                <div className="text-xs text-[#9CA3AF] mt-1">{pct}% daily cap</div>
+                <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 4 }}>{pct}% daily cap</div>
               </div>
             );
           })}
@@ -918,15 +946,15 @@ function OutreachSection({
       {/* Today's Activity */}
       {stats && (
         <div>
-          <h3 className="text-base font-semibold text-[#0F172A] mb-3">Today&apos;s Activity</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', marginBottom: 12 }}>Today&apos;s Activity</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-            <StatCard label="T1 Sent" value={stats.t1_sent} icon={<MessageSquare size={14} className="text-blue-500" />} color="bg-blue-50" />
-            <StatCard label="T2 Sent" value={stats.t2_sent} icon={<MessageSquare size={14} className="text-[#0F172A]" />} color="bg-[#F3F4F6]" />
-            <StatCard label="T3 Sent" value={stats.t3_sent} icon={<MessageSquare size={14} className="text-indigo-500" />} color="bg-indigo-50" />
-            <StatCard label="Total Sent" value={stats.sent} icon={<TrendingUp size={14} className="text-emerald-500" />} color="bg-emerald-50" />
-            <StatCard label="Failed" value={stats.failed} icon={<AlertCircle size={14} className="text-red-500" />} color="bg-red-50" />
-            <StatCard label="All-Time Responses" value={stats.total_responded} icon={<MessageSquare size={14} className="text-teal-500" />} color="bg-teal-50" />
-            <StatCard label="All-Time Signed Up" value={stats.total_signed_up} icon={<CheckCircle2 size={14} className="text-emerald-500" />} color="bg-emerald-50" />
+            <StatCard label="T1 Sent"           value={stats.t1_sent}          icon={<MessageSquare size={14} style={{ color: '#1D4ED8' }} />} color="" />
+            <StatCard label="T2 Sent"           value={stats.t2_sent}          icon={<MessageSquare size={14} style={{ color: '#0F172A' }} />} color="" />
+            <StatCard label="T3 Sent"           value={stats.t3_sent}          icon={<MessageSquare size={14} style={{ color: '#4338CA' }} />} color="" />
+            <StatCard label="Total Sent"        value={stats.sent}             icon={<TrendingUp size={14} style={{ color: '#10B981' }} />}    color="" />
+            <StatCard label="Failed"            value={stats.failed}           icon={<AlertCircle size={14} style={{ color: '#EF4444' }} />}   color="" />
+            <StatCard label="All-Time Responses" value={stats.total_responded} icon={<MessageSquare size={14} style={{ color: '#0F766E' }} />} color="" />
+            <StatCard label="All-Time Signed Up" value={stats.total_signed_up} icon={<CheckCircle2 size={14} style={{ color: '#10B981' }} />} color="" />
           </div>
         </div>
       )}
@@ -934,29 +962,31 @@ function OutreachSection({
       {/* Chapter Funnels */}
       {chapters.length > 0 && (
         <div>
-          <h3 className="text-base font-semibold text-[#0F172A] mb-3">Chapter Funnels</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', marginBottom: 12 }}>Chapter Funnels</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {chapters.map((ch) => (
-              <div key={ch.chapter_id} className="bg-white border border-[#E5E7EB] rounded-xl p-4">
-                <div className="font-semibold text-[#0F172A] mb-3 text-sm">{ch.chapter_name}</div>
-                <div className="space-y-1.5 text-xs">
+              <div key={ch.chapter_id} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+                <div style={{ fontWeight: 600, color: '#0F172A', marginBottom: 12, fontSize: '0.875rem' }}>{ch.chapter_name}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {[
-                    { label: 'Total', value: ch.total, color: 'bg-slate-200' },
-                    { label: 'Has Phone', value: ch.have_phone, color: 'bg-blue-200' },
-                    { label: 'iMessage', value: ch.imessage, color: 'bg-blue-300' },
-                    { label: 'Contacted', value: ch.contacted, color: 'bg-amber-200' },
-                    { label: 'Responded', value: ch.responded, color: 'bg-[#E5E7EB]' },
-                    { label: 'Signed Up', value: ch.signed_up, color: 'bg-emerald-300' },
+                    { label: 'Total',     value: ch.total,      barColor: '#CBD5E1' },
+                    { label: 'Has Phone', value: ch.have_phone, barColor: '#93C5FD' },
+                    { label: 'iMessage',  value: ch.imessage,   barColor: '#60A5FA' },
+                    { label: 'Contacted', value: ch.contacted,  barColor: '#FCD34D' },
+                    { label: 'Responded', value: ch.responded,  barColor: '#E5E7EB' },
+                    { label: 'Signed Up', value: ch.signed_up,  barColor: '#6EE7B7' },
                   ].map((row) => (
-                    <div key={row.label} className="flex items-center gap-2">
-                      <div className="w-20 text-[#6B7280] flex-shrink-0">{row.label}</div>
-                      <div className="flex-1 h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
+                    <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem' }}>
+                      <div style={{ width: 80, color: '#6B7280', flexShrink: 0 }}>{row.label}</div>
+                      <div style={{ flex: 1, height: 8, background: '#F3F4F6', borderRadius: 9999, overflow: 'hidden' }}>
                         <div
-                          className={`h-full rounded-full ${row.color}`}
-                          style={{ width: ch.total > 0 ? `${Math.min(100, (row.value / ch.total) * 100)}%` : '0%' }}
+                          style={{
+                            height: '100%', borderRadius: 9999, background: row.barColor,
+                            width: ch.total > 0 ? `${Math.min(100, (row.value / ch.total) * 100)}%` : '0%',
+                          }}
                         />
                       </div>
-                      <div className="w-8 text-right text-[#6B7280] font-medium">{row.value}</div>
+                      <div style={{ width: 32, textAlign: 'right', color: '#6B7280', fontWeight: 500 }}>{row.value}</div>
                     </div>
                   ))}
                 </div>
@@ -969,34 +999,35 @@ function OutreachSection({
       {/* Batch History */}
       {batches.length > 0 && (
         <div>
-          <h3 className="text-base font-semibold text-[#0F172A] mb-3">Batch History</h3>
-          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', marginBottom: 12 }}>Batch History</h3>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Date</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden md:table-cell">Chapter</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Contacts</th>
+                  <tr style={{ borderBottom: '1px solid #E5E7EB', background: '#F9FAFB' }}>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="hidden md:table-cell">Chapter</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contacts</th>
                   </tr>
                 </thead>
                 <tbody>
                   {batches.slice(0, 20).map((batch, i) => {
                     const b = batch as Record<string, unknown>;
+                    const batchStatus = String(b.status ?? '');
+                    const statusStyle: React.CSSProperties =
+                      batchStatus === 'completed'        ? { background: '#ECFDF5', color: '#059669' } :
+                      batchStatus === 'pending_approval' ? { background: '#FFFBEB', color: '#B45309' } :
+                      batchStatus === 'rejected'         ? { background: '#FEF2F2', color: '#DC2626' } :
+                                                           { background: '#F9FAFB', color: '#374151' };
                     return (
-                      <tr key={String(b.id ?? i)} className="border-b border-[#F3F4F6] hover:bg-[#F9FAFB]">
-                        <td className="px-4 py-3 text-[#0F172A] font-mono text-xs">{String(b.scheduled_date ?? '—')}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-xs ${
-                            b.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
-                            b.status === 'pending_approval' ? 'bg-amber-50 text-amber-700' :
-                            b.status === 'rejected' ? 'bg-red-50 text-red-700' :
-                            'bg-slate-50 text-slate-700'
-                          }`}>{String(b.status ?? '—')}</span>
+                      <tr key={String(b.id ?? i)} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                        <td style={{ padding: '12px 16px', color: '#0F172A', fontFamily: 'monospace', fontSize: '0.75rem' }}>{String(b.scheduled_date ?? '—')}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: 9999, fontSize: '0.75rem', ...statusStyle }}>{batchStatus || '—'}</span>
                         </td>
-                        <td className="px-4 py-3 text-[#6B7280] hidden md:table-cell">{String(b.chapter_name ?? b.chapter_id ?? 'Multi')}</td>
-                        <td className="px-4 py-3 text-[#0F172A] tabular-nums">{String(b.total_contacts ?? '—')}</td>
+                        <td style={{ padding: '12px 16px', color: '#6B7280' }} className="hidden md:table-cell">{String(b.chapter_name ?? b.chapter_id ?? 'Multi')}</td>
+                        <td style={{ padding: '12px 16px', color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>{String(b.total_contacts ?? '—')}</td>
                       </tr>
                     );
                   })}
@@ -1010,11 +1041,11 @@ function OutreachSection({
       {/* Response Inbox Summary */}
       {inbox && (
         <div>
-          <h3 className="text-base font-semibold text-[#0F172A] mb-3">Response Inbox</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', marginBottom: 12 }}>Response Inbox</h3>
           <div className="grid grid-cols-3 gap-4">
-            <StatCard label="Total Responses" value={inbox.total} icon={<MessageSquare size={14} className="text-blue-500" />} color="bg-blue-50" />
-            <StatCard label="Needs T2" value={inbox.needs_t2} icon={<ArrowUpRight size={14} className="text-amber-500" />} color="bg-amber-50" />
-            <StatCard label="Flagged" value={inbox.flagged} icon={<AlertCircle size={14} className="text-red-500" />} color="bg-red-50" />
+            <StatCard label="Total Responses" value={inbox.total}    icon={<MessageSquare size={14} style={{ color: '#1D4ED8' }} />} color="" />
+            <StatCard label="Needs T2"        value={inbox.needs_t2} icon={<ArrowUpRight size={14} style={{ color: '#B45309' }} />}   color="" />
+            <StatCard label="Flagged"         value={inbox.flagged}  icon={<AlertCircle size={14} style={{ color: '#EF4444' }} />}   color="" />
           </div>
         </div>
       )}
@@ -1039,47 +1070,63 @@ function AgentsSection({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 bg-[#F3F4F6] rounded-xl p-1">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 12, padding: 4 }}>
           <button
             onClick={() => onViewMode('hierarchy')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'hierarchy' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
-            }`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8,
+              fontSize: '0.875rem', fontWeight: 500,
+              border: 'none', cursor: 'pointer',
+              background: viewMode === 'hierarchy' ? 'white' : 'transparent',
+              color: viewMode === 'hierarchy' ? '#0F172A' : '#6B7280',
+              transition: 'all 0.15s',
+            }}
           >
             <Network size={14} /> Hierarchy
           </button>
           <button
             onClick={() => onViewMode('grid')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'grid' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
-            }`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8,
+              fontSize: '0.875rem', fontWeight: 500,
+              border: 'none', cursor: 'pointer',
+              background: viewMode === 'grid' ? 'white' : 'transparent',
+              color: viewMode === 'grid' ? '#0F172A' : '#6B7280',
+              transition: 'all 0.15s',
+            }}
           >
             <LayoutGrid size={14} /> Grid
           </button>
         </div>
-        <button onClick={onRefresh} className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-white">
+        <button
+          onClick={onRefresh}
+          style={{
+            padding: 8, borderRadius: 8,
+            border: '1px solid #E5E7EB', background: 'white',
+            color: '#6B7280', cursor: 'pointer',
+          }}
+        >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-[#6B7280]">
-          <Loader2 size={20} className="animate-spin mr-2" /> Loading agents…
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0', color: '#6B7280' }}>
+          <Loader2 size={20} className="animate-spin" style={{ marginRight: 8 }} /> Loading agents…
         </div>
       ) : viewMode === 'hierarchy' ? (
         <div>
-          {/* Main agent */}
           {mainAgent && (
-            <div className="mb-4">
+            <div style={{ marginBottom: 16 }}>
               <AgentCard agent={mainAgent} onViewSoul={onViewSoul} isMain />
-              {/* Connector */}
-              <div className="flex justify-center">
-                <div className="w-px h-6 bg-[#E5E7EB]" />
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div style={{ width: 1, height: 24, background: '#E5E7EB' }} />
               </div>
             </div>
           )}
-          {/* Sub agents */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {subAgents.map((agent) => (
               <AgentCard key={agent.id} agent={agent} onViewSoul={onViewSoul} />
@@ -1104,14 +1151,9 @@ function AgentCard({ agent, onViewSoul, isMain }: {
 }) {
   const colors = AGENT_COLOR_MAP[agent.color] ?? AGENT_COLOR_MAP.slate;
   return (
-    <div style={{
-      background: 'white',
-      border: '1px solid #E5E7EB',
-      borderRadius: 12,
-      padding: '1rem',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 40, height: 40, borderRadius: 10,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1124,7 +1166,7 @@ function AgentCard({ agent, onViewSoul, isMain }: {
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <span style={{
                 width: 6, height: 6, borderRadius: '50%',
-                background: agent.status === 'active' ? '#34d399' : '#cbd5e1',
+                background: agent.status === 'active' ? '#34d399' : '#CBD5E1',
                 display: 'inline-block',
               }} />
               <span style={{ fontSize: '0.72rem', color: agent.status === 'active' ? '#059669' : '#6B7280' }}>
@@ -1142,8 +1184,10 @@ function AgentCard({ agent, onViewSoul, isMain }: {
           </span>
         )}
       </div>
-      <p style={{ fontSize: '0.75rem', color: '#6B7280', lineHeight: 1.6, marginBottom: '0.75rem',
-        overflow: 'hidden', display: '-webkit-box', WebkitBoxOrient: 'vertical' as const, WebkitLineClamp: 2 } as React.CSSProperties}>
+      <p style={{
+        fontSize: '0.75rem', color: '#6B7280', lineHeight: 1.6, marginBottom: 12,
+        overflow: 'hidden', display: '-webkit-box', WebkitBoxOrient: 'vertical' as const, WebkitLineClamp: 2,
+      } as React.CSSProperties}>
         {agent.description}
       </p>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1166,6 +1210,34 @@ function AgentCard({ agent, onViewSoul, isMain }: {
 
 type CronsView = 'list' | 'schedule';
 
+// Agent badge styles (inline)
+const AGENT_BADGE_STYLES: Record<string, React.CSSProperties> = {
+  dev:     { background: '#EEF2FF', color: '#4338CA' },
+  alumni:  { background: '#EFF6FF', color: '#1D4ED8' },
+  success: { background: '#F0FDFA', color: '#0F766E' },
+  gtm:     { background: '#FFFBEB', color: '#B45309' },
+  main:    { background: '#F3F4F6', color: '#0F172A' },
+  tony:    { background: '#F3F4F6', color: '#0F172A' },
+  sales:   { background: '#ECFDF5', color: '#065F46' },
+};
+
+const DEFAULT_AGENT_STYLE: React.CSSProperties = { background: '#F9FAFB', color: '#374151' };
+
+// Kind badge styles (inline)
+const KIND_BADGE_STYLES: Record<string, React.CSSProperties> = {
+  cron:  { background: '#F9FAFB', color: '#4B5563' },
+  every: { background: '#EFF6FF', color: '#2563EB' },
+  at:    { background: '#FFFBEB', color: '#B45309' },
+};
+
+function statusBadgeStyle(s: string | null | undefined): React.CSSProperties {
+  if (s === 'success') return { background: '#ECFDF5', color: '#059669' };
+  if (s === 'error')   return { background: '#FEF2F2', color: '#DC2626' };
+  if (s === 'running') return { background: '#EFF6FF', color: '#2563EB' };
+  if (s === 'idle')    return { background: '#F9FAFB', color: '#6B7280' };
+  return { background: '#F9FAFB', color: '#374151' };
+}
+
 function CronsSection({
   jobs, loading, triggering, onTrigger, onRefresh,
 }: {
@@ -1178,26 +1250,9 @@ function CronsSection({
   const [view, setView] = React.useState<CronsView>('list');
   const [filterAgent, setFilterAgent] = React.useState('');
 
-  const AGENT_BADGE: Record<string, string> = {
-    dev: 'bg-indigo-50 text-indigo-700',
-    alumni: 'bg-blue-50 text-blue-700',
-    success: 'bg-teal-50 text-teal-700',
-    gtm: 'bg-amber-50 text-amber-700',
-    main: 'bg-[#F3F4F6] text-[#0F172A]',
-    tony: 'bg-[#F3F4F6] text-[#0F172A]',
-    sales: 'bg-emerald-50 text-emerald-700',
-  };
-
-  const KIND_BADGE: Record<string, string> = {
-    cron: 'bg-slate-50 text-slate-600',
-    every: 'bg-blue-50 text-blue-600',
-    at: 'bg-amber-50 text-amber-700',
-  };
-
   const agents = [...new Set(jobs.map((j) => j.agent).filter(Boolean))] as string[];
   const filtered = filterAgent ? jobs.filter((j) => j.agent === filterAgent) : jobs;
 
-  // Daily schedule: jobs sorted by nextRun, filter to those with a nextRun in the next 7 days
   const now = Date.now();
   const weekMs = 7 * 24 * 60 * 60 * 1000;
   const upcoming = [...jobs]
@@ -1211,56 +1266,75 @@ function CronsSection({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-[#6B7280]">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>
             {jobs.length} jobs
-            {enabledCount > 0 && <span className="ml-1 text-emerald-600">· {enabledCount} enabled</span>}
-            {disabledCount > 0 && <span className="ml-1 text-slate-500">· {disabledCount} disabled</span>}
-            {errorCount > 0 && <span className="ml-1 text-red-500">· {errorCount} errors</span>}
-            <span className="ml-1">· auto-refreshes 30s</span>
+            {enabledCount > 0 && <span style={{ marginLeft: 4, color: '#059669' }}>· {enabledCount} enabled</span>}
+            {disabledCount > 0 && <span style={{ marginLeft: 4, color: '#6B7280' }}>· {disabledCount} disabled</span>}
+            {errorCount > 0 && <span style={{ marginLeft: 4, color: '#EF4444' }}>· {errorCount} errors</span>}
+            <span style={{ marginLeft: 4 }}>· auto-refreshes 30s</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* View toggle */}
-          <div className="flex gap-0.5 bg-[#F3F4F6] rounded-lg p-0.5">
+          <div style={{ display: 'flex', gap: 2, background: '#F3F4F6', borderRadius: 8, padding: 2 }}>
             <button
               onClick={() => setView('list')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                view === 'list' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
-              }`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '6px 12px', borderRadius: 6,
+                fontSize: '0.75rem', fontWeight: 500,
+                border: 'none', cursor: 'pointer',
+                background: view === 'list' ? 'white' : 'transparent',
+                color: view === 'list' ? '#0F172A' : '#6B7280',
+                transition: 'all 0.15s',
+              }}
             >
               <Activity size={12} /> All Jobs
             </button>
             <button
               onClick={() => setView('schedule')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                view === 'schedule' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
-              }`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '6px 12px', borderRadius: 6,
+                fontSize: '0.75rem', fontWeight: 500,
+                border: 'none', cursor: 'pointer',
+                background: view === 'schedule' ? 'white' : 'transparent',
+                color: view === 'schedule' ? '#0F172A' : '#6B7280',
+                transition: 'all 0.15s',
+              }}
             >
               <Calendar size={12} /> Daily Schedule
             </button>
           </div>
-          <button onClick={onRefresh} className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-white">
+          <button
+            onClick={onRefresh}
+            style={{
+              padding: 8, borderRadius: 8,
+              border: '1px solid #E5E7EB', background: 'white',
+              color: '#6B7280', cursor: 'pointer',
+            }}
+          >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
 
       {loading && jobs.length === 0 ? (
-        <div className="flex items-center justify-center py-20 text-[#6B7280]">
-          <Loader2 size={20} className="animate-spin mr-2" /> Loading crons…
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0', color: '#6B7280' }}>
+          <Loader2 size={20} className="animate-spin" style={{ marginRight: 8 }} /> Loading crons…
         </div>
       ) : jobs.length === 0 ? (
-        <div className="text-center py-20 text-[#6B7280] text-sm">No cron jobs found</div>
+        <div style={{ textAlign: 'center', padding: '80px 0', color: '#6B7280', fontSize: '0.875rem' }}>No cron jobs found</div>
       ) : view === 'schedule' ? (
         /* Daily Schedule View */
         <div className="space-y-3">
-          <h3 className="text-base font-semibold text-[#0F172A]">
-            Coming Up — Next 7 Days
-          </h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A' }}>Coming Up — Next 7 Days</h3>
           {upcoming.length === 0 ? (
-            <div className="text-[#6B7280] text-sm italic py-8 text-center">No upcoming runs in the next 7 days</div>
+            <div style={{ color: '#6B7280', fontSize: '0.875rem', fontStyle: 'italic', padding: '32px 0', textAlign: 'center' }}>
+              No upcoming runs in the next 7 days
+            </div>
           ) : (
             <div className="space-y-2">
               {upcoming.map((job) => {
@@ -1270,31 +1344,34 @@ function CronsSection({
                 const dayLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                 const timeLabel = nextDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' });
                 return (
-                  <div key={job.id} className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3 hover:bg-[#F9FAFB]">
-                    <div className="w-24 flex-shrink-0">
-                      <div className={`text-xs font-semibold ${ isToday ? 'text-[#0F172A]' : 'text-[#6B7280]' }`}>{dayLabel}</div>
-                      <div className="text-sm font-mono text-[#0F172A]">{timeLabel}</div>
+                  <div key={job.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    background: 'white', border: '1px solid #E5E7EB', borderRadius: 12,
+                    padding: '12px 16px',
+                  }}>
+                    <div style={{ width: 96, flexShrink: 0 }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: isToday ? '#0F172A' : '#6B7280' }}>{dayLabel}</div>
+                      <div style={{ fontSize: '0.875rem', fontFamily: 'monospace', color: '#0F172A' }}>{timeLabel}</div>
                     </div>
-                    <div className="w-px h-10 bg-[#E5E7EB] flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-[#0F172A] text-sm">{job.name}</div>
+                    <div style={{ width: 1, height: 40, background: '#E5E7EB', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, color: '#0F172A', fontSize: '0.875rem' }}>{job.name}</div>
                       {job.description && (
-                        <div className="text-xs text-[#6B7280] mt-0.5 truncate">{job.description}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.description}</div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                       {job.agent && (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium hidden sm:inline ${
-                          AGENT_BADGE[job.agent.toLowerCase()] ?? 'bg-slate-50 text-slate-700'
-                        }`}>{job.agent}</span>
+                        <span style={{
+                          padding: '2px 8px', borderRadius: 9999,
+                          fontSize: '0.75rem', fontWeight: 500,
+                          ...(AGENT_BADGE_STYLES[job.agent.toLowerCase()] ?? DEFAULT_AGENT_STYLE),
+                        }} className="hidden sm:inline">{job.agent}</span>
                       )}
                       {job.lastStatus && (
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${
-                          job.lastStatus === 'success' ? 'bg-emerald-50 text-emerald-700' :
-                          job.lastStatus === 'error' ? 'bg-red-50 text-red-700' :
-                          job.lastStatus === 'running' ? 'bg-blue-50 text-blue-700' :
-                          'bg-slate-50 text-slate-700'
-                        }`}>{job.lastStatus}</span>
+                        <span style={{ padding: '2px 8px', borderRadius: 9999, fontSize: '0.75rem', ...statusBadgeStyle(job.lastStatus) }}>
+                          {job.lastStatus}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -1307,7 +1384,7 @@ function CronsSection({
         /* All Jobs List View */
         <div>
           {agents.length > 1 && (
-            <div className="mb-3">
+            <div style={{ marginBottom: 12 }}>
               <select
                 className="applications-filter-select"
                 value={filterAgent}
@@ -1320,87 +1397,93 @@ function CronsSection({
               </select>
             </div>
           )}
-          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden sm:table-cell">Agent</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden md:table-cell">Schedule</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden lg:table-cell">Next Run</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide hidden lg:table-cell">Last Run</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Status</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Actions</th>
+                  <tr style={{ borderBottom: '1px solid #E5E7EB', background: '#F9FAFB' }}>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="hidden sm:table-cell">Agent</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="hidden md:table-cell">Schedule</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="hidden lg:table-cell">Next Run</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="hidden lg:table-cell">Last Run</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((job) => (
-                    <tr key={job.id} className={`border-b border-[#F3F4F6] hover:bg-[#F9FAFB] ${ job.enabled === false ? 'opacity-60' : '' }`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium text-[#0F172A] text-sm">{job.name}</div>
+                    <tr key={job.id} style={{ borderBottom: '1px solid #F3F4F6', opacity: job.enabled === false ? 0.6 : 1 }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ fontWeight: 500, color: '#0F172A', fontSize: '0.875rem' }}>{job.name}</div>
                           {job.enabled === false && (
-                            <span className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-500 font-medium">disabled</span>
+                            <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: '0.75rem', background: '#F3F4F6', color: '#6B7280', fontWeight: 500 }}>disabled</span>
                           )}
                           {job.scheduleKind && job.scheduleKind !== 'cron' && (
-                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${ KIND_BADGE[job.scheduleKind] ?? 'bg-slate-50 text-slate-600' }`}>
+                            <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: '0.75rem', fontWeight: 500, ...(KIND_BADGE_STYLES[job.scheduleKind] ?? KIND_BADGE_STYLES.cron) }}>
                               {job.scheduleKind === 'at' ? 'one-time' : job.scheduleKind}
                             </span>
                           )}
                         </div>
                         {job.description && (
-                          <div className="text-xs text-[#6B7280] mt-0.5 hidden sm:block line-clamp-1">{job.description}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="hidden sm:block">{job.description}</div>
                         )}
                         {job.lastError && job.lastStatus === 'error' && (
-                          <div className="text-xs text-red-500 mt-0.5 hidden sm:block truncate max-w-xs" title={job.lastError}>
+                          <div style={{ fontSize: '0.75rem', color: '#EF4444', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 320 }} className="hidden sm:block" title={job.lastError}>
                             ↳ {job.lastError.slice(0, 80)}{job.lastError.length > 80 ? '…' : ''}
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
+                      <td style={{ padding: '12px 16px' }} className="hidden sm:table-cell">
                         {job.agent && (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            AGENT_BADGE[job.agent.toLowerCase()] ?? 'bg-slate-50 text-slate-700'
-                          }`}>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 9999,
+                            fontSize: '0.75rem', fontWeight: 500,
+                            ...(AGENT_BADGE_STYLES[job.agent.toLowerCase()] ?? DEFAULT_AGENT_STYLE),
+                          }}>
                             {job.agent}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <span className="text-xs text-[#6B7280]">
+                      <td style={{ padding: '12px 16px' }} className="hidden md:table-cell">
+                        <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>
                           {humanScheduleFromJob(job)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className={`text-xs font-medium ${ job.nextRun && new Date(job.nextRun).getTime() - now < 3600000 ? 'text-[#0F172A]' : 'text-[#6B7280]' }`}>
+                      <td style={{ padding: '12px 16px' }} className="hidden lg:table-cell">
+                        <span style={{
+                          fontSize: '0.75rem', fontWeight: 500,
+                          color: job.nextRun && new Date(job.nextRun).getTime() - now < 3600000 ? '#0F172A' : '#6B7280',
+                        }}>
                           {fmtNextRun(job.nextRun)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-[#6B7280]">
+                      <td style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#6B7280' }} className="hidden lg:table-cell">
                         {job.lastRun ? fmtTime(job.lastRun) : '—'}
                       </td>
-                      <td className="px-4 py-3">
+                      <td style={{ padding: '12px 16px' }}>
                         {job.lastStatus ? (
-                          <span className={`px-2 py-0.5 rounded-full text-xs ${
-                            job.lastStatus === 'success' ? 'bg-emerald-50 text-emerald-700' :
-                            job.lastStatus === 'error' ? 'bg-red-50 text-red-700' :
-                            job.lastStatus === 'running' ? 'bg-blue-50 text-blue-700' :
-                            job.lastStatus === 'idle' ? 'bg-slate-50 text-slate-500' :
-                            'bg-slate-50 text-slate-700'
-                          }`}>
+                          <span style={{ padding: '2px 8px', borderRadius: 9999, fontSize: '0.75rem', ...statusBadgeStyle(job.lastStatus) }}>
                             {job.lastStatus}
                             {job.consecutiveErrors && job.consecutiveErrors > 1 ? ` ×${job.consecutiveErrors}` : ''}
                           </span>
                         ) : (
-                          <span className="text-xs text-[#9CA3AF]">—</span>
+                          <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                         <button
                           onClick={() => onTrigger(job.id)}
                           disabled={triggering === job.id}
-                          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB] transition-colors disabled:opacity-50 ml-auto"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            fontSize: '0.75rem', padding: '4px 10px', borderRadius: 8,
+                            background: '#F3F4F6', color: '#6B7280',
+                            border: 'none', cursor: triggering === job.id ? 'not-allowed' : 'pointer',
+                            opacity: triggering === job.id ? 0.5 : 1,
+                            marginLeft: 'auto', transition: 'background 0.15s',
+                          }}
                         >
                           {triggering === job.id ? (
                             <Loader2 size={11} className="animate-spin" />
@@ -1475,10 +1558,10 @@ const REP_NAMES: Record<string, string> = {
 };
 
 const TEAM: Array<{ name: string; role: string; focus: string; emoji: string }> = [
-  { name: 'Owen',  role: 'Co-Founder',    focus: 'Sales & strategy',       emoji: '🧠' },
-  { name: 'Ford',  role: 'CS',            focus: 'Alumni calls & onboarding', emoji: '📞' },
-  { name: 'Adam',  role: 'Sales',         focus: 'Outreach & lead gen',    emoji: '📬' },
-  { name: 'Tony',  role: 'AI Chief of Staff', focus: 'Everything else',    emoji: '🤙' },
+  { name: 'Owen',  role: 'Co-Founder',        focus: 'Sales & strategy',          emoji: '🧠' },
+  { name: 'Ford',  role: 'CS',                focus: 'Alumni calls & onboarding', emoji: '📞' },
+  { name: 'Adam',  role: 'Sales',             focus: 'Outreach & lead gen',       emoji: '📬' },
+  { name: 'Tony',  role: 'AI Chief of Staff', focus: 'Everything else',           emoji: '🤙' },
 ];
 
 function HomeTab() {
@@ -1489,7 +1572,6 @@ function HomeTab() {
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
-    // Load crons
     fetch('/api/mission-control/crons')
       .then((r) => r.json())
       .then((d) => {
@@ -1499,7 +1581,6 @@ function HomeTab() {
       .catch(() => setCronsError('Failed to load crons'))
       .finally(() => setCronsLoading(false));
 
-    // Load pipeline stats
     fetch('/api/pipeline/stats')
       .then((r) => r.json())
       .then((d) => setStats(d))
@@ -1507,14 +1588,12 @@ function HomeTab() {
       .finally(() => setStatsLoading(false));
   }, []);
 
-  // Upcoming crons — next 5 with a nextRun in the future
   const now = Date.now();
   const upcoming = [...crons]
     .filter((j) => j.nextRun && new Date(j.nextRun).getTime() > now)
     .sort((a, b) => new Date(a.nextRun!).getTime() - new Date(b.nextRun!).getTime())
     .slice(0, 5);
 
-  // Recent active deals from stats
   const INACTIVE = ['closed_lost', 'hold_off'];
   const recentDeals = (stats?.recentDeals ?? [])
     .filter((d) => !INACTIVE.includes(d.stage))
@@ -1533,16 +1612,16 @@ function HomeTab() {
         <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', margin: 0 }}>Today&apos;s Schedule</h2>
 
         {cronsLoading ? (
-          <div className="flex items-center gap-2 text-[#6B7280] text-sm py-4">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#6B7280', fontSize: '0.875rem', padding: '16px 0' }}>
             <Loader2 size={14} className="animate-spin" /> Loading schedule…
           </div>
         ) : cronsError ? (
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
-            <div className="text-sm text-[#6B7280] italic">{cronsError}</div>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+            <div style={{ fontSize: '0.875rem', color: '#6B7280', fontStyle: 'italic' }}>{cronsError}</div>
           </div>
         ) : upcoming.length === 0 ? (
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
-            <div className="text-sm text-[#6B7280] italic">No upcoming jobs in the next 24h.</div>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+            <div style={{ fontSize: '0.875rem', color: '#6B7280', fontStyle: 'italic' }}>No upcoming jobs in the next 24h.</div>
           </div>
         ) : (
           <div className="space-y-2">
@@ -1556,7 +1635,7 @@ function HomeTab() {
               return (
                 <div
                   key={job.id}
-                  className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '12px 16px' }}
                 >
                   <div style={{ width: 72, flexShrink: 0 }}>
                     <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>{dayLabel || 'Today'}</div>
@@ -1575,14 +1654,14 @@ function HomeTab() {
           </div>
         )}
 
-        {/* Team Activity — hardcoded */}
+        {/* Team Activity */}
         <div style={{ marginTop: '1.5rem' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', margin: '0 0 0.75rem' }}>Team Activity</h2>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', margin: '0 0 12px' }}>Team Activity</h2>
           <div className="space-y-2">
             {TEAM.map((member) => (
               <div
                 key={member.name}
-                className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3"
+                style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '12px 16px' }}
               >
                 <span style={{ fontSize: '1.25rem', width: 32, textAlign: 'center', flexShrink: 0 }}>{member.emoji}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1603,25 +1682,22 @@ function HomeTab() {
       <div className="space-y-4">
         <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0F172A', margin: 0 }}>Office View</h2>
 
-        {/* Pipeline health stats */}
         {statsLoading ? (
-          <div className="flex items-center gap-2 text-[#6B7280] text-sm py-4">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#6B7280', fontSize: '0.875rem', padding: '16px 0' }}>
             <Loader2 size={14} className="animate-spin" /> Loading pipeline…
           </div>
         ) : stats ? (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-              <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 500, marginBottom: 4 }}>MRR</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A' }}>
-                  ${stats.mrr.toLocaleString()}
-                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A' }}>${stats.mrr.toLocaleString()}</div>
               </div>
-              <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 500, marginBottom: 4 }}>Demos (7d)</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A' }}>{stats.demosNext7}</div>
               </div>
-              <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 500, marginBottom: 4 }}>Schools</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A' }}>{stats.schoolsInConversation}</div>
               </div>
@@ -1629,10 +1705,10 @@ function HomeTab() {
 
             {/* Deals in motion */}
             <div>
-              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', margin: '0 0 0.5rem' }}>Deals in Motion</h3>
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', margin: '0 0 8px' }}>Deals in Motion</h3>
               {recentDeals.length === 0 ? (
-                <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
-                  <div className="text-sm text-[#6B7280] italic">No active deals</div>
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: '0.875rem', color: '#6B7280', fontStyle: 'italic' }}>No active deals</div>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1645,7 +1721,7 @@ function HomeTab() {
                     return (
                       <div
                         key={deal.id}
-                        className="flex items-center gap-3 bg-white border border-[#E5E7EB] rounded-xl px-4 py-3"
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '12px 16px' }}
                       >
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 500, fontSize: '0.875rem', color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{orgName}</div>
@@ -1653,7 +1729,7 @@ function HomeTab() {
                             <div style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: 1 }}>{schoolName}</div>
                           )}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                           <span style={{
                             fontSize: '0.72rem', padding: '2px 8px', borderRadius: 9999,
                             background: stageBadge.bg, color: stageBadge.color, fontWeight: 600,
@@ -1670,29 +1746,26 @@ function HomeTab() {
             </div>
 
             {/* Pipeline health summary */}
-            <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 space-y-2">
-              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', margin: '0 0 0.5rem' }}>Pipeline Health</h3>
-              <div className="flex items-center justify-between text-sm">
-                <span style={{ color: '#6B7280' }}>Clients closed</span>
-                <span style={{ fontWeight: 600, color: '#0F172A' }}>{stats.closedDealCount}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span style={{ color: '#6B7280' }}>Demos booked (7d)</span>
-                <span style={{ fontWeight: 600, color: '#0F172A' }}>{stats.demosNext7}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span style={{ color: '#6B7280' }}>Decision calls (7d)</span>
-                <span style={{ fontWeight: 600, color: '#0F172A' }}>{stats.decisionsNext7}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span style={{ color: '#6B7280' }}>Schools in conversation</span>
-                <span style={{ fontWeight: 600, color: '#0F172A' }}>{stats.schoolsInConversation}</span>
+            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0F172A', margin: '0 0 12px' }}>Pipeline Health</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { label: 'Clients closed',        value: stats.closedDealCount },
+                  { label: 'Demos booked (7d)',      value: stats.demosNext7 },
+                  { label: 'Decision calls (7d)',    value: stats.decisionsNext7 },
+                  { label: 'Schools in conversation',value: stats.schoolsInConversation },
+                ].map((row) => (
+                  <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                    <span style={{ color: '#6B7280' }}>{row.label}</span>
+                    <span style={{ fontWeight: 600, color: '#0F172A' }}>{row.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </>
         ) : (
-          <div className="bg-white border border-[#E5E7EB] rounded-xl p-4">
-            <div className="text-sm text-[#6B7280] italic">Pipeline data unavailable.</div>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+            <div style={{ fontSize: '0.875rem', color: '#6B7280', fontStyle: 'italic' }}>Pipeline data unavailable.</div>
           </div>
         )}
       </div>
@@ -1715,84 +1788,101 @@ function MemorySection({
 }) {
   return (
     <div className="space-y-5">
-      <div className="flex gap-1 bg-[#F3F4F6] rounded-xl p-1 w-fit">
+      <div style={{ display: 'flex', gap: 4, background: '#F3F4F6', borderRadius: 12, padding: 4, width: 'fit-content' }}>
         <button
           onClick={() => onSub('daily')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            sub === 'daily' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
-          }`}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 16px', borderRadius: 8,
+            fontSize: '0.875rem', fontWeight: 500,
+            border: 'none', cursor: 'pointer',
+            background: sub === 'daily' ? 'white' : 'transparent',
+            color: sub === 'daily' ? '#0F172A' : '#6B7280',
+            transition: 'all 0.15s',
+          }}
         >
           <Calendar size={14} /> Daily Notes
         </button>
         <button
           onClick={() => onSub('longterm')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            sub === 'longterm' ? 'bg-white text-[#0F172A]' : 'text-[#6B7280]'
-          }`}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 16px', borderRadius: 8,
+            fontSize: '0.875rem', fontWeight: 500,
+            border: 'none', cursor: 'pointer',
+            background: sub === 'longterm' ? 'white' : 'transparent',
+            color: sub === 'longterm' ? '#0F172A' : '#6B7280',
+            transition: 'all 0.15s',
+          }}
         >
           <FileText size={14} /> Long-term Memory
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-[#6B7280]">
-          <Loader2 size={20} className="animate-spin mr-2" /> Loading memory…
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0', color: '#6B7280' }}>
+          <Loader2 size={20} className="animate-spin" style={{ marginRight: 8 }} /> Loading memory…
         </div>
       ) : sub === 'longterm' ? (
-        <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-[#0F172A] mb-4">
+        <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 24 }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>
             MEMORY.md — Tony&apos;s Long-term Memory
           </h3>
           {longTermContent ? (
-            <div className="prose prose-sm max-w-none text-[#0F172A]">
+            <div className="prose prose-sm max-w-none" style={{ color: '#0F172A' }}>
               <ReactMarkdown>{longTermContent}</ReactMarkdown>
             </div>
           ) : (
-            <div className="text-[#6B7280] text-sm italic">Memory file is empty.</div>
+            <div style={{ color: '#6B7280', fontSize: '0.875rem', fontStyle: 'italic' }}>Memory file is empty.</div>
           )}
         </div>
       ) : (
-        <div className="flex gap-5">
+        <div style={{ display: 'flex', gap: 20 }}>
           {/* Entry list */}
-          <div className="w-64 flex-shrink-0 space-y-2">
+          <div style={{ width: 256, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {entries.length === 0 ? (
-              <div className="text-[#6B7280] text-sm italic px-2">No daily notes found.</div>
-            ) : entries.map((entry) => (
-              <button
-                key={entry.date}
-                onClick={() => onSelect(selected?.date === entry.date ? null : entry)}
-                className={`w-full text-left p-3 rounded-xl border transition-all ${
-                  selected?.date === entry.date
-                    ? 'border-[#0F172A] bg-[#F3F4F6]'
-                    : 'border-[#E5E7EB] bg-white hover:bg-[#F9FAFB]'
-                }`}
-              >
-                <div className="font-medium text-[#0F172A] text-sm font-mono">{entry.date}</div>
-                {entry.preview && (
-                  <div className="text-xs text-[#6B7280] mt-0.5 line-clamp-2">{entry.preview}</div>
-                )}
-              </button>
-            ))}
+              <div style={{ color: '#6B7280', fontSize: '0.875rem', fontStyle: 'italic', padding: '0 8px' }}>No daily notes found.</div>
+            ) : entries.map((entry) => {
+              const isSelected = selected?.date === entry.date;
+              return (
+                <button
+                  key={entry.date}
+                  onClick={() => onSelect(isSelected ? null : entry)}
+                  style={{
+                    width: '100%', textAlign: 'left', padding: 12, borderRadius: 12,
+                    border: isSelected ? '1px solid #0F172A' : '1px solid #E5E7EB',
+                    background: isSelected ? '#F3F4F6' : 'white',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{ fontWeight: 500, color: '#0F172A', fontSize: '0.875rem', fontFamily: 'monospace' }}>{entry.date}</div>
+                  {entry.preview && (
+                    <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>{entry.preview}</div>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Entry content */}
-          <div className="flex-1 min-w-0">
+          <div style={{ flex: 1, minWidth: 0 }}>
             {selected ? (
-              <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-[#0F172A]">
-                    {selected.date}
-                  </h3>
-                  <button onClick={() => onSelect(null)} className="text-[#6B7280] hover:text-[#0F172A]">
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <h3 style={{ fontWeight: 600, color: '#0F172A', margin: 0 }}>{selected.date}</h3>
+                  <button
+                    onClick={() => onSelect(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', padding: 4 }}
+                  >
                     <X size={16} />
                   </button>
                 </div>
-                <div className="prose prose-sm max-w-none text-[#0F172A]">
+                <div className="prose prose-sm max-w-none" style={{ color: '#0F172A' }}>
                   <ReactMarkdown>{selected.content ?? ''}</ReactMarkdown>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-40 text-[#6B7280] text-sm italic">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: '#6B7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
                 Select a date to read the notes
               </div>
             )}
