@@ -31,6 +31,7 @@ export interface Employee {
 export type EmployeeRole = 
   | 'founder' 
   | 'cofounder' 
+  | 'gtm'
   | 'growth_intern' 
   | 'engineer' 
   | 'sales_intern'
@@ -52,12 +53,14 @@ export const ROLE_HIERARCHY: Record<EmployeeRole, number> = {
   ambassador_leader: 3,
   marketing_director: 3,
   cofounder: 5,
+  gtm: 6,
   founder: 6,
 };
 
 export const ROLE_LABELS: Record<EmployeeRole, string> = {
   founder: 'Founder',
   cofounder: 'Co-Founder',
+  gtm: 'GTM',
   growth_intern: 'Growth Intern',
   engineer: 'Engineer',
   sales_intern: 'Sales Intern',
@@ -73,6 +76,7 @@ export const ROLE_PERMISSIONS: Record<EmployeeRole, string[]> = {
   // Founders - Full Nucleus access
   founder: ['nucleus', 'all'],
   cofounder: ['nucleus', 'all'],
+  gtm: ['nucleus', 'all'],
   
   // Growth Intern - Pipeline access + alumni outreach
   growth_intern: [

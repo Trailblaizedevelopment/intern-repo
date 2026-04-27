@@ -9,6 +9,7 @@ export function getWorkspaceRole(role: EmployeeRole): WorkspaceRole {
   switch (role) {
     case 'founder':
     case 'cofounder':
+    case 'gtm':
       return 'founder';
     case 'engineer':
       return 'engineer';
