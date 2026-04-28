@@ -68,26 +68,28 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Update chapter with form data
+    const updateData: Record<string, unknown> = {
+      onboarding_submitted_at: new Date().toISOString(),
+      chapter_created: true,
+      last_activity: new Date().toISOString().split('T')[0],
+    };
+    // Only set fields that are present in the form data
+    if (formData.university) updateData.school = formData.university;
+    if (formData.fraternity) updateData.fraternity = formData.fraternity;
+    if (formData.chapter_designation) updateData.chapter_designation = formData.chapter_designation;
+    if (formData.year_founded) updateData.year_founded = formData.year_founded;
+    if (formData.estimated_alumni) updateData.estimated_alumni = formData.estimated_alumni;
+    if (formData.active_members) updateData.active_members = formData.active_members;
+    if (formData.instagram_handle) updateData.instagram_handle = formData.instagram_handle;
+    if (formData.instagram_photo_url) updateData.instagram_photo_url = formData.instagram_photo_url;
+    if (formData.alumni_list_file_url) updateData.alumni_list_url = formData.alumni_list_file_url;
+    if (formData.scheduled_demo_time) updateData.scheduled_demo_time = formData.scheduled_demo_time;
+    if (formData.executives?.[0]?.full_name) updateData.contact_name = formData.executives[0].full_name;
+    if (formData.executives?.[0]?.email) updateData.contact_email = formData.executives[0].email;
+
     const { error: updateError } = await supabase
       .from('chapters')
-      .update({
-        school: formData.university,
-        fraternity: formData.fraternity,
-        chapter_designation: formData.chapter_designation,
-        year_founded: formData.year_founded,
-        estimated_alumni: formData.estimated_alumni,
-        active_members: formData.active_members,
-        instagram_handle: formData.instagram_handle,
-        instagram_photo_url: formData.instagram_photo_url,
-        alumni_list_url: formData.alumni_list_file_url,
-        scheduled_demo_time: formData.scheduled_demo_time,
-        onboarding_submitted_at: new Date().toISOString(),
-        chapter_created: true, // Auto-complete this step
-        last_activity: new Date().toISOString().split('T')[0],
-        // Set contact info from first executive (usually president)
-        contact_name: formData.executives[0]?.full_name,
-        contact_email: formData.executives[0]?.email,
-      })
+      .update(updateData)
       .eq('id', chapterId);
 
     if (updateError) {
@@ -98,23 +100,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Insert executives
+    // 3. Insert executives (only if provided)
     if (formData.executives && formData.executives.length > 0) {
-      const executiveRecords = formData.executives.map(exec => ({
-        chapter_id: chapterId,
-        full_name: exec.full_name,
-        position: exec.position,
-        custom_position: exec.custom_position,
-        email: exec.email,
-      }));
+      const executiveRecords = formData.executives
+        .filter(exec => exec.full_name) // Only insert execs with names
+        .map(exec => ({
+          chapter_id: chapterId,
+          full_name: exec.full_name,
+          position: exec.position,
+          custom_position: exec.custom_position,
+          email: exec.email,
+        }));
 
-      const { error: execError } = await supabase
-        .from('chapter_executives')
-        .insert(executiveRecords);
+      if (executiveRecords.length > 0) {
+        const { error: execError } = await supabase
+          .from('chapter_executives')
+          .insert(executiveRecords);
 
-      if (execError) {
-        console.error('Executives error:', execError);
-        // Non-fatal, continue
+        if (execError) {
+          console.error('Executives error:', execError);
+          // Non-fatal, continue
+        }
       }
     }
 
