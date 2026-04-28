@@ -2,50 +2,46 @@
 
 import React, { useState } from 'react';
 
-const SUGGESTED_TAGS = [
+const CATEGORIES = [
   'Fraternity', 'Sorority', 'Club Sport', 'Business Fraternity',
   'Honor Society', 'Student Government', 'Alumni Association',
-  'Professional Org', 'Greek Life', 'Club Team', 'Military',
-  'Startup', 'Consulting', 'Finance', 'Engineering',
-  'Pre-Law', 'Pre-Med', 'Church Group', 'Volunteer Org'
+  'Professional Org', 'Club Team', 'Military',
+  'Startup', 'Church Group', 'Volunteer Org', 'Other'
 ];
+
+interface Affiliation {
+  category: string;
+  orgName: string;
+}
 
 export default function WaitlistPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
-  const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  const [affiliations, setAffiliations] = useState<Affiliation[]>([]);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [orgInput, setOrgInput] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const addTag = (tag: string) => {
-    const t = tag.trim();
-    if (t && !tags.includes(t)) {
-      setTags([...tags, t]);
-    }
-    setTagInput('');
-    setShowSuggestions(false);
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter(t => t !== tag));
-  };
-
-  const handleTagKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
-      e.preventDefault();
-      addTag(tagInput);
-    }
-    if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
-      setTags(tags.slice(0, -1));
+  const toggleCategory = (cat: string) => {
+    const existing = affiliations.find(a => a.category === cat);
+    if (existing) {
+      setAffiliations(affiliations.filter(a => a.category !== cat));
+      if (expandedCategory === cat) setExpandedCategory(null);
+    } else {
+      setExpandedCategory(cat);
+      setOrgInput('');
     }
   };
 
-  const filteredSuggestions = SUGGESTED_TAGS.filter(
-    s => s.toLowerCase().includes(tagInput.toLowerCase()) && !tags.includes(s)
-  );
+  const confirmOrg = () => {
+    if (expandedCategory && orgInput.trim()) {
+      setAffiliations([...affiliations.filter(a => a.category !== expandedCategory), { category: expandedCategory, orgName: orgInput.trim() }]);
+      setExpandedCategory(null);
+      setOrgInput('');
+    }
+  };
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 10);
@@ -55,7 +51,7 @@ export default function WaitlistPage() {
   };
 
   const handleSubmit = async () => {
-    if (!firstName.trim() || !phone.replace(/\D/g, '').length) return;
+    if (!firstName.trim() || phone.replace(/\D/g, '').length < 10) return;
     setLoading(true);
     try {
       const res = await fetch('/api/waitlist', {
@@ -65,7 +61,7 @@ export default function WaitlistPage() {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           phone: phone.replace(/\D/g, ''),
-          affiliations: tags,
+          affiliations: affiliations.map(a => `${a.category}: ${a.orgName}`),
         }),
       });
       if (res.ok) setSubmitted(true);
@@ -82,41 +78,29 @@ export default function WaitlistPage() {
         <div style={{ maxWidth: 480, width: '100%', textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔥</div>
           <h1 style={{ color: 'white', fontSize: 28, fontWeight: 700, marginBottom: 12, fontFamily: 'Inter, system-ui, sans-serif' }}>
-            You're on the list.
+            You&apos;re on the list.
           </h1>
           <p style={{ color: '#94A3B8', fontSize: 16, lineHeight: 1.6, fontFamily: 'Inter, system-ui, sans-serif' }}>
-            We'll text you when it's your turn to join. Your network is closer than you think.
+            We&apos;ll text you when it&apos;s your turn to join. Your network is closer than you think.
           </p>
         </div>
       </div>
     );
   }
 
+  const isSelected = (cat: string) => affiliations.some(a => a.category === cat);
+  const canSubmit = firstName.trim() && phone.replace(/\D/g, '').length >= 10;
+
   return (
     <div style={{ minHeight: '100vh', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ maxWidth: 480, width: '100%' }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-              <line x1="4" y1="22" x2="4" y2="15"/>
-            </svg>
-            <span style={{ color: 'white', fontSize: 22, fontWeight: 700, letterSpacing: '-0.5px', fontFamily: 'Inter, system-ui, sans-serif' }}>
-              Trailblaize
-            </span>
-          </div>
-          <p style={{ color: '#64748B', fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif' }}>
-            The app is almost here.
-          </p>
-        </div>
 
-        {/* Heading */}
+        {/* Heading — no logo */}
         <h1 style={{ color: 'white', fontSize: 26, fontWeight: 700, textAlign: 'center', marginBottom: 8, lineHeight: 1.3, fontFamily: 'Inter, system-ui, sans-serif' }}>
           Join the Waitlist
         </h1>
         <p style={{ color: '#94A3B8', fontSize: 15, textAlign: 'center', marginBottom: 32, lineHeight: 1.5, fontFamily: 'Inter, system-ui, sans-serif' }}>
-          Your private network for the people and places that actually matter. Enter your info and we'll text you when it's time.
+          Your private network for the people and places that actually matter. Enter your info and we&apos;ll text you when it&apos;s time.
         </p>
 
         {/* Form */}
@@ -160,52 +144,71 @@ export default function WaitlistPage() {
             }}
           />
 
-          {/* Tags */}
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              padding: '10px 12px', borderRadius: 10, border: '1px solid #334155',
-              background: '#1E293B', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center',
-              minHeight: 48,
-            }}>
-              {tags.map(tag => (
-                <span key={tag} style={{
-                  background: '#334155', color: 'white', padding: '4px 10px', borderRadius: 20,
-                  fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
-                  fontFamily: 'Inter, system-ui, sans-serif',
-                }}>
-                  {tag}
-                  <span onClick={() => removeTag(tag)} style={{ cursor: 'pointer', color: '#94A3B8', fontSize: 16, lineHeight: 1 }}>×</span>
-                </span>
-              ))}
-              <input
-                type="text"
-                placeholder={tags.length === 0 ? "Your affiliations (fraternity, club, school...)" : "Add more..."}
-                value={tagInput}
-                onChange={e => { setTagInput(e.target.value); setShowSuggestions(true); }}
-                onKeyDown={handleTagKeyDown}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                style={{
-                  flex: 1, minWidth: 150, background: 'transparent', border: 'none', outline: 'none',
-                  color: 'white', fontSize: 14, padding: '4px 0',
-                  fontFamily: 'Inter, system-ui, sans-serif',
-                }}
-              />
-            </div>
-            {showSuggestions && filteredSuggestions.length > 0 && (
-              <div style={{
-                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
-                background: '#1E293B', border: '1px solid #334155', borderRadius: 10,
-                maxHeight: 200, overflowY: 'auto', zIndex: 10,
-              }}>
-                {filteredSuggestions.slice(0, 8).map(s => (
-                  <div key={s} onMouseDown={() => addTag(s)} style={{
-                    padding: '10px 16px', cursor: 'pointer', color: '#CBD5E1', fontSize: 14,
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                  }}>
-                    {s}
+          {/* Category label */}
+          <div>
+            <p style={{ color: '#94A3B8', fontSize: 13, marginBottom: 12, fontFamily: 'Inter, system-ui, sans-serif' }}>
+              Select your affiliations
+            </p>
+
+            {/* Category buttons grid */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {CATEGORIES.map(cat => {
+                const selected = isSelected(cat);
+                const expanded = expandedCategory === cat;
+                const affiliation = affiliations.find(a => a.category === cat);
+
+                return (
+                  <div key={cat} style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => toggleCategory(cat)}
+                      style={{
+                        padding: '8px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                        background: selected ? 'white' : '#1E293B',
+                        color: selected ? '#0F172A' : '#CBD5E1',
+                        fontSize: 13, fontWeight: selected ? 600 : 400,
+                        fontFamily: 'Inter, system-ui, sans-serif',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {selected ? `${cat}: ${affiliation?.orgName}` : cat}
+                      {selected && <span style={{ marginLeft: 6, fontSize: 11 }}>✕</span>}
+                    </button>
                   </div>
-                ))}
+                );
+              })}
+            </div>
+
+            {/* Org name input — appears below buttons when a category is expanded */}
+            {expandedCategory && (
+              <div style={{
+                marginTop: 12, display: 'flex', gap: 8, alignItems: 'center',
+                animation: 'fadeIn 0.15s ease',
+              }}>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder={`Name of your ${expandedCategory.toLowerCase()}...`}
+                  value={orgInput}
+                  onChange={e => setOrgInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && orgInput.trim()) confirmOrg(); }}
+                  style={{
+                    flex: 1, padding: '12px 16px', borderRadius: 10, border: '1px solid #334155',
+                    background: '#1E293B', color: 'white', fontSize: 14, outline: 'none',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                  }}
+                />
+                <button
+                  onClick={confirmOrg}
+                  disabled={!orgInput.trim()}
+                  style={{
+                    padding: '12px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                    background: orgInput.trim() ? 'white' : '#334155',
+                    color: orgInput.trim() ? '#0F172A' : '#64748B',
+                    fontSize: 14, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif',
+                  }}
+                >
+                  Add
+                </button>
               </div>
             )}
           </div>
@@ -213,12 +216,12 @@ export default function WaitlistPage() {
           {/* Submit */}
           <button
             onClick={handleSubmit}
-            disabled={!firstName.trim() || phone.replace(/\D/g, '').length < 10 || loading}
+            disabled={!canSubmit || loading}
             style={{
               padding: '16px 24px', borderRadius: 10, border: 'none',
-              background: (!firstName.trim() || phone.replace(/\D/g, '').length < 10) ? '#334155' : 'white',
-              color: (!firstName.trim() || phone.replace(/\D/g, '').length < 10) ? '#64748B' : '#0F172A',
-              fontSize: 16, fontWeight: 600, cursor: 'pointer', marginTop: 8,
+              background: canSubmit ? 'white' : '#334155',
+              color: canSubmit ? '#0F172A' : '#64748B',
+              fontSize: 16, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'default', marginTop: 8,
               fontFamily: 'Inter, system-ui, sans-serif',
               opacity: loading ? 0.7 : 1,
             }}
