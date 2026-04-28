@@ -53,10 +53,8 @@ function fmtTs(ts: string | null | undefined): string {
 
 const STEPS = [
   { num: 1, label: 'Chapter Info' },
-  { num: 2, label: 'Contract' },
-  { num: 3, label: 'Invoice' },
-  { num: 4, label: 'Submission' },
-  { num: 5, label: 'Done' },
+  { num: 2, label: 'Submission' },
+  { num: 3, label: 'Done' },
 ];
 
 function StepIndicator({ current, max }: { current: number; max: number }) {
@@ -170,16 +168,11 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
 
   // Step 1 form
   const [form, setForm] = useState({
-    chapter_name: initialChapter?.chapter_name || '',
     school: initialChapter?.school || '',
     fraternity: initialChapter?.fraternity || '',
     contact_name: initialChapter?.contact_name || '',
     contact_email: initialChapter?.contact_email || '',
     contact_phone: initialChapter?.contact_phone || '',
-    member_count: initialChapter?.member_count || 0,
-    mrr: initialChapter?.mrr || 0,
-    payment_type: initialChapter?.payment_type || 'monthly' as Chapter['payment_type'],
-    payment_amount: initialChapter?.payment_amount || 0,
   });
 
   // Step 2 — contract DocuSign fields
@@ -206,6 +199,9 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   const [markDoneStep, setMarkDoneStep] = useState<{ step: number; name: string } | null>(null);
   const [markingDone, setMarkingDone] = useState(false);
 
+  // Schedule Demo modal
+  const [showDemoModal, setShowDemoModal] = useState(false);
+
   // Derived state from chapterData
   const contractSent = !!(chapterData?.contract_sent_at);
   const contractSigned = chapterData?.contract_status === 'signed';
@@ -216,11 +212,9 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   useEffect(() => {
     let max = 1;
     if (chapterId) max = 2;
-    if (contractSent) max = 3;
-    if (invoiceSent) max = 4;
-    if (submissionFormSent) max = 5;
+    if (submissionFormSent) max = 3;
     setMaxUnlockedStep(max);
-  }, [chapterId, contractSent, invoiceSent, submissionFormSent]);
+  }, [chapterId, submissionFormSent]);
 
 
 
@@ -235,7 +229,8 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
   // ── Step 1: Create Chapter ──────────────────────────────────────────────────
 
   async function handleCreateChapter() {
-    if (!form.chapter_name.trim()) return setError('Chapter name is required');
+    if (!form.school.trim() && !form.fraternity.trim()) return setError('University and Fraternity / Sorority are required');
+    const generatedName = [form.fraternity.trim(), form.school.trim()].filter(Boolean).join(' @ ');
     setSaving(true); setError(null);
 
     if (chapterId) {
@@ -243,7 +238,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
       const res = await fetch(`/api/chapters/${chapterId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, wizard_step: 2 }),
+        body: JSON.stringify({ ...form, chapter_name: generatedName, wizard_step: 2 }),
       });
       if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to update'); setSaving(false); return; }
       await refreshChapter(chapterId);
@@ -254,6 +249,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          chapter_name: generatedName,
           status: 'onboarding',
           health: 'good',
           chapter_created: true,
@@ -355,12 +351,12 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     const res = await fetch(`/api/chapters/${chapterId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ submission_sent_at: new Date().toISOString(), setup_groupchat_created: groupchatMade, wizard_step: 5 }),
+      body: JSON.stringify({ submission_sent_at: new Date().toISOString(), setup_groupchat_created: groupchatMade, wizard_step: 3 }),
     });
     if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to update'); setSaving(false); return; }
     await refreshChapter(chapterId);
     setSaving(false);
-    setCurrentStep(5);
+    setCurrentStep(3);
   }
 
   // ── Mark As Done (retroactive override) ────────────────────────────────────
@@ -374,27 +370,27 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     let nextStep = step + 1;
 
     if (step === 2) {
-      // Contract: set sent + signed timestamps, mark as signed
+      // Submission — step 2 in the simplified wizard flow
+      nextStep = 3;
+      updates = {
+        submission_sent_at: now,
+        wizard_step: 3,
+      };
+    }
+    // Legacy contract / invoice mark-as-done (kept for potential future use, not in active wizard flow)
+    else if (step === 20) {
       updates = {
         contract_sent_at: now,
         contract_signed_at: now,
         contract_status: 'signed',
         wizard_step: nextStep,
       };
-    } else if (step === 3) {
-      // Invoice: set sent + paid timestamps
+    } else if (step === 30) {
       updates = {
         invoice_sent_at: now,
         invoice_paid_at: now,
         invoice_status: 'paid',
         wizard_step: nextStep,
-      };
-    } else if (step === 4) {
-      // Submission
-      nextStep = 5;
-      updates = {
-        submission_sent_at: now,
-        wizard_step: 5,
       };
     }
 
@@ -427,7 +423,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
     const res = await fetch(`/api/chapters/${chapterId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wizard_completed_at: now, onboarding_completed: now.split('T')[0], status: 'active', wizard_step: 5 }),
+      body: JSON.stringify({ wizard_completed_at: now, onboarding_completed: now.split('T')[0], status: 'active', wizard_step: 3 }),
     });
 
     if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to complete setup'); setSaving(false); return; }
@@ -471,8 +467,10 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, fontFamily: "'Instrument Serif', Georgia, serif" }}>
                 {chapterId ? 'Chapter Onboarding' : 'Add New Chapter'}
               </h2>
-              {form.chapter_name && (
-                <p style={{ fontSize: '0.85rem', opacity: 0.7, margin: '4px 0 0' }}>{form.chapter_name}</p>
+              {(chapterData?.chapter_name || (form.fraternity && form.school)) && (
+                <p style={{ fontSize: '0.85rem', opacity: 0.7, margin: '4px 0 0' }}>
+                  {chapterData?.chapter_name || [form.fraternity, form.school].filter(Boolean).join(' @ ')}
+                </p>
               )}
             </div>
             <button
@@ -507,51 +505,13 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
             </div>
           )}
 
-          {/* ── STEP 1 ── */}
+          {/* ── STEP 1: Chapter Info ── */}
           {currentStep === 1 && (
             <Step1ChapterInfo form={form} setForm={setForm} />
           )}
 
-          {/* ── STEP 2 ── */}
+          {/* ── STEP 2: Submission ── */}
           {currentStep === 2 && (
-            <Step2Contract
-              chapterId={chapterId}
-              contractSent={contractSent}
-              contractSigned={contractSigned}
-              contractSentAt={chapterData?.contract_sent_at}
-              contractSignedAt={chapterData?.contract_signed_at}
-              contractStatus={chapterData?.contract_status}
-              chapterLegalName={chapterLegalName}
-              setChapterLegalName={setChapterLegalName}
-              signerName={signerName}
-              setSignerName={setSignerName}
-              signerEmail={signerEmail}
-              setSignerEmail={setSignerEmail}
-              memberCount={contractMemberCount}
-              setMemberCount={setContractMemberCount}
-              effectiveDate={contractEffectiveDate}
-              setEffectiveDate={setContractEffectiveDate}
-              onSend={handleSendContract}
-              sending={sendingContract}
-            />
-          )}
-
-          {/* ── STEP 3 ── */}
-          {currentStep === 3 && (
-            <Step3Invoice
-              memberCount={invoiceMemberCount || chapterData?.member_count || 0}
-              setMemberCount={setInvoiceMemberCount}
-              onSendInvoice={handleSendInvoice}
-              sending={sendingInvoice}
-              invoiceSentResult={invoiceSentResult}
-              existingInvoiceSentAt={chapterData?.invoice_sent_at}
-              existingInvoicePaidAt={chapterData?.invoice_paid_at}
-              contactEmail={chapterData?.contact_email || ''}
-            />
-          )}
-
-          {/* ── STEP 4 ── */}
-          {currentStep === 4 && (
             <Step4Submission
               submissionSent={submissionSent}
               setSubmissionSent={setSubmissionSent}
@@ -562,9 +522,14 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
             />
           )}
 
-          {/* ── STEP 5 ── */}
-          {currentStep === 5 && (
-            <Step5Done chapter={chapterData} />
+          {/* ── STEP 3: Done ── */}
+          {currentStep === 3 && (
+            <Step3Done chapter={chapterData} onScheduleDemo={() => setShowDemoModal(true)} />
+          )}
+
+          {/* Schedule Demo modal */}
+          {showDemoModal && (
+            <ScheduleDemoModal onClose={() => setShowDemoModal(false)} />
           )}
         </div>
 
@@ -576,7 +541,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
           borderRadius: '0 0 20px 20px',
         }}>
           <div style={{ fontSize: '0.8rem', color: '#8A7E72' }}>
-            Step {currentStep} of 5
+            Step {currentStep} of 3
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             {currentStep > 1 && (
@@ -594,8 +559,8 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
             {currentStep === 1 && (
               <button
                 onClick={handleCreateChapter}
-                disabled={saving || !form.chapter_name.trim()}
-                style={primaryBtnStyle(saving || !form.chapter_name.trim())}
+                disabled={saving || (!form.school.trim() && !form.fraternity.trim())}
+                style={primaryBtnStyle(saving || (!form.school.trim() && !form.fraternity.trim()))}
               >
                 {saving ? <Loader2 size={16} className="spin" /> : null}
                 {chapterId ? 'Save & Continue' : 'Create Chapter'}
@@ -604,24 +569,8 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
             )}
 
             {currentStep === 2 && (
-              contractSent ? (
-                <button onClick={() => setCurrentStep(3)} style={primaryBtnStyle(false)}>
-                  Continue <ChevronRight size={16} />
-                </button>
-              ) : null
-            )}
-
-            {currentStep === 3 && (
-              invoiceSent ? (
-                <button onClick={() => setCurrentStep(4)} style={primaryBtnStyle(false)}>
-                  Continue <ChevronRight size={16} />
-                </button>
-              ) : null
-            )}
-
-            {currentStep === 4 && (
               submissionFormSent ? (
-                <button onClick={() => setCurrentStep(5)} style={primaryBtnStyle(false)}>
+                <button onClick={() => setCurrentStep(3)} style={primaryBtnStyle(false)}>
                   Continue <ChevronRight size={16} />
                 </button>
               ) : (
@@ -635,7 +584,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
                     Save & Continue <ChevronRight size={16} />
                   </button>
                   <button
-                    onClick={() => setMarkDoneStep({ step: 4, name: 'Submission Form' })}
+                    onClick={() => setMarkDoneStep({ step: 2, name: 'Submission Form' })}
                     style={markAsDoneLinkStyle}
                   >
                     Mark as already done
@@ -644,7 +593,7 @@ export default function OnboardingWizard({ chapter: initialChapter, onClose, onC
               )
             )}
 
-            {currentStep === 5 && (
+            {currentStep === 3 && (
               <button
                 onClick={handleCompleteSetup}
                 disabled={saving}
@@ -671,31 +620,33 @@ function Step1ChapterInfo({
 }: {
   form: Record<string, unknown>;
   setForm: React.Dispatch<React.SetStateAction<{
-    chapter_name: string; school: string; fraternity: string;
+    school: string; fraternity: string;
     contact_name: string; contact_email: string; contact_phone: string;
-    member_count: number; mrr: number; payment_type: Chapter['payment_type']; payment_amount: number;
   }>>;
 }) {
   const fv = form as {
-    chapter_name: string; school: string; fraternity: string;
+    school: string; fraternity: string;
     contact_name: string; contact_email: string; contact_phone: string;
-    member_count: number; mrr: number; payment_type: string; payment_amount: number;
   };
+
+  const previewName = [fv.fraternity, fv.school].filter(Boolean).join(' @ ');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <SectionTitle icon={<Building2 size={16} />} title="Chapter Details" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <FormField label="Chapter Name *">
-          <input type="text" value={fv.chapter_name} onChange={e => setForm(f => ({ ...f, chapter_name: e.target.value }))} placeholder="Ole Miss Phi Delt" style={inputStyle} />
+        <FormField label="University *">
+          <input type="text" value={fv.school} onChange={e => setForm(f => ({ ...f, school: e.target.value }))} placeholder="University of Mississippi" style={inputStyle} />
         </FormField>
-        <FormField label="Fraternity / Org">
+        <FormField label="Fraternity / Sorority *">
           <input type="text" value={fv.fraternity} onChange={e => setForm(f => ({ ...f, fraternity: e.target.value }))} placeholder="Phi Delta Theta" style={inputStyle} />
         </FormField>
       </div>
-      <FormField label="School">
-        <input type="text" value={fv.school} onChange={e => setForm(f => ({ ...f, school: e.target.value }))} placeholder="University of Mississippi" style={inputStyle} />
-      </FormField>
+      {previewName && (
+        <div style={{ fontSize: '0.82rem', color: '#1B2A4A', fontWeight: 600, padding: '8px 12px', background: '#EEF2FA', borderRadius: 8 }}>
+          Chapter: <span style={{ color: '#C4874A' }}>{previewName}</span>
+        </div>
+      )}
 
       <SectionTitle icon={<User size={16} />} title="Primary Contact" />
       <FormField label="Contact Name">
@@ -715,68 +666,6 @@ function Step1ChapterInfo({
           </div>
         </FormField>
       </div>
-
-      <SectionTitle icon={<DollarSign size={16} />} title="Revenue" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <FormField label="Member Count">
-          <input
-            type="number"
-            min={0}
-            value={fv.member_count || ''}
-            placeholder="e.g. 120"
-            onChange={e => {
-              const count = parseInt(e.target.value, 10) || 0;
-              const tier = getPriceTierClient(count);
-              setForm(f => ({ ...f, member_count: count, payment_amount: tier, mrr: tier }));
-            }}
-            style={inputStyle}
-          />
-        </FormField>
-        <FormField label="Payment Type">
-          <select value={fv.payment_type} onChange={e => setForm(f => ({ ...f, payment_type: e.target.value as Chapter['payment_type'] }))} style={inputStyle}>
-            <option value="monthly">Monthly</option>
-            <option value="annual">Annual (one-time)</option>
-            <option value="one_time">One-Time</option>
-          </select>
-        </FormField>
-      </div>
-      {fv.member_count > 0 && (() => {
-        const TIERS = [
-          { label: '0–99 members', value: 99 },
-          { label: '100–174 members', value: 199 },
-          { label: '175–249 members', value: 299 },
-          { label: '250–324 members', value: 399 },
-          { label: '325–399 members', value: 499 },
-          { label: '400+ members', value: 599 },
-        ];
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <FormField label="Pricing Tier">
-              <select
-                value={fv.payment_amount}
-                onChange={e => {
-                  const amt = parseInt(e.target.value, 10);
-                  setForm(f => ({ ...f, payment_amount: amt, mrr: amt }));
-                }}
-                style={inputStyle}
-              >
-                {TIERS.map(t => (
-                  <option key={t.value} value={t.value}>{t.label} — ${t.value}/mo</option>
-                ))}
-              </select>
-            </FormField>
-            <div style={{
-              fontSize: '0.82rem', color: '#1B2A4A', fontWeight: 600,
-              padding: '8px 12px', background: '#EEF2FA', borderRadius: 8,
-            }}>
-              {fv.member_count} members → <span style={{ color: '#C4874A' }}>${fv.payment_amount}/mo</span>
-              <span style={{ fontWeight: 400, color: '#6B6058', marginLeft: 6 }}>
-                ({fv.payment_type === 'monthly' ? 'billed monthly' : fv.payment_type === 'annual' ? 'billed annually' : 'one-time'})
-              </span>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
@@ -1234,15 +1123,11 @@ function Step4Submission({
   );
 }
 
-function Step5Done({ chapter }: { chapter: WizardChapter | null }) {
+function Step3Done({ chapter, onScheduleDemo }: { chapter: WizardChapter | null; onScheduleDemo: () => void }) {
   if (!chapter) return null;
 
   const rows: { label: string; value: string | null; done: boolean }[] = [
     { label: 'Chapter Created', value: fmtTs(chapter.created_at) || 'Yes', done: true },
-    { label: 'Contract Sent', value: fmtTs(chapter.contract_sent_at), done: !!chapter.contract_sent_at },
-    { label: 'Contract Signed', value: fmtTs(chapter.contract_signed_at), done: chapter.contract_status === 'signed' },
-    { label: 'Invoice Sent', value: fmtTs(chapter.invoice_sent_at), done: !!chapter.invoice_sent_at },
-    { label: 'Invoice Paid', value: fmtTs(chapter.invoice_paid_at), done: !!chapter.invoice_paid_at },
     { label: 'Submission Form Sent', value: fmtTs(chapter.submission_sent_at), done: !!chapter.submission_sent_at },
   ];
 
@@ -1251,10 +1136,10 @@ function Step5Done({ chapter }: { chapter: WizardChapter | null }) {
       <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
         <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🎉</div>
         <h3 style={{ fontSize: '1.2rem', fontFamily: "'Instrument Serif', Georgia, serif", color: '#1B2A4A', margin: 0 }}>
-          Setup Complete!
+          Chapter Created!
         </h3>
         <p style={{ fontSize: '0.875rem', color: '#6B6058', margin: '6px 0 0' }}>
-          {chapter.chapter_name} is ready to go.
+          {chapter.chapter_name} is all set up.
         </p>
       </div>
 
@@ -1277,6 +1162,86 @@ function Step5Done({ chapter }: { chapter: WizardChapter | null }) {
             </span>
           </div>
         ))}
+      </div>
+
+      {/* Schedule Demo CTA */}
+      <div style={{
+        padding: '16px', background: '#EEF2FA', borderRadius: 12,
+        border: '1px solid #C5D2E8', textAlign: 'center', marginTop: 4,
+      }}>
+        <div style={{ marginBottom: 8 }}><Calendar size={20} color="#1B2A4A" /></div>
+        <p style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1B2A4A', margin: '0 0 6px' }}>
+          Want to schedule a demo call?
+        </p>
+        <p style={{ fontSize: '0.8rem', color: '#6B6058', margin: '0 0 12px' }}>
+          Book a 30-min intro with Owen to walk the chapter through Trailblaize.
+        </p>
+        <button
+          onClick={onScheduleDemo}
+          style={{
+            padding: '9px 20px', borderRadius: 8, border: 'none',
+            background: '#1B2A4A', color: '#fff',
+            fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          <Calendar size={15} /> Schedule Demo
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ScheduleDemoModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1200,
+      background: 'rgba(15,22,40,0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16,
+    }}>
+      <div style={{
+        background: '#FDFAF5', borderRadius: 16, padding: '28px',
+        maxWidth: 480, width: '100%',
+        boxShadow: '0 20px 70px rgba(0,0,0,0.3)',
+        display: 'flex', flexDirection: 'column', gap: 16,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#1B2A4A', fontFamily: "'Instrument Serif', Georgia, serif" }}>
+            Schedule a Demo
+          </h3>
+          <button
+            onClick={onClose}
+            style={{ background: '#F0EDE8', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', color: '#1B2A4A' }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <p style={{ fontSize: '0.875rem', color: '#6B6058', margin: 0, lineHeight: 1.6 }}>
+          Book a 30-minute intro call with Owen to walk the chapter through Trailblaize and get them excited about launch.
+        </p>
+        <a
+          href="https://calendly.com/owen-trailblaize/30min"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '12px 24px', borderRadius: 8, border: 'none',
+            background: '#C4874A', color: '#fff',
+            fontWeight: 700, fontSize: '0.9rem', textDecoration: 'none',
+          }}
+        >
+          <Calendar size={16} /> Open Calendly
+        </a>
+        <button
+          onClick={onClose}
+          style={{
+            padding: '9px 16px', borderRadius: 8, border: '1px solid #D9D4CC',
+            background: '#fff', color: '#6B6058', cursor: 'pointer', fontSize: '0.875rem',
+          }}
+        >
+          Maybe later
+        </button>
       </div>
     </div>
   );
