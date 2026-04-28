@@ -1,35 +1,25 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { 
-  Check, ChevronRight, ChevronLeft, Upload, X, Plus, Trash2, 
-  AlertCircle, CheckCircle2, Building2, Users, Share2, FileSpreadsheet,
-  Calendar, Instagram, Send, Loader2
+  Check, ChevronRight, ChevronLeft, Upload, X,
+  AlertCircle, CheckCircle2, Building2, Share2, FileSpreadsheet,
+  Send, Loader2, Calendar
 } from 'lucide-react';
 import {
   GREEK_ORGANIZATIONS,
   UNIVERSITIES,
-  ExecutivePosition,
-  EXECUTIVE_POSITION_LABELS,
   OnboardingFormData,
   OutreachChannelType,
   OUTREACH_CHANNEL_LABELS,
 } from '@/lib/supabase';
 
 // Default booking link fallback
-const DEFAULT_BOOKING_LINK = '';
+const DEFAULT_BOOKING_LINK = 'https://calendly.com/owen-trailblaize/30min';
 
 interface ValidationErrors {
   [key: string]: string;
-}
-
-interface Executive {
-  id: string;
-  full_name: string;
-  position: ExecutivePosition;
-  custom_position: string;
-  email: string;
 }
 
 interface OutreachChannel {
@@ -48,19 +38,15 @@ interface OutreachChannel {
 
 const SECTIONS = [
   { id: 1, title: 'Chapter Information', icon: Building2 },
-  { id: 2, title: 'Executive Board', icon: Users },
-  { id: 3, title: 'Outreach Channels', icon: Share2 },
-  { id: 4, title: 'Alumni List', icon: FileSpreadsheet },
-  { id: 5, title: 'Schedule Demo', icon: Calendar },
-  { id: 6, title: 'Instagram Launch', icon: Instagram },
-  { id: 7, title: 'Submit', icon: Send },
+  { id: 2, title: 'Outreach Channels', icon: Share2 },
+  { id: 3, title: 'Alumni List', icon: FileSpreadsheet },
+  { id: 4, title: 'Submit', icon: Send },
 ];
 
 const COMMUNICATION_METHODS = ['Email', 'Physical Mail', 'Both Email and Mail'];
 
 export default function OnboardingForm() {
   const params = useParams();
-  const router = useRouter();
   const token = params.token as string;
 
   // State
@@ -85,15 +71,6 @@ export default function OnboardingForm() {
   const [fraternity, setFraternity] = useState('');
   const [fraternitySearch, setFraternitySearch] = useState('');
   const [showFraternitySuggestions, setShowFraternitySuggestions] = useState(false);
-  const [chapterDesignation, setChapterDesignation] = useState('');
-  const [yearFounded, setYearFounded] = useState<number | ''>('');
-  const [estimatedAlumni, setEstimatedAlumni] = useState<number | ''>('');
-  const [activeMembers, setActiveMembers] = useState<number | ''>('');
-
-  // Executives
-  const [executives, setExecutives] = useState<Executive[]>([
-    { id: '1', full_name: '', position: 'president', custom_position: '', email: '' }
-  ]);
 
   // Outreach Channels
   const [selectedChannels, setSelectedChannels] = useState<Set<OutreachChannelType>>(new Set());
@@ -113,15 +90,8 @@ export default function OnboardingForm() {
   const [noAlumniList, setNoAlumniList] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
 
-  // Demo
-  const [scheduledDemo, setScheduledDemo] = useState('');
+  // Booking link (shown on success screen)
   const [bookingLink, setBookingLink] = useState(DEFAULT_BOOKING_LINK);
-
-  // Instagram Launch
-  const [igHandle, setIgHandle] = useState('');
-  const [igPhoto, setIgPhoto] = useState<File | null>(null);
-  const [igPhotoUrl, setIgPhotoUrl] = useState('');
-  const [igPhotoPreview, setIgPhotoPreview] = useState('');
 
   // Load draft from localStorage
   useEffect(() => {
@@ -132,15 +102,9 @@ export default function OnboardingForm() {
           const parsed = JSON.parse(draft);
           if (parsed.university) setUniversity(parsed.university);
           if (parsed.fraternity) setFraternity(parsed.fraternity);
-          if (parsed.chapterDesignation) setChapterDesignation(parsed.chapterDesignation);
-          if (parsed.yearFounded) setYearFounded(parsed.yearFounded);
-          if (parsed.estimatedAlumni) setEstimatedAlumni(parsed.estimatedAlumni);
-          if (parsed.activeMembers) setActiveMembers(parsed.activeMembers);
-          if (parsed.executives) setExecutives(parsed.executives);
           if (parsed.selectedChannels) setSelectedChannels(new Set(parsed.selectedChannels));
           if (parsed.channelData) setChannelData(parsed.channelData);
           if (parsed.noAlumniList) setNoAlumniList(parsed.noAlumniList);
-          if (parsed.igHandle) setIgHandle(parsed.igHandle);
           if (parsed.currentSection) setCurrentSection(parsed.currentSection);
         } catch (e) {
           console.error('Failed to parse draft:', e);
@@ -155,21 +119,14 @@ export default function OnboardingForm() {
       const draft = {
         university,
         fraternity,
-        chapterDesignation,
-        yearFounded,
-        estimatedAlumni,
-        activeMembers,
-        executives,
         selectedChannels: Array.from(selectedChannels),
         channelData,
         noAlumniList,
-        igHandle,
         currentSection,
       };
       localStorage.setItem(`onboarding_draft_${token}`, JSON.stringify(draft));
     }
-  }, [token, university, fraternity, chapterDesignation, yearFounded, estimatedAlumni, activeMembers,
-      executives, selectedChannels, channelData, noAlumniList, igHandle, currentSection]);
+  }, [token, university, fraternity, selectedChannels, channelData, noAlumniList, currentSection]);
 
   // Auto-save draft on changes
   useEffect(() => {
@@ -238,26 +195,6 @@ export default function OnboardingForm() {
     o.toLowerCase().includes(fraternitySearch.toLowerCase())
   ).slice(0, 8);
 
-  // Executive handlers
-  const addExecutive = () => {
-    setExecutives([
-      ...executives,
-      { id: Date.now().toString(), full_name: '', position: 'president', custom_position: '', email: '' }
-    ]);
-  };
-
-  const removeExecutive = (id: string) => {
-    if (executives.length > 1) {
-      setExecutives(executives.filter(e => e.id !== id));
-    }
-  };
-
-  const updateExecutive = (id: string, field: keyof Executive, value: string) => {
-    setExecutives(executives.map(e => 
-      e.id === id ? { ...e, [field]: value } : e
-    ));
-  };
-
   // Channel handlers
   const toggleChannel = (type: OutreachChannelType) => {
     const newSelected = new Set(selectedChannels);
@@ -277,7 +214,7 @@ export default function OnboardingForm() {
   };
 
   // File upload handler
-  const handleFileUpload = async (file: File, type: 'alumni' | 'instagram') => {
+  const handleFileUpload = async (file: File) => {
     if (!file) return;
 
     setUploadingFile(true);
@@ -285,7 +222,7 @@ export default function OnboardingForm() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('type', type);
+      formData.append('type', 'alumni');
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -295,20 +232,14 @@ export default function OnboardingForm() {
       const result = await response.json();
       
       if (result.error) {
-        setValidationErrors({ ...validationErrors, [type]: result.error.message });
+        setValidationErrors(prev => ({ ...prev, alumni: result.error.message }));
         return;
       }
 
-      if (type === 'alumni') {
-        setAlumniFile(file);
-        setAlumniFileUrl(result.data.url);
-      } else {
-        setIgPhoto(file);
-        setIgPhotoUrl(result.data.url);
-        setIgPhotoPreview(URL.createObjectURL(file));
-      }
+      setAlumniFile(file);
+      setAlumniFileUrl(result.data.url);
     } catch {
-      setValidationErrors({ ...validationErrors, [type]: 'Failed to upload file' });
+      setValidationErrors(prev => ({ ...prev, alumni: 'Failed to upload file' }));
     } finally {
       setUploadingFile(false);
     }
@@ -322,22 +253,6 @@ export default function OnboardingForm() {
       case 1:
         if (!university.trim()) errors.university = 'University is required';
         if (!fraternity.trim()) errors.fraternity = 'Fraternity/Sorority is required';
-        if (!estimatedAlumni) errors.estimatedAlumni = 'Estimated alumni count is required';
-        if (!activeMembers) errors.activeMembers = 'Active member count is required';
-        break;
-      case 2:
-        executives.forEach((exec, index) => {
-          if (!exec.full_name.trim()) errors[`exec_${index}_name`] = 'Name is required';
-          if (!exec.email.trim()) errors[`exec_${index}_email`] = 'Email is required';
-          else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(exec.email)) {
-            errors[`exec_${index}_email`] = 'Invalid email format';
-          } else if (exec.email.toLowerCase().endsWith('.edu')) {
-            errors[`exec_${index}_email`] = 'Please use a personal email (no .edu addresses)';
-          }
-          if (exec.position === 'other' && !exec.custom_position.trim()) {
-            errors[`exec_${index}_position`] = 'Please specify position';
-          }
-        });
         break;
     }
 
@@ -361,7 +276,7 @@ export default function OnboardingForm() {
   };
 
   const nextSection = () => {
-    if (currentSection < 7) {
+    if (currentSection < 4) {
       goToSection(currentSection + 1);
     }
   };
@@ -374,34 +289,20 @@ export default function OnboardingForm() {
 
   // Submit form
   const handleSubmit = async () => {
-    // Validate all required sections
-    if (!validateSection(1) || !validateSection(2)) {
+    if (!validateSection(1)) {
       setCurrentSection(1);
       return;
     }
 
     setSubmitting(true);
 
-    const formData: OnboardingFormData = {
+    const formData: Partial<OnboardingFormData> = {
       university,
       fraternity,
-      chapter_designation: chapterDesignation || undefined,
-      year_founded: yearFounded ? Number(yearFounded) : undefined,
-      estimated_alumni: Number(estimatedAlumni),
-      active_members: Number(activeMembers),
-      executives: executives.map(e => ({
-        full_name: e.full_name,
-        position: e.position,
-        custom_position: e.position === 'other' ? e.custom_position : undefined,
-        email: e.email,
-      })),
       outreach_channels: Array.from(selectedChannels).map(type => channelData[type]),
       alumni_list_file_name: alumniFile?.name,
       alumni_list_file_url: alumniFileUrl || undefined,
       no_alumni_list: noAlumniList,
-      scheduled_demo_time: scheduledDemo || undefined,
-      instagram_handle: igHandle || undefined,
-      instagram_photo_url: igPhotoUrl || undefined,
     };
 
     try {
@@ -454,7 +355,7 @@ export default function OnboardingForm() {
     );
   }
 
-  // Already submitted state
+  // Already submitted / success state
   if (submitted) {
     return (
       <div className="onboarding-success">
@@ -474,11 +375,28 @@ export default function OnboardingForm() {
             <strong>University:</strong> {university}
           </div>
           <div className="summary-item">
-            <strong>Executives Added:</strong> {executives.length}
-          </div>
-          <div className="summary-item">
             <strong>Communication Channels:</strong> {selectedChannels.size}
           </div>
+        </div>
+
+        {/* Schedule a Call CTA */}
+        <div className="schedule-call-card">
+          <div className="schedule-call-icon">
+            <Calendar size={32} />
+          </div>
+          <h3>Want to schedule a quick call with our team?</h3>
+          <p>
+            We&apos;d love to walk you through the platform and get your chapter set up for success.
+          </p>
+          <a
+            href={bookingLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="schedule-call-btn"
+          >
+            <Calendar size={18} />
+            Book a 30-Minute Call
+          </a>
         </div>
       </div>
     );
@@ -523,6 +441,7 @@ export default function OnboardingForm() {
 
       {/* Form Content */}
       <main className="onboarding-content">
+
         {/* Section 1: Chapter Information */}
         {currentSection === 1 && (
           <section className="form-section">
@@ -537,7 +456,7 @@ export default function OnboardingForm() {
                   value={universitySearch}
                   onChange={(e) => {
                     setUniversitySearch(e.target.value);
-                    setUniversity(e.target.value); // Also set university for validation
+                    setUniversity(e.target.value);
                     setShowUniversitySuggestions(true);
                   }}
                   onFocus={() => setShowUniversitySuggestions(true)}
@@ -575,7 +494,7 @@ export default function OnboardingForm() {
                   value={fraternitySearch}
                   onChange={(e) => {
                     setFraternitySearch(e.target.value);
-                    setFraternity(e.target.value); // Also set fraternity for validation
+                    setFraternity(e.target.value);
                     setShowFraternitySuggestions(true);
                   }}
                   onFocus={() => setShowFraternitySuggestions(true)}
@@ -604,152 +523,11 @@ export default function OnboardingForm() {
                 <span className="error-message">{validationErrors.fraternity}</span>
               )}
             </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Chapter Designation</label>
-                <input
-                  type="text"
-                  value={chapterDesignation}
-                  onChange={(e) => setChapterDesignation(e.target.value)}
-                  placeholder="e.g., Alpha Beta, Gamma Mu"
-                />
-              </div>
-              <div className="form-group">
-                <label>Year Founded</label>
-                <input
-                  type="number"
-                  value={yearFounded}
-                  onChange={(e) => setYearFounded(e.target.value ? parseInt(e.target.value) : '')}
-                  placeholder="e.g., 1985"
-                  min={1800}
-                  max={new Date().getFullYear()}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group" data-field="estimatedAlumni">
-                <label>Estimated Total Living Alumni *</label>
-                <input
-                  type="number"
-                  value={estimatedAlumni}
-                  onChange={(e) => setEstimatedAlumni(e.target.value ? parseInt(e.target.value) : '')}
-                  placeholder="e.g., 500"
-                  min={0}
-                  className={validationErrors.estimatedAlumni ? 'error' : ''}
-                />
-                <span className="helper-text">Approximate is fine</span>
-                {validationErrors.estimatedAlumni && (
-                  <span className="error-message">{validationErrors.estimatedAlumni}</span>
-                )}
-              </div>
-              <div className="form-group" data-field="activeMembers">
-                <label># of Active Members *</label>
-                <input
-                  type="number"
-                  value={activeMembers}
-                  onChange={(e) => setActiveMembers(e.target.value ? parseInt(e.target.value) : '')}
-                  placeholder="e.g., 80"
-                  min={0}
-                  className={validationErrors.activeMembers ? 'error' : ''}
-                />
-                <span className="helper-text">Current chapter size</span>
-                {validationErrors.activeMembers && (
-                  <span className="error-message">{validationErrors.activeMembers}</span>
-                )}
-              </div>
-            </div>
           </section>
         )}
 
-        {/* Section 2: Executive Board */}
+        {/* Section 2: Outreach Channels */}
         {currentSection === 2 && (
-          <section className="form-section">
-            <h2><Users size={24} /> Executive Board</h2>
-            <p className="section-description">Add your chapter&apos;s executive team</p>
-
-            <div className="executives-list">
-              {executives.map((exec, index) => (
-                <div key={exec.id} className="executive-card">
-                  <div className="executive-header">
-                    <span className="executive-number">Executive {index + 1}</span>
-                    {executives.length > 1 && (
-                      <button
-                        type="button"
-                        className="remove-btn"
-                        onClick={() => removeExecutive(exec.id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="form-group" data-field={`exec_${index}_name`}>
-                    <label>Full Name *</label>
-                    <input
-                      type="text"
-                      value={exec.full_name}
-                      onChange={(e) => updateExecutive(exec.id, 'full_name', e.target.value)}
-                      placeholder="John Smith"
-                      className={validationErrors[`exec_${index}_name`] ? 'error' : ''}
-                    />
-                    {validationErrors[`exec_${index}_name`] && (
-                      <span className="error-message">{validationErrors[`exec_${index}_name`]}</span>
-                    )}
-                  </div>
-
-                  <div className="form-group" data-field={`exec_${index}_position`}>
-                    <label>Position *</label>
-                    <select
-                      value={exec.position}
-                      onChange={(e) => updateExecutive(exec.id, 'position', e.target.value)}
-                    >
-                      {Object.entries(EXECUTIVE_POSITION_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
-                    {exec.position === 'other' && (
-                      <input
-                        type="text"
-                        value={exec.custom_position}
-                        onChange={(e) => updateExecutive(exec.id, 'custom_position', e.target.value)}
-                        placeholder="Specify position..."
-                        className={`mt-2 ${validationErrors[`exec_${index}_position`] ? 'error' : ''}`}
-                      />
-                    )}
-                    {validationErrors[`exec_${index}_position`] && (
-                      <span className="error-message">{validationErrors[`exec_${index}_position`]}</span>
-                    )}
-                  </div>
-
-                  <div className="form-group" data-field={`exec_${index}_email`}>
-                    <label>Personal Email *</label>
-                    <input
-                      type="email"
-                      value={exec.email}
-                      onChange={(e) => updateExecutive(exec.id, 'email', e.target.value)}
-                      placeholder="john@gmail.com"
-                      className={validationErrors[`exec_${index}_email`] ? 'error' : ''}
-                    />
-                    <span className="helper-text">Use a personal email (no .edu) - graduates lose access to school emails</span>
-                    {validationErrors[`exec_${index}_email`] && (
-                      <span className="error-message">{validationErrors[`exec_${index}_email`]}</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button type="button" className="add-btn" onClick={addExecutive}>
-              <Plus size={18} />
-              Add Another Executive
-            </button>
-          </section>
-        )}
-
-        {/* Section 3: Outreach Channels */}
-        {currentSection === 3 && (
           <section className="form-section">
             <h2><Share2 size={24} /> Current Outreach Channels</h2>
             <p className="section-description">
@@ -906,8 +684,8 @@ export default function OnboardingForm() {
           </section>
         )}
 
-        {/* Section 4: Alumni List */}
-        {currentSection === 4 && (
+        {/* Section 3: Alumni List */}
+        {currentSection === 3 && (
           <section className="form-section">
             <h2><FileSpreadsheet size={24} /> Alumni List Upload</h2>
             <p className="section-description">
@@ -922,7 +700,7 @@ export default function OnboardingForm() {
                 onDrop={(e) => {
                   e.preventDefault();
                   const file = e.dataTransfer.files[0];
-                  if (file) handleFileUpload(file, 'alumni');
+                  if (file) handleFileUpload(file);
                 }}
               >
                 {alumniFile ? (
@@ -957,7 +735,7 @@ export default function OnboardingForm() {
                       accept=".csv,.xlsx,.xls"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file, 'alumni');
+                        if (file) handleFileUpload(file);
                       }}
                     />
                   </>
@@ -984,142 +762,8 @@ export default function OnboardingForm() {
           </section>
         )}
 
-        {/* Section 5: Schedule Demo */}
-        {currentSection === 5 && (
-          <section className="form-section">
-            <h2><Calendar size={24} /> Schedule Demo</h2>
-            <p className="section-description">
-              Let&apos;s get your executive team up to speed! Pick a time that works for your officers.
-            </p>
-
-            <div className="schedule-demo-card">
-              <div className="schedule-demo-info">
-                <div className="schedule-demo-icon">
-                  <Calendar size={32} />
-                </div>
-                <div>
-                  <h3>Book a Demo Call</h3>
-                  <p>30-minute walkthrough with our team to get your chapter set up for success.</p>
-                </div>
-              </div>
-              {bookingLink ? (
-                <a 
-                  href={bookingLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="schedule-demo-btn"
-                >
-                  <Calendar size={18} />
-                  Schedule Demo
-                </a>
-              ) : (
-                <div className="schedule-demo-pending">
-                  <p>Scheduling link coming soon! Your CS manager will reach out to schedule.</p>
-                </div>
-              )}
-            </div>
-
-            <p className="fallback-text">
-              Can&apos;t find a time? Email us at{' '}
-              <a href="mailto:ford@trailblaize.net">ford@trailblaize.net</a>
-            </p>
-          </section>
-        )}
-
-        {/* Section 6: Instagram Launch */}
-        {currentSection === 6 && (
-          <section className="form-section">
-            <h2><Instagram size={24} /> Instagram Launch Post</h2>
-            
-            <div className="info-card">
-              <h3>What is this?</h3>
-              <p>
-                We&apos;ll create a co-branded Instagram post to announce your chapter&apos;s 
-                launch on Trailblaize. This drives early alumni sign-ups!
-              </p>
-              <div className="checklist-preview">
-                <h4>What to prepare:</h4>
-                <ul>
-                  <li>
-                    <Check size={14} />
-                    <strong>A high-quality photo of your chapter house</strong>
-                  </li>
-                  <li>
-                    <Check size={14} />
-                    <strong>Your chapter&apos;s Instagram handle</strong> so we can tag you
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Chapter Instagram Handle</label>
-              <div className="input-prefix">
-                <span>@</span>
-                <input
-                  type="text"
-                  value={igHandle}
-                  onChange={(e) => setIgHandle(e.target.value.replace('@', ''))}
-                  placeholder="yourchapter"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Upload House Photo (optional)</label>
-              <div 
-                className={`file-upload-zone image-upload ${igPhotoPreview ? 'has-file' : ''}`}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const file = e.dataTransfer.files[0];
-                  if (file) handleFileUpload(file, 'instagram');
-                }}
-              >
-                {igPhotoPreview ? (
-                  <div className="uploaded-image">
-                    <img src={igPhotoPreview} alt="Preview" />
-                    <button 
-                      type="button" 
-                      className="remove-file"
-                      onClick={() => {
-                        setIgPhoto(null);
-                        setIgPhotoUrl('');
-                        setIgPhotoPreview('');
-                      }}
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {uploadingFile ? (
-                      <Loader2 className="animate-spin" size={32} />
-                    ) : (
-                      <Upload size={32} />
-                    )}
-                    <p>Drag and drop a photo of your chapter house</p>
-                    <span className="file-types">Accepts .jpg, .png (min 1080x1080)</span>
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file, 'instagram');
-                      }}
-                    />
-                  </>
-                )}
-              </div>
-              <span className="helper-text">
-                You can also send the photo later - we&apos;ll share a draft with you before posting
-              </span>
-            </div>
-          </section>
-        )}
-
-        {/* Section 7: Submit */}
-        {currentSection === 7 && (
+        {/* Section 4: Submit */}
+        {currentSection === 4 && (
           <section className="form-section submit-section">
             <h2><Send size={24} /> Ready to Submit</h2>
             <p className="section-description">
@@ -1130,12 +774,6 @@ export default function OnboardingForm() {
               <div className="review-item">
                 <h4>Chapter</h4>
                 <p>{fraternity} at {university}</p>
-                {chapterDesignation && <p className="secondary">{chapterDesignation}</p>}
-              </div>
-              
-              <div className="review-item">
-                <h4>Executives</h4>
-                <p>{executives.length} executive{executives.length !== 1 ? 's' : ''} added</p>
               </div>
 
               <div className="review-item">
@@ -1146,11 +784,6 @@ export default function OnboardingForm() {
               <div className="review-item">
                 <h4>Alumni List</h4>
                 <p>{alumniFile ? alumniFile.name : noAlumniList ? 'Will provide later' : 'Not uploaded'}</p>
-              </div>
-
-              <div className="review-item">
-                <h4>Instagram</h4>
-                <p>{igHandle ? `@${igHandle}` : 'Not provided'}</p>
               </div>
             </div>
 
@@ -1195,7 +828,7 @@ export default function OnboardingForm() {
               Previous
             </button>
           )}
-          {currentSection < 7 && (
+          {currentSection < 4 && (
             <button type="button" className="nav-btn next" onClick={nextSection}>
               Next
               <ChevronRight size={20} />
