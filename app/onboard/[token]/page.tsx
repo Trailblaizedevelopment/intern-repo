@@ -37,10 +37,9 @@ interface OutreachChannel {
 }
 
 const SECTIONS = [
-  { id: 1, title: 'Chapter Information', icon: Building2 },
-  { id: 2, title: 'Outreach Channels', icon: Share2 },
-  { id: 3, title: 'Alumni List', icon: FileSpreadsheet },
-  { id: 4, title: 'Submit', icon: Send },
+  { id: 1, title: 'Outreach Channels', icon: Share2 },
+  { id: 2, title: 'Alumni List', icon: FileSpreadsheet },
+  { id: 3, title: 'Submit', icon: Send },
 ];
 
 const COMMUNICATION_METHODS = ['Email', 'Physical Mail', 'Both Email and Mail'];
@@ -442,92 +441,7 @@ export default function OnboardingForm() {
       {/* Form Content */}
       <main className="onboarding-content">
 
-        {/* Section 1: Chapter Information */}
         {currentSection === 1 && (
-          <section className="form-section">
-            <h2><Building2 size={24} /> Chapter Information</h2>
-            <p className="section-description">Tell us about your chapter</p>
-
-            <div className="form-group" data-field="university">
-              <label>University *</label>
-              <div className="autocomplete-wrapper">
-                <input
-                  type="text"
-                  value={universitySearch}
-                  onChange={(e) => {
-                    setUniversitySearch(e.target.value);
-                    setUniversity(e.target.value);
-                    setShowUniversitySuggestions(true);
-                  }}
-                  onFocus={() => setShowUniversitySuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowUniversitySuggestions(false), 200)}
-                  placeholder="Search for your university..."
-                  className={validationErrors.university ? 'error' : ''}
-                />
-                {showUniversitySuggestions && filteredUniversities.length > 0 && (
-                  <ul className="autocomplete-list">
-                    {filteredUniversities.map(u => (
-                      <li 
-                        key={u}
-                        onClick={() => {
-                          setUniversity(u);
-                          setUniversitySearch(u);
-                          setShowUniversitySuggestions(false);
-                        }}
-                      >
-                        {u}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              {validationErrors.university && (
-                <span className="error-message">{validationErrors.university}</span>
-              )}
-            </div>
-
-            <div className="form-group" data-field="fraternity">
-              <label>Fraternity/Sorority *</label>
-              <div className="autocomplete-wrapper">
-                <input
-                  type="text"
-                  value={fraternitySearch}
-                  onChange={(e) => {
-                    setFraternitySearch(e.target.value);
-                    setFraternity(e.target.value);
-                    setShowFraternitySuggestions(true);
-                  }}
-                  onFocus={() => setShowFraternitySuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowFraternitySuggestions(false), 200)}
-                  placeholder="Search for your organization..."
-                  className={validationErrors.fraternity ? 'error' : ''}
-                />
-                {showFraternitySuggestions && filteredOrganizations.length > 0 && (
-                  <ul className="autocomplete-list">
-                    {filteredOrganizations.map(o => (
-                      <li 
-                        key={o}
-                        onClick={() => {
-                          setFraternity(o);
-                          setFraternitySearch(o);
-                          setShowFraternitySuggestions(false);
-                        }}
-                      >
-                        {o}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              {validationErrors.fraternity && (
-                <span className="error-message">{validationErrors.fraternity}</span>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* Section 2: Outreach Channels */}
-        {currentSection === 2 && (
           <section className="form-section">
             <h2><Share2 size={24} /> Current Outreach Channels</h2>
             <p className="section-description">
@@ -684,8 +598,8 @@ export default function OnboardingForm() {
           </section>
         )}
 
-        {/* Section 3: Alumni List */}
-        {currentSection === 3 && (
+        {/* Section 2: Alumni List */}
+        {currentSection === 2 && (
           <section className="form-section">
             <h2><FileSpreadsheet size={24} /> Alumni List Upload</h2>
             <p className="section-description">
@@ -762,8 +676,8 @@ export default function OnboardingForm() {
           </section>
         )}
 
-        {/* Section 4: Submit */}
-        {currentSection === 4 && (
+        {/* Section 3: Submit */}
+        {currentSection === 3 && (
           <section className="form-section submit-section">
             <h2><Send size={24} /> Ready to Submit</h2>
             <p className="section-description">
