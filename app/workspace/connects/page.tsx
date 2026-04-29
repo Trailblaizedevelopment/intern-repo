@@ -210,9 +210,45 @@ const SEED_FLAG = 'connects_seeded_v5';
 function readCallLogs(): Record<string, CallLog> {
   try { return JSON.parse(localStorage.getItem(LS.callLogs) || '{}'); } catch { return {}; }
 }
-function writeCallLog(log: CallLog) {
+function writeCallLog(log: CallLog, chapterId?: string) {
+  // Write to localStorage (immediate)
   const all = readCallLogs(); all[log.contactId] = log;
   localStorage.setItem(LS.callLogs, JSON.stringify(all));
+  // Also persist to Supabase (async, non-blocking)
+  fetch('/api/call-logs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contactId: log.contactId,
+      chapterId: chapterId || null,
+      status: log.status,
+      notes: log.notes,
+      tags: log.tags,
+      calledBy: log.calledBy,
+      calledAt: log.calledAt,
+      followUpDate: log.followUpDate,
+      followUpCompleted: log.followUpCompleted,
+      contactSnapshot: log.contactSnapshot,
+    }),
+  }).catch(err => console.error('Failed to persist call log:', err));
+}
+async function loadCallLogsFromDB(chapterId?: string): Promise<Record<string, CallLog>> {
+  try {
+    const url = chapterId ? `/api/call-logs?chapter_id=${chapterId}` : '/api/call-logs';
+    const res = await fetch(url);
+    if (!res.ok) return readCallLogs(); // fallback to localStorage
+    const { logs } = await res.json();
+    if (logs && Object.keys(logs).length > 0) {
+      // Merge DB logs with localStorage (DB takes precedence)
+      const local = readCallLogs();
+      const merged = { ...local, ...logs };
+      localStorage.setItem(LS.callLogs, JSON.stringify(merged));
+      return merged as Record<string, CallLog>;
+    }
+    return readCallLogs();
+  } catch {
+    return readCallLogs();
+  }
 }
 
 function readClaims(): Record<string, Claim> {
@@ -1954,12 +1990,14 @@ export default function ConnectsCenter() {
   const [statusPanel, setStatusPanel] = useState<{ contact: MergedAlumni; log: CallLog | undefined } | null>(null);
   const [promotingEntry, setPromotingEntry] = useState<PendingConnectEntry | null>(null);
 
-  // Hydrate localStorage
+  // Hydrate from localStorage first, then load from DB
   useEffect(() => {
     setCallLogs(readCallLogs());
     setClaims(readClaims());
     setAssignments(readAssignments());
     setCurrentUserState(readCurrentUser());
+    // Load call logs from DB (merges with localStorage)
+    loadCallLogsFromDB(selectedChapterId).then(merged => setCallLogs(merged));
     setTodoCompleted(readTodoCompleted());
     setPendingConnects(readPendingConnects());
     setConnected(readConnected());
@@ -2120,7 +2158,7 @@ export default function ConnectsCenter() {
       calledBy: currentUser,
       calledAt: new Date().toISOString(),
     };
-    writeCallLog(log);
+    writeCallLog(log, selectedChapterId);
     setCallLogs(prev => ({ ...prev, [callModal.id]: log }));
     deleteClaim(callModal.id);
     setCallModal(null);
@@ -2144,7 +2182,7 @@ export default function ConnectsCenter() {
       calledBy: currentUser,
       calledAt: new Date().toISOString(),
     };
-    writeCallLog(log);
+    writeCallLog(log, selectedChapterId);
     setCallLogs(prev => ({ ...prev, [callModal.id]: log }));
     deleteClaim(callModal.id);
     setCallModal(null);
@@ -2181,7 +2219,7 @@ export default function ConnectsCenter() {
       followUpCompleted: false,
       contactSnapshot: snapshot,
     };
-    writeCallLog(log);
+    writeCallLog(log, selectedChapterId);
     setCallLogs(prev => ({ ...prev, [contact.id]: log }));
     deleteClaim(contact.id);
     setClaims(prev => { const n = { ...prev }; delete n[contact.id]; return n; });
