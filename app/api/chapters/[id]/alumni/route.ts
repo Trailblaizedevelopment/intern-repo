@@ -150,6 +150,11 @@ export async function GET(
     }
   }
 
+  // Fallback 2: use the internal chapter_id directly as external (same DB scenario)
+  if (!externalChapterId) {
+    externalChapterId = id;
+  }
+
   // ── Step 3: Fetch external platform profiles ──────────────────────────────
   let externalProfiles: ExternalProfile[] = [];
 
