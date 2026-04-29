@@ -13,15 +13,8 @@ interface Affiliation {
   orgName: string;
 }
 
-// Real people faces from our icon database
-const FACES = [
-  { name: 'Whitney Wolfe Herd', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Whitney_Wolfe_Herd_2019.jpg/440px-Whitney_Wolfe_Herd_2019.jpg' },
-  { name: 'Sanjay Gupta', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Sanjay_Gupta_-_2019_%28cropped%29.jpg/440px-Sanjay_Gupta_-_2019_%28cropped%29.jpg' },
-  { name: 'Matthew McConaughey', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Matthew_McConaughey_2019_%2848648344772%29.jpg/440px-Matthew_McConaughey_2019_%2848648344772%29.jpg' },
-  { name: 'Braxton Berrios', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Braxton_Berrios.jpg/440px-Braxton_Berrios.jpg' },
-  { name: 'Steve Cadigan', img: 'https://pbs.twimg.com/profile_images/1284937389985959937/KMlPMCxo_400x400.jpg' },
-  { name: 'Dorel Tamam', img: 'https://pbs.twimg.com/profile_images/1284937389985959937/KMlPMCxo_400x400.jpg' },
-];
+// Face photos hosted locally in /public/faces/
+const FACE_URLS = Array.from({ length: 12 }, (_, i) => `/faces/face${i + 1}.jpg`);
 
 // Floating node for the animated web
 interface WebNode {
@@ -53,19 +46,18 @@ function AnimatedWeb() {
     resize();
     window.addEventListener('resize', resize);
 
-    // Load face images
+    // Load face images from local files
     const imgs: HTMLImageElement[] = [];
-    FACES.forEach((face, i) => {
+    FACE_URLS.forEach((url, i) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = face.img;
+      img.src = url;
       img.onerror = () => { /* silently fail */ };
       imgs[i] = img;
     });
     imagesRef.current = imgs;
 
     // Create nodes
-    const nodeCount = 18;
+    const nodeCount = 20;
     const nodes: WebNode[] = [];
     for (let i = 0; i < nodeCount; i++) {
       nodes.push({
@@ -74,8 +66,8 @@ function AnimatedWeb() {
         y: Math.random() * canvas.height,
         vx: (Math.random() - 0.5) * 0.4,
         vy: (Math.random() - 0.5) * 0.4,
-        radius: i < 6 ? 28 : 16,
-        faceIdx: i < 6 ? i : -1,
+        radius: i < 12 ? 26 : 10,
+        faceIdx: i < 12 ? i : -1,
       });
     }
     nodesRef.current = nodes;
