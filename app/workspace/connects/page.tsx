@@ -548,7 +548,7 @@ function DailyTodo({ contacts, callLogs, currentUser, assignments, completed, on
 
 // ─── Contact Card (V3) ────────────────────────────────────────────────────────
 
-function ContactCard({ contact, log, claim, status, onCallClick, onTextClick, onStatusClick }: {
+function ContactCard({ contact, log, claim, status, onCallClick, onTextClick, onStatusClick, onCardClick }: {
   contact: MergedAlumni;
   log: CallLog | undefined;
   claim: Claim | undefined;
@@ -556,10 +556,13 @@ function ContactCard({ contact, log, claim, status, onCallClick, onTextClick, on
   onCallClick: () => void;
   onTextClick: () => void;
   onStatusClick?: () => void;
+  onCardClick?: () => void;
 }) {
   const overdueFollowUp = log?.followUpDate && !log.followUpCompleted && isOverdue(log.followUpDate);
   return (
-    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px', transition: 'border-color 0.15s', opacity: log?.status === 'declined' ? 0.65 : 1 }}
+    <div
+      onClick={onCardClick}
+      style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px', transition: 'border-color 0.15s', opacity: log?.status === 'declined' ? 0.65 : 1, cursor: onCardClick ? 'pointer' : 'default' }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = '#9ca3af')}
       onMouseLeave={e => (e.currentTarget.style.borderColor = '#E5E7EB')}
     >
@@ -606,7 +609,7 @@ function ContactCard({ contact, log, claim, status, onCallClick, onTextClick, on
         <div style={{ display: 'flex', gap: 8 }}>
           {status === 'called' ? (
             <button
-              onClick={onStatusClick}
+              onClick={e => { e.stopPropagation(); onStatusClick?.(); }}
               style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
@@ -615,7 +618,7 @@ function ContactCard({ contact, log, claim, status, onCallClick, onTextClick, on
             </button>
           ) : (
             <button
-              onClick={onCallClick}
+              onClick={e => { e.stopPropagation(); onCallClick(); }}
               style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #0d9488, #10b981)', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
@@ -624,7 +627,7 @@ function ContactCard({ contact, log, claim, status, onCallClick, onTextClick, on
             </button>
           )}
           <button
-            onClick={onTextClick}
+            onClick={e => { e.stopPropagation(); onTextClick(); }}
             style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: '#0F172A', color: 'white', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', transition: 'opacity 0.15s' }}
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
             onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
@@ -1526,7 +1529,7 @@ function ConnectedColumn({ entries }: { entries: ConnectedEntry[] }) {
 
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 
-function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextClick, onStatusClick }: {
+function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextClick, onStatusClick, onCardClick }: {
   status: ColumnStatus;
   contacts: MergedAlumni[];
   callLogs: Record<string, CallLog>;
@@ -1534,6 +1537,7 @@ function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextC
   onCallClick: (c: MergedAlumni) => void;
   onTextClick: (c: MergedAlumni) => void;
   onStatusClick: (c: MergedAlumni) => void;
+  onCardClick: (c: MergedAlumni) => void;
 }) {
   const cfg = COLUMN_CONFIG[status];
   return (
@@ -1546,10 +1550,162 @@ function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextC
         {contacts.length === 0 ? (
           <div style={{ padding: '24px 0', textAlign: 'center', color: '#d1d5db', fontSize: '0.8125rem' }}>No contacts</div>
         ) : contacts.map(c => (
-          <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} status={status} onCallClick={() => onCallClick(c)} onTextClick={() => onTextClick(c)} onStatusClick={() => onStatusClick(c)} />
+          <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} status={status} onCallClick={() => onCallClick(c)} onTextClick={() => onTextClick(c)} onStatusClick={() => onStatusClick(c)} onCardClick={() => onCardClick(c)} />
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Profile Drawer ──────────────────────────────────────────────────────────
+
+function ProfileDrawer({ contact, log, onClose }: {
+  contact: MergedAlumni;
+  log: CallLog | undefined;
+  onClose: () => void;
+}) {
+  const calledAtStr = log?.calledAt
+    ? new Date(log.calledAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  const lastActiveStr = contact.last_active_at
+    ? new Date(contact.last_active_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.18)', zIndex: 47 }} />
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0,
+        width: 380, maxWidth: '100vw',
+        background: 'white',
+        borderLeft: '1px solid #E5E7EB',
+        zIndex: 47,
+        boxShadow: '-4px 0 32px rgba(0,0,0,0.10)',
+        display: 'flex', flexDirection: 'column',
+        overflowY: 'auto',
+        borderRadius: '12px 0 0 12px',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '24px 24px 18px', borderBottom: '1px solid #E5E7EB', flexShrink: 0, background: 'white', position: 'sticky', top: 0, zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <AvatarImg avatarUrl={contact.avatar_url} name={contact.full_name} size={60} />
+              <div>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0F172A', margin: '0 0 3px' }}>{contact.full_name}</h2>
+                {contact.chapter_name && <div style={{ fontSize: '0.8rem', color: '#6B7280', marginBottom: 2 }}>🏛️ {contact.chapter_name}</div>}
+                {contact.grad_year && <div style={{ fontSize: '0.78rem', color: '#6B7280' }}>Class of {contact.grad_year}</div>}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#9ca3af', display: 'flex', flexShrink: 0 }}><X size={20} /></button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* Member status pill */}
+          {contact.member_status && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f3f4f6', padding: '5px 12px', borderRadius: 9999, width: 'fit-content' }}>
+              <User size={13} style={{ color: '#6B7280' }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>{contact.member_status}</span>
+            </div>
+          )}
+
+          {/* Contact Info */}
+          <div style={{ background: '#f9fafb', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 9, border: '1px solid #E5E7EB' }}>
+            <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 2px' }}>Contact Info</p>
+            {contact.phone && (
+              <a href={`tel:${contact.phone}`} style={{ fontSize: '0.875rem', color: '#2563eb', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Phone size={13} /> {fmtPhone(contact.phone)}
+              </a>
+            )}
+            {!contact.phone && (
+              <span style={{ fontSize: '0.82rem', color: '#d1d5db' }}>No phone on file</span>
+            )}
+            {contact.email && (
+              <div style={{ fontSize: '0.82rem', color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>✉️ {contact.email}</div>
+            )}
+            {contact.location && (
+              <div style={{ fontSize: '0.82rem', color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>📍 {contact.location}</div>
+            )}
+            {contact.linkedin_url && (
+              <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.82rem', color: '#2563eb', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>🔗 LinkedIn Profile</a>
+            )}
+          </div>
+
+          {/* Platform Info */}
+          <div style={{ background: '#f9fafb', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 9, border: '1px solid #E5E7EB' }}>
+            <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 2px' }}>Platform</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.82rem', color: '#6B7280' }}>Outreach Status</span>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#374151', background: '#E5E7EB', padding: '2px 10px', borderRadius: 9999 }}>
+                {contact.outreach_status || 'not_contacted'}
+              </span>
+            </div>
+            {lastActiveStr && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.82rem', color: '#6B7280' }}>Last Active</span>
+                <span style={{ fontSize: '0.78rem', color: '#374151' }}>{lastActiveStr}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.82rem', color: '#6B7280' }}>Platform Member</span>
+              <span style={{ fontSize: '0.78rem', color: contact.platform_joined ? '#15803d' : '#6B7280', fontWeight: 600 }}>
+                {contact.platform_joined ? '✅ Yes' : 'No'}
+              </span>
+            </div>
+          </div>
+
+          {/* Call History */}
+          {log ? (
+            <div>
+              <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Call History</p>
+              <div style={{ background: '#f9fafb', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, border: '1px solid #E5E7EB' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: COLUMN_CONFIG[log.status]?.badgeColor || '#6B7280', background: COLUMN_CONFIG[log.status]?.badgeBg || '#f3f4f6', padding: '3px 10px', borderRadius: 9999 }}>
+                    {COLUMN_CONFIG[log.status]?.label || log.status}
+                  </span>
+                  {calledAtStr && <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>{calledAtStr}</span>}
+                </div>
+                {log.calledBy && (
+                  <div style={{ fontSize: '0.8rem', color: '#374151' }}>Called by <strong>{log.calledBy}</strong></div>
+                )}
+                {log.notes && (
+                  <div>
+                    <p style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 600, margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Notes</p>
+                    <p style={{ fontSize: '0.8125rem', color: '#374151', margin: 0, fontStyle: 'italic', lineHeight: 1.5, borderLeft: '3px solid #86efac', paddingLeft: 10 }}>{log.notes}</p>
+                  </div>
+                )}
+                {log.tags && log.tags.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 600, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tags</p>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {log.tags.map(t => <TagPill key={t} tag={t} />)}
+                    </div>
+                  </div>
+                )}
+                {log.followUpDate && (
+                  <div style={{
+                    fontSize: '0.78rem', fontWeight: 600,
+                    color: isOverdue(log.followUpDate) ? '#92400e' : '#15803d',
+                    background: isOverdue(log.followUpDate) ? '#fef3c7' : '#f0fdf4',
+                    padding: '5px 12px', borderRadius: 8, display: 'inline-block', width: 'fit-content',
+                  }}>
+                    {isOverdue(log.followUpDate) ? '⚠️ Overdue' : '📅'} Follow-up: {log.followUpDate}
+                    {log.followUpCompleted && ' ✓ Done'}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '12px 0', color: '#d1d5db', fontSize: '0.8rem' }}>
+              No call history yet
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1989,6 +2145,7 @@ export default function ConnectsCenter() {
   const [textingContact, setTextingContact] = useState<MergedAlumni | null>(null);
   const [statusPanel, setStatusPanel] = useState<{ contact: MergedAlumni; log: CallLog | undefined } | null>(null);
   const [promotingEntry, setPromotingEntry] = useState<PendingConnectEntry | null>(null);
+  const [profileContact, setProfileContact] = useState<MergedAlumni | null>(null);
 
   // Hydrate from localStorage first, then load from DB
   useEffect(() => {
@@ -2409,7 +2566,7 @@ export default function ConnectsCenter() {
               <div style={{ overflowX: 'auto', paddingBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 'max-content' }}>
                   {(['not_called', 'voicemail', 'called', 'declined'] as const).map(status => (
-                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} onTextClick={handleTextClick} onStatusClick={handleStatusClick} />
+                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} onTextClick={handleTextClick} onStatusClick={handleStatusClick} onCardClick={c => setProfileContact(c)} />
                   ))}
                   <PendingConnectColumn
                     entries={pendingConnects}
@@ -2481,6 +2638,15 @@ export default function ConnectsCenter() {
           entry={promotingEntry}
           onConfirm={(outcome) => handlePromoteToConnected(promotingEntry.id, outcome)}
           onClose={() => setPromotingEntry(null)}
+        />
+      )}
+
+      {/* Profile Drawer */}
+      {profileContact && (
+        <ProfileDrawer
+          contact={profileContact}
+          log={callLogs[profileContact.id]}
+          onClose={() => setProfileContact(null)}
         />
       )}
     </div>
