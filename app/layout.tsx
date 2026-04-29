@@ -3,23 +3,21 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Trailblaize",
-  description: "Alumni relationship management for Greek life chapters.",
-  keywords: ["alumni", "networking", "community", "organizations", "Trailblaize", "engagement", "growth"],
+  description: "The private network for the people and places that matter.",
+  keywords: ["alumni", "networking", "community", "organizations", "Trailblaize", "engagement", "growth", "social network"],
   authors: [{ name: "Trailblaize" }],
   metadataBase: new URL("https://trailblaize.space"),
   openGraph: {
     title: "Trailblaize",
-    description: "Alumni relationship management for Greek life chapters.",
+    description: "The private network for the people and places that matter.",
     url: "https://trailblaize.space",
     siteName: "Trailblaize",
-    images: [{ url: "/logos/logo-wordmark-color.png", width: 1200, height: 630 }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Trailblaize",
-    description: "Alumni relationship management for Greek life chapters.",
-    images: ["/logos/logo-wordmark-color.png"],
+    description: "The private network for the people and places that matter.",
   },
   icons: {
     icon: "/logos/logo-icon-white.png",
