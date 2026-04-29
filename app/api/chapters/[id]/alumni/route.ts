@@ -160,8 +160,67 @@ export async function GET(
 
   const platformClient = getPlatformAdmin();
 
+  // Auto-match: if direct ID lookup returns 0 profiles, search by chapter name
+  const autoMatchByName = async (platform: NonNullable<typeof platformClient>, chapterId: string, internalId: string) => {
+    // First try direct chapter_id match
+    const { data: directProfiles } = await platform
+      .from('profiles')
+      .select('id')
+      .eq('chapter_id', chapterId)
+      .limit(1);
+
+    if (directProfiles && directProfiles.length > 0) return chapterId;
+
+    // No profiles found — search spaces/chapters table by name for a match
+    const { data: internalChapter } = await supabase
+      .from('chapters')
+      .select('chapter_name')
+      .eq('id', internalId)
+      .single();
+
+    if (!internalChapter?.chapter_name) return chapterId;
+
+    // Search external spaces by name similarity
+    const name = internalChapter.chapter_name;
+    const { data: matchingSpaces } = await platform
+      .from('spaces')
+      .select('id, name')
+      .or(`name.ilike.%${name.split('@')[0].trim()}%,name.ilike.%${name.split(' ').slice(0, 2).join(' ')}%`)
+      .limit(5);
+
+    if (matchingSpaces && matchingSpaces.length > 0) {
+      // Check which space has actual profiles
+      for (const space of matchingSpaces) {
+        const { data: spaceProfiles } = await platform
+          .from('profiles')
+          .select('id')
+          .eq('chapter_id', space.id)
+          .limit(1);
+
+        if (spaceProfiles && spaceProfiles.length > 0) {
+          // Found a match — save the mapping for future lookups
+          await supabase.from('chapter_external_mappings').upsert({
+            internal_chapter_id: internalId,
+            external_chapter_id: space.id,
+          }, { onConflict: 'internal_chapter_id' }).select();
+
+          return space.id;
+        }
+      }
+    }
+
+    return chapterId;
+  };
+
   if (externalChapterId && platformClient) {
     const platform = platformClient;
+
+    // Auto-match: resolve the correct external chapter_id (saves mapping for next time)
+    const resolvedExternalId = await autoMatchByName(platform, externalChapterId, id);
+    if (resolvedExternalId !== externalChapterId) {
+      externalChapterId = resolvedExternalId;
+    }
+
     const { data: profiles } = await platform
       .from('profiles')
       .select(
