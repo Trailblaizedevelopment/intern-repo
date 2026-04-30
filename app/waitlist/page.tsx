@@ -203,20 +203,32 @@ function SearchableDropdown({
 // ─── Alpha Chapter profiles ───────────────────────────────────────────────────
 
 const ALPHA_PROFILES = [
-  // Alpha Chapter (men)
-  { name: 'Zach', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg', role: 'VP of BD @ Virtue' },
-  { name: 'Ethan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cc27eb12-c5fb-4d60-86ef-74e6f28ad9a4-1776170865222.jpg', role: 'Financial Services @ Fidelity' },
+  // Alpha Chapter (men) — 12
   { name: 'Nash', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg', role: 'Dir of Ops, US Senate' },
+  { name: 'Ethan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cc27eb12-c5fb-4d60-86ef-74e6f28ad9a4-1776170865222.jpg', role: 'Financial Services @ Fidelity' },
   { name: 'Jake', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/4be69e44-669f-442e-8859-731db416ea3b-1776172132818.jpg', role: 'Founder @ Scratch AI' },
   { name: 'Gavin', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/365ac617-1637-4a85-b02c-b2b23b4307c7-1776171942678.jpg', role: 'Analyst @ JPMorgan' },
   { name: 'Garrett', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8ee6fb3e-f6a8-486f-a140-cad49adfeee4-1776171107178.jpg', role: 'Underwriter @ Chubb' },
-  // Omega Chapter (women)
+  { name: 'Payne', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/dec7107c-53b3-4613-8929-1357413117f5-1776171340287.jpg', role: 'AE @ Knight Commercial' },
+  { name: 'Andrew', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/799297e8-2135-4ffd-aa78-a4b370964ed4-1776172249725.jpg', role: 'IB Analyst @ GSI Capital' },
+  { name: 'Dimitri', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/c5b64119-3a87-40ca-b9ce-0f895daa35f2-1776171773028.png', role: 'Growth @ Doorlist' },
+  { name: 'Peyton', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/c763c3a6-f096-4d2d-bb33-ab72fa68f18d-1776171724379.jpg', role: 'Advisor @ Williams Wealth' },
+  { name: 'Luke', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/b3c91296-b4d6-4bc3-80ae-8f428d238bf7-1776172539399.jpg', role: 'MS Finance @ McCombs' },
+  { name: 'Nick', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/927335a8-cce4-4f05-b004-281d8d8c00f9-1776170450281.jpg', role: 'AE @ Hooray Health' },
+  { name: 'Eli', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/53cb2180-3389-4ab5-a273-cc07b9dc1930-1776172483234.jpg', role: 'Real Estate @ Watersound' },
+  // Omega Chapter (women) — 12
   { name: 'Sarah B.', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/793c6990-cf2d-436c-97ce-adde55d88b80-1777564226650.jpg', role: 'Scheduler, US Senate' },
   { name: 'Megan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8005621f-cb31-42a6-b7e3-29d756d6d49a-1777563457055.png', role: 'CRA @ Fidelity' },
   { name: 'Maria', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/7b28512b-59c9-4a2d-a7d6-955b48ce3c8a-1777563644735.jpg', role: 'Sales @ Jack Victor' },
   { name: 'Mary', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/5a8d9026-e29e-4b45-b070-1a171330dedd-1777564410163.png', role: 'Real Estate @ Compass' },
   { name: 'Brenley', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/2701ac2c-5f21-484d-99f6-93ee5dc992f7-1777565592730.jpg', role: 'Business Comms, NYC' },
   { name: 'Paloma', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/601df2dd-0691-4ecc-90c6-bace232857f6-1777563930930.jpg', role: 'Wealth Mgmt @ Fidelity' },
+  { name: 'Nat', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/9e6a9d40-3193-4e8c-9ed6-5ff6d4e89e87-1777563259842.jpg', role: 'CRA @ Fidelity' },
+  { name: 'Brooks', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/84757da0-ab6d-44b2-9a45-a4fd21aded5c-1777564053378.jpg', role: 'Marketing @ OakTruss' },
+  { name: 'Elise', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/fc766b39-5a30-4ada-abec-e276e6784216-1777564716161.jpg', role: 'Dental Assistant' },
+  { name: 'Lindsey', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17cd225c-782f-487c-a9bd-10abfd4fe5e7-1777565363946.png', role: 'Dietitian @ NutriFocus' },
+  { name: 'Sadler', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/9882ad6a-3e53-472d-89eb-e8e8d435ccf8-1777565880596.jpg', role: 'Stylist @ Natasha Colvin' },
+  { name: 'Ivonne', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/2e275ac2-aa89-4d5f-872a-4bfaa5d0125f-1777560860099.jpg', role: 'Finance Professor' },
 ];
 
 // ─── Floating node for the animated web ──────────────────────────────────────
@@ -260,7 +272,7 @@ function AnimatedWeb() {
     });
     imagesRef.current = imgs;
 
-    const nodeCount = 20;
+    const nodeCount = 32;
     const nodes: WebNode[] = [];
     for (let i = 0; i < nodeCount; i++) {
       nodes.push({
@@ -269,8 +281,8 @@ function AnimatedWeb() {
         y: Math.random() * canvas.height,
         vx: (Math.random() - 0.5) * 0.25,
         vy: (Math.random() - 0.5) * 0.25,
-        radius: i < 12 ? 34 : 6,
-        faceIdx: i < 12 ? i : -1,
+        radius: i < 24 ? 30 : 5,
+        faceIdx: i < 24 ? i : -1,
       });
     }
     nodesRef.current = nodes;
