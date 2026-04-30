@@ -1683,6 +1683,46 @@ function SetUpPage() {
           <h2 style={S.h2}>Here&apos;s what you&apos;re agreeing to</h2>
           <p style={S.sub}>Plain language, no surprises.</p>
 
+          {/* Member count + contact info — needed for pricing and checkout */}
+          <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 12, padding: '20px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', display: 'block', marginBottom: 6 }}>How many active members does your chapter have?</label>
+              <input
+                type="number"
+                min={1}
+                placeholder="e.g. 120"
+                value={form.memberCount}
+                onChange={e => setForm(f => ({ ...f, memberCount: e.target.value }))}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: '0.9375rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+              {form.memberCount && <p style={{ fontSize: '0.8125rem', color: '#10B981', marginTop: 6, marginBottom: 0, fontWeight: 600 }}>${getPriceTier(Number(form.memberCount))}/month</p>}
+            </div>
+            {!form.leaderEmail && (
+              <div>
+                <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', display: 'block', marginBottom: 6 }}>Contact email</label>
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={form.leaderEmail}
+                  onChange={e => setForm(f => ({ ...f, leaderEmail: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: '0.9375rem', fontFamily: 'inherit', outline: 'none' }}
+                />
+              </div>
+            )}
+            {!form.leaderPhone && (
+              <div>
+                <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', display: 'block', marginBottom: 6 }}>Contact phone</label>
+                <input
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={form.leaderPhone}
+                  onChange={e => setForm(f => ({ ...f, leaderPhone: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: '0.9375rem', fontFamily: 'inherit', outline: 'none' }}
+                />
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
             {[
               { icon: <Zap size={18} color="#0F172A" />, title: "What you're getting", desc: "Access to the full Trailblaize platform — alumni directory, message board, engagement tools, and ongoing support." },
