@@ -200,54 +200,59 @@ function SearchableDropdown({
   );
 }
 
-// ─── Alpha Chapter profiles ───────────────────────────────────────────────────
+// ─── Avatar URLs for the animated web ───────────────────────────────────────
 
-const ALPHA_PROFILES = [
-  // Alpha Chapter (men) — 12
-  { name: 'Nash', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg', role: 'Dir of Ops, US Senate' },
-  { name: 'Ethan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cc27eb12-c5fb-4d60-86ef-74e6f28ad9a4-1776170865222.jpg', role: 'Financial Services @ Fidelity' },
-  { name: 'Jake', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/4be69e44-669f-442e-8859-731db416ea3b-1776172132818.jpg', role: 'Founder @ Scratch AI' },
-  { name: 'Gavin', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/365ac617-1637-4a85-b02c-b2b23b4307c7-1776171942678.jpg', role: 'Analyst @ JPMorgan' },
-  { name: 'Garrett', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8ee6fb3e-f6a8-486f-a140-cad49adfeee4-1776171107178.jpg', role: 'Underwriter @ Chubb' },
-  { name: 'Payne', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/dec7107c-53b3-4613-8929-1357413117f5-1776171340287.jpg', role: 'AE @ Knight Commercial' },
-  { name: 'Andrew', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/799297e8-2135-4ffd-aa78-a4b370964ed4-1776172249725.jpg', role: 'IB Analyst @ GSI Capital' },
-  { name: 'Dimitri', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/c5b64119-3a87-40ca-b9ce-0f895daa35f2-1776171773028.png', role: 'Growth @ Doorlist' },
-  { name: 'Peyton', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/c763c3a6-f096-4d2d-bb33-ab72fa68f18d-1776171724379.jpg', role: 'Advisor @ Williams Wealth' },
-  { name: 'Luke', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/b3c91296-b4d6-4bc3-80ae-8f428d238bf7-1776172539399.jpg', role: 'MS Finance @ McCombs' },
-  { name: 'Nick', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/927335a8-cce4-4f05-b004-281d8d8c00f9-1776170450281.jpg', role: 'AE @ Hooray Health' },
-  { name: 'Eli', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/53cb2180-3389-4ab5-a273-cc07b9dc1930-1776172483234.jpg', role: 'Real Estate @ Watersound' },
-  // Omega Chapter (women) — 12
-  { name: 'Sarah B.', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/793c6990-cf2d-436c-97ce-adde55d88b80-1777564226650.jpg', role: 'Scheduler, US Senate' },
-  { name: 'Megan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8005621f-cb31-42a6-b7e3-29d756d6d49a-1777563457055.png', role: 'CRA @ Fidelity' },
-  { name: 'Maria', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/7b28512b-59c9-4a2d-a7d6-955b48ce3c8a-1777563644735.jpg', role: 'Sales @ Jack Victor' },
-  { name: 'Mary', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/5a8d9026-e29e-4b45-b070-1a171330dedd-1777564410163.png', role: 'Real Estate @ Compass' },
-  { name: 'Brenley', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/2701ac2c-5f21-484d-99f6-93ee5dc992f7-1777565592730.jpg', role: 'Business Comms, NYC' },
-  { name: 'Paloma', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/601df2dd-0691-4ecc-90c6-bace232857f6-1777563930930.jpg', role: 'Wealth Mgmt @ Fidelity' },
-  { name: 'Nat', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/9e6a9d40-3193-4e8c-9ed6-5ff6d4e89e87-1777563259842.jpg', role: 'CRA @ Fidelity' },
-  { name: 'Brooks', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/84757da0-ab6d-44b2-9a45-a4fd21aded5c-1777564053378.jpg', role: 'Marketing @ OakTruss' },
-  { name: 'Elise', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/fc766b39-5a30-4ada-abec-e276e6784216-1777564716161.jpg', role: 'Dental Assistant' },
-  { name: 'Lindsey', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17cd225c-782f-487c-a9bd-10abfd4fe5e7-1777565363946.png', role: 'Dietitian @ NutriFocus' },
-  { name: 'Sadler', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/9882ad6a-3e53-472d-89eb-e8e8d435ccf8-1777565880596.jpg', role: 'Stylist @ Natasha Colvin' },
-  { name: 'Ivonne', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/2e275ac2-aa89-4d5f-872a-4bfaa5d0125f-1777560860099.jpg', role: 'Finance Professor' },
+const AVATAR_URLS: string[] = [
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cc27eb12-c5fb-4d60-86ef-74e6f28ad9a4-1776170865222.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/4be69e44-669f-442e-8859-731db416ea3b-1776172132818.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/365ac617-1637-4a85-b02c-b2b23b4307c7-1776171942678.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8ee6fb3e-f6a8-486f-a140-cad49adfeee4-1776171107178.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/dec7107c-53b3-4613-8929-1357413117f5-1776171340287.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/799297e8-2135-4ffd-aa78-a4b370964ed4-1776172249725.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/c5b64119-3a87-40ca-b9ce-0f895daa35f2-1776171773028.png',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/c763c3a6-f096-4d2d-bb33-ab72fa68f18d-1776171724379.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/b3c91296-b4d6-4bc3-80ae-8f428d238bf7-1776172539399.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/927335a8-cce4-4f05-b004-281d8d8c00f9-1776170450281.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/53cb2180-3389-4ab5-a273-cc07b9dc1930-1776172483234.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/793c6990-cf2d-436c-97ce-adde55d88b80-1777564226650.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8005621f-cb31-42a6-b7e3-29d756d6d49a-1777563457055.png',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/7b28512b-59c9-4a2d-a7d6-955b48ce3c8a-1777563644735.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/5a8d9026-e29e-4b45-b070-1a171330dedd-1777564410163.png',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/2701ac2c-5f21-484d-99f6-93ee5dc992f7-1777565592730.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/601df2dd-0691-4ecc-90c6-bace232857f6-1777563930930.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/9e6a9d40-3193-4e8c-9ed6-5ff6d4e89e87-1777563259842.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/84757da0-ab6d-44b2-9a45-a4fd21aded5c-1777564053378.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/fc766b39-5a30-4ada-abec-e276e6784216-1777564716161.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17cd225c-782f-487c-a9bd-10abfd4fe5e7-1777565363946.png',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/9882ad6a-3e53-472d-89eb-e8e8d435ccf8-1777565880596.jpg',
+  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/2e275ac2-aa89-4d5f-872a-4bfaa5d0125f-1777560860099.jpg',
 ];
 
-// ─── Floating node for the animated web ──────────────────────────────────────
+// ─── Animated network web ────────────────────────────────────────────────────
 
 interface WebNode {
-  id: number;
   x: number;
   y: number;
   vx: number;
   vy: number;
-  radius: number;
-  faceIdx: number;
+  appearTime: number; // performance.now() when revealed, -1 = not yet
 }
+
+const NODE_RADIUS = 22;
+const CONNECTION_DIST = 250;
+const NODE_VELOCITY = 0.15;
+const FADE_DURATION = 400;
 
 function AnimatedWeb() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const nodesRef = useRef<WebNode[]>([]);
-  const imagesRef = useRef<HTMLImageElement[]>([]);
-  const animRef = useRef<number>(0);
+  const stateRef = useRef<{
+    nodes: WebNode[];
+    imgs: HTMLImageElement[];
+    visibleCount: number;
+    animId: number;
+    timeouts: ReturnType<typeof setTimeout>[];
+  } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -262,103 +267,151 @@ function AnimatedWeb() {
     resize();
     window.addEventListener('resize', resize);
 
-    const imgs: HTMLImageElement[] = [];
-    ALPHA_PROFILES.forEach((profile, i) => {
+    // Preload all images
+    const imgs: HTMLImageElement[] = AVATAR_URLS.map(url => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.src = profile.avatar;
-      img.onerror = () => { /* silently fail */ };
-      imgs[i] = img;
+      img.src = url;
+      return img;
     });
-    imagesRef.current = imgs;
 
-    const nodeCount = 32;
-    const nodes: WebNode[] = [];
-    for (let i = 0; i < nodeCount; i++) {
-      nodes.push({
-        id: i,
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: (Math.random() - 0.5) * 0.25,
-        radius: i < 24 ? 30 : 5,
-        faceIdx: i < 24 ? i : -1,
-      });
-    }
-    nodesRef.current = nodes;
+    // Build node positions: first node at center, rest spread outward
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const nodes: WebNode[] = AVATAR_URLS.map((_, i) => {
+      if (i === 0) {
+        return { x: cx, y: cy, vx: (Math.random() - 0.5) * NODE_VELOCITY, vy: (Math.random() - 0.5) * NODE_VELOCITY, appearTime: -1 };
+      }
+      // Spread in a loose spiral outward from center
+      const angle = (i / AVATAR_URLS.length) * Math.PI * 4.5 + Math.random() * 0.6;
+      const minDist = NODE_RADIUS * 3;
+      const maxDist = Math.min(w, h) * 0.42;
+      const dist = minDist + (i / (AVATAR_URLS.length - 1)) * (maxDist - minDist) + (Math.random() - 0.5) * 60;
+      const nx = Math.max(NODE_RADIUS + 10, Math.min(w - NODE_RADIUS - 10, cx + Math.cos(angle) * dist));
+      const ny = Math.max(NODE_RADIUS + 10, Math.min(h - NODE_RADIUS - 10, cy + Math.sin(angle) * dist));
+      return {
+        x: nx,
+        y: ny,
+        vx: (Math.random() - 0.5) * NODE_VELOCITY,
+        vy: (Math.random() - 0.5) * NODE_VELOCITY,
+        appearTime: -1,
+      };
+    });
 
-    const connectionDist = 260;
+    let visibleCount = 0;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    // Progressive reveal: first node at 500ms, then +200ms each
+    AVATAR_URLS.forEach((_, i) => {
+      const t = setTimeout(() => {
+        nodes[i].appearTime = performance.now();
+        visibleCount = i + 1;
+        if (stateRef.current) stateRef.current.visibleCount = visibleCount;
+      }, 500 + i * 200);
+      timeouts.push(t);
+    });
+
+    stateRef.current = { nodes, imgs, visibleCount, animId: 0, timeouts };
 
     const animate = () => {
-      if (!canvas || !ctx) return;
+      if (!canvas || !ctx || !stateRef.current) return;
+      const now = performance.now();
+      const vc = stateRef.current.visibleCount;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      for (const node of nodes) {
-        node.x += node.vx;
-        node.y += node.vy;
-        if (node.x < -40) node.x = canvas.width + 40;
-        if (node.x > canvas.width + 40) node.x = -40;
-        if (node.y < -40) node.y = canvas.height + 40;
-        if (node.y > canvas.height + 40) node.y = -40;
+      // Update positions with edge bounce
+      for (let i = 0; i < vc; i++) {
+        const n = nodes[i];
+        if (n.appearTime < 0) continue;
+        n.x += n.vx;
+        n.y += n.vy;
+        if (n.x - NODE_RADIUS < 0) { n.x = NODE_RADIUS; n.vx = Math.abs(n.vx); }
+        if (n.x + NODE_RADIUS > canvas.width) { n.x = canvas.width - NODE_RADIUS; n.vx = -Math.abs(n.vx); }
+        if (n.y - NODE_RADIUS < 0) { n.y = NODE_RADIUS; n.vy = Math.abs(n.vy); }
+        if (n.y + NODE_RADIUS > canvas.height) { n.y = canvas.height - NODE_RADIUS; n.vy = -Math.abs(n.vy); }
       }
 
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const dx = nodes[i].x - nodes[j].x;
-          const dy = nodes[i].y - nodes[j].y;
+      // Draw connection lines between visible nodes
+      for (let i = 0; i < vc; i++) {
+        const ni = nodes[i];
+        if (ni.appearTime < 0) continue;
+        const ai = Math.min(1, (now - ni.appearTime) / FADE_DURATION);
+        for (let j = i + 1; j < vc; j++) {
+          const nj = nodes[j];
+          if (nj.appearTime < 0) continue;
+          const aj = Math.min(1, (now - nj.appearTime) / FADE_DURATION);
+          const dx = ni.x - nj.x;
+          const dy = ni.y - nj.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < connectionDist) {
-            const opacity = (1 - dist / connectionDist) * 0.25;
+          if (dist < CONNECTION_DIST) {
+            const lineAlpha = Math.min(ai, aj) * (1 - dist / CONNECTION_DIST) * 0.3;
             ctx.beginPath();
-            ctx.moveTo(nodes[i].x, nodes[i].y);
-            ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
-            ctx.lineWidth = 1.5;
+            ctx.moveTo(ni.x, ni.y);
+            ctx.lineTo(nj.x, nj.y);
+            ctx.strokeStyle = `rgba(255,255,255,${lineAlpha})`;
+            ctx.lineWidth = 1;
             ctx.stroke();
           }
         }
       }
 
-      for (const node of nodes) {
-        if (node.faceIdx >= 0 && imgs[node.faceIdx]?.complete && imgs[node.faceIdx]?.naturalWidth > 0) {
-          ctx.save();
+      // Draw face nodes
+      for (let i = 0; i < vc; i++) {
+        const n = nodes[i];
+        if (n.appearTime < 0) continue;
+        const alpha = Math.min(1, (now - n.appearTime) / FADE_DURATION);
+        const img = imgs[i];
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        if (img?.complete && img.naturalWidth > 0) {
+          // Clip to circle and draw avatar
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, NODE_RADIUS, 0, Math.PI * 2);
           ctx.closePath();
           ctx.clip();
           try {
-            ctx.drawImage(imgs[node.faceIdx], node.x - node.radius, node.y - node.radius, node.radius * 2, node.radius * 2);
+            ctx.drawImage(img, n.x - NODE_RADIUS, n.y - NODE_RADIUS, NODE_RADIUS * 2, NODE_RADIUS * 2);
           } catch {
-            ctx.fillStyle = 'rgba(255,255,255,0.1)';
+            ctx.fillStyle = 'rgba(255,255,255,0.2)';
             ctx.fill();
           }
           ctx.restore();
+          // White border ring
+          ctx.save();
+          ctx.globalAlpha = alpha;
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-          ctx.lineWidth = 2;
+          ctx.arc(n.x, n.y, NODE_RADIUS, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+          ctx.lineWidth = 1.5;
           ctx.stroke();
-          const name = ALPHA_PROFILES[node.faceIdx]?.name ?? '';
-          ctx.font = '600 10px Inter, system-ui, sans-serif';
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(name, node.x, node.y + node.radius + 4);
+          ctx.restore();
         } else {
+          // Placeholder while loading
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.arc(n.x, n.y, NODE_RADIUS, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
           ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.restore();
         }
       }
 
-      animRef.current = requestAnimationFrame(animate);
+      stateRef.current.animId = requestAnimationFrame(animate);
     };
 
-    animate();
+    stateRef.current.animId = requestAnimationFrame(animate);
 
     return () => {
-      cancelAnimationFrame(animRef.current);
+      if (stateRef.current) {
+        cancelAnimationFrame(stateRef.current.animId);
+        stateRef.current.timeouts.forEach(t => clearTimeout(t));
+      }
       window.removeEventListener('resize', resize);
     };
   }, []);
