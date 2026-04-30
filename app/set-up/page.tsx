@@ -4,12 +4,10 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Check,
   ChevronRight,
-  ChevronDown,
   Zap,
   Calendar,
   DollarSign,
   Shield,
-  X,
   Users,
   MessageSquare,
   User,
@@ -22,9 +20,7 @@ import {
   Clock,
   Globe,
   Share2,
-  UserCheck,
   Mail,
-  Network,
   GraduationCap,
   Briefcase,
   Building2,
@@ -75,6 +71,184 @@ interface FormData {
   leaderEmail: string;
   leaderPhone: string;
   instagramHandle: string;
+}
+
+// ─── Alpha Chapter Demo Profiles ─────────────────────────────────────────────
+
+// face1–face12 are hosted at /faces/faceN.jpg
+// Alumni (12 faces → 12 people):
+//  face1  Payne Parker       — AE @ Knight Commercial, Dallas TX,   Marketing '26
+//  face2  Ethan Hill         — Fidelity Investments,  Dallas TX,    Finance '26
+//  face3  Garrett Smalley    — Underwriter @ Chubb,   Milton GA,    Finance '25
+//  face4  Nash Dehmer        — US Senate,              Washington DC, PoliSci '23
+//  face5  Peyton Pounds      — Williams Wealth,        Charlotte NC,  Finance '23
+//  face6  Jake Coppen        — Founder @ Scratch AI,  New York NY,  Finance '26
+//  face7  Andrew Hopperton   — IB @ GSI Capital,      Tampa FL,     Finance '25
+//  face8  Gavin Murrey       — JPMorgan,               New York NY,  Finance '26
+//  face9  Luke Nayfa         — MS Finance McCombs,    Austin TX,    Finance '25
+//  face10 Andrew Longo       — GTM @ Glean,            Nashville TN, Marketing '26
+//  face11 Zach Fosseen       — VP BD @ Virtue,        Seattle WA,   Entrepreneurship '24
+//  face12 Abhi Bhabad        — AI Product @ Search Party, CS '26
+// Actives (reuse nearest unused face per slide):
+//  face3  Chadwick Mask      — Oxford MS, Finance '29  (messaging slide only)
+//  face2  Evan Foster        — Finance '27              (step 2 mocks only)
+//  face10 Thomas Pham        — College Station TX, AI in Business '27
+
+const DEMO_PROFILES = [
+  // ── Alumni ──
+  { name: 'Payne Parker',    chapter: 'Alpha Chapter',  year: '2026', location: 'Dallas, TX',       major: 'Marketing',        avatar: '/faces/face1.jpg',  role: 'Alumni', bio: 'Account Executive @ Knight Commercial' },
+  { name: 'Ethan Hill',      chapter: 'Alpha Chapter',  year: '2026', location: 'Dallas, TX',       major: 'Finance',          avatar: '/faces/face2.jpg',  role: 'Alumni', bio: 'Financial Services Rep @ Fidelity' },
+  { name: 'Garrett Smalley', chapter: 'Alpha Chapter',  year: '2025', location: 'Milton, GA',       major: 'Finance',          avatar: '/faces/face3.jpg',  role: 'Alumni', bio: 'Associate Underwriter @ Chubb' },
+  { name: 'Nash Dehmer',     chapter: 'Alpha Chapter',  year: '2023', location: 'Washington, DC',   major: 'Political Science', avatar: '/faces/face4.jpg', role: 'Alumni', bio: 'Director of Operations @ US Senate' },
+  { name: 'Peyton Pounds',   chapter: 'Alpha Chapter',  year: '2023', location: 'Charlotte, NC',    major: 'Finance',          avatar: '/faces/face5.jpg',  role: 'Alumni', bio: 'Financial Advisor @ Williams Wealth' },
+  { name: 'Jake Coppen',     chapter: 'Alpha Chapter',  year: '2026', location: 'New York, NY',     major: 'Finance',          avatar: '/faces/face6.jpg',  role: 'Alumni', bio: 'Founder @ Scratch AI' },
+  { name: 'Andrew Hopperton',chapter: 'Alpha Chapter',  year: '2025', location: 'Tampa, FL',        major: 'Finance',          avatar: '/faces/face7.jpg',  role: 'Alumni', bio: 'IB Analyst @ GSI Capital' },
+  { name: 'Gavin Murrey',    chapter: 'Alpha Chapter',  year: '2026', location: 'New York, NY',     major: 'Finance',          avatar: '/faces/face8.jpg',  role: 'Alumni', bio: 'Credit Portfolio Analyst @ JPMorgan' },
+  { name: 'Luke Nayfa',      chapter: 'Alpha Chapter',  year: '2025', location: 'Austin, TX',       major: 'Finance',          avatar: '/faces/face9.jpg',  role: 'Alumni', bio: 'MS Finance @ McCombs' },
+  { name: 'Andrew Longo',    chapter: 'Alpha Chapter',  year: '2026', location: 'Nashville, TN',    major: 'Marketing',        avatar: '/faces/face10.jpg', role: 'Alumni', bio: 'GTM @ Glean' },
+  { name: 'Zach Fosseen',    chapter: 'Alpha Chapter',  year: '2024', location: 'Seattle, WA',      major: 'Entrepreneurship', avatar: '/faces/face11.jpg', role: 'Alumni', bio: 'VP of BD @ Virtue' },
+  { name: 'Abhi Bhabad',     chapter: 'Alpha Chapter',  year: '2026', location: null,               major: 'Computer Science', avatar: '/faces/face12.jpg', role: 'Alumni', bio: 'AI Product @ Search Party' },
+  // ── Actives ──
+  { name: 'Chadwick Mask',   chapter: 'Alpha Chapter',  year: '2029', location: 'Oxford, MS',       major: 'Finance',          avatar: '/faces/face3.jpg',  role: 'Active', bio: 'Finance · Senior' },
+  { name: 'Evan Foster',     chapter: 'Alpha Chapter',  year: '2027', location: null,               major: 'Finance',          avatar: '/faces/face2.jpg',  role: 'Active', bio: 'Finance · Junior' },
+  { name: 'Thomas Pham',     chapter: 'Alpha Chapter',  year: '2027', location: 'College Station, TX', major: 'AI in Business', avatar: '/faces/face10.jpg', role: 'Active', bio: 'AI in Business · Junior' },
+] as const;
+
+const CHAPTER_OPTIONS = [
+  'KA @ Alabama', 'Sigma Nu @ Alabama', 'SAE @ Alabama', 'Sigma Chi @ Alabama', 'Pi Kappa Alpha @ Alabama', 'Kappa Sigma @ Alabama', 'Phi Delta Theta @ Alabama', 'Beta Theta Pi @ Alabama',
+  'Sigma Chi @ Ole Miss', 'Sigma Nu @ Ole Miss', 'ATO @ Ole Miss', 'KA @ Ole Miss', 'SAE @ Ole Miss', 'Pi Kappa Alpha @ Ole Miss', 'Phi Delta Theta @ Ole Miss',
+  'SAE @ Tennessee', 'Sigma Chi @ Tennessee', 'Pi Kappa Alpha @ Tennessee', 'KA @ Tennessee', 'Sigma Nu @ Tennessee', 'Phi Delta Theta @ Tennessee',
+  'Theta Xi @ Boulder', 'Sigma Chi @ Colorado', 'SAE @ Colorado', 'Beta Theta Pi @ Colorado',
+  'Sigma Chi @ Mississippi State', 'KA @ Mississippi State', 'Pi Kappa Alpha @ Mississippi State', 'SAE @ Mississippi State',
+  'Sigma Chi @ Auburn', 'KA @ Auburn', 'SAE @ Auburn', 'Sigma Nu @ Auburn', 'Pi Kappa Alpha @ Auburn', 'Phi Delta Theta @ Auburn',
+  'Sigma Chi @ LSU', 'KA @ LSU', 'SAE @ LSU', 'Sigma Nu @ LSU', 'Pi Kappa Alpha @ LSU',
+  'Sigma Chi @ Georgia', 'KA @ Georgia', 'SAE @ Georgia', 'Pi Kappa Alpha @ Georgia', 'Sigma Nu @ Georgia',
+  'Sigma Chi @ Florida', 'KA @ Florida', 'SAE @ Florida', 'Sigma Nu @ Florida', 'Pi Kappa Alpha @ Florida',
+  'Sigma Chi @ Arkansas', 'KA @ Arkansas', 'SAE @ Arkansas', 'Pi Kappa Alpha @ Arkansas',
+  'Sigma Chi @ Texas', 'KA @ Texas', 'SAE @ Texas', 'Phi Delta Theta @ Texas', 'Sigma Nu @ Texas',
+  'Sigma Chi @ Texas A&M', 'KA @ Texas A&M', 'SAE @ Texas A&M', 'Pi Kappa Alpha @ Texas A&M',
+  'Sigma Chi @ Vanderbilt', 'KA @ Vanderbilt', 'SAE @ Vanderbilt', 'Beta Theta Pi @ Vanderbilt',
+  'Sigma Chi @ South Carolina', 'KA @ South Carolina', 'Pi Kappa Alpha @ South Carolina',
+  'Sigma Chi @ Kentucky', 'KA @ Kentucky', 'SAE @ Kentucky', 'Sigma Nu @ Kentucky',
+  'Sigma Chi @ Ohio State', 'SAE @ Ohio State', 'Sigma Nu @ Ohio State', 'Beta Theta Pi @ Ohio State',
+  'Sigma Chi @ Michigan', 'SAE @ Michigan', 'Beta Theta Pi @ Michigan', 'Phi Delta Theta @ Michigan',
+  'Sigma Chi @ Penn State', 'SAE @ Penn State', 'Pi Kappa Alpha @ Penn State',
+  'Sigma Chi @ USC', 'SAE @ USC', 'Pi Kappa Alpha @ USC', 'Sigma Nu @ USC',
+  'Sigma Chi @ UCLA', 'SAE @ UCLA', 'Beta Theta Pi @ UCLA',
+  'Sigma Chi @ Arizona', 'SAE @ Arizona', 'KA @ Arizona', 'Pi Kappa Alpha @ Arizona',
+  'Sigma Chi @ Arizona State', 'SAE @ Arizona State', 'Pi Kappa Alpha @ Arizona State',
+  'Sigma Chi @ Indiana', 'SAE @ Indiana', 'Beta Theta Pi @ Indiana', 'Phi Delta Theta @ Indiana',
+  'Sigma Chi @ Purdue', 'SAE @ Purdue', 'Beta Theta Pi @ Purdue',
+  'Sigma Chi @ Missouri', 'KA @ Missouri', 'SAE @ Missouri', 'Pi Kappa Alpha @ Missouri',
+  'Sigma Chi @ Oklahoma', 'KA @ Oklahoma', 'SAE @ Oklahoma', 'Pi Kappa Alpha @ Oklahoma',
+  'KA @ Tulane', 'SAE @ Tulane', 'Pi Kappa Alpha @ Tulane', 'Sigma Nu @ Tulane',
+];
+
+// ─── Slide 1 Filter Animation (needs internal React state) ───────────────────
+
+function Slide1FilterAnimation() {
+  const [filterActive, setFilterActive] = useState(false);
+  const [cardsVisible, setCardsVisible] = useState(false);
+  const [expandTarget, setExpandTarget] = useState(false);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setFilterActive(true), 1000);
+    const t2 = setTimeout(() => setCardsVisible(true), 1600);
+    const t3 = setTimeout(() => setExpandTarget(true), 5400);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
+
+  const financeCards = [
+    { name: 'Ethan Hill',       company: 'Fidelity',       year: '\'26', avatar: '/faces/face2.jpg', location: 'Dallas, TX',    isTarget: false },
+    { name: 'Garrett Smalley',  company: 'Chubb',          year: '\'25', avatar: '/faces/face3.jpg', location: 'Milton, GA',    isTarget: false },
+    { name: 'Andrew Hopperton', company: 'GSI Capital',    year: '\'25', avatar: '/faces/face7.jpg', location: 'Tampa, FL',     isTarget: false },
+    { name: 'Gavin Murrey',     company: 'JPMorgan',       year: '\'26', avatar: '/faces/face8.jpg', location: 'New York, NY',  isTarget: true  },
+    { name: 'Peyton Pounds',    company: 'Williams Wealth', year: '\'23', avatar: '/faces/face5.jpg', location: 'Charlotte, NC', isTarget: false },
+  ];
+
+  return (
+    <>
+      {/* Filter chips */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' as const }}>
+        {(['Finance', 'Engineering', 'Real Estate']).map((f) => (
+          <div
+            key={f}
+            style={{
+              padding: '8px 18px',
+              borderRadius: '20px',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: 'default',
+              fontFamily: 'Inter, system-ui, sans-serif',
+              border: '1.5px solid #E5E7EB',
+              background: filterActive && f === 'Finance' ? '#0F172A' : 'white',
+              color: filterActive && f === 'Finance' ? 'white' : '#374151',
+              transition: 'background 0.3s ease, color 0.3s ease, border-color 0.3s ease',
+              borderColor: filterActive && f === 'Finance' ? '#0F172A' : '#E5E7EB',
+            }}
+          >
+            {f}
+          </div>
+        ))}
+      </div>
+
+      {/* Scrolling cards */}
+      <div style={{ width: '100%', overflow: 'hidden' }}>
+        {cardsVisible ? (
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            animation: 'cardsScroll 3.8s cubic-bezier(0.25, 0.8, 0.3, 1) both',
+          }}>
+            {financeCards.map((card) => (
+              <div
+                key={card.name}
+                style={{
+                  flexShrink: 0,
+                  width: '160px',
+                  background: 'white',
+                  border: `1.5px solid ${card.isTarget && expandTarget ? '#0F172A' : '#E5E7EB'}`,
+                  borderRadius: '12px',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  transform: card.isTarget && expandTarget ? 'scale(1.06)' : 'scale(1)',
+                  boxShadow: card.isTarget && expandTarget
+                    ? '0 8px 24px rgba(0,0,0,0.12)'
+                    : '0 2px 8px rgba(0,0,0,0.05)',
+                  transition: 'transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease',
+                }}
+              >
+                <img
+                  src={card.avatar}
+                  alt={card.name}
+                  style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+                <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: '#111827', lineHeight: 1.2 }}>{card.name}</div>
+                <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>{card.company}</div>
+                <div style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>Finance · {card.year}</div>
+                {card.isTarget && expandTarget && (
+                  <div style={{
+                    fontSize: '0.68rem', color: '#9CA3AF',
+                    opacity: expandTarget ? 1 : 0,
+                    transition: 'opacity 0.4s ease 0.1s',
+                  }}>
+                    📍 {card.location}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: '0.8125rem', color: '#D1D5DB' }}>Finding Finance alumni…</div>
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
 
 // ─── Step Indicator ──────────────────────────────────────────────────────────
@@ -172,6 +346,9 @@ function SetUpPage() {
     instagramHandle: '',
   });
 
+  // Chapter autocomplete
+  const [chapterDropdownOpen, setChapterDropdownOpen] = useState(false);
+
   // Agreement state
   const [agreedName, setAgreedName] = useState('');
   const [promoCode, setPromoCode] = useState('');
@@ -183,7 +360,6 @@ function SetUpPage() {
   // Payment state
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
-  const [discountCode, setDiscountCode] = useState('');
 
   // Confirmation state
   const [confirmLoading, setConfirmLoading] = useState(false);
@@ -203,7 +379,6 @@ function SetUpPage() {
 
     const bypassParam = searchParams.get('bypass');
     if (success === 'true' && bypassParam === '1') {
-      // Internal bypass - extract all params from URL
       setStep(5);
       const bypassData: Record<string, string> = {};
       searchParams.forEach((v, k) => { bypassData[k] = v; });
@@ -272,6 +447,16 @@ function SetUpPage() {
     setErrors((prev) => ({ ...prev, [field]: '' }));
   }
 
+  // Simplified validation for the streamlined step 1 form
+  function validateSimpleForm(): boolean {
+    const newErrors: Partial<Record<keyof FormData, string>> = {};
+    if (!form.leaderName.trim()) newErrors.leaderName = 'Name is required';
+    if (!form.orgName.trim()) newErrors.orgName = 'Chapter is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
+
+  // Full validation (kept for downstream payment flow)
   function validateStep1(): boolean {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
     if (!form.orgName.trim()) newErrors.orgName = 'Organization name is required';
@@ -293,12 +478,8 @@ function SetUpPage() {
   function advanceSubStep() {
     setSubStepVisible(false);
     setTimeout(() => {
-      if (subStep >= 5) {
-        goToStep(1);
-      } else {
-        setSubStep((s) => s + 1);
-        setSubStepVisible(true);
-      }
+      setSubStep((s) => s + 1);
+      setSubStepVisible(true);
     }, 220);
   }
 
@@ -326,7 +507,6 @@ function SetUpPage() {
           memberCount: Number(form.memberCount),
           agreedName,
           agreedAt: agreedAtISO,
-          // Promo codes handled natively by Stripe checkout
         }),
       });
       const data = await res.json();
@@ -342,49 +522,69 @@ function SetUpPage() {
     }
   }
 
-  // ─── Step 0: Overview (click-through) ──────────────────────────────────────
+  // ─── Step 0: Overview (animated feature walkthrough) ─────────────────────
 
   if (step === 0) {
-    const TOTAL_SUBSTEPS = 6;
+    const TOTAL_SUBSTEPS = 5;
+
+    // Slide 0 profile card display data
+    const slide0Profiles = [
+      { name: 'Payne Parker',  bio: 'AE @ Knight Commercial', location: 'Dallas, TX',     avatar: '/faces/face1.jpg' },
+      { name: 'Nash Dehmer',   bio: 'US Senate',               location: 'Washington, DC', avatar: '/faces/face4.jpg' },
+      { name: 'Jake Coppen',   bio: 'Founder @ Scratch AI',    location: 'New York, NY',   avatar: '/faces/face6.jpg' },
+      { name: 'Zach Fosseen',  bio: 'VP of BD @ Virtue',       location: 'Seattle, WA',    avatar: '/faces/face11.jpg' },
+      { name: 'Abhi Bhabad',   bio: 'AI Product @ Search Party', location: null,           avatar: '/faces/face12.jpg' },
+    ];
+
     return (
       <div style={{ background: 'white', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
         <style>{`
-          @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+          @keyframes cardFloat {
+            from { opacity: 0; transform: translateY(28px) scale(0.96); }
+            to   { opacity: 1; transform: translateY(0)   scale(1); }
           }
-          @keyframes iconSlideIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
+          @keyframes cardsScroll {
+            from { transform: translateX(120vw); }
+            to   { transform: translateX(-340px); }
           }
-          .org-types-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
+          @keyframes avatarPop {
+            from { opacity: 0; transform: scale(0.72); }
+            to   { opacity: 1; transform: scale(1); }
           }
-          @media (max-width: 640px) {
-            .org-types-grid {
-              grid-template-columns: repeat(2, 1fr);
-            }
-            .overview-grid {
-              grid-template-columns: 1fr !important;
-              gap: 24px !important;
-            }
-            .overview-cards {
-              grid-template-columns: 1fr !important;
-            }
+          @keyframes bubbleSlideLeft {
+            from { opacity: 0; transform: translateX(-24px); }
+            to   { opacity: 1; transform: translateX(0); }
+          }
+          @keyframes bubbleSlideRight {
+            from { opacity: 0; transform: translateX(24px); }
+            to   { opacity: 1; transform: translateX(0); }
+          }
+          @keyframes connectedBadge {
+            from { opacity: 0; transform: scale(0.8) translateY(8px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+          }
+          @keyframes spaceCardIn {
+            from { opacity: 0; transform: translateX(-12px); }
+            to   { opacity: 1; transform: translateX(0); }
+          }
+          @keyframes phoneIn {
+            from { opacity: 0; transform: scale(0.88); }
+            to   { opacity: 1; transform: scale(1); }
+          }
+          @media (max-width: 580px) {
+            .slide0-grid { grid-template-columns: 1fr 1fr !important; }
           }
         `}</style>
 
         {testMode && (
           <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '8px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#92400e' }}>
-            🧪 TEST MODE - No real charges will be made
+            🧪 TEST MODE — No real charges will be made
           </div>
         )}
 
-        {/* Nav - always visible */}
-        <nav style={{ padding: '0 32px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6', background: 'white', flexShrink: 0 }}>
-          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '44px' }} />
+        {/* Nav */}
+        <nav style={{ padding: '0 28px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6', background: 'white', flexShrink: 0 }}>
+          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '28px' }} />
           <button
             onClick={() => goToStep(1)}
             style={{ padding: '8px 20px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.875rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
@@ -394,399 +594,353 @@ function SetUpPage() {
         </nav>
 
         {/* Progress dots */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '14px 0', background: 'white', borderBottom: '1px solid #F3F4F6', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '14px 0', borderBottom: '1px solid #F3F4F6', flexShrink: 0 }}>
           {Array.from({ length: TOTAL_SUBSTEPS }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: i === subStep ? '22px' : '7px',
-                height: '7px',
-                borderRadius: '4px',
-                background: i === subStep ? '#0F172A' : '#D1D5DB',
-                transition: 'all 0.3s ease',
-              }}
-            />
+            <div key={i} style={{
+              width: i === subStep ? '22px' : '7px',
+              height: '7px',
+              borderRadius: '4px',
+              background: i === subStep ? '#0F172A' : '#D1D5DB',
+              transition: 'all 0.3s ease',
+            }} />
           ))}
         </div>
 
-        {/* Transitioning content area */}
-        <div
-          style={{
-            flex: 1,
-            opacity: subStepVisible ? 1 : 0,
-            transform: subStepVisible ? 'translateY(0)' : 'translateY(20px)',
-            transition: 'opacity 0.22s ease, transform 0.22s ease',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
+        {/* Slide content */}
+        <div style={{
+          flex: 1,
+          opacity: subStepVisible ? 1 : 0,
+          transform: subStepVisible ? 'translateY(0)' : 'translateY(20px)',
+          transition: 'opacity 0.22s ease, transform 0.22s ease',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
 
-          {/* ── Sub-step 0: Hook ── */}
+          {/* ── Slide 0: Your network, in one place. ── */}
           {subStep === 0 && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', minHeight: 'calc(100vh - 210px)' }}>
-              <div style={{ maxWidth: '680px', textAlign: 'center' }}>
-                <h1 style={{
-                  fontSize: 'clamp(2.25rem, 5.5vw, 3.75rem)',
-                  fontWeight: 400,
-                  lineHeight: 1.15,
-                  color: '#0F172A',
-                  margin: 0,
-                  fontFamily: '"Instrument Serif", Georgia, serif',
-                  letterSpacing: '-0.02em',
-                }}>
-                  What if every member and alumni in your organization were one tap away?
-                </h1>
-              </div>
-            </div>
-          )}
-
-          {/* ── Sub-step 1: Hero ── */}
-          {subStep === 1 && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', minHeight: 'calc(100vh - 210px)' }}>
-              <div style={{ maxWidth: '680px', textAlign: 'center' }}>
-                <h1 style={{
-                  fontSize: 'clamp(2.25rem, 5.5vw, 3.75rem)',
-                  fontWeight: 400,
-                  lineHeight: 1.08,
-                  color: '#0F172A',
-                  marginBottom: '20px',
-                  fontFamily: '"Instrument Serif", Georgia, serif',
-                  letterSpacing: '-0.02em',
-                }}>
-                  The alumni network for every organization.
-                </h1>
-                <p style={{ fontSize: '1.125rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '460px', margin: '0 auto' }}>
-                  A shared social network where organizations own their alumni community - without relying on LinkedIn or scattered group chats.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* ── Sub-step 2: One Place for Everyone ── */}
-          {subStep === 2 && (
-            <div style={{ padding: '52px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
-              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '12px', background: '#F9FAFB', border: '1px solid #E5E7EB', marginBottom: '16px' }}>
-                  <Users size={20} color="#10B981" />
-                </div>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
-                  One place for everyone
-                </h2>
-                <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                  Your members, alumni, and leadership - connected in a single private network your organization actually owns.
-                </p>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '28px' }}>
-                {[
-                  { icon: <Users size={18} color="#10B981" />, title: 'Private member directory', desc: 'Every member, past and present, in one searchable space.' },
-                  { icon: <MessageSquare size={18} color="#10B981" />, title: 'Instant messaging', desc: 'Message anyone directly - no scattered group chats.' },
-                  { icon: <Shield size={18} color="#10B981" />, title: 'You control access', desc: 'Approve who joins, manage roles, keep your network clean.' },
-                ].map((card) => (
-                  <div key={card.title} style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px' }}>
-                    <div style={{ marginBottom: '10px' }}>{card.icon}</div>
-                    <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: '0 0 6px' }}>{card.title}</h3>
-                    <p style={{ fontSize: '0.8125rem', color: '#6B7280', margin: 0, lineHeight: 1.6 }}>{card.desc}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="overview-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '8px' }}>
-                {/* Mock Feed */}
-                <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', background: 'white', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em' }}>Recent Posts</div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <img src="https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg" alt="Ethan Hill" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0F172A', display: 'none', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>EH</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Ethan Hill</span>
-                        <span style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>· 2h ago</span>
-                      </div>
-                      <p style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.5, margin: '0 0 8px' }}>Working at Fidelity Investments in Dallas, TX. Always open to help with jobs or advice on getting into the industry.</p>
-                      <div style={{ display: 'flex', gap: '12px' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#6B7280' }}>❤️ 6</span>
-                        <span style={{ fontSize: '0.72rem', color: '#6B7280' }}>💬 1</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: '14px', display: 'flex', gap: '10px' }}>
-                    <img src="https://api.trailblaize.net/storage/v1/object/public/user-avatar/11aae122-df59-40ac-baef-800fa16f6763-1776174041250.jpg" alt="Taylor Durham" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#10B981', display: 'none', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>TD</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Taylor Durham</span>
-                        <span style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>· 5h ago</span>
-                      </div>
-                      <p style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.5, margin: '0 0 8px' }}>Graduated in 2025, staying in Oxford at Farm Bureau. Open to chatting about insurance or life insurance - let's make something happen!</p>
-                      <div style={{ display: 'flex', gap: '12px' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#6B7280' }}>❤️ 5</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {/* Mock Alumni Grid */}
-                <div style={{ borderRadius: '12px', border: '1px solid #E5E7EB', background: 'white', padding: '16px' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: '12px' }}>Alumni Directory</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    {[
-                      { initials: 'EG', name: 'Ewing Gillaspy', title: 'M&A at AND Capital', location: 'Phoenix, AZ', color: '#0F172A', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg' },
-                      { initials: 'JB', name: 'Jack Blackburn', title: 'Catalyst Financial', location: 'Houston, TX', color: '#6366F1', avatar: 'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg' },
-                      { initials: 'WD', name: 'Worth DuPerier', title: 'Fifth Third Bank', location: 'Nashville, TN', color: '#0EA5E9', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg' },
-                      { initials: 'ZF', name: 'Zach Fosseen', title: 'VP, Virtue', location: 'Seattle, WA', color: '#10B981', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg' },
-                    ].map((a) => (
-                      <div key={a.initials} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <img src={a.avatar} alt={a.name} style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', marginBottom: '2px' }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
-                        <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: a.color, display: 'none', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.65rem', fontWeight: 700, marginBottom: '2px' }}>{a.initials}</div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>{a.name}</span>
-                        <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>{a.title}</span>
-                        <span style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>{a.location}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Sub-step 3: Real Connections ── */}
-          {subStep === 3 && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '52px 24px 0', minHeight: 'calc(100vh - 210px)' }}>
-              <div className="overview-grid" style={{ maxWidth: '680px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '48px', alignItems: 'center' }}>
-                <div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #D1FAE5', marginBottom: '20px' }}>
-                    <Share2 size={28} color="#10B981" />
-                  </div>
-                  <h2 style={{ fontSize: '1.625rem', fontWeight: 700, color: '#111827', margin: '0 0 14px', letterSpacing: '-0.01em' }}>
-                    Real connections, not just contacts
-                  </h2>
-                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: '0 0 12px' }}>
-                    Members find jobs, mentors, and friendships through your alumni network - matched by industry, city, and shared interests.
-                  </p>
-                  <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                    Whether you&apos;re a new grad looking for your first role or an alum giving back - Trailblaize makes the introduction.
-                  </p>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: '100%', maxWidth: '320px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      {[
-                        { initials: 'EG', name: 'Ewing Gillaspy', title: 'Managing Director, M&A', org: 'AND Capital Ventures', location: 'Phoenix, AZ', color: '#0F172A', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg' },
-                        { initials: 'JB', name: 'Jack Blackburn', title: 'Investment Advisor Rep', org: 'Catalyst Financial', location: 'Houston, TX', color: '#6366F1', avatar: 'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg' },
-                        { initials: 'WD', name: 'Worth DuPerier', title: 'Client Banker', org: 'Fifth Third Bank', location: 'Nashville, TN', color: '#0EA5E9', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg' },
-                        { initials: 'JC', name: 'Joe Chatham', title: 'Technical Assistant', org: 'Amwins', location: 'Dallas, TX', color: '#F59E0B', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/20ba450e-709c-4a78-a963-7cbfb2de72ef-1776173885369.jpg' },
-                      ].map((a) => (
-                        <div key={a.initials} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <img src={a.avatar} alt={a.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', marginBottom: '4px' }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
-                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: a.color, display: 'none', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px' }}>{a.initials}</div>
-                          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>{a.name}</span>
-                          <span style={{ fontSize: '0.72rem', color: '#374151' }}>{a.title}</span>
-                          <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>{a.org}</span>
-                          <span style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>{a.location}</span>
-                          <button style={{ marginTop: '6px', padding: '4px 10px', fontSize: '0.7rem', fontWeight: 600, color: '#0F172A', border: '1px solid #E5E7EB', borderRadius: '6px', background: 'white', cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-start' as const }}>Connect</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Sub-step 4: Built for Your Organization ── */}
-          {subStep === 4 && (
-            <div style={{ padding: '52px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
-              <div style={{ marginBottom: '32px' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '12px', background: '#F9FAFB', border: '1px solid #E5E7EB', marginBottom: '16px' }}>
-                  <Zap size={20} color="#10B981" />
-                </div>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#111827', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
-                  Built for your organization
-                </h2>
-                <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                  Whether you&apos;re a Greek chapter, high school, or professional network - Trailblaize works for you.
-                </p>
-              </div>
-              <div className="org-types-grid">
-                {[
-                  { icon: <GraduationCap size={18} color="#10B981" />, label: 'Universities / Business Schools' },
-                  { icon: <Users size={18} color="#10B981" />, label: 'Greek Life Chapters' },
-                  { icon: <Globe size={18} color="#10B981" />, label: 'High Schools' },
-                  { icon: <Briefcase size={18} color="#10B981" />, label: 'Professional Associations' },
-                  { icon: <Building2 size={18} color="#10B981" />, label: 'Corporate Alumni Networks' },
-                  { icon: <Heart size={18} color="#10B981" />, label: 'Philanthropic / Advisory Boards' },
-                  { icon: <TrendingUp size={18} color="#10B981" />, label: 'Investor / Founder Networks' },
-                  { icon: <Trophy size={18} color="#10B981" />, label: 'Athletic Programs / Teams' },
-                ].map((item) => (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                Your network, in one place.
+              </h1>
+              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 32px' }}>
+                Every member and alumni, one tap away.
+              </p>
+              <div className="slide0-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', width: '100%', maxWidth: '560px' }}>
+                {slide0Profiles.map((profile, i) => (
                   <div
-                    key={item.label}
+                    key={profile.name}
                     style={{
-                      background: '#F9FAFB',
+                      background: 'white',
                       border: '1px solid #E5E7EB',
                       borderRadius: '12px',
-                      padding: '18px 12px',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      animation: `cardFloat 0.55s ease ${i * 0.12 + 0.1}s both`,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                      ...(i === 4 ? { gridColumn: '2' } : {}),
                     }}
                   >
-                    {item.icon}
-                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>{item.label}</span>
+                    <img
+                      src={profile.avatar}
+                      alt={profile.name}
+                      style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                    <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: '#111827', lineHeight: 1.2 }}>{profile.name}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#6B7280', lineHeight: 1.3 }}>{profile.bio}</div>
+                    {profile.location && (
+                      <div style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>📍 {profile.location}</div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ── Sub-step 5: CTA ── */}
-          {subStep === 5 && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', minHeight: 'calc(100vh - 210px)' }}>
-              <div style={{ maxWidth: '480px', textAlign: 'center' }}>
-                <h2 style={{ fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', fontWeight: 700, color: '#111827', margin: '0 0 14px', letterSpacing: '-0.01em' }}>
-                  Ready to activate your network?
-                </h2>
-                <p style={{ fontSize: '1rem', color: '#6B7280', margin: 0, lineHeight: 1.65 }}>
-                  Takes about 5 minutes to set up.
-                </p>
+          {/* ── Slide 1: Find anyone by what matters. ── */}
+          {subStep === 1 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                Find anyone by what matters.
+              </h1>
+              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 28px' }}>
+                Filter by industry, location, or interests.
+              </p>
+              <div style={{ width: '100%', maxWidth: '560px', animation: 'cardFloat 0.4s ease 0.1s both' }}>
+                <Slide1FilterAnimation />
               </div>
             </div>
           )}
 
-          {/* Bottom nav: Skip + Next */}
-          <div style={{ maxWidth: '680px', margin: '0 auto', width: '100%', padding: '24px 24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {subStep < 5 ? (
+          {/* ── Slide 2: Start a conversation that matters. ── */}
+          {subStep === 2 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '520px', margin: '0 auto', width: '100%' }}>
+              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                Start a conversation that matters.
+              </h1>
+              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 32px' }}>
+                Message any alumni directly — no LinkedIn required.
+              </p>
+
+              {/* Two avatars */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: '420px', marginBottom: '20px' }}>
+                {/* Chadwick (active, left / initiator) */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', animation: 'avatarPop 0.4s ease 0.1s both' }}>
+                  <img src="/faces/face3.jpg" alt="Chadwick Mask" style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #E5E7EB' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Chadwick Mask</div>
+                    <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>Finance · Active &apos;29</div>
+                  </div>
+                </div>
+                {/* Nash (alumni, right / responder) */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', animation: 'avatarPop 0.4s ease 0.25s both' }}>
+                  <img src="/faces/face4.jpg" alt="Nash Dehmer" style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #E5E7EB' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Nash Dehmer</div>
+                    <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>US Senate · DC &apos;23</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Message bubbles */}
+              <div style={{ width: '100%', maxWidth: '420px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                {/* Chadwick → Nash */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', animation: 'bubbleSlideLeft 0.4s ease 0.8s both', opacity: 0 }}>
+                  <img src="/faces/face3.jpg" alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  <div style={{ background: '#F3F4F6', borderRadius: '14px 14px 14px 2px', padding: '10px 14px', maxWidth: '280px' }}>
+                    <p style={{ fontSize: '0.8125rem', color: '#111827', margin: 0, lineHeight: 1.5 }}>
+                      Hey Nash, saw you&apos;re working at the US Senate in DC — exploring a career in policy after graduation. Any advice on how to break in?
+                    </p>
+                  </div>
+                </div>
+                {/* Nash → Chadwick */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', justifyContent: 'flex-end', animation: 'bubbleSlideRight 0.4s ease 2.4s both', opacity: 0 }}>
+                  <div style={{ background: '#0F172A', borderRadius: '14px 14px 2px 14px', padding: '10px 14px', maxWidth: '280px' }}>
+                    <p style={{ fontSize: '0.8125rem', color: 'white', margin: 0, lineHeight: 1.5 }}>
+                      Definitely happy to help. My path was a bit unconventional — send me a message and let&apos;s find time to chat this week.
+                    </p>
+                  </div>
+                  <img src="/faces/face4.jpg" alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                </div>
+              </div>
+
+              {/* Connected badge */}
+              <div style={{ animation: 'connectedBadge 0.4s ease 4.4s both', opacity: 0 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '20px', padding: '7px 18px' }}>
+                  <Check size={14} color="#16A34A" strokeWidth={2.5} />
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#16A34A' }}>Connected</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Slide 3: Your chapter. Your alumni. One tap away. ── */}
+          {subStep === 3 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                Your chapter. Your alumni.
+                <br />One tap away.
+              </h1>
+              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 28px' }}>
+                Every Space, all your people, one app.
+              </p>
+
+              {/* Phone mockup */}
+              <div style={{
+                width: '210px',
+                minHeight: '340px',
+                border: '3px solid #111827',
+                borderRadius: '32px',
+                padding: '14px 12px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                animation: 'phoneIn 0.5s ease 0.1s both',
+                background: 'white',
+              }}>
+                {/* Speaker notch */}
+                <div style={{ width: '44px', height: '5px', background: '#D1D5DB', borderRadius: '4px', margin: '0 auto 4px' }} />
+                {/* Header */}
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: '2px' }}>Your Spaces</div>
+                {/* Space cards */}
+                {[
+                  { name: 'Alpha Chapter', sub: 'Sigma Chi @ Ole Miss', count: '247 members' },
+                  { name: 'KA @ Alabama', sub: 'Kappa Alpha Order',     count: '1,598 alumni' },
+                  { name: 'Theta Xi @ Boulder', sub: 'Theta Xi Fraternity', count: '200+ alumni' },
+                ].map((space, i) => (
+                  <div key={space.name} style={{
+                    background: '#F9FAFB',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '10px',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    animation: `spaceCardIn 0.4s ease ${i * 0.18 + 0.4}s both`,
+                    opacity: 0,
+                  }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>{space.name}</div>
+                    <div style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>{space.count}</div>
+                  </div>
+                ))}
+                {/* Home indicator */}
+                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
+                  <div style={{ width: '40px', height: '4px', background: '#D1D5DB', borderRadius: '4px' }} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Slide 4: Ready to claim your Space? (CTA) ── */}
+          {subStep === 4 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', maxWidth: '480px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
+              <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', fontWeight: 700, color: '#111827', margin: '0 0 16px', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
+                Ready to claim
+                <br />your Space?
+              </h1>
+              <p style={{ fontSize: '1.0625rem', color: '#6B7280', margin: '0 0 36px', lineHeight: 1.65, maxWidth: '340px' }}>
+                Takes 2 minutes. No credit card required to get started.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '300px' }}>
+                <button
+                  onClick={() => goToStep(1)}
+                  style={{ padding: '14px 28px', borderRadius: '10px', background: '#0F172A', color: 'white', fontWeight: 700, fontSize: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  Let&apos;s get started <ArrowRight size={18} />
+                </button>
+                <button
+                  onClick={() => router.push('/waitlist')}
+                  style={{ padding: '13px 28px', borderRadius: '10px', background: 'white', color: '#374151', fontWeight: 600, fontSize: '1rem', border: '1.5px solid #E5E7EB', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Join the waitlist
+                </button>
+              </div>
+              {activeChapterCount !== null && (
+                <p style={{ fontSize: '0.8125rem', color: '#9CA3AF', margin: '24px 0 0' }}>
+                  {activeChapterCount} chapter{activeChapterCount !== 1 ? 's' : ''} already on Trailblaize
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Bottom nav — hidden on CTA slide */}
+          {subStep < 4 && (
+            <div style={{ maxWidth: '680px', margin: '0 auto', width: '100%', padding: '24px 24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
                 onClick={() => goToStep(1)}
                 style={{ fontSize: '0.8125rem', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
               >
                 Skip to setup →
               </button>
-            ) : (
-              <div />
-            )}
-            <button
-              onClick={advanceSubStep}
-              style={{
-                padding: '10px 28px',
-                borderRadius: '8px',
-                background: '#0F172A',
-                color: 'white',
-                fontWeight: 600,
-                fontSize: '0.9375rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              {subStep === 5 ? 'Get Started' : 'Next'}
-              {subStep === 5 ? <ArrowRight size={16} /> : <ChevronRight size={16} />}
-            </button>
-          </div>
+              <button
+                onClick={advanceSubStep}
+                style={{ padding: '10px 28px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.9375rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              >
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
 
-        </div>{/* end transitioning wrapper */}
+        </div>
       </div>
     );
   }
 
-  // ─── Step 1: Org Info ─────────────────────────────────────────────────────
+  // ─── Step 1: Simplified form (name + chapter) ─────────────────────────────
 
   if (step === 1) {
+    const filteredChapters = CHAPTER_OPTIONS.filter(
+      (c) => form.orgName.trim().length > 0 && c.toLowerCase().includes(form.orgName.toLowerCase())
+    ).slice(0, 8);
+
     return (
       <PageShell testMode={testMode}>
         <StepIndicator current={1} />
         <Card>
-          <h2 style={S.h2}>Tell us about your organization</h2>
-          <p style={S.sub}>We&apos;ll use this to set up your account.</p>
+          <h2 style={S.h2}>Let&apos;s get you set up</h2>
+          <p style={S.sub}>Just the basics for now — we&apos;ll collect the rest before you go live.</p>
 
           <div style={S.fieldWrap}>
-            <Field label="Organization Name *" error={errors.orgName}>
-              <input
-                type="text"
-                value={form.orgName}
-                onChange={(e) => updateForm('orgName', e.target.value)}
-                placeholder="e.g. Kappa Alpha Order, UF Tennis Alumni, Dallas Young Professionals"
-                style={S.input(!!errors.orgName)}
-              />
-            </Field>
-
-            <Field label="Associated Institution" hint="Optional">
-              <input
-                type="text"
-                value={form.school}
-                onChange={(e) => updateForm('school', e.target.value)}
-                placeholder="e.g. University of Florida, Goldman Sachs, St. Mark's Academy"
-                style={S.input(false)}
-              />
-            </Field>
-
-            <Field label="Org Type *" error={errors.orgType}>
-              <div className="flex flex-wrap gap-2">
-                {ORG_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => updateForm('orgType', type)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all
-                      ${form.orgType === type
-                        ? 'bg-[#0F172A] text-white border-[#0F172A]'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-[#0F172A]/40'}`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            <Field label="Estimated Member Count *" error={errors.memberCount}>
-              <input
-                type="number"
-                value={form.memberCount}
-                onChange={(e) => updateForm('memberCount', e.target.value)}
-                placeholder="e.g. 150"
-                style={S.input(!!errors.memberCount)}
-              />
-            </Field>
-
+            {/* Name */}
             <Field label="Your Name *" error={errors.leaderName}>
               <input
                 type="text"
                 value={form.leaderName}
                 onChange={(e) => updateForm('leaderName', e.target.value)}
-                placeholder="Full name"
+                placeholder="First and last name"
                 style={S.input(!!errors.leaderName)}
               />
             </Field>
 
-            <Field label="Your Email *" error={errors.leaderEmail}>
-              <input
-                type="email"
-                value={form.leaderEmail}
-                onChange={(e) => updateForm('leaderEmail', e.target.value)}
-                placeholder="you@email.com"
-                style={S.input(!!errors.leaderEmail)}
-              />
-            </Field>
-
-            <Field label="Your Phone *" error={errors.leaderPhone}>
-              <input
-                type="tel"
-                value={form.leaderPhone}
-                onChange={(e) => updateForm('leaderPhone', e.target.value)}
-                placeholder="(555) 555-5555"
-                style={S.input(!!errors.leaderPhone)}
-              />
+            {/* Chapter autocomplete */}
+            <Field label="Your Chapter *" error={errors.orgName}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={form.orgName}
+                  onChange={(e) => {
+                    updateForm('orgName', e.target.value);
+                    setChapterDropdownOpen(true);
+                  }}
+                  onFocus={() => setChapterDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setChapterDropdownOpen(false), 160)}
+                  placeholder="e.g. Sigma Chi @ Ole Miss"
+                  style={S.input(!!errors.orgName)}
+                  autoComplete="off"
+                />
+                {chapterDropdownOpen && filteredChapters.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    right: 0,
+                    background: 'white',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '10px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.09)',
+                    zIndex: 50,
+                    overflow: 'hidden',
+                  }}>
+                    {filteredChapters.map((chapter, i) => (
+                      <button
+                        key={chapter}
+                        type="button"
+                        onMouseDown={() => {
+                          updateForm('orgName', chapter);
+                          setChapterDropdownOpen(false);
+                        }}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left' as const,
+                          padding: '10px 14px',
+                          fontSize: '0.875rem',
+                          color: '#374151',
+                          background: 'none',
+                          border: 'none',
+                          borderBottom: i < filteredChapters.length - 1 ? '1px solid #F3F4F6' : 'none',
+                          cursor: 'pointer',
+                          fontFamily: 'Inter, system-ui, sans-serif',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#F9FAFB'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                      >
+                        {chapter}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </Field>
           </div>
 
           <div style={S.actions}>
-            <button
-              onClick={() => goToStep(0)}
-              style={S.backBtn}
-            >
-              ← Back
-            </button>
+            <button onClick={() => goToStep(0)} style={S.backBtn}>← Back</button>
             <NavButton
               onClick={() => {
-                if (validateStep1()) goToStep(2);
+                if (validateSimpleForm()) goToStep(2);
               }}
             >
               Continue <ChevronRight size={16} />
@@ -923,7 +1077,6 @@ function SetUpPage() {
                   </p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  {/* Instagram DM Mock — keep dark bubble as product preview */}
                   <div style={{ width: '230px', background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
                     <div style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -979,11 +1132,11 @@ function SetUpPage() {
                     <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
                     <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
                     {[
-                      {cx:52,cy:52,d:0.3,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg'},
-                      {cx:228,cy:52,d:0.5,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg'},
-                      {cx:228,cy:148,d:0.7,avatar:'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg'},
-                      {cx:52,cy:148,d:0.9,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg'},
-                      {cx:140,cy:16,d:1.1,avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg'},
+                      {cx:52,cy:52,d:0.3,avatar:'/faces/face1.jpg'},
+                      {cx:228,cy:52,d:0.5,avatar:'/faces/face4.jpg'},
+                      {cx:228,cy:148,d:0.7,avatar:'/faces/face6.jpg'},
+                      {cx:52,cy:148,d:0.9,avatar:'/faces/face11.jpg'},
+                      {cx:140,cy:16,d:1.1,avatar:'/faces/face8.jpg'},
                     ].map((n,i) => (
                       <g key={`node-${i}`} style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}>
                         <image href={n.avatar} x={n.cx-18} y={n.cy-18} width={36} height={36}
@@ -1061,7 +1214,7 @@ function SetUpPage() {
                   </div>
                 </div>
               </div>
-              {/* Messaging Hub Mock — keep dark as product preview */}
+              {/* Messaging mock */}
               <div style={{ background: 'rgba(15,23,42,0.97)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <MessageSquare size={14} color="#10B981" />
@@ -1069,9 +1222,9 @@ function SetUpPage() {
                   <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>Payne Parker</span>
                 </div>
                 {[
-                  { initials: 'EH', name: 'Ethan Hill', preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas insurance - let me connect you.", time: '2m ago', unread: true, color: '#0F172A', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg' },
-                  { initials: 'EF', name: 'Evan Foster', preview: 'Would love to chat about wealth management opportunities. Are you free this week?', time: '1h ago', unread: false, color: '#8B5CF6', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png' },
-                  { initials: 'BK', name: 'Bryce Kallio', preview: "Great to see you on here. Let's catch up soon.", time: '3h ago', unread: false, color: '#0EA5E9', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cd5b69be-83c4-4cf3-b961-abfb7a892d35-1776217083451.png' },
+                  { initials: 'EH', name: 'Ethan Hill',    preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas real estate — let me connect you.", time: '2m ago', unread: true, color: '#0F172A', avatar: '/faces/face2.jpg' },
+                  { initials: 'ND', name: 'Nash Dehmer',   preview: 'Would love to connect you with someone at the Senate if policy is interesting to you.',                time: '1h ago', unread: false, color: '#6366F1', avatar: '/faces/face4.jpg' },
+                  { initials: 'ZF', name: 'Zach Fosseen',  preview: "Great to see you on here. We're hiring at Virtue — let's catch up.",                                 time: '3h ago', unread: false, color: '#0EA5E9', avatar: '/faces/face11.jpg' },
                 ].map((m, i) => (
                   <div key={i} style={{ padding: '12px 16px', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none', display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <img src={m.avatar} alt={m.name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
@@ -1101,8 +1254,8 @@ function SetUpPage() {
                       <span style={{ color: 'white', fontSize: '0.75rem', fontWeight: 600 }}>alumni_contacts.csv</span>
                     </div>
                     {[
-                      {name:'James D.', d:'0.2s'},{name:'Maria K.', d:'0.5s'},
-                      {name:'Tyler R.', d:'0.8s'},{name:'Sara L.', d:'1.1s'},{name:'Alex B.', d:'1.4s'},
+                      {name:'Payne P.', d:'0.2s'},{name:'Nash D.', d:'0.5s'},
+                      {name:'Gavin M.', d:'0.8s'},{name:'Zach F.', d:'1.1s'},{name:'Abhi B.', d:'1.4s'},
                     ].map((row,i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: '1px solid #F3F4F6', animation: `rowFade 0.5s ease ${row.d} both` }}>
                         <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>{row.name}</span>
@@ -1150,7 +1303,6 @@ function SetUpPage() {
                   Once alumni receive the invite, joining is frictionless. Create a profile, join your space, done. Then the whole network opens up.
                 </p>
               </div>
-              {/* Product mock cards — keep dark as in-app preview */}
               <div className="launch-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                 <div style={{ background: '#0F172A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px' }}>
                   <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 1</div>
@@ -1159,13 +1311,13 @@ function SetUpPage() {
                       <User size={18} color="rgba(255,255,255,0.4)" />
                     </div>
                     <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Evan Foster</span>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Chadwick Mask</span>
                     </div>
                     <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
                       <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Finance · Senior</span>
                     </div>
                     <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: '28px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Nashville, TN</span>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Oxford, MS</span>
                     </div>
                   </div>
                   <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Create Profile</h4>
@@ -1225,10 +1377,10 @@ function SetUpPage() {
                     <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
                     <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
                     {[
-                      {cx:86,cy:52,d:'0.2s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/20ba450e-709c-4a78-a963-7cbfb2de72ef-1776173885369.jpg'},
-                      {cx:174,cy:52,d:'0.4s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png'},
-                      {cx:174,cy:128,d:'0.6s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg'},
-                      {cx:86,cy:128,d:'0.8s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cd5b69be-83c4-4cf3-b961-abfb7a892d35-1776217083451.png'},
+                      {cx:86,cy:52,d:'0.2s',avatar:'/faces/face1.jpg'},
+                      {cx:174,cy:52,d:'0.4s',avatar:'/faces/face4.jpg'},
+                      {cx:174,cy:128,d:'0.6s',avatar:'/faces/face6.jpg'},
+                      {cx:86,cy:128,d:'0.8s',avatar:'/faces/face11.jpg'},
                     ].map((n,i) => (
                       <g key={i}>
                         <line x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
@@ -1242,12 +1394,12 @@ function SetUpPage() {
                       </g>
                     ))}
                     {[
-                      {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/dec7107c-53b3-4613-8929-1357413117f5-1776171340287.jpg'},
-                      {cx:218,cy:38,fromX:174,fromY:52,d:'1.2s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/17a305a0-ecd8-41f4-9fc3-a24aabd45b31-1774369035764.jpg'},
-                      {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cac5168f-653d-4cf6-bbcf-72c94ebda545-1776377757016.jpg'},
-                      {cx:42,cy:142,fromX:86,fromY:128,d:'1.6s',avatar:'https://ssqpfkiesxwnmphwyezb.supabase.co/storage/v1/object/public/user-avatar/919506eb-0c33-4ea1-9bb1-aba0fe2440e2-1764604386655.jpg'},
-                      {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a71ded56-4d7b-4d57-9e0d-6541aea48da4-1776174486183.jpg'},
-                      {cx:130,cy:168,fromX:130,fromY:90,d:'2.0s',avatar:'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg'},
+                      {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s',avatar:'/faces/face2.jpg'},
+                      {cx:218,cy:38,fromX:174,fromY:52,d:'1.2s',avatar:'/faces/face8.jpg'},
+                      {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s',avatar:'/faces/face12.jpg'},
+                      {cx:42,cy:142,fromX:86,fromY:128,d:'1.6s',avatar:'/faces/face9.jpg'},
+                      {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s',avatar:'/faces/face5.jpg'},
+                      {cx:130,cy:168,fromX:130,fromY:90,d:'2.0s',avatar:'/faces/face10.jpg'},
                     ].map((n,i) => (
                       <g key={i}>
                         <line x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
@@ -1292,28 +1444,14 @@ function SetUpPage() {
             <button
               className="launch-next-btn"
               onClick={advanceLaunchStep}
-              style={{
-                padding: '10px 28px',
-                borderRadius: '8px',
-                background: '#0F172A',
-                color: 'white',
-                fontWeight: 600,
-                fontSize: '0.9375rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                minHeight: '44px',
-              }}
+              style={{ padding: '10px 28px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.9375rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '8px', minHeight: '44px' }}
             >
               {launchSubStep === 5 ? 'Continue to Agreement' : 'Next'}
               {launchSubStep === 5 ? <ArrowRight size={16} /> : <ChevronRight size={16} />}
             </button>
           </div>
 
-        </div>{/* end transitioning wrapper */}
+        </div>
       </div>
     );
   }
@@ -1347,7 +1485,6 @@ function SetUpPage() {
             ))}
           </div>
 
-          {/* Full agreement toggle */}
           <button type="button" onClick={() => setShowFullAgreement(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A', background: 'none', border: 'none', cursor: 'pointer', marginBottom: '12px', fontFamily: 'inherit' }}>
             {showFullAgreement ? 'Hide full agreement ↑' : 'Read full agreement ↓'}
@@ -1369,7 +1506,6 @@ function SetUpPage() {
             </div>
           )}
 
-          {/* Signature section */}
           <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <p style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500, margin: 0 }}>
               I agree to these terms on behalf of <span style={{ color: '#111827', fontWeight: 700 }}>{form.orgName || 'my organization'}</span>
@@ -1394,16 +1530,8 @@ function SetUpPage() {
           </div>
 
           <div style={S.actions}>
-            <button
-              onClick={() => goToStep(2)}
-              style={S.backBtn}
-            >
-              ← Back
-            </button>
-            <NavButton
-              onClick={() => { if (canProceed) goToStep(4); }}
-              disabled={!canProceed}
-            >
+            <button onClick={() => goToStep(2)} style={S.backBtn}>← Back</button>
+            <NavButton onClick={() => { if (canProceed) goToStep(4); }} disabled={!canProceed}>
               Continue to Payment <ChevronRight size={16} />
             </NavButton>
           </div>
@@ -1422,26 +1550,21 @@ function SetUpPage() {
           <h2 style={S.h2}>Complete your payment</h2>
           <p style={S.sub}>You&apos;ll be redirected to Stripe&apos;s secure checkout.</p>
 
-          {/* Summary */}
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-6 space-y-3">
-            <h3 className="font-semibold text-[#0F172A] mb-3">Order Summary</h3>
+          <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '24px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <h3 style={{ fontWeight: 600, color: '#0F172A', margin: '0 0 4px' }}>Order Summary</h3>
             <Row label="Organization" value={form.orgName} />
-            <Row label="School" value={form.school} />
-            <Row label="Type" value={form.orgType} />
-            <Row label="Members" value={`${form.memberCount} members`} />
-            <div className="border-t border-gray-200 pt-3 mt-3">
-              <Row
-                label="Monthly Price"
-                value={price ? `$${price}/month` : '-'}
-                valueClass="text-[#0F172A] font-bold text-lg"
-              />
+            {form.school && <Row label="School" value={form.school} />}
+            {form.orgType && <Row label="Type" value={form.orgType} />}
+            {form.memberCount && <Row label="Members" value={`${form.memberCount} members`} />}
+            <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '12px', marginTop: '4px' }}>
+              <Row label="Monthly Price" value={price ? `$${price}/month` : 'TBD'} />
             </div>
-            <p className="text-xs text-gray-400 pt-1">Annual commitment, then month-to-month · Cancel after year one with 30 days notice</p>
+            <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: 0 }}>Annual commitment, then month-to-month · Cancel after year one with 30 days notice</p>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-            <Shield size={16} className="text-gray-400" />
-            <span>Secured by Stripe - your payment info is never stored on our servers</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: '#6B7280', marginBottom: '24px' }}>
+            <Shield size={16} color="#9CA3AF" />
+            <span>Secured by Stripe — your payment info is never stored on our servers</span>
           </div>
 
           {checkoutError && (
@@ -1451,15 +1574,10 @@ function SetUpPage() {
           )}
 
           <div style={S.actions}>
-            <button
-              onClick={() => goToStep(3)}
-              style={S.backBtn}
-            >
-              ← Back
-            </button>
+            <button onClick={() => goToStep(3)} style={S.backBtn}>← Back</button>
             <NavButton onClick={handleCheckout} disabled={checkoutLoading}>
               {checkoutLoading ? (
-                <><Loader2 size={16} className="animate-spin" /> Redirecting...</>
+                <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Redirecting...</>
               ) : (
                 <>Complete Payment <ArrowRight size={16} /></>
               )}
@@ -1489,7 +1607,6 @@ function SetUpPage() {
           </div>
         ) : (
           <>
-            {/* Checkmark */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '28px' }}>
               <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', border: '1px solid #bbf7d0' }}>
                 <Check size={36} color="#16a34a" strokeWidth={2.5} />
@@ -1500,7 +1617,6 @@ function SetUpPage() {
               )}
             </div>
 
-            {/* What happens next */}
             <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
               <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 16px 0' }}>What happens next</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1612,11 +1728,6 @@ function NavButton({ onClick, disabled, children }: { onClick: () => void; disab
       {children}
     </button>
   );
-}
-
-function inputCls(_hasError: boolean) {
-  // Legacy - kept for any remaining uses; new code uses S.input()
-  return '';
 }
 
 // Wrap in Suspense so useSearchParams() works with Next.js static export
