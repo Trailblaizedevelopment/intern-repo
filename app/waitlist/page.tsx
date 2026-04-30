@@ -15,18 +15,18 @@ interface Affiliation {
 
 // Alpha Chapter profiles — real names with local face placeholders
 const ALPHA_PROFILES = [
-  { name: 'Payne', avatar: '/faces/face1.jpg', role: 'Account Executive @ Knight Commercial' },
-  { name: 'Nash', avatar: '/faces/face2.jpg', role: 'Dir of Operations, US Senate' },
-  { name: 'Jake', avatar: '/faces/face3.jpg', role: 'Founder @ Scratch AI' },
-  { name: 'Ethan', avatar: '/faces/face4.jpg', role: 'Financial Services Rep @ Fidelity' },
-  { name: 'Andrew', avatar: '/faces/face5.jpg', role: 'IB Analyst @ GSI Capital' },
-  { name: 'Gavin', avatar: '/faces/face6.jpg', role: 'Credit Portfolio Analyst @ JPMorgan' },
-  { name: 'Luke', avatar: '/faces/face7.jpg', role: 'MS Finance @ McCombs' },
-  { name: 'Zach', avatar: '/faces/face8.jpg', role: 'VP of BD @ Virtue' },
-  { name: 'Andrew L.', avatar: '/faces/face9.jpg', role: 'GTM @ Glean' },
-  { name: 'Peyton', avatar: '/faces/face10.jpg', role: 'Financial Advisor @ Williams Wealth' },
-  { name: 'Abhi', avatar: '/faces/face11.jpg', role: 'AI Product @ Search Party' },
-  { name: 'Chadwick', avatar: '/faces/face12.jpg', role: 'Active Member, Finance 29' },
+  { name: 'Zach', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg', role: 'VP of BD @ Virtue' },
+  { name: 'Chadwick', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/74c73f4e-fed8-466a-858d-5d95bcc7c77c-1776207737679.png', role: 'Active, Finance 29' },
+  { name: 'Ewing', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ed2f2057-35b4-4f07-96df-d1571349a87b-1776467784797.png', role: 'Angel Investor & MD' },
+  { name: 'Ethan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cc27eb12-c5fb-4d60-86ef-74e6f28ad9a4-1776170865222.jpg', role: 'Financial Services @ Fidelity' },
+  { name: 'Jackson', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a240db6a-3481-49b9-be5a-cd39af25d284-1776170846340.png', role: 'Territory Sales @ Priority1' },
+  { name: 'Nick', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/927335a8-cce4-4f05-b004-281d8d8c00f9-1776170450281.jpg', role: 'AE at Hooray Health' },
+  { name: 'Garrett', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8ee6fb3e-f6a8-486f-a140-cad49adfeee4-1776171107178.jpg', role: 'Underwriter at Chubb' },
+  { name: 'Thomas', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/5f35ecba-22a5-4f16-a451-14d3fed93a69-1776208149093.png', role: 'AI in Business 27' },
+  { name: 'Hugh', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/e6017abe-9ade-4911-b106-1f6035a8e1cf-1776208471420.jpg', role: 'Business Admin 29' },
+  { name: 'Clayton', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6db3cdca-bf65-494c-93b2-3fb4a320c479-1776215748157.png', role: 'Accounting 26' },
+  { name: 'Evan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png', role: 'Finance 27' },
+  { name: 'Nick F.', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/e7583cf2-d713-4675-8d9c-fed241bb6131-1776215917963.png', role: 'Aerospace Engineering 30' },
 ];
 
 // Floating node for the animated web
@@ -63,6 +63,7 @@ function AnimatedWeb() {
     const imgs: HTMLImageElement[] = [];
     ALPHA_PROFILES.forEach((profile, i) => {
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       img.src = profile.avatar;
       img.onerror = () => { /* silently fail */ };
       imgs[i] = img;
@@ -241,7 +242,7 @@ export default function WaitlistPage() {
   // SPLASH SCREEN — animated web with faces
   if (!showForm && !submitted) {
     return (
-      <div style={{ minHeight: '100vh', background: '#B8B5AD', position: 'relative', overflow: 'hidden', cursor: 'pointer' }} onClick={() => setShowForm(true)}>
+      <div style={{ minHeight: '100vh', background: '#4A4A4F', position: 'relative', overflow: 'hidden', cursor: 'pointer' }} onClick={() => setShowForm(true)}>
         <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
         <AnimatedWeb />
 
@@ -291,7 +292,7 @@ export default function WaitlistPage() {
   // SUCCESS SCREEN
   if (submitted) {
     return (
-      <div style={{ minHeight: '100vh', background: '#B8B5AD', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ minHeight: '100vh', background: '#4A4A4F', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
         <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
         <AnimatedWeb />
         <div style={{ maxWidth: 440, width: '100%', textAlign: 'center', position: 'relative', zIndex: 10 }}>
@@ -308,7 +309,7 @@ export default function WaitlistPage() {
 
   // FORM SCREEN
   return (
-    <div style={{ minHeight: '100vh', background: '#B8B5AD', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: '#4A4A4F', position: 'relative', overflow: 'hidden' }}>
       <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
       <AnimatedWeb />
 
