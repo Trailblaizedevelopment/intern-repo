@@ -34,8 +34,13 @@ export async function POST(req: NextRequest) {
       discountCode,
     } = body;
 
-    if (!orgName || !school || !orgType || !memberCount || !leaderName || !leaderEmail || !leaderPhone) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Only truly required for Stripe: orgName, memberCount, leaderEmail
+    if (!orgName || !memberCount || !leaderEmail) {
+      const missing = [];
+      if (!orgName) missing.push('organization name');
+      if (!memberCount) missing.push('member count');
+      if (!leaderEmail) missing.push('email');
+      return NextResponse.json({ error: `Missing: ${missing.join(', ')}` }, { status: 400 });
     }
 
     const priceInDollars = getPriceTier(Number(memberCount));
