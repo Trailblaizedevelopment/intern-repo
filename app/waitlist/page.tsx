@@ -13,8 +13,21 @@ interface Affiliation {
   orgName: string;
 }
 
-// Face photos hosted locally in /public/faces/
-const FACE_URLS = Array.from({ length: 12 }, (_, i) => `/faces/face${i + 1}.jpg`);
+// Alpha Chapter profiles — real names with local face placeholders
+const ALPHA_PROFILES = [
+  { name: 'Payne', avatar: '/faces/face1.jpg', role: 'Account Executive @ Knight Commercial' },
+  { name: 'Nash', avatar: '/faces/face2.jpg', role: 'Dir of Operations, US Senate' },
+  { name: 'Jake', avatar: '/faces/face3.jpg', role: 'Founder @ Scratch AI' },
+  { name: 'Ethan', avatar: '/faces/face4.jpg', role: 'Financial Services Rep @ Fidelity' },
+  { name: 'Andrew', avatar: '/faces/face5.jpg', role: 'IB Analyst @ GSI Capital' },
+  { name: 'Gavin', avatar: '/faces/face6.jpg', role: 'Credit Portfolio Analyst @ JPMorgan' },
+  { name: 'Luke', avatar: '/faces/face7.jpg', role: 'MS Finance @ McCombs' },
+  { name: 'Zach', avatar: '/faces/face8.jpg', role: 'VP of BD @ Virtue' },
+  { name: 'Andrew L.', avatar: '/faces/face9.jpg', role: 'GTM @ Glean' },
+  { name: 'Peyton', avatar: '/faces/face10.jpg', role: 'Financial Advisor @ Williams Wealth' },
+  { name: 'Abhi', avatar: '/faces/face11.jpg', role: 'AI Product @ Search Party' },
+  { name: 'Chadwick', avatar: '/faces/face12.jpg', role: 'Active Member, Finance 29' },
+];
 
 // Floating node for the animated web
 interface WebNode {
@@ -46,11 +59,11 @@ function AnimatedWeb() {
     resize();
     window.addEventListener('resize', resize);
 
-    // Load face images from local files
+    // Load face images from Alpha profiles
     const imgs: HTMLImageElement[] = [];
-    FACE_URLS.forEach((url, i) => {
+    ALPHA_PROFILES.forEach((profile, i) => {
       const img = new Image();
-      img.src = url;
+      img.src = profile.avatar;
       img.onerror = () => { /* silently fail */ };
       imgs[i] = img;
     });
@@ -64,15 +77,15 @@ function AnimatedWeb() {
         id: i,
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        radius: i < 12 ? 26 : 10,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: (Math.random() - 0.5) * 0.25,
+        radius: i < 12 ? 34 : 6,
         faceIdx: i < 12 ? i : -1,
       });
     }
     nodesRef.current = nodes;
 
-    const connectionDist = 200;
+    const connectionDist = 260;
 
     const animate = () => {
       if (!canvas || !ctx) return;
@@ -95,12 +108,12 @@ function AnimatedWeb() {
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < connectionDist) {
-            const opacity = (1 - dist / connectionDist) * 0.15;
+            const opacity = (1 - dist / connectionDist) * 0.25;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
             ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
           }
         }
@@ -126,18 +139,22 @@ function AnimatedWeb() {
           // Border
           ctx.beginPath();
           ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.lineWidth = 2;
           ctx.stroke();
+          // Name label
+          const name = ALPHA_PROFILES[node.faceIdx]?.name ?? '';
+          ctx.font = '600 10px Inter, system-ui, sans-serif';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(name, node.x, node.y + node.radius + 4);
         } else {
           // Plain dot node
           ctx.beginPath();
           ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
           ctx.fill();
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
         }
       }
 
@@ -318,32 +335,33 @@ export default function WaitlistPage() {
 
         {/* Form card */}
         <div style={{
-          background: 'rgba(255,255,255,0.12)',
+          background: 'rgba(255,255,255,0.97)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          border: 'none',
           borderRadius: 16,
           padding: '28px 24px',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 10 }}>
               <input type="text" placeholder="First name" value={firstName} onChange={e => setFirstName(e.target.value)}
-                style={{ flex: 1, padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 15, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
+                style={{ flex: 1, padding: '12px 14px', borderRadius: 10, border: '1px solid #E5E7EB', background: 'white', color: '#374151', fontSize: 15, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
               />
               <input type="text" placeholder="Last name" value={lastName} onChange={e => setLastName(e.target.value)}
-                style={{ flex: 1, padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 15, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
+                style={{ flex: 1, padding: '12px 14px', borderRadius: 10, border: '1px solid #E5E7EB', background: 'white', color: '#374151', fontSize: 15, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
               />
             </div>
 
             <input type="tel" placeholder="Phone number" value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
-              style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 15, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
+              style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #E5E7EB', background: 'white', color: '#374151', fontSize: 15, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
             />
 
             <input type="text" placeholder="University" value={school} onChange={e => setSchool(e.target.value)}
-              style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 15, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
+              style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #E5E7EB', background: 'white', color: '#374151', fontSize: 15, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
             />
 
             <div>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'Inter, system-ui, sans-serif' }}>
+              <p style={{ color: '#6B7280', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'Inter, system-ui, sans-serif' }}>
                 Your organizations
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -353,9 +371,9 @@ export default function WaitlistPage() {
                   return (
                     <button key={cat} onClick={() => toggleCategory(cat)}
                       style={{
-                        padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                        background: selected ? 'white' : 'rgba(255,255,255,0.1)',
-                        color: selected ? '#333' : 'rgba(255,255,255,0.7)',
+                        padding: '6px 12px', borderRadius: 20, border: '1px solid #E5E7EB', cursor: 'pointer',
+                        background: selected ? '#0F172A' : '#F9FAFB',
+                        color: selected ? 'white' : '#374151',
                         fontSize: 12, fontWeight: selected ? 600 : 400, fontFamily: 'Inter, system-ui, sans-serif',
                         transition: 'all 0.15s',
                       }}
@@ -371,10 +389,10 @@ export default function WaitlistPage() {
                   <input type="text" autoFocus placeholder={`Name of your ${expandedCategory.toLowerCase()}...`}
                     value={orgInput} onChange={e => setOrgInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && orgInput.trim()) confirmOrg(); }}
-                    style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 13, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', background: 'white', color: '#374151', fontSize: 13, outline: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}
                   />
                   <button onClick={confirmOrg} disabled={!orgInput.trim()}
-                    style={{ padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', background: orgInput.trim() ? 'white' : 'rgba(255,255,255,0.1)', color: orgInput.trim() ? '#333' : 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif' }}>
+                    style={{ padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', background: orgInput.trim() ? '#0F172A' : '#E5E7EB', color: orgInput.trim() ? 'white' : '#9CA3AF', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif' }}>
                     Add
                   </button>
                 </div>
@@ -384,8 +402,8 @@ export default function WaitlistPage() {
             <button onClick={handleSubmit} disabled={!canSubmit || loading}
               style={{
                 padding: '14px 24px', borderRadius: 10, border: 'none',
-                background: canSubmit ? 'white' : 'rgba(255,255,255,0.1)',
-                color: canSubmit ? '#333' : 'rgba(255,255,255,0.3)',
+                background: canSubmit ? '#0F172A' : '#E5E7EB',
+                color: canSubmit ? 'white' : '#9CA3AF',
                 fontSize: 15, fontWeight: 700, cursor: canSubmit ? 'pointer' : 'default',
                 marginTop: 4, fontFamily: 'Inter, system-ui, sans-serif',
                 opacity: loading ? 0.7 : 1, transition: 'all 0.15s',
@@ -396,7 +414,7 @@ export default function WaitlistPage() {
           </div>
         </div>
 
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 16, fontFamily: 'Inter, system-ui, sans-serif' }}>
+        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, textAlign: 'center', marginTop: 16, fontFamily: 'Inter, system-ui, sans-serif' }}>
           No spam. We&apos;ll text you when the app launches.
         </p>
       </div>
