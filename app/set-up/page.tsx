@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Check,
@@ -8,7 +8,6 @@ import {
   Calendar,
   DollarSign,
   Shield,
-  Users,
   MessageSquare,
   User,
   Loader2,
@@ -21,15 +20,20 @@ import {
   Globe,
   Share2,
   Mail,
-  GraduationCap,
-  Briefcase,
-  Building2,
-  Heart,
-  TrendingUp,
-  Trophy,
 } from 'lucide-react';
 
-// ─── Pricing ────────────────────────────────────────────────────────────────
+// ─── Real Avatar URLs ─────────────────────────────────────────────────────────
+
+const RA = {
+  nashDehmer:  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg',
+  ethanHill:   'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cc27eb12-c5fb-4d60-86ef-74e6f28ad9a4-1776170865222.jpg',
+  jakeCoppen:  'https://api.trailblaize.net/storage/v1/object/public/user-avatar/4be69e44-669f-442e-8859-731db416ea3b-1776172132818.jpg',
+  gavinMurrey: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/365ac617-1637-4a85-b02c-b2b23b4307c7-1776171942678.jpg',
+  payneParker: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/dec7107c-53b3-4613-8929-1357413117f5-1776171340287.jpg',
+  andrewLongo: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/849b9364-7abd-4e0e-b777-56705b42b096-1776172803787.jpg',
+};
+
+// ─── Pricing ─────────────────────────────────────────────────────────────────
 
 function getPriceTier(memberCount: number): number {
   if (memberCount < 100) return 99;
@@ -40,7 +44,7 @@ function getPriceTier(memberCount: number): number {
   return 599;
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type OrgType =
   | 'Fraternity'
@@ -61,7 +65,21 @@ const ORG_TYPES: OrgType[] = [
   'Other',
 ];
 
+type AlumniCard = {
+  name: string;
+  bio: string;
+  location: string | null;
+  major: string;
+  year: string;
+  chapter: string;
+  avatar: string | null;
+  initials: string;
+  color: string;
+};
+
 interface FormData {
+  firstName: string;
+  lastName: string;
   orgName: string;
   school: string;
   orgType: OrgType | '';
@@ -73,46 +91,92 @@ interface FormData {
   instagramHandle: string;
 }
 
-// ─── Alpha Chapter Demo Profiles ─────────────────────────────────────────────
+// ─── Filter Alumni Data ───────────────────────────────────────────────────────
 
-// face1–face12 are hosted at /faces/faceN.jpg
-// Alumni (12 faces → 12 people):
-//  face1  Payne Parker       — AE @ Knight Commercial, Dallas TX,   Marketing '26
-//  face2  Ethan Hill         — Fidelity Investments,  Dallas TX,    Finance '26
-//  face3  Garrett Smalley    — Underwriter @ Chubb,   Milton GA,    Finance '25
-//  face4  Nash Dehmer        — US Senate,              Washington DC, PoliSci '23
-//  face5  Peyton Pounds      — Williams Wealth,        Charlotte NC,  Finance '23
-//  face6  Jake Coppen        — Founder @ Scratch AI,  New York NY,  Finance '26
-//  face7  Andrew Hopperton   — IB @ GSI Capital,      Tampa FL,     Finance '25
-//  face8  Gavin Murrey       — JPMorgan,               New York NY,  Finance '26
-//  face9  Luke Nayfa         — MS Finance McCombs,    Austin TX,    Finance '25
-//  face10 Andrew Longo       — GTM @ Glean,            Nashville TN, Marketing '26
-//  face11 Zach Fosseen       — VP BD @ Virtue,        Seattle WA,   Entrepreneurship '24
-//  face12 Abhi Bhabad        — AI Product @ Search Party, CS '26
-// Actives (reuse nearest unused face per slide):
-//  face3  Chadwick Mask      — Oxford MS, Finance '29  (messaging slide only)
-//  face2  Evan Foster        — Finance '27              (step 2 mocks only)
-//  face10 Thomas Pham        — College Station TX, AI in Business '27
+const FILTER_ALUMNI: Record<string, AlumniCard[]> = {
+  Finance: [
+    { name: 'Ethan Hill',       bio: 'Financial Services Rep @ Fidelity',     location: 'Dallas, TX',      major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.ethanHill,   initials: 'EH', color: '#0F172A' },
+    { name: 'Garrett Smalley',  bio: 'Associate Underwriter @ Chubb',          location: 'Milton, GA',       major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face3.jpg', initials: 'GS', color: '#6366F1' },
+    { name: 'Andrew Hopperton', bio: 'IB Analyst @ GSI Capital',               location: 'Tampa, FL',        major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face7.jpg', initials: 'AH', color: '#0EA5E9' },
+    { name: 'Gavin Murrey',     bio: 'Credit Portfolio Analyst @ JPMorgan',    location: 'New York, NY',    major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.gavinMurrey, initials: 'GM', color: '#0F172A' },
+    { name: 'Peyton Pounds',    bio: 'Financial Advisor @ Williams Wealth',    location: 'Charlotte, NC',   major: 'Finance',          year: '23', chapter: 'Alpha Chapter', avatar: '/faces/face5.jpg', initials: 'PP', color: '#10B981' },
+    { name: 'Luke Nayfa',       bio: 'MS Finance @ McCombs',                   location: 'Austin, TX',      major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face9.jpg', initials: 'LN', color: '#F59E0B' },
+    { name: 'Jack Grier',       bio: 'Healthcare Recruiter @ Medasource',      location: 'Nashville, TN',   major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'JG', color: '#EC4899' },
+    { name: 'William Heusler',  bio: 'Analyst @ MSCI',                         location: 'New York, NY',    major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'WH', color: '#8B5CF6' },
+  ],
+  'Real Estate': [
+    { name: 'Eli Ridgeway',     bio: 'Development @ Watersound',               location: 'Nashville, TN',   major: 'Real Estate',      year: '24', chapter: 'Alpha Chapter', avatar: null, initials: 'ER', color: '#10B981' },
+    { name: 'Charlie Parkman',  bio: 'Real Estate Associate',                  location: 'Dallas, TX',      major: 'Finance',          year: '24', chapter: 'Alpha Chapter', avatar: null, initials: 'CP', color: '#F59E0B' },
+    { name: 'Cole Montgomery',  bio: 'Commercial Real Estate',                 location: 'Atlanta, GA',     major: 'Business',         year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'CM', color: '#0EA5E9' },
+  ],
+  Engineering: [
+    { name: 'Abhi Bhabad',      bio: 'AI Product @ Search Party',              location: null,               major: 'Computer Science', year: '26', chapter: 'Alpha Chapter', avatar: '/faces/face12.jpg', initials: 'AB', color: '#10B981' },
+    { name: 'Jake Coppen',      bio: 'Founder @ Scratch AI',                   location: 'New York, NY',    major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.jakeCoppen,  initials: 'JC', color: '#0F172A' },
+    { name: 'Thomas Pham',      bio: 'AI in Business',                          location: 'College Station, TX', major: 'AI in Business', year: '27', chapter: 'Alpha Chapter', avatar: '/faces/face10.jpg', initials: 'TP', color: '#6366F1' },
+  ],
+  Marketing: [
+    { name: 'Payne Parker',     bio: 'Account Executive @ Knight Commercial',  location: 'Dallas, TX',      major: 'Marketing',        year: '26', chapter: 'Alpha Chapter', avatar: RA.payneParker, initials: 'PP', color: '#0F172A' },
+    { name: 'Andrew Longo',     bio: 'GTM @ Glean',                             location: 'Nashville, TN',   major: 'Marketing',        year: '26', chapter: 'Alpha Chapter', avatar: RA.andrewLongo, initials: 'AL', color: '#6366F1' },
+    { name: 'Carter Brown',     bio: 'Marketing Manager',                       location: 'Austin, TX',      major: 'Marketing',        year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'CB', color: '#EC4899' },
+  ],
+  Healthcare: [
+    { name: 'Jack Grier',       bio: 'Healthcare Recruiter @ Medasource',      location: 'Nashville, TN',   major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'JG', color: '#EC4899' },
+    { name: 'Peyton Pounds',    bio: 'Financial Advisor @ Williams Wealth',    location: 'Charlotte, NC',   major: 'Finance',          year: '23', chapter: 'Alpha Chapter', avatar: '/faces/face5.jpg', initials: 'PP', color: '#10B981' },
+    { name: 'Andrew Hopperton', bio: 'IB Analyst @ GSI Capital',               location: 'Tampa, FL',       major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face7.jpg', initials: 'AH', color: '#0EA5E9' },
+  ],
+  Consulting: [
+    { name: 'Andrew Hopperton', bio: 'IB Analyst @ GSI Capital',               location: 'Tampa, FL',       major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face7.jpg', initials: 'AH', color: '#0EA5E9' },
+    { name: 'Gavin Murrey',     bio: 'Credit Portfolio Analyst @ JPMorgan',    location: 'New York, NY',    major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.gavinMurrey, initials: 'GM', color: '#0F172A' },
+    { name: 'Luke Nayfa',       bio: 'MS Finance @ McCombs',                   location: 'Austin, TX',      major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face9.jpg', initials: 'LN', color: '#F59E0B' },
+    { name: 'Ethan Hill',       bio: 'Financial Services Rep @ Fidelity',      location: 'Dallas, TX',      major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.ethanHill,   initials: 'EH', color: '#0F172A' },
+  ],
+  Tech: [
+    { name: 'Abhi Bhabad',      bio: 'AI Product @ Search Party',              location: null,               major: 'Computer Science', year: '26', chapter: 'Alpha Chapter', avatar: '/faces/face12.jpg', initials: 'AB', color: '#10B981' },
+    { name: 'Jake Coppen',      bio: 'Founder @ Scratch AI',                   location: 'New York, NY',    major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.jakeCoppen,  initials: 'JC', color: '#0F172A' },
+    { name: 'Thomas Pham',      bio: 'AI in Business',                          location: 'College Station, TX', major: 'AI in Business', year: '27', chapter: 'Alpha Chapter', avatar: '/faces/face10.jpg', initials: 'TP', color: '#6366F1' },
+    { name: 'Garrett Smalley',  bio: 'Associate @ Chubb',                       location: 'Milton, GA',      major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face3.jpg', initials: 'GS', color: '#6366F1' },
+  ],
+  Legal: [
+    { name: 'Nash Dehmer',      bio: 'Dir of Operations @ US Senate',          location: 'Washington, DC',  major: 'Political Science', year: '23', chapter: 'Alpha Chapter', avatar: RA.nashDehmer, initials: 'ND', color: '#6366F1' },
+    { name: 'Garrett Smalley',  bio: 'Associate Underwriter @ Chubb',          location: 'Milton, GA',      major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face3.jpg', initials: 'GS', color: '#6366F1' },
+    { name: 'William Heusler',  bio: 'Analyst @ MSCI',                         location: 'New York, NY',    major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'WH', color: '#8B5CF6' },
+  ],
+  Dallas: [
+    { name: 'Ethan Hill',       bio: 'Financial Services Rep @ Fidelity',      location: 'Dallas, TX',      major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.ethanHill,   initials: 'EH', color: '#0F172A' },
+    { name: 'Nick Siebert',     bio: 'Dallas, TX',                              location: 'Dallas, TX',      major: 'Business',         year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'NS', color: '#F59E0B' },
+    { name: 'Payne Parker',     bio: 'Account Executive @ Knight Commercial',  location: 'Dallas, TX',      major: 'Marketing',        year: '26', chapter: 'Alpha Chapter', avatar: RA.payneParker, initials: 'PP', color: '#EC4899' },
+    { name: 'Joe Chatham',      bio: 'Dallas, TX',                              location: 'Dallas, TX',      major: 'Finance',          year: '24', chapter: 'Alpha Chapter', avatar: null, initials: 'JC', color: '#0EA5E9' },
+  ],
+  'New York': [
+    { name: 'Jake Coppen',      bio: 'Founder @ Scratch AI',                   location: 'New York, NY',    major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.jakeCoppen,  initials: 'JC', color: '#0F172A' },
+    { name: 'William Heusler',  bio: 'Analyst @ MSCI',                         location: 'New York, NY',    major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'WH', color: '#8B5CF6' },
+    { name: 'Dimitri Nakis',    bio: 'New York, NY',                            location: 'New York, NY',    major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'DN', color: '#EC4899' },
+    { name: 'Gavin Murrey',     bio: 'Credit Portfolio Analyst @ JPMorgan',    location: 'New York, NY',    major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.gavinMurrey, initials: 'GM', color: '#0F172A' },
+  ],
+  Nashville: [
+    { name: 'Andrew Longo',     bio: 'GTM @ Glean',                             location: 'Nashville, TN',   major: 'Marketing',        year: '26', chapter: 'Alpha Chapter', avatar: RA.andrewLongo, initials: 'AL', color: '#6366F1' },
+    { name: 'Carter Matulich',  bio: 'Nashville, TN',                           location: 'Nashville, TN',   major: 'Business',         year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'CM', color: '#10B981' },
+    { name: 'Jack Grier',       bio: 'Healthcare Recruiter @ Medasource',      location: 'Nashville, TN',   major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'JG', color: '#EC4899' },
+    { name: 'Worth DuPerier',   bio: 'Nashville, TN',                           location: 'Nashville, TN',   major: 'Finance',          year: '24', chapter: 'Alpha Chapter', avatar: null, initials: 'WD', color: '#F59E0B' },
+    { name: 'Tanner McCraney',  bio: 'Nashville, TN',                           location: 'Nashville, TN',   major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'TM', color: '#0EA5E9' },
+  ],
+  Houston: [
+    { name: 'Nash Dehmer',      bio: 'Dir of Operations @ US Senate',          location: 'Washington, DC',  major: 'Political Science', year: '23', chapter: 'Alpha Chapter', avatar: RA.nashDehmer, initials: 'ND', color: '#6366F1' },
+    { name: 'Gavin Murrey',     bio: 'Credit Portfolio Analyst @ JPMorgan',    location: 'New York, NY',    major: 'Finance',          year: '26', chapter: 'Alpha Chapter', avatar: RA.gavinMurrey, initials: 'GM', color: '#0F172A' },
+    { name: 'Peyton Pounds',    bio: 'Financial Advisor @ Williams Wealth',    location: 'Charlotte, NC',   major: 'Finance',          year: '23', chapter: 'Alpha Chapter', avatar: '/faces/face5.jpg', initials: 'PP', color: '#10B981' },
+  ],
+  'Washington DC': [
+    { name: 'Nash Dehmer',      bio: 'Dir of Operations @ US Senate',          location: 'Washington, DC',  major: 'Political Science', year: '23', chapter: 'Alpha Chapter', avatar: RA.nashDehmer, initials: 'ND', color: '#6366F1' },
+    { name: 'Andrew Hopperton', bio: 'IB Analyst @ GSI Capital',               location: 'Tampa, FL',       major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face7.jpg', initials: 'AH', color: '#0EA5E9' },
+  ],
+  Austin: [
+    { name: 'Luke Nayfa',       bio: 'MS Finance @ McCombs',                   location: 'Austin, TX',      major: 'Finance',          year: '25', chapter: 'Alpha Chapter', avatar: '/faces/face9.jpg', initials: 'LN', color: '#F59E0B' },
+    { name: 'Thomas Pham',      bio: 'AI in Business',                          location: 'College Station, TX', major: 'AI in Business', year: '27', chapter: 'Alpha Chapter', avatar: '/faces/face10.jpg', initials: 'TP', color: '#6366F1' },
+    { name: 'Carter Brown',     bio: 'Marketing Manager',                       location: 'Austin, TX',      major: 'Marketing',        year: '25', chapter: 'Alpha Chapter', avatar: null, initials: 'CB', color: '#EC4899' },
+  ],
+};
 
-const DEMO_PROFILES = [
-  // ── Alumni ──
-  { name: 'Payne Parker',    chapter: 'Alpha Chapter',  year: '2026', location: 'Dallas, TX',       major: 'Marketing',        avatar: '/faces/face1.jpg',  role: 'Alumni', bio: 'Account Executive @ Knight Commercial' },
-  { name: 'Ethan Hill',      chapter: 'Alpha Chapter',  year: '2026', location: 'Dallas, TX',       major: 'Finance',          avatar: '/faces/face2.jpg',  role: 'Alumni', bio: 'Financial Services Rep @ Fidelity' },
-  { name: 'Garrett Smalley', chapter: 'Alpha Chapter',  year: '2025', location: 'Milton, GA',       major: 'Finance',          avatar: '/faces/face3.jpg',  role: 'Alumni', bio: 'Associate Underwriter @ Chubb' },
-  { name: 'Nash Dehmer',     chapter: 'Alpha Chapter',  year: '2023', location: 'Washington, DC',   major: 'Political Science', avatar: '/faces/face4.jpg', role: 'Alumni', bio: 'Director of Operations @ US Senate' },
-  { name: 'Peyton Pounds',   chapter: 'Alpha Chapter',  year: '2023', location: 'Charlotte, NC',    major: 'Finance',          avatar: '/faces/face5.jpg',  role: 'Alumni', bio: 'Financial Advisor @ Williams Wealth' },
-  { name: 'Jake Coppen',     chapter: 'Alpha Chapter',  year: '2026', location: 'New York, NY',     major: 'Finance',          avatar: '/faces/face6.jpg',  role: 'Alumni', bio: 'Founder @ Scratch AI' },
-  { name: 'Andrew Hopperton',chapter: 'Alpha Chapter',  year: '2025', location: 'Tampa, FL',        major: 'Finance',          avatar: '/faces/face7.jpg',  role: 'Alumni', bio: 'IB Analyst @ GSI Capital' },
-  { name: 'Gavin Murrey',    chapter: 'Alpha Chapter',  year: '2026', location: 'New York, NY',     major: 'Finance',          avatar: '/faces/face8.jpg',  role: 'Alumni', bio: 'Credit Portfolio Analyst @ JPMorgan' },
-  { name: 'Luke Nayfa',      chapter: 'Alpha Chapter',  year: '2025', location: 'Austin, TX',       major: 'Finance',          avatar: '/faces/face9.jpg',  role: 'Alumni', bio: 'MS Finance @ McCombs' },
-  { name: 'Andrew Longo',    chapter: 'Alpha Chapter',  year: '2026', location: 'Nashville, TN',    major: 'Marketing',        avatar: '/faces/face10.jpg', role: 'Alumni', bio: 'GTM @ Glean' },
-  { name: 'Zach Fosseen',    chapter: 'Alpha Chapter',  year: '2024', location: 'Seattle, WA',      major: 'Entrepreneurship', avatar: '/faces/face11.jpg', role: 'Alumni', bio: 'VP of BD @ Virtue' },
-  { name: 'Abhi Bhabad',     chapter: 'Alpha Chapter',  year: '2026', location: null,               major: 'Computer Science', avatar: '/faces/face12.jpg', role: 'Alumni', bio: 'AI Product @ Search Party' },
-  // ── Actives ──
-  { name: 'Chadwick Mask',   chapter: 'Alpha Chapter',  year: '2029', location: 'Oxford, MS',       major: 'Finance',          avatar: '/faces/face3.jpg',  role: 'Active', bio: 'Finance · Senior' },
-  { name: 'Evan Foster',     chapter: 'Alpha Chapter',  year: '2027', location: null,               major: 'Finance',          avatar: '/faces/face2.jpg',  role: 'Active', bio: 'Finance · Junior' },
-  { name: 'Thomas Pham',     chapter: 'Alpha Chapter',  year: '2027', location: 'College Station, TX', major: 'AI in Business', avatar: '/faces/face10.jpg', role: 'Active', bio: 'AI in Business · Junior' },
-] as const;
+// ─── Chapter Options ──────────────────────────────────────────────────────────
 
 const CHAPTER_OPTIONS = [
   'KA @ Alabama', 'Sigma Nu @ Alabama', 'SAE @ Alabama', 'Sigma Chi @ Alabama', 'Pi Kappa Alpha @ Alabama', 'Kappa Sigma @ Alabama', 'Phi Delta Theta @ Alabama', 'Beta Theta Pi @ Alabama',
@@ -144,114 +208,312 @@ const CHAPTER_OPTIONS = [
   'KA @ Tulane', 'SAE @ Tulane', 'Pi Kappa Alpha @ Tulane', 'Sigma Nu @ Tulane',
 ];
 
-// ─── Slide 1 Filter Animation (needs internal React state) ───────────────────
+// ─── AvatarImg — with initials fallback ──────────────────────────────────────
 
-function Slide1FilterAnimation() {
-  const [filterActive, setFilterActive] = useState(false);
-  const [cardsVisible, setCardsVisible] = useState(false);
-  const [expandTarget, setExpandTarget] = useState(false);
+function AvatarImg({ src, name, initials, bg, size, style: extraStyle }: {
+  src: string | null;
+  name: string;
+  initials: string;
+  bg: string;
+  size: number;
+  style?: React.CSSProperties;
+}) {
+  const [failed, setFailed] = useState(false);
+  const baseStyle: React.CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    flexShrink: 0,
+    ...extraStyle,
+  };
+  if (!src || failed) {
+    return (
+      <div style={{ ...baseStyle, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: Math.round(size * 0.32), fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
+        {initials}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={name}
+      crossOrigin="anonymous"
+      style={{ ...baseStyle, objectFit: 'cover' }}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+// ─── Network Filter Animation (Slide 2) ──────────────────────────────────────
+
+function NetworkFilterAnimation() {
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [scrollKey, setScrollKey] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+  const [targetCard, setTargetCard] = useState<AlumniCard | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const CATEGORIES = ['Finance', 'Real Estate', 'Engineering', 'Marketing', 'Healthcare', 'Consulting', 'Tech', 'Legal'];
+  const LOCATIONS   = ['Dallas', 'New York', 'Nashville', 'Houston', 'Washington DC', 'Austin'];
+
+  function handleFilter(filter: string) {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setActiveFilter(filter);
+    setShowModal(false);
+    setTargetCard(null);
+    setScrollKey((k) => k + 1);
+    const cards = FILTER_ALUMNI[filter] ?? [];
+    timerRef.current = setTimeout(() => {
+      const card = cards[Math.min(3, cards.length - 1)] ?? cards[0];
+      if (card) { setTargetCard(card); setShowModal(true); }
+    }, 3900);
+  }
 
   useEffect(() => {
-    const t1 = setTimeout(() => setFilterActive(true), 1000);
-    const t2 = setTimeout(() => setCardsVisible(true), 1600);
-    const t3 = setTimeout(() => setExpandTarget(true), 5400);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
 
-  const financeCards = [
-    { name: 'Ethan Hill',       company: 'Fidelity',       year: '\'26', avatar: '/faces/face2.jpg', location: 'Dallas, TX',    isTarget: false },
-    { name: 'Garrett Smalley',  company: 'Chubb',          year: '\'25', avatar: '/faces/face3.jpg', location: 'Milton, GA',    isTarget: false },
-    { name: 'Andrew Hopperton', company: 'GSI Capital',    year: '\'25', avatar: '/faces/face7.jpg', location: 'Tampa, FL',     isTarget: false },
-    { name: 'Gavin Murrey',     company: 'JPMorgan',       year: '\'26', avatar: '/faces/face8.jpg', location: 'New York, NY',  isTarget: true  },
-    { name: 'Peyton Pounds',    company: 'Williams Wealth', year: '\'23', avatar: '/faces/face5.jpg', location: 'Charlotte, NC', isTarget: false },
-  ];
+  const currentCards = activeFilter ? (FILTER_ALUMNI[activeFilter] ?? []) : [];
+  const displayCards = currentCards.length < 5
+    ? [...currentCards, ...currentCards, ...currentCards]
+    : [...currentCards, ...currentCards];
 
   return (
-    <>
-      {/* Filter chips */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' as const }}>
-        {(['Finance', 'Engineering', 'Real Estate']).map((f) => (
-          <div
-            key={f}
+    <div>
+      {/* Category buttons */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' as const }}>
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => handleFilter(cat)}
             style={{
-              padding: '8px 18px',
-              borderRadius: '20px',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              cursor: 'default',
-              fontFamily: 'Inter, system-ui, sans-serif',
-              border: '1.5px solid #E5E7EB',
-              background: filterActive && f === 'Finance' ? '#0F172A' : 'white',
-              color: filterActive && f === 'Finance' ? 'white' : '#374151',
-              transition: 'background 0.3s ease, color 0.3s ease, border-color 0.3s ease',
-              borderColor: filterActive && f === 'Finance' ? '#0F172A' : '#E5E7EB',
+              padding: '7px 15px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600,
+              cursor: 'pointer', fontFamily: "'Instrument Serif', Georgia, serif",
+              border: '1.5px solid',
+              background: activeFilter === cat ? '#0F172A' : 'white',
+              color: activeFilter === cat ? 'white' : '#374151',
+              borderColor: activeFilter === cat ? '#0F172A' : '#E5E7EB',
+              transition: 'all 0.2s ease',
             }}
           >
-            {f}
-          </div>
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Location buttons */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const }}>
+        {LOCATIONS.map((loc) => (
+          <button
+            key={loc}
+            onClick={() => handleFilter(loc)}
+            style={{
+              padding: '6px 12px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 600,
+              cursor: 'pointer', fontFamily: "'Instrument Serif', Georgia, serif",
+              border: '1.5px solid',
+              background: activeFilter === loc ? '#6366F1' : 'white',
+              color: activeFilter === loc ? 'white' : '#6B7280',
+              borderColor: activeFilter === loc ? '#6366F1' : '#E5E7EB',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            📍 {loc}
+          </button>
         ))}
       </div>
 
       {/* Scrolling cards */}
-      <div style={{ width: '100%', overflow: 'hidden' }}>
-        {cardsVisible ? (
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            animation: 'cardsScroll 3.8s cubic-bezier(0.25, 0.8, 0.3, 1) both',
-          }}>
-            {financeCards.map((card) => (
+      <div style={{ width: '100%', overflow: 'hidden', height: '148px' }}>
+        {!activeFilter ? (
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: '0.875rem', color: '#D1D5DB', fontFamily: "'Instrument Serif', Georgia, serif" }}>
+              Select a category to find alumni…
+            </div>
+          </div>
+        ) : (
+          <div
+            key={scrollKey}
+            style={{
+              display: 'flex',
+              gap: '12px',
+              animation: 'cardsScroll 3.8s cubic-bezier(0.25, 0.8, 0.3, 1) forwards',
+            }}
+          >
+            {displayCards.map((card, idx) => (
               <div
-                key={card.name}
+                key={idx}
                 style={{
                   flexShrink: 0,
-                  width: '160px',
+                  width: '156px',
                   background: 'white',
-                  border: `1.5px solid ${card.isTarget && expandTarget ? '#0F172A' : '#E5E7EB'}`,
+                  border: '1.5px solid #E5E7EB',
                   borderRadius: '12px',
                   padding: '14px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px',
-                  transform: card.isTarget && expandTarget ? 'scale(1.06)' : 'scale(1)',
-                  boxShadow: card.isTarget && expandTarget
-                    ? '0 8px 24px rgba(0,0,0,0.12)'
-                    : '0 2px 8px rgba(0,0,0,0.05)',
-                  transition: 'transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                 }}
               >
-                <img
-                  src={card.avatar}
-                  alt={card.name}
-                  style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
-                <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: '#111827', lineHeight: 1.2 }}>{card.name}</div>
-                <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>{card.company}</div>
-                <div style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>Finance · {card.year}</div>
-                {card.isTarget && expandTarget && (
-                  <div style={{
-                    fontSize: '0.68rem', color: '#9CA3AF',
-                    opacity: expandTarget ? 1 : 0,
-                    transition: 'opacity 0.4s ease 0.1s',
-                  }}>
-                    📍 {card.location}
-                  </div>
-                )}
+                <AvatarImg src={card.avatar} name={card.name} initials={card.initials} bg={card.color} size={36} />
+                <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#111827', lineHeight: 1.2, fontFamily: "'Instrument Serif', Georgia, serif" }}>{card.name}</div>
+                <div style={{ fontSize: '0.7rem', color: '#6B7280', fontFamily: "'Instrument Serif', Georgia, serif" }}>{card.bio}</div>
+                <div style={{ fontSize: '0.67rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>{card.major} · &apos;{card.year}</div>
               </div>
             ))}
           </div>
-        ) : (
-          <div style={{ height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: '0.8125rem', color: '#D1D5DB' }}>Finding Finance alumni…</div>
-          </div>
         )}
       </div>
-    </>
+
+      {/* Expanded modal card */}
+      {showModal && targetCard && (
+        <div style={{ marginTop: '14px', animation: 'cardFloat 0.35s ease both' }}>
+          <div style={{
+            background: 'white',
+            border: '2px solid #0F172A',
+            borderRadius: '16px',
+            padding: '20px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+            display: 'flex',
+            gap: '14px',
+            alignItems: 'flex-start',
+            position: 'relative',
+          }}>
+            <AvatarImg src={targetCard.avatar} name={targetCard.name} initials={targetCard.initials} bg={targetCard.color} size={52} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: '1rem', color: '#111827', marginBottom: '3px', fontFamily: "'Instrument Serif', Georgia, serif" }}>{targetCard.name}</div>
+              <div style={{ fontSize: '0.8125rem', color: '#6B7280', marginBottom: '8px', fontFamily: "'Instrument Serif', Georgia, serif" }}>{targetCard.bio}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {targetCard.location && (
+                  <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>📍 {targetCard.location}</div>
+                )}
+                <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>🎓 {targetCard.major} · Class of &apos;{targetCard.year}</div>
+                <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>🏛️ {targetCard.chapter}</div>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowModal(false)}
+              style={{ position: 'absolute', top: '12px', right: '14px', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: '18px', lineHeight: 1, padding: '2px 4px' }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-// ─── Step Indicator ──────────────────────────────────────────────────────────
+// ─── Comm Hub Slide (Slide 5) ─────────────────────────────────────────────────
+
+function CommHubSlide() {
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 900);
+    const t2 = setTimeout(() => setPhase(2), 2200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  const emailRecips = [
+    { avatar: RA.ethanHill,   initials: 'EH', bg: '#0F172A' },
+    { avatar: RA.nashDehmer,  initials: 'ND', bg: '#6366F1' },
+    { avatar: null,            initials: 'GS', bg: '#EC4899' },
+    { avatar: null,            initials: 'AH', bg: '#0EA5E9' },
+    { avatar: RA.payneParker, initials: 'PP', bg: '#10B981' },
+  ];
+  const textRecips = [
+    { avatar: RA.jakeCoppen,  initials: 'JC', bg: '#0F172A' },
+    { avatar: RA.gavinMurrey, initials: 'GM', bg: '#8B5CF6' },
+    { avatar: RA.andrewLongo, initials: 'AL', bg: '#F59E0B' },
+    { avatar: null,            initials: 'LN', bg: '#EC4899' },
+    { avatar: null,            initials: 'AB', bg: '#10B981' },
+  ];
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
+      <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+        Never lose touch again.
+      </h1>
+      <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 28px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
+        Reach every member — email or text, all in one place.
+      </p>
+
+      {/* Admin */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px', animation: 'cardFloat 0.4s ease 0.1s both' }}>
+        <div style={{ width: '58px', height: '58px', borderRadius: '50%', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid white', boxShadow: '0 4px 16px rgba(15,23,42,0.25)' }}>
+          <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem', fontFamily: 'Inter, sans-serif' }}>TB</span>
+        </div>
+        <div style={{ marginTop: '5px', fontSize: '0.75rem', fontWeight: 600, color: '#374151', fontFamily: "'Instrument Serif', Georgia, serif" }}>Chapter Admin</div>
+      </div>
+
+      {/* Arrow */}
+      <div style={{ fontSize: '1.25rem', marginBottom: '14px', color: '#9CA3AF', opacity: phase >= 1 ? 1 : 0, transition: 'opacity 0.4s ease 0.2s' }}>↓</div>
+
+      {/* Two channel cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', width: '100%', maxWidth: '560px' }}>
+        {/* Email */}
+        <div style={{
+          background: 'white', border: '1.5px solid #E5E7EB', borderRadius: '14px', padding: '18px',
+          opacity: phase >= 1 ? 1 : 0,
+          transform: phase >= 1 ? 'translateX(0)' : 'translateX(-24px)',
+          transition: 'opacity 0.5s ease 0.1s, transform 0.5s ease 0.1s',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '1.3rem' }}>📧</span>
+            <div>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', fontFamily: "'Instrument Serif', Georgia, serif" }}>Email Campaign</div>
+              <div style={{ fontSize: '0.7rem', color: '#6B7280', fontFamily: "'Instrument Serif', Georgia, serif" }}>Sent to 45 alumni</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' as const, marginBottom: '10px' }}>
+            {emailRecips.map((r, i) => (
+              <AvatarImg key={i} src={r.avatar} name="" initials={r.initials} bg={r.bg} size={28} />
+            ))}
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: '#9CA3AF', fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>+40</div>
+          </div>
+          {phase >= 2 && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '4px 10px', animation: 'connectedBadge 0.35s ease both' }}>
+              <Check size={11} color="#16A34A" strokeWidth={3} />
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#16A34A', fontFamily: "'Instrument Serif', Georgia, serif" }}>Delivered</span>
+            </div>
+          )}
+        </div>
+
+        {/* SMS */}
+        <div style={{
+          background: 'white', border: '1.5px solid #E5E7EB', borderRadius: '14px', padding: '18px',
+          opacity: phase >= 1 ? 1 : 0,
+          transform: phase >= 1 ? 'translateX(0)' : 'translateX(24px)',
+          transition: 'opacity 0.5s ease 0.28s, transform 0.5s ease 0.28s',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '1.3rem' }}>💬</span>
+            <div>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', fontFamily: "'Instrument Serif', Georgia, serif" }}>Text Blast</div>
+              <div style={{ fontSize: '0.7rem', color: '#6B7280', fontFamily: "'Instrument Serif', Georgia, serif" }}>Sent to 128 members</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' as const, marginBottom: '10px' }}>
+            {textRecips.map((r, i) => (
+              <AvatarImg key={i} src={r.avatar} name="" initials={r.initials} bg={r.bg} size={28} />
+            ))}
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: '#9CA3AF', fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>+123</div>
+          </div>
+          {phase >= 2 && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '4px 10px', animation: 'connectedBadge 0.35s ease 0.18s both' }}>
+              <Check size={11} color="#16A34A" strokeWidth={3} />
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#16A34A', fontFamily: "'Instrument Serif', Georgia, serif" }}>Delivered</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step Indicator ───────────────────────────────────────────────────────────
 
 const STEPS = ['Overview', 'Org Info', 'Your Launch', 'Agreement', 'Payment', 'Confirmation'];
 
@@ -264,10 +526,7 @@ function StepIndicator({ current }: { current: number }) {
         return (
           <React.Fragment key={label}>
             <div className="flex flex-col items-center gap-1">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all
-                  ${done ? 'bg-[#0F172A] text-white' : active ? 'bg-[#0F172A] text-white ring-4 ring-[#0F172A]/20' : 'bg-gray-200 text-gray-500'}`}
-              >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${done ? 'bg-[#0F172A] text-white' : active ? 'bg-[#0F172A] text-white ring-4 ring-[#0F172A]/20' : 'bg-gray-200 text-gray-500'}`}>
                 {done ? <Check size={14} /> : i + 1}
               </div>
               <span className={`text-xs font-medium hidden sm:block ${active ? 'text-[#0F172A]' : done ? 'text-[#0F172A]' : 'text-gray-400'}`}>
@@ -284,7 +543,7 @@ function StepIndicator({ current }: { current: number }) {
   );
 }
 
-// ─── Full Agreement Text ─────────────────────────────────────────────────────
+// ─── Full Agreement Text ──────────────────────────────────────────────────────
 
 const FULL_AGREEMENT = `TRAILBLAIZE SOFTWARE AS A SERVICE AGREEMENT
 
@@ -319,7 +578,7 @@ This Agreement constitutes the entire agreement between the parties and supersed
 
 By completing the signup process and providing a typed signature, Client acknowledges that it has read, understood, and agrees to be bound by this Agreement.`;
 
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 function SetUpPage() {
   const searchParams = useSearchParams();
@@ -331,10 +590,11 @@ function SetUpPage() {
   const [subStepVisible, setSubStepVisible] = useState(true);
   const [launchSubStep, setLaunchSubStep] = useState(0);
   const [launchVisible, setLaunchVisible] = useState(true);
-  const [activeChapterCount, setActiveChapterCount] = useState<number | null>(null);
 
   // Form state
   const [form, setForm] = useState<FormData>({
+    firstName: '',
+    lastName: '',
     orgName: '',
     school: '',
     orgType: '',
@@ -376,8 +636,8 @@ function SetUpPage() {
     const success = searchParams.get('success');
     const sessionId = searchParams.get('session_id');
     const stepParam = searchParams.get('step');
-
     const bypassParam = searchParams.get('bypass');
+
     if (success === 'true' && bypassParam === '1') {
       setStep(5);
       const bypassData: Record<string, string> = {};
@@ -390,20 +650,6 @@ function SetUpPage() {
       setStep(Number(stepParam));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Fetch active chapter count
-  useEffect(() => {
-    fetch('/api/chapters?status=active')
-      .then((r) => r.json())
-      .then((data) => {
-        const chapters = data?.data || [];
-        const active = Array.isArray(chapters)
-          ? chapters.filter((c: { status: string }) => c.status === 'active').length
-          : 0;
-        setActiveChapterCount(active);
-      })
-      .catch(() => setActiveChapterCount(null));
   }, []);
 
   const handleBypassConfirmation = useCallback(async (params: Record<string, string>) => {
@@ -421,12 +667,10 @@ function SetUpPage() {
   }, []);
 
   const handleConfirmation = useCallback(async (sessionId: string) => {
-    setConfirmLoading(true);
-    setConfirmError('');
+    setConfirmLoading(true); setConfirmError('');
     try {
       const res = await fetch('/api/set-up/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       });
       const data = await res.json();
@@ -443,20 +687,25 @@ function SetUpPage() {
   }, []);
 
   function updateForm(field: keyof FormData, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === 'firstName' || field === 'lastName') {
+        next.leaderName = `${field === 'firstName' ? value : prev.firstName} ${field === 'lastName' ? value : prev.lastName}`.trim();
+      }
+      return next;
+    });
     setErrors((prev) => ({ ...prev, [field]: '' }));
   }
 
-  // Simplified validation for the streamlined step 1 form
   function validateSimpleForm(): boolean {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
-    if (!form.leaderName.trim()) newErrors.leaderName = 'Name is required';
+    if (!form.firstName.trim()) newErrors.firstName = 'First name is required';
+    if (!form.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!form.orgName.trim()) newErrors.orgName = 'Chapter is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
 
-  // Full validation (kept for downstream payment flow)
   function validateStep1(): boolean {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
     if (!form.orgName.trim()) newErrors.orgName = 'Organization name is required';
@@ -496,18 +745,11 @@ function SetUpPage() {
   }
 
   async function handleCheckout() {
-    setCheckoutLoading(true);
-    setCheckoutError('');
+    setCheckoutLoading(true); setCheckoutError('');
     try {
       const res = await fetch('/api/set-up/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          memberCount: Number(form.memberCount),
-          agreedName,
-          agreedAt: agreedAtISO,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, memberCount: Number(form.memberCount), agreedName, agreedAt: agreedAtISO }),
       });
       const data = await res.json();
       if (!res.ok || data.error) {
@@ -522,30 +764,32 @@ function SetUpPage() {
     }
   }
 
-  // ─── Step 0: Overview (animated feature walkthrough) ─────────────────────
+  // ─── Step 0: Overview (animated walkthrough) ─────────────────────────────
 
   if (step === 0) {
-    const TOTAL_SUBSTEPS = 5;
+    const TOTAL_SUBSTEPS = 6;
 
-    // Slide 0 profile card display data
+    // Slide 0: 6 real Alpha Chapter profile cards
     const slide0Profiles = [
-      { name: 'Payne Parker',  bio: 'AE @ Knight Commercial', location: 'Dallas, TX',     avatar: '/faces/face1.jpg' },
-      { name: 'Nash Dehmer',   bio: 'US Senate',               location: 'Washington, DC', avatar: '/faces/face4.jpg' },
-      { name: 'Jake Coppen',   bio: 'Founder @ Scratch AI',    location: 'New York, NY',   avatar: '/faces/face6.jpg' },
-      { name: 'Zach Fosseen',  bio: 'VP of BD @ Virtue',       location: 'Seattle, WA',    avatar: '/faces/face11.jpg' },
-      { name: 'Abhi Bhabad',   bio: 'AI Product @ Search Party', location: null,           avatar: '/faces/face12.jpg' },
+      { name: 'Nash Dehmer',   bio: 'Dir of Operations @ US Senate',         location: 'Washington, DC', chapter: 'Alpha · PoliSci \'23', avatar: RA.nashDehmer,  initials: 'ND', color: '#6366F1' },
+      { name: 'Ethan Hill',    bio: 'Financial Services Rep @ Fidelity',      location: 'Dallas, TX',     chapter: 'Alpha · Finance \'26', avatar: RA.ethanHill,   initials: 'EH', color: '#0F172A' },
+      { name: 'Jake Coppen',   bio: 'Founder @ Scratch AI',                   location: 'New York, NY',   chapter: 'Alpha · Finance \'26', avatar: RA.jakeCoppen,  initials: 'JC', color: '#0F172A' },
+      { name: 'Gavin Murrey',  bio: 'Credit Portfolio Analyst @ JPMorgan',   location: null,              chapter: 'Alpha · Finance \'26', avatar: RA.gavinMurrey, initials: 'GM', color: '#8B5CF6' },
+      { name: 'Payne Parker',  bio: 'Account Executive @ Knight Commercial', location: 'Dallas, TX',     chapter: 'Alpha · Marketing \'26', avatar: RA.payneParker, initials: 'PP', color: '#EC4899' },
+      { name: 'Andrew Longo',  bio: 'GTM @ Glean',                            location: 'Nashville, TN',  chapter: 'Alpha · Marketing \'26', avatar: RA.andrewLongo, initials: 'AL', color: '#F59E0B' },
     ];
 
     return (
       <div style={{ background: 'white', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
         <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
           @keyframes cardFloat {
             from { opacity: 0; transform: translateY(28px) scale(0.96); }
             to   { opacity: 1; transform: translateY(0)   scale(1); }
           }
           @keyframes cardsScroll {
-            from { transform: translateX(120vw); }
-            to   { transform: translateX(-340px); }
+            from { transform: translateX(110vw); }
+            to   { transform: translateX(-420px); }
           }
           @keyframes avatarPop {
             from { opacity: 0; transform: scale(0.72); }
@@ -618,14 +862,14 @@ function SetUpPage() {
 
           {/* ── Slide 0: Your network, in one place. ── */}
           {subStep === 0 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
-              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '720px', margin: '0 auto', width: '100%' }}>
+              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
                 Your network, in one place.
               </h1>
-              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 32px' }}>
+              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 32px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
                 Every member and alumni, one tap away.
               </p>
-              <div className="slide0-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', width: '100%', maxWidth: '560px' }}>
+              <div className="slide0-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', width: '100%', maxWidth: '600px' }}>
                 {slide0Profiles.map((profile, i) => (
                   <div
                     key={profile.name}
@@ -637,39 +881,34 @@ function SetUpPage() {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '6px',
-                      animation: `cardFloat 0.55s ease ${i * 0.12 + 0.1}s both`,
+                      animation: `cardFloat 0.55s ease ${i * 0.1 + 0.1}s both`,
                       boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                      ...(i === 4 ? { gridColumn: '2' } : {}),
                     }}
                   >
-                    <img
-                      src={profile.avatar}
-                      alt={profile.name}
-                      style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                    <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: '#111827', lineHeight: 1.2 }}>{profile.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: '#6B7280', lineHeight: 1.3 }}>{profile.bio}</div>
+                    <AvatarImg src={profile.avatar} name={profile.name} initials={profile.initials} bg={profile.color} size={40} />
+                    <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: '#111827', lineHeight: 1.2, fontFamily: "'Instrument Serif', Georgia, serif" }}>{profile.name}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#6B7280', lineHeight: 1.3, fontFamily: "'Instrument Serif', Georgia, serif" }}>{profile.bio}</div>
                     {profile.location && (
-                      <div style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>📍 {profile.location}</div>
+                      <div style={{ fontSize: '0.67rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>📍 {profile.location}</div>
                     )}
+                    <div style={{ fontSize: '0.65rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>🏛️ {profile.chapter}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ── Slide 1: Find anyone by what matters. ── */}
+          {/* ── Slide 1: Open Up Your Verified Network ── */}
           {subStep === 1 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
-              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-                Find anyone by what matters.
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '720px', margin: '0 auto', width: '100%' }}>
+              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                Open Up Your <span style={{ fontStyle: 'italic' }}>Verified</span> Network
               </h1>
-              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 28px' }}>
+              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 24px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
                 Filter by industry, location, or interests.
               </p>
-              <div style={{ width: '100%', maxWidth: '560px', animation: 'cardFloat 0.4s ease 0.1s both' }}>
-                <Slide1FilterAnimation />
+              <div style={{ width: '100%', maxWidth: '620px', animation: 'cardFloat 0.4s ease 0.1s both' }}>
+                <NetworkFilterAnimation />
               </div>
             </div>
           )}
@@ -677,52 +916,50 @@ function SetUpPage() {
           {/* ── Slide 2: Start a conversation that matters. ── */}
           {subStep === 2 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '520px', margin: '0 auto', width: '100%' }}>
-              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
                 Start a conversation that matters.
               </h1>
-              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 32px' }}>
+              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 32px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
                 Message any alumni directly — no LinkedIn required.
               </p>
 
-              {/* Two avatars */}
+              {/* Avatars */}
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: '420px', marginBottom: '20px' }}>
-                {/* Chadwick (active, left / initiator) */}
+                {/* Chadwick (active, initiator) */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', animation: 'avatarPop 0.4s ease 0.1s both' }}>
-                  <img src="/faces/face3.jpg" alt="Chadwick Mask" style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #E5E7EB' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  <AvatarImg src="/faces/face3.jpg" name="Chadwick Mask" initials="CM" bg="#0EA5E9" size={56} style={{ border: '2px solid #E5E7EB' }} />
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Chadwick Mask</div>
-                    <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>Finance · Active &apos;29</div>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', fontFamily: "'Instrument Serif', Georgia, serif" }}>Chadwick Mask</div>
+                    <div style={{ fontSize: '0.7rem', color: '#6B7280', fontFamily: "'Instrument Serif', Georgia, serif" }}>Finance · Active &apos;29</div>
                   </div>
                 </div>
-                {/* Nash (alumni, right / responder) */}
+                {/* Nash (alumni, responder) */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', animation: 'avatarPop 0.4s ease 0.25s both' }}>
-                  <img src="/faces/face4.jpg" alt="Nash Dehmer" style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #E5E7EB' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  <AvatarImg src={RA.nashDehmer} name="Nash Dehmer" initials="ND" bg="#6366F1" size={56} style={{ border: '2px solid #E5E7EB' }} />
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>Nash Dehmer</div>
-                    <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>US Senate · DC &apos;23</div>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', fontFamily: "'Instrument Serif', Georgia, serif" }}>Nash Dehmer</div>
+                    <div style={{ fontSize: '0.7rem', color: '#6B7280', fontFamily: "'Instrument Serif', Georgia, serif" }}>US Senate · DC &apos;23</div>
                   </div>
                 </div>
               </div>
 
               {/* Message bubbles */}
               <div style={{ width: '100%', maxWidth: '420px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-                {/* Chadwick → Nash */}
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', animation: 'bubbleSlideLeft 0.4s ease 0.8s both', opacity: 0 }}>
-                  <img src="/faces/face3.jpg" alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  <AvatarImg src="/faces/face3.jpg" name="Chadwick" initials="CM" bg="#0EA5E9" size={28} />
                   <div style={{ background: '#F3F4F6', borderRadius: '14px 14px 14px 2px', padding: '10px 14px', maxWidth: '280px' }}>
-                    <p style={{ fontSize: '0.8125rem', color: '#111827', margin: 0, lineHeight: 1.5 }}>
+                    <p style={{ fontSize: '0.8125rem', color: '#111827', margin: 0, lineHeight: 1.5, fontFamily: "'Instrument Serif', Georgia, serif" }}>
                       Hey Nash, saw you&apos;re working at the US Senate in DC — exploring a career in policy after graduation. Any advice on how to break in?
                     </p>
                   </div>
                 </div>
-                {/* Nash → Chadwick */}
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', justifyContent: 'flex-end', animation: 'bubbleSlideRight 0.4s ease 2.4s both', opacity: 0 }}>
                   <div style={{ background: '#0F172A', borderRadius: '14px 14px 2px 14px', padding: '10px 14px', maxWidth: '280px' }}>
-                    <p style={{ fontSize: '0.8125rem', color: 'white', margin: 0, lineHeight: 1.5 }}>
+                    <p style={{ fontSize: '0.8125rem', color: 'white', margin: 0, lineHeight: 1.5, fontFamily: "'Instrument Serif', Georgia, serif" }}>
                       Definitely happy to help. My path was a bit unconventional — send me a message and let&apos;s find time to chat this week.
                     </p>
                   </div>
-                  <img src="/faces/face4.jpg" alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  <AvatarImg src={RA.nashDehmer} name="Nash" initials="ND" bg="#6366F1" size={28} />
                 </div>
               </div>
 
@@ -730,7 +967,7 @@ function SetUpPage() {
               <div style={{ animation: 'connectedBadge 0.4s ease 4.4s both', opacity: 0 }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '20px', padding: '7px 18px' }}>
                   <Check size={14} color="#16A34A" strokeWidth={2.5} />
-                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#16A34A' }}>Connected</span>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#16A34A', fontFamily: "'Instrument Serif', Georgia, serif" }}>Connected</span>
                 </div>
               </div>
             </div>
@@ -739,12 +976,12 @@ function SetUpPage() {
           {/* ── Slide 3: Your chapter. Your alumni. One tap away. ── */}
           {subStep === 3 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
-              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
                 Your chapter. Your alumni.
                 <br />One tap away.
               </h1>
-              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 28px' }}>
-                Every Space, all your people, one app.
+              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 28px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
+                Spaces aren&apos;t just Greek — universities, clubs, companies.
               </p>
 
               {/* Phone mockup */}
@@ -760,15 +997,13 @@ function SetUpPage() {
                 animation: 'phoneIn 0.5s ease 0.1s both',
                 background: 'white',
               }}>
-                {/* Speaker notch */}
                 <div style={{ width: '44px', height: '5px', background: '#D1D5DB', borderRadius: '4px', margin: '0 auto 4px' }} />
-                {/* Header */}
-                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: '2px' }}>Your Spaces</div>
-                {/* Space cards */}
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: '2px', fontFamily: "'Instrument Serif', Georgia, serif" }}>Your Spaces</div>
                 {[
-                  { name: 'Alpha Chapter', sub: 'Sigma Chi @ Ole Miss', count: '247 members' },
-                  { name: 'KA @ Alabama', sub: 'Kappa Alpha Order',     count: '1,598 alumni' },
-                  { name: 'Theta Xi @ Boulder', sub: 'Theta Xi Fraternity', count: '200+ alumni' },
+                  { icon: '🎓', name: 'NYU',               sub: 'New York University',        count: '12,400+ alumni' },
+                  { icon: '🏛️', name: 'Kappa Kappa Gamma', sub: 'ΚΚΓ Chapter',                count: '850 members' },
+                  { icon: '💼', name: 'NYU Finance Club',   sub: 'Student Organization',       count: '320 members' },
+                  { icon: '🏢', name: 'Goldman Sachs',      sub: 'Alumni & Employees',         count: '200+ alumni' },
                 ].map((space, i) => (
                   <div key={space.name} style={{
                     background: '#F9FAFB',
@@ -776,16 +1011,18 @@ function SetUpPage() {
                     borderRadius: '10px',
                     padding: '10px 12px',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '2px',
-                    animation: `spaceCardIn 0.4s ease ${i * 0.18 + 0.4}s both`,
+                    alignItems: 'center',
+                    gap: '8px',
+                    animation: `spaceCardIn 0.4s ease ${i * 0.15 + 0.35}s both`,
                     opacity: 0,
                   }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>{space.name}</div>
-                    <div style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>{space.count}</div>
+                    <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{space.icon}</span>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#111827', lineHeight: 1.2, fontFamily: "'Instrument Serif', Georgia, serif" }}>{space.name}</div>
+                      <div style={{ fontSize: '0.62rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>{space.count}</div>
+                    </div>
                   </div>
                 ))}
-                {/* Home indicator */}
                 <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
                   <div style={{ width: '40px', height: '4px', background: '#D1D5DB', borderRadius: '4px' }} />
                 </div>
@@ -793,14 +1030,19 @@ function SetUpPage() {
             </div>
           )}
 
-          {/* ── Slide 4: Ready to claim your Space? (CTA) ── */}
+          {/* ── Slide 4 (NEW): Never lose touch again. ── */}
           {subStep === 4 && (
+            <CommHubSlide />
+          )}
+
+          {/* ── Slide 5: Ready to claim your Space? (CTA) ── */}
+          {subStep === 5 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', maxWidth: '480px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
-              <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', fontWeight: 700, color: '#111827', margin: '0 0 16px', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
+              <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', fontWeight: 700, color: '#111827', margin: '0 0 16px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.025em', lineHeight: 1.1 }}>
                 Ready to claim
                 <br />your Space?
               </h1>
-              <p style={{ fontSize: '1.0625rem', color: '#6B7280', margin: '0 0 36px', lineHeight: 1.65, maxWidth: '340px' }}>
+              <p style={{ fontSize: '1.0625rem', color: '#6B7280', margin: '0 0 36px', lineHeight: 1.65, maxWidth: '340px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
                 Takes 2 minutes. No credit card required to get started.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '300px' }}>
@@ -817,17 +1059,12 @@ function SetUpPage() {
                   Join the waitlist
                 </button>
               </div>
-              {activeChapterCount !== null && (
-                <p style={{ fontSize: '0.8125rem', color: '#9CA3AF', margin: '24px 0 0' }}>
-                  {activeChapterCount} chapter{activeChapterCount !== 1 ? 's' : ''} already on Trailblaize
-                </p>
-              )}
             </div>
           )}
 
           {/* Bottom nav — hidden on CTA slide */}
-          {subStep < 4 && (
-            <div style={{ maxWidth: '680px', margin: '0 auto', width: '100%', padding: '24px 24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {subStep < 5 && (
+            <div style={{ maxWidth: '720px', margin: '0 auto', width: '100%', padding: '24px 24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
                 onClick={() => goToStep(1)}
                 style={{ fontSize: '0.8125rem', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
@@ -848,7 +1085,7 @@ function SetUpPage() {
     );
   }
 
-  // ─── Step 1: Simplified form (name + chapter) ─────────────────────────────
+  // ─── Step 1: Form (First name, Last name, Chapter) ────────────────────────
 
   if (step === 1) {
     const filteredChapters = CHAPTER_OPTIONS.filter(
@@ -863,14 +1100,25 @@ function SetUpPage() {
           <p style={S.sub}>Just the basics for now — we&apos;ll collect the rest before you go live.</p>
 
           <div style={S.fieldWrap}>
-            {/* Name */}
-            <Field label="Your Name *" error={errors.leaderName}>
+            {/* First Name */}
+            <Field label="First Name *" error={errors.firstName}>
               <input
                 type="text"
-                value={form.leaderName}
-                onChange={(e) => updateForm('leaderName', e.target.value)}
-                placeholder="First and last name"
-                style={S.input(!!errors.leaderName)}
+                value={form.firstName}
+                onChange={(e) => updateForm('firstName', e.target.value)}
+                placeholder="First name"
+                style={S.input(!!errors.firstName)}
+              />
+            </Field>
+
+            {/* Last Name */}
+            <Field label="Last Name *" error={errors.lastName}>
+              <input
+                type="text"
+                value={form.lastName}
+                onChange={(e) => updateForm('lastName', e.target.value)}
+                placeholder="Last name"
+                style={S.input(!!errors.lastName)}
               />
             </Field>
 
@@ -892,37 +1140,21 @@ function SetUpPage() {
                 />
                 {chapterDropdownOpen && filteredChapters.length > 0 && (
                   <div style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 4px)',
-                    left: 0,
-                    right: 0,
-                    background: 'white',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '10px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.09)',
-                    zIndex: 50,
-                    overflow: 'hidden',
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                    background: 'white', border: '1px solid #E5E7EB', borderRadius: '10px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.09)', zIndex: 50, overflow: 'hidden',
                   }}>
                     {filteredChapters.map((chapter, i) => (
                       <button
                         key={chapter}
                         type="button"
-                        onMouseDown={() => {
-                          updateForm('orgName', chapter);
-                          setChapterDropdownOpen(false);
-                        }}
+                        onMouseDown={() => { updateForm('orgName', chapter); setChapterDropdownOpen(false); }}
                         style={{
-                          display: 'block',
-                          width: '100%',
-                          textAlign: 'left' as const,
-                          padding: '10px 14px',
-                          fontSize: '0.875rem',
-                          color: '#374151',
-                          background: 'none',
-                          border: 'none',
+                          display: 'block', width: '100%', textAlign: 'left' as const,
+                          padding: '10px 14px', fontSize: '0.875rem', color: '#374151',
+                          background: 'none', border: 'none',
                           borderBottom: i < filteredChapters.length - 1 ? '1px solid #F3F4F6' : 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'Inter, system-ui, sans-serif',
+                          cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = '#F9FAFB'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
@@ -938,11 +1170,7 @@ function SetUpPage() {
 
           <div style={S.actions}>
             <button onClick={() => goToStep(0)} style={S.backBtn}>← Back</button>
-            <NavButton
-              onClick={() => {
-                if (validateSimpleForm()) goToStep(2);
-              }}
-            >
+            <NavButton onClick={() => { if (validateSimpleForm()) goToStep(2); }}>
               Continue <ChevronRight size={16} />
             </NavButton>
           </div>
@@ -951,7 +1179,7 @@ function SetUpPage() {
     );
   }
 
-  // ─── Step 2: Your Launch ─────────────────────────────────────────────────
+  // ─── Step 2: Your Launch ──────────────────────────────────────────────────
 
   if (step === 2) {
     const LAUNCH_TOTAL = 6;
@@ -1035,7 +1263,6 @@ function SetUpPage() {
           ))}
         </div>
 
-        {/* Transitioning content */}
         <div style={{
           flex: 1,
           opacity: launchVisible ? 1 : 0,
@@ -1045,7 +1272,7 @@ function SetUpPage() {
           flexDirection: 'column',
         }}>
 
-          {/* ── Sub-step 0: Collaborative Launch ── */}
+          {/* Sub-step 0: Collaborative Launch */}
           {launchSubStep === 0 && (
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
@@ -1054,9 +1281,7 @@ function SetUpPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16,185,129,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'glowPulse 2.8s ease infinite' }}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                          <circle cx="12" cy="12" r="4"/>
-                          <circle cx="17.5" cy="6.5" r="1.5" fill="#10B981" stroke="none"/>
+                          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5" fill="#10B981" stroke="none"/>
                         </svg>
                       </div>
                       <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16,185,129,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1073,7 +1298,7 @@ function SetUpPage() {
                     Members DM us or comment on the post for a private sign-up link.
                   </p>
                   <p style={{ fontSize: '0.9375rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }}>
-                    Those early adopters become your ambassadors, bringing in the rest of your alumni through real word-of-mouth. The network effect starts here.
+                    Those early adopters become your ambassadors, bringing in the rest of your alumni through real word-of-mouth.
                   </p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -1106,7 +1331,7 @@ function SetUpPage() {
             </div>
           )}
 
-          {/* ── Sub-step 1: Activate Your Network ── */}
+          {/* Sub-step 1: Activate Your Network */}
           {launchSubStep === 1 && (
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
@@ -1114,29 +1339,25 @@ function SetUpPage() {
                   <svg viewBox="0 0 280 200" width="280" height="200" style={{ overflow: 'visible', maxWidth: '100%' }}>
                     <defs>
                       {[{cx:52,cy:52},{cx:228,cy:52},{cx:228,cy:148},{cx:52,cy:148},{cx:140,cy:16}].map((n,i) => (
-                        <clipPath key={i} id={`ls1-clip-${i}`}>
-                          <circle cx={n.cx} cy={n.cy} r={18} />
-                        </clipPath>
+                        <clipPath key={i} id={`ls1-clip-${i}`}><circle cx={n.cx} cy={n.cy} r={18} /></clipPath>
                       ))}
                     </defs>
                     {[
                       {cx:52,cy:52,d:0.25},{cx:228,cy:52,d:0.45},
-                      {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},
-                      {cx:140,cy:16,d:1.05},
+                      {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},{cx:140,cy:16,d:1.05},
                     ].map((n,i) => (
                       <line key={`line-${i}`} x1="140" y1="100" x2={n.cx} y2={n.cy}
                         stroke="#E5E7EB" strokeWidth="1.5"
-                        style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}
-                      />
+                        style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }} />
                     ))}
                     <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
                     <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
                     {[
-                      {cx:52,cy:52,d:0.3,avatar:'/faces/face1.jpg'},
-                      {cx:228,cy:52,d:0.5,avatar:'/faces/face4.jpg'},
-                      {cx:228,cy:148,d:0.7,avatar:'/faces/face6.jpg'},
-                      {cx:52,cy:148,d:0.9,avatar:'/faces/face11.jpg'},
-                      {cx:140,cy:16,d:1.1,avatar:'/faces/face8.jpg'},
+                      {cx:52,cy:52,d:0.3,avatar:RA.payneParker},
+                      {cx:228,cy:52,d:0.5,avatar:RA.nashDehmer},
+                      {cx:228,cy:148,d:0.7,avatar:RA.jakeCoppen},
+                      {cx:52,cy:148,d:0.9,avatar:RA.andrewLongo},
+                      {cx:140,cy:16,d:1.1,avatar:RA.gavinMurrey},
                     ].map((n,i) => (
                       <g key={`node-${i}`} style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}>
                         <image href={n.avatar} x={n.cx-18} y={n.cy-18} width={36} height={36}
@@ -1165,7 +1386,7 @@ function SetUpPage() {
             </div>
           )}
 
-          {/* ── Sub-step 2: Meet Alumni Where They Are ── */}
+          {/* Sub-step 2: Meet Alumni Where They Are */}
           {launchSubStep === 2 && (
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center', marginBottom: '32px' }}>
@@ -1222,13 +1443,12 @@ function SetUpPage() {
                   <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>Payne Parker</span>
                 </div>
                 {[
-                  { initials: 'EH', name: 'Ethan Hill',    preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas real estate — let me connect you.", time: '2m ago', unread: true, color: '#0F172A', avatar: '/faces/face2.jpg' },
-                  { initials: 'ND', name: 'Nash Dehmer',   preview: 'Would love to connect you with someone at the Senate if policy is interesting to you.',                time: '1h ago', unread: false, color: '#6366F1', avatar: '/faces/face4.jpg' },
-                  { initials: 'ZF', name: 'Zach Fosseen',  preview: "Great to see you on here. We're hiring at Virtue — let's catch up.",                                 time: '3h ago', unread: false, color: '#0EA5E9', avatar: '/faces/face11.jpg' },
+                  { initials: 'EH', name: 'Ethan Hill',   preview: "Hey Payne, saw you're at Knight Commercial. I know a few guys in Dallas real estate — let me connect you.", time: '2m ago', unread: true,  color: '#0F172A', avatar: RA.ethanHill },
+                  { initials: 'ND', name: 'Nash Dehmer',  preview: "Would love to connect you with someone at the Senate if policy is interesting to you.",                   time: '1h ago', unread: false, color: '#6366F1', avatar: RA.nashDehmer },
+                  { initials: 'JC', name: 'Jake Coppen',  preview: "Great to see you on here. We're growing at Scratch AI — let's catch up.",                                 time: '3h ago', unread: false, color: '#0F172A', avatar: RA.jakeCoppen },
                 ].map((m, i) => (
                   <div key={i} style={{ padding: '12px 16px', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <img src={m.avatar} alt={m.name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.nextElementSibling as HTMLElement | null; if (fb) fb.style.display = 'flex'; }} />
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: m.color, display: 'none', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0 }}>{m.initials}</div>
+                    <AvatarImg src={m.avatar} name={m.name} initials={m.initials} bg={m.color} size={36} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                         <span style={{ fontSize: '0.8125rem', fontWeight: m.unread ? 700 : 600, color: 'white' }}>{m.name}</span>
@@ -1243,7 +1463,7 @@ function SetUpPage() {
             </div>
           )}
 
-          {/* ── Sub-step 3: Database Outreach ── */}
+          {/* Sub-step 3: Database Outreach */}
           {launchSubStep === 3 && (
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
@@ -1255,7 +1475,7 @@ function SetUpPage() {
                     </div>
                     {[
                       {name:'Payne P.', d:'0.2s'},{name:'Nash D.', d:'0.5s'},
-                      {name:'Gavin M.', d:'0.8s'},{name:'Zach F.', d:'1.1s'},{name:'Abhi B.', d:'1.4s'},
+                      {name:'Gavin M.', d:'0.8s'},{name:'Ethan H.', d:'1.1s'},{name:'Jake C.', d:'1.4s'},
                     ].map((row,i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: '1px solid #F3F4F6', animation: `rowFade 0.5s ease ${row.d} both` }}>
                         <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>{row.name}</span>
@@ -1288,7 +1508,7 @@ function SetUpPage() {
             </div>
           )}
 
-          {/* ── Sub-step 4: Alumni Sign Up in Minutes ── */}
+          {/* Sub-step 4: Alumni Sign Up in Minutes */}
           {launchSubStep === 4 && (
             <div style={{ padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div style={{ marginBottom: '28px' }}>
@@ -1338,7 +1558,7 @@ function SetUpPage() {
                     <button style={{ width: '100%', padding: '7px', borderRadius: '7px', background: '#10B981', color: 'white', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Request to Join</button>
                   </div>
                   <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: '14px 0 4px' }}>Join Your Space</h4>
-                  <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Request access - admin approves in one tap</p>
+                  <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>Request access — admin approves in one tap</p>
                 </div>
                 <div style={{ background: '#0F172A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '20px' }}>
                   <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10B981', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '14px' }}>Step 3</div>
@@ -1356,7 +1576,7 @@ function SetUpPage() {
             </div>
           )}
 
-          {/* ── Sub-step 5: Your Digital Community ── */}
+          {/* Sub-step 5: Your Digital Community */}
           {launchSubStep === 5 && (
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
@@ -1364,23 +1584,19 @@ function SetUpPage() {
                   <svg viewBox="0 0 260 180" width="260" height="180" style={{ overflow: 'visible', maxWidth: '100%' }}>
                     <defs>
                       {[{cx:86,cy:52},{cx:174,cy:52},{cx:174,cy:128},{cx:86,cy:128}].map((n,i) => (
-                        <clipPath key={i} id={`ls5i-clip-${i}`}>
-                          <circle cx={n.cx} cy={n.cy} r={11} />
-                        </clipPath>
+                        <clipPath key={i} id={`ls5i-clip-${i}`}><circle cx={n.cx} cy={n.cy} r={11} /></clipPath>
                       ))}
                       {[{cx:42,cy:38},{cx:218,cy:38},{cx:218,cy:142},{cx:42,cy:142},{cx:130,cy:12},{cx:130,cy:168}].map((n,i) => (
-                        <clipPath key={i} id={`ls5o-clip-${i}`}>
-                          <circle cx={n.cx} cy={n.cy} r={7} />
-                        </clipPath>
+                        <clipPath key={i} id={`ls5o-clip-${i}`}><circle cx={n.cx} cy={n.cy} r={7} /></clipPath>
                       ))}
                     </defs>
                     <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
                     <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
                     {[
-                      {cx:86,cy:52,d:'0.2s',avatar:'/faces/face1.jpg'},
-                      {cx:174,cy:52,d:'0.4s',avatar:'/faces/face4.jpg'},
-                      {cx:174,cy:128,d:'0.6s',avatar:'/faces/face6.jpg'},
-                      {cx:86,cy:128,d:'0.8s',avatar:'/faces/face11.jpg'},
+                      {cx:86,cy:52,d:'0.2s',avatar:RA.payneParker},
+                      {cx:174,cy:52,d:'0.4s',avatar:RA.nashDehmer},
+                      {cx:174,cy:128,d:'0.6s',avatar:RA.jakeCoppen},
+                      {cx:86,cy:128,d:'0.8s',avatar:RA.andrewLongo},
                     ].map((n,i) => (
                       <g key={i}>
                         <line x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
@@ -1390,16 +1606,16 @@ function SetUpPage() {
                           clipPath={`url(#ls5i-clip-${i})`} preserveAspectRatio="xMidYMid slice"
                           style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
                         <circle cx={n.cx} cy={n.cy} r={11} fill="none" stroke="#E5E7EB" strokeWidth="1.5"
-                          style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
+                          style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
                       </g>
                     ))}
                     {[
-                      {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s',avatar:'/faces/face2.jpg'},
-                      {cx:218,cy:38,fromX:174,fromY:52,d:'1.2s',avatar:'/faces/face8.jpg'},
+                      {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s',avatar:RA.ethanHill},
+                      {cx:218,cy:38,fromX:174,fromY:52,d:'1.2s',avatar:RA.gavinMurrey},
                       {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s',avatar:'/faces/face12.jpg'},
                       {cx:42,cy:142,fromX:86,fromY:128,d:'1.6s',avatar:'/faces/face9.jpg'},
                       {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s',avatar:'/faces/face5.jpg'},
-                      {cx:130,cy:168,fromX:130,fromY:90,d:'2.0s',avatar:'/faces/face10.jpg'},
+                      {cx:130,cy:168,fromX:130,fromY:90,d:'2.0s',avatar:'/faces/face3.jpg'},
                     ].map((n,i) => (
                       <g key={i}>
                         <line x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
@@ -1460,7 +1676,6 @@ function SetUpPage() {
 
   if (step === 3) {
     const canProceed = agreedName.trim().length > 0 && agreedAuthorized;
-
     return (
       <PageShell testMode={testMode}>
         <StepIndicator current={3} />
@@ -1470,7 +1685,7 @@ function SetUpPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
             {[
-              { icon: <Zap size={18} color="#0F172A" />, title: "What you're getting", desc: "Access to the full Trailblaize platform - alumni directory, message board, engagement tools, and ongoing support." },
+              { icon: <Zap size={18} color="#0F172A" />, title: "What you're getting", desc: "Access to the full Trailblaize platform — alumni directory, message board, engagement tools, and ongoing support." },
               { icon: <Calendar size={18} color="#0F172A" />, title: 'Your commitment', desc: promoCode === 'SAE' ? '6-month commitment starting today. After six months, cancel anytime with 30 days notice. No hidden fees.' : '12-month commitment starting today. After year one, cancel anytime with 30 days notice. No hidden fees.' },
               { icon: <DollarSign size={18} color="#0F172A" />, title: 'What it costs', desc: price ? `$${price}/month · Billed monthly · Based on ${form.memberCount} members. Pricing reviewed at renewal.` : 'Pricing based on your member count.' },
               { icon: <Shield size={18} color="#0F172A" />, title: 'Your data', desc: "Your data belongs to you. We use it only to run the platform. Never sold. Export or delete anytime." },
@@ -1495,9 +1710,7 @@ function SetUpPage() {
               <pre style={{ fontSize: '0.6875rem', color: '#6B7280', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>{promoCode === 'SAE' ? FULL_AGREEMENT.replace('twelve (12) months', 'six (6) months').replace('Initial Term', 'Initial Term (6 months)') : FULL_AGREEMENT}</pre>
               <div style={{ marginTop: '12px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
                 <input
-                  type="text"
-                  value={promoCode}
-                  onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                  type="text" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())}
                   placeholder="Code"
                   style={{ width: '120px', padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'inherit', color: '#9CA3AF' }}
                 />
@@ -1549,7 +1762,6 @@ function SetUpPage() {
         <Card>
           <h2 style={S.h2}>Complete your payment</h2>
           <p style={S.sub}>You&apos;ll be redirected to Stripe&apos;s secure checkout.</p>
-
           <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '24px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <h3 style={{ fontWeight: 600, color: '#0F172A', margin: '0 0 4px' }}>Order Summary</h3>
             <Row label="Organization" value={form.orgName} />
@@ -1561,18 +1773,15 @@ function SetUpPage() {
             </div>
             <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: 0 }}>Annual commitment, then month-to-month · Cancel after year one with 30 days notice</p>
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: '#6B7280', marginBottom: '24px' }}>
             <Shield size={16} color="#9CA3AF" />
             <span>Secured by Stripe — your payment info is never stored on our servers</span>
           </div>
-
           {checkoutError && (
             <div style={{ background: '#fef2f2', color: '#dc2626', borderRadius: '10px', padding: '12px 16px', fontSize: '0.875rem', marginBottom: '16px' }}>
               {checkoutError}
             </div>
           )}
-
           <div style={S.actions}>
             <button onClick={() => goToStep(3)} style={S.backBtn}>← Back</button>
             <NavButton onClick={handleCheckout} disabled={checkoutLoading}>
@@ -1616,9 +1825,8 @@ function SetUpPage() {
                 <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: 0 }}>{form.orgName}{form.school ? ` · ${form.school}` : ''}</p>
               )}
             </div>
-
             <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
-              <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 16px 0' }}>What happens next</p>
+              <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase' as const, letterSpacing: '0.05em', margin: '0 0 16px 0' }}>What happens next</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {[
                   { emoji: '✅', text: 'Your account is being created' },
@@ -1633,7 +1841,6 @@ function SetUpPage() {
                 ))}
               </div>
             </div>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <a href="https://calendly.com/owen-trailblaize/30min" target="_blank" rel="noopener noreferrer"
                 style={{ display: 'block', textAlign: 'center', padding: '12px 24px', borderRadius: '10px', border: '1.5px solid #0F172A', color: '#0F172A', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none', fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -1651,7 +1858,7 @@ function SetUpPage() {
   );
 }
 
-// ─── Helper Components ───────────────────────────────────────────────────────
+// ─── Helper Components ────────────────────────────────────────────────────────
 
 function PageShell({ children, testMode }: { children: React.ReactNode; testMode?: boolean }) {
   return (
@@ -1673,22 +1880,22 @@ function PageShell({ children, testMode }: { children: React.ReactNode; testMode
 
 const S = {
   card: { background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '28px' },
-  h2: { fontSize: '1.375rem', fontWeight: 700, color: '#111827', margin: '0 0 6px 0', fontFamily: 'Inter, system-ui, sans-serif' },
-  sub: { fontSize: '0.875rem', color: '#6B7280', margin: '0 0 28px 0' },
+  h2: { fontSize: '1.375rem', fontWeight: 700, color: '#111827', margin: '0 0 6px 0', fontFamily: 'Inter, system-ui, sans-serif' } as React.CSSProperties,
+  sub: { fontSize: '0.875rem', color: '#6B7280', margin: '0 0 28px 0' } as React.CSSProperties,
   fieldWrap: { display: 'flex', flexDirection: 'column' as const, gap: '20px' },
-  label: { display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px', fontFamily: 'Inter, system-ui, sans-serif' },
-  hint: { fontSize: '0.75rem', color: '#9ca3af', marginTop: '4px' },
-  error: { fontSize: '0.75rem', color: '#ef4444', marginTop: '4px' },
-  input: (hasError: boolean) => ({
+  label: { display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px', fontFamily: 'Inter, system-ui, sans-serif' } as React.CSSProperties,
+  hint: { fontSize: '0.75rem', color: '#9ca3af', marginTop: '4px' } as React.CSSProperties,
+  error: { fontSize: '0.75rem', color: '#ef4444', marginTop: '4px' } as React.CSSProperties,
+  input: (hasError: boolean): React.CSSProperties => ({
     width: '100%', padding: '10px 12px', fontSize: '0.875rem',
     border: `1px solid ${hasError ? '#ef4444' : '#E5E7EB'}`,
     borderRadius: '10px', outline: 'none', fontFamily: 'Inter, system-ui, sans-serif',
     boxSizing: 'border-box' as const, color: '#111827', background: 'white',
   }),
-  row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' } as const,
-  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '28px' },
-  backBtn: { fontSize: '0.875rem', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', gap: '4px' },
-  primaryBtn: (disabled?: boolean) => ({
+  row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' } as React.CSSProperties,
+  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '28px' } as React.CSSProperties,
+  backBtn: { fontSize: '0.875rem', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', gap: '4px' } as React.CSSProperties,
+  primaryBtn: (disabled?: boolean): React.CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', gap: '6px',
     padding: '10px 24px', borderRadius: '10px',
     background: disabled ? '#D1D5DB' : '#0F172A',

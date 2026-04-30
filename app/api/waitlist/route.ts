@@ -9,13 +9,14 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { first_name, last_name, phone, affiliations } = body;
+    const { first_name, last_name, phone, affiliations, university, university_id, national_org, national_org_id, org_type, org_name } = body;
 
     if (!first_name || !phone) {
       return NextResponse.json({ error: 'Name and phone required' }, { status: 400 });
     }
 
-    // Store in Supabase
+    // Store in waitlist table ONLY (growth Supabase)
+    // NEVER write to the external trailblaize.net database
     const { data, error } = await supabase
       .from('waitlist')
       .insert({
@@ -23,6 +24,12 @@ export async function POST(request: Request) {
         last_name: last_name || null,
         phone,
         affiliations: affiliations || [],
+        university: university || null,
+        university_id: university_id || null,
+        national_org: national_org || null,
+        national_org_id: national_org_id || null,
+        org_type: org_type || null,
+        org_name: org_name || null,
         created_at: new Date().toISOString(),
       })
       .select()
