@@ -203,18 +203,20 @@ function SearchableDropdown({
 // ─── Alpha Chapter profiles ───────────────────────────────────────────────────
 
 const ALPHA_PROFILES = [
+  // Alpha Chapter (men)
   { name: 'Zach', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ec88bcb7-7f89-45c4-b9ae-45ffff915981-1776173030122.jpg', role: 'VP of BD @ Virtue' },
-  { name: 'Chadwick', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/74c73f4e-fed8-466a-858d-5d95bcc7c77c-1776207737679.png', role: 'Active, Finance 29' },
-  { name: 'Ewing', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/ed2f2057-35b4-4f07-96df-d1571349a87b-1776467784797.png', role: 'Angel Investor & MD' },
   { name: 'Ethan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/cc27eb12-c5fb-4d60-86ef-74e6f28ad9a4-1776170865222.jpg', role: 'Financial Services @ Fidelity' },
-  { name: 'Jackson', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/a240db6a-3481-49b9-be5a-cd39af25d284-1776170846340.png', role: 'Territory Sales @ Priority1' },
-  { name: 'Nick', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/927335a8-cce4-4f05-b004-281d8d8c00f9-1776170450281.jpg', role: 'AE at Hooray Health' },
-  { name: 'Garrett', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8ee6fb3e-f6a8-486f-a140-cad49adfeee4-1776171107178.jpg', role: 'Underwriter at Chubb' },
-  { name: 'Thomas', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/5f35ecba-22a5-4f16-a451-14d3fed93a69-1776208149093.png', role: 'AI in Business 27' },
-  { name: 'Hugh', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/e6017abe-9ade-4911-b106-1f6035a8e1cf-1776208471420.jpg', role: 'Business Admin 29' },
-  { name: 'Clayton', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6db3cdca-bf65-494c-93b2-3fb4a320c479-1776215748157.png', role: 'Accounting 26' },
-  { name: 'Evan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/89180ae2-f8ba-429c-bfe5-1e552db3193c-1776207915509.png', role: 'Finance 27' },
-  { name: 'Nick F.', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/e7583cf2-d713-4675-8d9c-fed241bb6131-1776215917963.png', role: 'Aerospace Engineering 30' },
+  { name: 'Nash', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/6f14185e-61b9-468d-a0fc-1d46eb5e122d-1776171521116.jpg', role: 'Dir of Ops, US Senate' },
+  { name: 'Jake', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/4be69e44-669f-442e-8859-731db416ea3b-1776172132818.jpg', role: 'Founder @ Scratch AI' },
+  { name: 'Gavin', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/365ac617-1637-4a85-b02c-b2b23b4307c7-1776171942678.jpg', role: 'Analyst @ JPMorgan' },
+  { name: 'Garrett', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8ee6fb3e-f6a8-486f-a140-cad49adfeee4-1776171107178.jpg', role: 'Underwriter @ Chubb' },
+  // Omega Chapter (women)
+  { name: 'Sarah B.', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/793c6990-cf2d-436c-97ce-adde55d88b80-1777564226650.jpg', role: 'Scheduler, US Senate' },
+  { name: 'Megan', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/8005621f-cb31-42a6-b7e3-29d756d6d49a-1777563457055.png', role: 'CRA @ Fidelity' },
+  { name: 'Maria', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/7b28512b-59c9-4a2d-a7d6-955b48ce3c8a-1777563644735.jpg', role: 'Sales @ Jack Victor' },
+  { name: 'Mary', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/5a8d9026-e29e-4b45-b070-1a171330dedd-1777564410163.png', role: 'Real Estate @ Compass' },
+  { name: 'Brenley', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/2701ac2c-5f21-484d-99f6-93ee5dc992f7-1777565592730.jpg', role: 'Business Comms, NYC' },
+  { name: 'Paloma', avatar: 'https://api.trailblaize.net/storage/v1/object/public/user-avatar/601df2dd-0691-4ecc-90c6-bace232857f6-1777563930930.jpg', role: 'Wealth Mgmt @ Fidelity' },
 ];
 
 // ─── Floating node for the animated web ──────────────────────────────────────
