@@ -12,12 +12,14 @@ export const metadata: Metadata = {
     description: "The private network for the people and places that matter.",
     url: "https://trailblaize.space",
     siteName: "Trailblaize",
+    images: [{ url: "/logos/logo-wordmark-on-navy.png", width: 1200, height: 630, alt: "Trailblaize" }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Trailblaize",
     description: "The private network for the people and places that matter.",
+    images: ["/logos/logo-wordmark-on-navy.png"],
   },
   icons: {
     icon: "/logos/logo-icon-white.png",
