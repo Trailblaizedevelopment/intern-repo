@@ -1697,30 +1697,26 @@ function SetUpPage() {
               />
               {form.memberCount && <p style={{ fontSize: '0.8125rem', color: '#10B981', marginTop: 6, marginBottom: 0, fontWeight: 600 }}>${getPriceTier(Number(form.memberCount))}/month</p>}
             </div>
-            {!form.leaderEmail && (
-              <div>
-                <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', display: 'block', marginBottom: 6 }}>Contact email</label>
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={form.leaderEmail}
-                  onChange={e => setForm(f => ({ ...f, leaderEmail: e.target.value }))}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: '0.9375rem', fontFamily: 'inherit', outline: 'none' }}
-                />
-              </div>
-            )}
-            {!form.leaderPhone && (
-              <div>
-                <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', display: 'block', marginBottom: 6 }}>Contact phone</label>
-                <input
-                  type="tel"
-                  placeholder="(555) 123-4567"
-                  value={form.leaderPhone}
-                  onChange={e => setForm(f => ({ ...f, leaderPhone: e.target.value }))}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: '0.9375rem', fontFamily: 'inherit', outline: 'none' }}
-                />
-              </div>
-            )}
+            <div>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', display: 'block', marginBottom: 6 }}>Contact email *</label>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={form.leaderEmail}
+                onChange={e => setForm(f => ({ ...f, leaderEmail: e.target.value }))}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: '0.9375rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', display: 'block', marginBottom: 6 }}>Contact phone *</label>
+              <input
+                type="tel"
+                placeholder="(555) 123-4567"
+                value={form.leaderPhone}
+                onChange={e => setForm(f => ({ ...f, leaderPhone: e.target.value }))}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: '0.9375rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
