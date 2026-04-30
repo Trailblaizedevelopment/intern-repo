@@ -300,7 +300,7 @@ export default function WaitlistPage() {
             You&apos;re in.
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 16, lineHeight: 1.7, fontFamily: 'Inter, system-ui, sans-serif', maxWidth: 340, margin: '0 auto' }}>
-            We&apos;ll text you when the app is ready.
+            We&apos;ll text you when the app is launched.
           </p>
         </div>
       </div>
@@ -416,7 +416,7 @@ export default function WaitlistPage() {
         </div>
 
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, textAlign: 'center', marginTop: 16, fontFamily: 'Inter, system-ui, sans-serif' }}>
-          No spam. We&apos;ll text you when the app launches.
+          No spam. We&apos;ll text you when the app is launched.
         </p>
       </div>
     </div>
