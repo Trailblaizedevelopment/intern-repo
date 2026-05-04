@@ -67,8 +67,10 @@ function buildT3PitchedMessage(firstName: string, fraternityName: string): strin
 }
 
 // Track B — no response to T1 (touch1_sent, 2+ days)
-function buildT2BMessage(firstName: string, fraternityName: string, school: string, joinLink: string): string {
-  return `Hey ${firstName}, just following up - we're building out the ${fraternityName} alumni network at ${school}. Here's the link if you're interested: ${joinLink}`;
+// NO LINK — don't send the join link to someone who hasn't confirmed their number.
+// Keep it natural and human. Re-engage without pitching.
+function buildT2BMessage(firstName: string, fraternityName: string, school: string): string {
+  return `Hey ${firstName}, this is Ford again from Trailblaize. Just wanted to make sure I had the right number — still working on the ${fraternityName} alumni directory at ${school}. Do I have you?`;
 }
 function buildT3BMessage(firstName: string, fraternityName: string): string {
   return `Hey ${firstName}, last one from us. If you ever want to connect with other ${fraternityName} guys, we're at trailblaize.net. No pressure.`;
@@ -566,7 +568,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           status === 'not_contacted'    ? buildT1Message(contact.first_name, chapter.fraternity_name, chapter.university) :
           useT2ALongGap                 ? buildT2ALongGapMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
           status === 'touch1_confirmed' ? buildT2AMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
-          status === 'touch1_sent'      ? buildT2BMessage(contact.first_name, chapter.fraternity_name, chapter.university, joinLink) :
+          status === 'touch1_sent'      ? buildT2BMessage(contact.first_name, chapter.fraternity_name, chapter.university) :
           status === 'pitched'          ? buildT3PitchedMessage(contact.first_name, chapter.fraternity_name) :
           contact.linq_chat_id          ? buildT3AMessage(contact.first_name) :
                                           buildT3BMessage(contact.first_name, chapter.fraternity_name);
