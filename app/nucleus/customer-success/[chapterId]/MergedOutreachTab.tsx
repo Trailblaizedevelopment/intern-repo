@@ -556,9 +556,16 @@ function ContactsTab({
       });
       const json = await res.json();
       if (json.success) {
-        showToast(`Sent T1 to ${json.sent} contacts (${json.failed} failed)`, json.failed > 0 ? 'info' : 'success');
+        const remaining = json.remaining ?? 0;
+        const msg = remaining > 0
+          ? `Sent T1 to ${json.sent} contacts. ${remaining} remaining — run again to continue.`
+          : `Sent T1 to ${json.sent} contacts${json.failed > 0 ? ` (${json.failed} failed)` : ' ✓'}`;
+        showToast(msg, json.failed > 0 || remaining > 0 ? 'info' : 'success');
         setBulkConfirm(false);
         await fetchContacts();
+      } else if (json.daily_cap_hit) {
+        showToast('Daily limit reached across all lines (45/line). Resume tomorrow.', 'error');
+        setBulkConfirm(false);
       } else {
         showToast(json.error || 'Bulk send failed', 'error');
       }

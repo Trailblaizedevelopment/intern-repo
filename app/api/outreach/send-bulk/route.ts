@@ -16,6 +16,13 @@ const OUTREACH_LINES = [
   { number: 10, phone: '+12817773280' },
   { number: 11, phone: '+12817452268' },
 ];
+
+// Per-line daily T1 cap — 45 new convos/line is the safe Linq limit
+const DAILY_CAP_PER_LINE = 45;
+
+// Max contacts per single API call — at 1s delay this = ~200s, safely inside 300s Vercel limit
+const MAX_PER_CALL = 200;
+
 let lineIdx = 0;
 function nextLine() {
   const line = OUTREACH_LINES[lineIdx % OUTREACH_LINES.length];
@@ -36,7 +43,7 @@ function buildT3Message(firstName: string): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { chapter_id, touch = 'T1', limit = 100 } = body as {
+    const { chapter_id, touch = 'T1', limit } = body as {
       chapter_id: string;
       touch: 'T1' | 'T2' | 'T3';
       limit?: number;
@@ -47,11 +54,60 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabaseAdmin();
     if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
+    // ── Daily limit guard (T1 only) ───────────────────────────────────────────
+    // Count how many T1s each line has already sent today across ALL chapters.
+    // This prevents blowing the 45/line/day Linq cap, regardless of chapter.
+    let totalDailyCapacity = OUTREACH_LINES.length * DAILY_CAP_PER_LINE; // max if no sends yet today
+    if (touch === 'T1') {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { data: sentTodayRows } = await supabase
+        .from('alumni_contacts')
+        .select('assigned_line')
+        .not('touch1_sent_at', 'is', null)
+        .gte('touch1_sent_at', todayStart.toISOString());
+
+      const sentTodayPerLine: Record<number, number> = {};
+      for (const row of sentTodayRows || []) {
+        const ln = row.assigned_line as number;
+        if (ln) sentTodayPerLine[ln] = (sentTodayPerLine[ln] || 0) + 1;
+      }
+
+      // Sum remaining capacity across all outreach lines
+      totalDailyCapacity = OUTREACH_LINES.reduce((sum, line) => {
+        const used = sentTodayPerLine[line.number] || 0;
+        return sum + Math.max(0, DAILY_CAP_PER_LINE - used);
+      }, 0);
+
+      if (totalDailyCapacity === 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'Daily T1 limit reached across all lines (45/line). Resume tomorrow.',
+          daily_cap_hit: true,
+          sent: 0,
+          failed: 0,
+          total: 0,
+          remaining: 0,
+        });
+      }
+    }
+
+    // ── Effective limit: respect caller's limit, daily capacity, and per-call cap ─
+    // MAX_PER_CALL ensures we never exceed the Vercel 300s timeout.
+    // At 1s delay per send: 200 contacts = ~200s — safely inside the limit.
+    const requestedLimit = limit ?? totalDailyCapacity;
+    const effectiveLimit = Math.min(requestedLimit, totalDailyCapacity, MAX_PER_CALL);
+
     // Get chapter info
-    const { data: chapter } = await supabase.from('chapters').select('fraternity, school, alumni_join_link').eq('id', chapter_id).single();
+    const { data: chapter } = await supabase
+      .from('chapters')
+      .select('fraternity, school, alumni_join_link')
+      .eq('id', chapter_id)
+      .single();
     if (!chapter) return NextResponse.json({ error: 'Chapter not found' }, { status: 404 });
 
-    // Fetch eligible contacts
+    // Fetch eligible contacts up to effectiveLimit
     let query = supabase
       .from('alumni_contacts')
       .select('id, first_name, last_name, phone_primary, outreach_status, touch1_sent_at')
@@ -59,7 +115,7 @@ export async function POST(req: NextRequest) {
       .not('phone_primary', 'is', null)
       .not('first_name', 'is', null)
       .eq('flagged', false)
-      .limit(Math.min(limit, 500));
+      .limit(effectiveLimit);
 
     if (touch === 'T1') {
       query = query.eq('outreach_status', 'not_contacted');
@@ -72,15 +128,38 @@ export async function POST(req: NextRequest) {
     const { data: contacts, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!contacts || contacts.length === 0) {
-      return NextResponse.json({ success: true, sent: 0, failed: 0, total: 0, message: 'No eligible contacts found' });
+      return NextResponse.json({
+        success: true,
+        sent: 0,
+        failed: 0,
+        total: 0,
+        remaining: 0,
+        message: 'No eligible contacts found',
+      });
     }
 
-    const results = { sent: 0, failed: 0, total: contacts.length, errors: [] as string[] };
+    // Count total eligible in chapter so UI can show how many remain after this batch
+    const { count: totalEligible } = await supabase
+      .from('alumni_contacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('chapter_id', chapter_id)
+      .not('phone_primary', 'is', null)
+      .not('first_name', 'is', null)
+      .eq('flagged', false)
+      .eq('outreach_status', touch === 'T1' ? 'not_contacted' : touch === 'T2' ? 'touch1_sent' : 'touch2_sent');
+
+    const results = {
+      sent: 0,
+      failed: 0,
+      total: contacts.length,
+      total_eligible: totalEligible ?? contacts.length,
+      remaining: 0,
+      errors: [] as string[],
+    };
 
     for (const contact of contacts) {
       const line = nextLine();
       try {
-        // Build message
         let message = '';
         if (touch === 'T1') {
           message = buildT1Message(contact.first_name, chapter.fraternity || '', chapter.school || '');
@@ -117,11 +196,14 @@ export async function POST(req: NextRequest) {
         results.errors.push(`${contact.first_name} ${contact.last_name || ''} (${contact.id}): ${String(e)}`);
       }
 
-      // 2s delay between sends
+      // 1s delay between sends — keeps us well inside the 300s Vercel limit
+      // (200 contacts × 1s = ~200s) while still spacing messages naturally
       if (results.sent + results.failed < contacts.length) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
+
+    results.remaining = Math.max(0, (totalEligible ?? 0) - results.sent);
 
     return NextResponse.json({ success: true, ...results });
   } catch (err) {
