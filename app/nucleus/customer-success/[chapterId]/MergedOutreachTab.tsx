@@ -313,7 +313,7 @@ function BulkConfirmModal({
           >
             {sending
               ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Sending...</>
-              : <><Send size={14} /> Send All {touch} ({count})</>
+              : <><Send size={14} /> Confirm — Send {capacity ? capacity.this_run : count}</>
             }
           </button>
         </div>
