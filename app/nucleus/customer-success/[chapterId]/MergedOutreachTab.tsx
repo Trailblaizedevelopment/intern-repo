@@ -479,6 +479,7 @@ function ContactsTab({
 }) {
   const chapterId = chapter.id;
   const [contacts, setContacts] = useState<AlumniContact[]>([]);
+  const [totalNotContacted, setTotalNotContacted] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedContact, setSelectedContact] = useState<AlumniContact | null>(null);
@@ -510,6 +511,22 @@ function ContactsTab({
         return;
       }
       setContacts((json.data?.contacts ?? []) as AlumniContact[]);
+
+      // If filtering by not_contacted, use the API's exact total count (not the page size).
+      // Otherwise compute from the loaded list.
+      if (!statusFilter || statusFilter === 'all' || statusFilter === 'not_contacted') {
+        // Fetch true not-contacted total separately (unaffected by current status filter)
+        const countParams = new URLSearchParams({
+          chapter_id: chapterId,
+          outreach_status: 'not_contacted',
+          has_phone: 'true',
+          limit: '1',
+          offset: '0',
+        });
+        const countRes = await fetch(`/api/alumni-contacts?${countParams}`, { headers: { Authorization: AUTH } });
+        const countJson = await countRes.json().catch(() => ({}));
+        setTotalNotContacted(countJson?.data?.total ?? 0);
+      }
     } catch {
       showToast('Failed to load contacts', 'error');
     } finally {
@@ -519,7 +536,7 @@ function ContactsTab({
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
-  const notContactedCount = contacts.filter(c => c.outreach_status === 'not_contacted').length;
+  const notContactedCount = totalNotContacted || contacts.filter(c => c.outreach_status === 'not_contacted').length;
 
   async function handleSendConfirm() {
     if (!pendingSend) return;
