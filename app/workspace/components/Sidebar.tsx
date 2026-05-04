@@ -174,6 +174,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
         { name: 'Connects',        href: '/workspace/connects', Icon: Phone },
         { name: 'Creative Studio', href: '/workspace/socials',  Icon: Palette },
         { name: 'Projects',        href: '/workspace/projects', Icon: Building2 },
+        { name: 'Tickets',         href: '/workspace/tickets',  Icon: Ticket },
         { name: 'Team',            href: '/workspace/team',     Icon: Users },
       ],
     },
@@ -193,6 +194,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     { name: 'Creative Studio',  href: '/workspace/socials',          Icon: Palette },
     { name: 'Connects',         href: '/workspace/connects',         Icon: Phone },
     { name: 'Projects',         href: '/workspace/projects',         Icon: Building2 },
+    { name: 'Tickets',          href: '/workspace/tickets',          Icon: Ticket },
     { name: 'Team',             href: '/workspace/team',             Icon: Users },
   ];
 
