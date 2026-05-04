@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { createChat } from '@/lib/linq';
+import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 
 export const maxDuration = 300;
 
@@ -270,6 +271,16 @@ export async function POST(req: NextRequest) {
     }
 
     results.remaining = Math.max(0, (totalEligible ?? 0) - results.sent);
+
+    // Kick off a conversations sync in the background so the
+    // Conversations tab populates immediately after the bulk send.
+    // Fire-and-forget — don't block the response.
+    if (results.sent > 0) {
+      fetch(`${req.nextUrl.origin}/api/conversations/sync`, {
+        method: 'POST',
+        headers: { Authorization: INTERNAL_AUTH_HEADER },
+      }).catch(() => {}); // non-fatal
+    }
 
     return NextResponse.json({ success: true, ...results });
   } catch (err) {
