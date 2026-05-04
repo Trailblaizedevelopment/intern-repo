@@ -247,12 +247,14 @@ function BulkConfirmModal({
   onConfirm,
   onCancel,
   sending,
+  capacity,
 }: {
   count: number;
   touch: TouchType;
   onConfirm: () => void;
   onCancel: () => void;
   sending: boolean;
+  capacity?: { this_run: number; sendable_today: number; not_touched_today: number; eligible: number } | null;
 }) {
   const touchStyle = TOUCH_BUTTON_STYLES[touch];
   return (
@@ -268,11 +270,23 @@ function BulkConfirmModal({
         boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
       }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: C.heading, marginBottom: 8 }}>
-          Send {touch} to {count} contacts?
+          Send {touch} — {capacity ? capacity.this_run : count} contacts this run
         </div>
-        <div style={{ fontSize: 14, color: C.body, marginBottom: 20, lineHeight: 1.6 }}>
-          This will send {touch} messages to all <strong>{count}</strong> not-contacted contacts with phone numbers. Messages send with 2-second gaps between each.
+        <div style={{ fontSize: 14, color: C.body, marginBottom: capacity?.not_touched_today ? 12 : 20, lineHeight: 1.6 }}>
+          This run will send <strong>{capacity ? capacity.this_run : count}</strong> messages with 1-second gaps (~{Math.ceil((capacity ? capacity.this_run : count) / 60)} min).
+          {capacity && capacity.sendable_today > capacity.this_run && (
+            <> {capacity.sendable_today - capacity.this_run} more can send today in subsequent runs.</>
+          )}
         </div>
+        {capacity && capacity.not_touched_today > 0 && (
+          <div style={{
+            fontSize: 13, color: '#92400E', background: '#FFFBEB',
+            border: '1px solid #FDE68A', borderRadius: 8,
+            padding: '10px 14px', marginBottom: 20, lineHeight: 1.5,
+          }}>
+            ⚠️ <strong>{capacity.not_touched_today} contacts won&apos;t be touched today</strong> — daily line limit ({capacity.sendable_today} of {capacity.eligible}). They&apos;ll be available tomorrow.
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button
             onClick={onCancel}
@@ -490,6 +504,12 @@ function ContactsTab({
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkLimit, setBulkLimit] = useState<number | undefined>(undefined);
+  const [capacity, setCapacity] = useState<{
+    this_run: number;
+    sendable_today: number;
+    not_touched_today: number;
+    eligible: number;
+  } | null>(null);
 
   const fetchContacts = useCallback(async () => {
     setLoading(true);
@@ -535,6 +555,17 @@ function ContactsTab({
   }, [chapterId, statusFilter, showToast]);
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
+
+  // Fetch daily send capacity so the button shows accurate numbers
+  useEffect(() => {
+    if (!chapterId) return;
+    fetch(`/api/outreach/send-bulk?chapter_id=${chapterId}&touch=T1`, { headers: { Authorization: AUTH } })
+      .then(r => r.json())
+      .then(json => {
+        if (!json.error) setCapacity(json);
+      })
+      .catch(() => {});
+  }, [chapterId, totalNotContacted]);
 
   const notContactedCount = totalNotContacted || contacts.filter(c => c.outreach_status === 'not_contacted').length;
 
@@ -614,19 +645,33 @@ function ContactsTab({
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {notContactedCount > 0 && (<>
-              <button
-                onClick={() => { setBulkLimit(undefined); setBulkConfirm(true); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
-                  border: `1px solid ${TOUCH_BUTTON_STYLES.T1.border}`,
-                  background: TOUCH_BUTTON_STYLES.T1.bg,
-                  color: TOUCH_BUTTON_STYLES.T1.color,
-                  fontSize: 13, fontWeight: 600, minHeight: 36,
-                }}
-              >
-                <Send size={13} /> Send All T1 ({notContactedCount})
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                <button
+                  onClick={() => { setBulkLimit(undefined); setBulkConfirm(true); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
+                    border: `1px solid ${TOUCH_BUTTON_STYLES.T1.border}`,
+                    background: TOUCH_BUTTON_STYLES.T1.bg,
+                    color: TOUCH_BUTTON_STYLES.T1.color,
+                    fontSize: 13, fontWeight: 600, minHeight: 36,
+                  }}
+                >
+                  <Send size={13} />
+                  {capacity
+                    ? `Send T1 (${capacity.this_run} this run)`
+                    : `Send T1 (${notContactedCount})`
+                  }
+                </button>
+                {capacity && capacity.eligible > 0 && (
+                  <span style={{ fontSize: 11, color: '#6B7280', textAlign: 'right', lineHeight: 1.4 }}>
+                    {capacity.sendable_today} of {capacity.eligible} send today
+                    {capacity.not_touched_today > 0 && (
+                      <> &middot; <span style={{ color: '#F59E0B', fontWeight: 600 }}>{capacity.not_touched_today} won&apos;t be touched today</span></>
+                    )}
+                  </span>
+                )}
+              </div>
               {[25, 50, 200, 250].map(n => (
                 <button
                   key={n}
@@ -814,6 +859,7 @@ function ContactsTab({
           onConfirm={handleBulkSend}
           onCancel={() => { if (!bulkSending) setBulkConfirm(false); }}
           sending={bulkSending}
+          capacity={capacity}
         />
       )}
     </div>

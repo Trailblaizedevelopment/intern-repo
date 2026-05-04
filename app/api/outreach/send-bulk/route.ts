@@ -40,6 +40,72 @@ function buildT3Message(firstName: string): string {
   return `Hey ${firstName}, just checking - did you get a chance to join? Happy to answer any questions.`;
 }
 
+/**
+ * GET /api/outreach/send-bulk?chapter_id=xxx&touch=T1
+ * Returns today's remaining send capacity without sending anything.
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const chapter_id = searchParams.get('chapter_id');
+    const touch = (searchParams.get('touch') || 'T1') as 'T1' | 'T2' | 'T3';
+
+    if (!chapter_id) return NextResponse.json({ error: 'chapter_id is required' }, { status: 400 });
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
+
+    // Daily capacity check (T1 only)
+    let remainingCapacity = OUTREACH_LINES.length * DAILY_CAP_PER_LINE;
+    if (touch === 'T1') {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { data: sentTodayRows } = await supabase
+        .from('alumni_contacts')
+        .select('assigned_line')
+        .not('touch1_sent_at', 'is', null)
+        .gte('touch1_sent_at', todayStart.toISOString());
+
+      const sentTodayPerLine: Record<number, number> = {};
+      for (const row of sentTodayRows || []) {
+        const ln = row.assigned_line as number;
+        if (ln) sentTodayPerLine[ln] = (sentTodayPerLine[ln] || 0) + 1;
+      }
+      remainingCapacity = OUTREACH_LINES.reduce((sum, line) => {
+        const used = sentTodayPerLine[line.number] || 0;
+        return sum + Math.max(0, DAILY_CAP_PER_LINE - used);
+      }, 0);
+    }
+
+    // Total eligible in chapter
+    const statusFilter = touch === 'T1' ? 'not_contacted' : touch === 'T2' ? 'touch1_sent' : 'touch2_sent';
+    const { count: totalEligible } = await supabase
+      .from('alumni_contacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('chapter_id', chapter_id)
+      .not('phone_primary', 'is', null)
+      .not('first_name', 'is', null)
+      .eq('flagged', false)
+      .eq('outreach_status', statusFilter);
+
+    const eligible = totalEligible ?? 0;
+    const sendableToday = Math.min(eligible, remainingCapacity);
+    const notTouchedToday = Math.max(0, eligible - sendableToday);
+    const thisRun = Math.min(sendableToday, MAX_PER_CALL);
+
+    return NextResponse.json({
+      eligible,
+      sendable_today: sendableToday,
+      not_touched_today: notTouchedToday,
+      this_run: thisRun,
+      daily_cap_total: OUTREACH_LINES.length * DAILY_CAP_PER_LINE,
+      remaining_capacity: remainingCapacity,
+    });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
