@@ -37,6 +37,7 @@ import {
   Phone,
   Palette,
   MoreHorizontal,
+  Send,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -68,6 +69,7 @@ const iconMap: Record<string, LucideIcon> = {
   Wallet,
   Rocket,
   MoreHorizontal,
+  Send,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
@@ -171,6 +173,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     {
       label: 'Growth',
       items: [
+        { name: 'Outreach',        href: '/workspace/outreach', Icon: Send },
         { name: 'Connects',        href: '/workspace/connects', Icon: Phone },
         { name: 'Creative Studio', href: '/workspace/socials',  Icon: Palette },
         { name: 'Projects',        href: '/workspace/projects', Icon: Building2 },
@@ -192,6 +195,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     { name: 'Ambassadors',      href: '/nucleus/ambassadors',        Icon: Star },
     { name: 'Mission Control',  href: '/nucleus/mission-control',    Icon: Radar },
     { name: 'Creative Studio',  href: '/workspace/socials',          Icon: Palette },
+    { name: 'Outreach',         href: '/workspace/outreach',         Icon: Send },
     { name: 'Connects',         href: '/workspace/connects',         Icon: Phone },
     { name: 'Projects',         href: '/workspace/projects',         Icon: Building2 },
     { name: 'Tickets',          href: '/workspace/tickets',          Icon: Ticket },

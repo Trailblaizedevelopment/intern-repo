@@ -184,6 +184,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
         { name: 'My Tasks', href: '/workspace/tasks', icon: 'CheckSquare' },
         { name: 'Projects', href: '/workspace/projects', icon: 'Building2' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
+        { name: 'Outreach', href: '/workspace/outreach', icon: 'Send' },
         { name: 'Connects', href: '/workspace/connects', icon: 'Phone' },
         { name: 'Mission Control', href: '/nucleus/mission-control', icon: 'Radar' },
         { name: 'Creative Studio', href: '/workspace/socials', icon: 'Palette' },
