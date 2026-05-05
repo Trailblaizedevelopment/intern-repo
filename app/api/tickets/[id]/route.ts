@@ -8,42 +8,21 @@ const TICKET_SELECT = `
   reviewer:employees!tickets_reviewer_id_fkey(id, name, email, role)
 `;
 
-// Hard gate: "done" requires a reviewer who is NOT the assignee
+// Status transition validation — any status can move to done or canceled freely
 function validateStatusTransition(
   currentStatus: string,
   newStatus: string,
-  assigneeId: string | null,
-  reviewerId: string | null
+  _assigneeId: string | null,
+  _reviewerId: string | null
 ): { valid: boolean; message?: string } {
-  const VALID_TRANSITIONS: Record<string, string[]> = {
-    backlog: ['todo', 'open', 'in_progress', 'canceled'],
-    todo: ['backlog', 'open', 'in_progress', 'canceled'],
-    open: ['in_progress', 'backlog', 'todo', 'done', 'canceled'],
-    in_progress: ['in_review', 'open', 'canceled'],
-    in_review: ['testing', 'in_progress', 'canceled'],
-    testing: ['done', 'in_review', 'in_progress', 'canceled'],
-    done: ['open', 'backlog'],
-    canceled: ['open', 'backlog'],
-  };
-
-  const allowed = VALID_TRANSITIONS[currentStatus];
-  if (!allowed || !allowed.includes(newStatus)) {
-    return { valid: false, message: `Cannot move from "${currentStatus}" to "${newStatus}"` };
+  const ALL_STATUSES = ['backlog', 'todo', 'open', 'in_progress', 'in_review', 'testing', 'done', 'canceled'];
+  if (!ALL_STATUSES.includes(newStatus)) {
+    return { valid: false, message: `Unknown status: "${newStatus}"` };
   }
-
-  // QA Gate: moving to "done" requires testing first and a reviewer
-  if (newStatus === 'done' && currentStatus !== 'testing') {
-    return { valid: false, message: 'Tickets must pass through Testing before being marked Done' };
+  // Only block nonsensical same-status no-ops
+  if (currentStatus === newStatus) {
+    return { valid: false, message: `Ticket is already "${currentStatus}"` };
   }
-
-  if (newStatus === 'done' && !reviewerId) {
-    return { valid: false, message: 'A reviewer must verify the ticket before it can be marked Done' };
-  }
-
-  if (newStatus === 'done' && reviewerId === assigneeId) {
-    return { valid: false, message: 'The reviewer cannot be the same person as the assignee' };
-  }
-
   return { valid: true };
 }
 
@@ -220,7 +199,7 @@ export async function PATCH(
   }
 }
 
-// DELETE - Soft delete ticket (sets status = 'canceled')
+// DELETE - Hard delete ticket (permanently removes from DB)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -233,13 +212,18 @@ export async function DELETE(
 
     const { id } = await params;
 
+    // Clean up related records first
+    await supabase.from('ticket_activity').delete().eq('ticket_id', id);
+    await supabase.from('ticket_comments').delete().eq('ticket_id', id);
+    await supabase.from('ticket_notifications').delete().eq('ticket_id', id);
+
     const { error } = await supabase
       .from('tickets')
-      .update({ status: 'canceled', updated_at: new Date().toISOString() })
+      .delete()
       .eq('id', id);
 
     if (error) {
-      console.error('Error soft-deleting ticket:', error);
+      console.error('Error deleting ticket:', error);
       return NextResponse.json({ data: null, error: { message: error.message, code: error.code } }, { status: 500 });
     }
 
