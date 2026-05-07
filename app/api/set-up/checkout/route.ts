@@ -6,6 +6,11 @@ export const runtime = 'nodejs';
 // Internal bypass codes — these skip Stripe entirely and go straight to completion
 const INTERNAL_BYPASS_CODES = ['TRAILBLAIZE100', 'FOUNDER', 'INTERNAL'];
 
+// Discounted price codes — these override the normal tier price
+const DISCOUNTED_PRICE_CODES: Record<string, number> = {
+  ADAM: 29,
+};
+
 /**
  * POST /api/set-up/checkout
  * Creates a Stripe Checkout Session for the /set-up onboarding flow.
@@ -43,10 +48,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Missing: ${missing.join(', ')}` }, { status: 400 });
     }
 
-    const priceInDollars = getPriceTier(Number(memberCount));
-    const priceInCents = priceInDollars * 100;
-
     const codeUpper = (discountCode || '').toUpperCase().trim();
+
+    // Discounted price override
+    const discountedPrice = DISCOUNTED_PRICE_CODES[codeUpper];
+    const priceInDollars = discountedPrice ?? getPriceTier(Number(memberCount));
+    const priceInCents = priceInDollars * 100;
 
     // Internal bypass — skip Stripe, go straight to completion with a fake session token
     if (INTERNAL_BYPASS_CODES.includes(codeUpper)) {
