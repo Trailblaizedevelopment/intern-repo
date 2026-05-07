@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 import { CampaignCRM } from './CampaignCRM';
+import { SalesCRM } from './SalesCRM';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2006,14 +2007,15 @@ const TEMP_OPTIONS_MAP = [
 ];
 
 // ── Main Page ──────────────────────────────────────────────────────────────
-type Tab = 'dashboard' | 'campaigns';
+type Tab = 'crm' | 'dashboard' | 'campaigns';
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'crm',       label: 'CRM' },
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'campaigns', label: 'Campaigns' },
 ];
 
 export default function WarRoomPage() {
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<Tab>('crm');
   const [stats, setStats] = useState<PipelineStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -2074,7 +2076,7 @@ export default function WarRoomPage() {
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: 0 }}>War Room</h1>
+              <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: 0 }}>Sales Room</h1>
               <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Live sales intelligence</span>
               {statsLoading && <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />}
             </div>
@@ -2100,6 +2102,7 @@ export default function WarRoomPage() {
 
       {/* Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
+        {tab === 'crm'        && <SalesCRM />}
         {tab === 'dashboard'  && <DashboardTab stats={stats} onOpenDeal={openDeal} />}
         {tab === 'campaigns'  && <CampaignCRM stats={stats} openDeal={openDeal} />}
       </div>

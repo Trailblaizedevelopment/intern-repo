@@ -11,7 +11,7 @@ export default function PageError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[War Room Error]', error);
+    console.error('[Sales Room Error]', error);
   }, [error]);
 
   return (
@@ -22,7 +22,7 @@ export default function PageError({
         </div>
         <h1 className="error-page-title">Something went wrong</h1>
         <p className="error-page-message">
-          {error.message || 'An unexpected error occurred in War Room.'}
+          {error.message || 'An unexpected error occurred in Sales Room.'}
         </p>
         {error.digest && (
           <p className="error-page-digest">Error ID: {error.digest}</p>

@@ -122,7 +122,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const inNucleus = pathname.startsWith('/nucleus');
   const nucleusModules = [
     { name: 'Dashboard', href: '/nucleus', icon: Zap },
-    { name: 'War Room', href: '/nucleus/war-room', icon: Tv },
+    { name: 'Sales Room', href: '/nucleus/war-room', icon: Tv },
     { name: 'Sales Pipeline', href: '/nucleus/pipeline', icon: TrendingUp },
     { name: 'Customer Success', href: '/nucleus/customer-success', icon: HeartHandshake },
     { name: 'Client Map', href: '/nucleus/client-map', icon: Map },
@@ -147,7 +147,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     {
       label: 'Command Center',
       items: [
-        { name: 'War Room',          href: '/nucleus/war-room',           Icon: Tv },
+        { name: 'Sales Room',         href: '/nucleus/war-room',           Icon: Tv },
         { name: 'Pipeline',          href: '/nucleus/pipeline',           Icon: TrendingUp },
         { name: 'Customer Success',  href: '/nucleus/customer-success',   Icon: HeartHandshake },
         { name: 'Client Map',        href: '/nucleus/client-map',         Icon: Map },
@@ -214,7 +214,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     : isInternRole
     ? [
         { name: 'Home',     href: '/workspace',          icon: 'LayoutDashboard', badge: 0 },
-        { name: 'War Room', href: '/nucleus/war-room',   icon: 'Tv',              badge: 0 },
+        { name: 'Sales Room', href: '/nucleus/war-room',  icon: 'Tv',              badge: 0 },
         { name: 'Pipeline', href: '/nucleus/pipeline',   icon: 'TrendingUp',      badge: 0 },
         { name: 'Connects', href: '/workspace/connects', icon: 'Phone',           badge: 0 },
       ]
