@@ -34,3 +34,26 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_deals_last_activity_at ON pipeline_deals
 ```
 
 **Why:** `pipeline/page.tsx` and `DealEditPanel.tsx` write `last_activity_at` on every deal touch (logCall, advanceStage, save). Without this column the updates fail silently with a Supabase error. The "Going Cold" badge and "X days since last contact" subtitle on deal cards require this field.
+
+---
+
+## [2026-05-07] Creative Studio — Post Tracking Table
+
+New table for the 28-day content experiment (May 9 – June 5, 2026). Tracks posts across 3 content types at 5/day each = 15/day target.
+
+```sql
+create table creative_posts (
+  id uuid primary key default gen_random_uuid(),
+  post_date date not null,
+  content_type text not null check (content_type in ('real_person','ai_influencer','ai_pictures')),
+  caption text,
+  link text,
+  notes text,
+  created_at timestamptz default now()
+);
+
+create index idx_creative_posts_date on creative_posts(post_date);
+create index idx_creative_posts_type on creative_posts(content_type);
+```
+
+**Why:** Powers `/nucleus/creative-studio` — the 28-day content dashboard. API at `/api/creative-posts` reads/writes this table. Run against internal workspace DB (`uoemlefauspgmmpeoilq`).

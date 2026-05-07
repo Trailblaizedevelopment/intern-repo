@@ -38,6 +38,7 @@ import {
   Palette,
   MoreHorizontal,
   Send,
+  Sparkles,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -70,6 +71,7 @@ const iconMap: Record<string, LucideIcon> = {
   Rocket,
   MoreHorizontal,
   Send,
+  Sparkles,
 };
 
 export function Sidebar({ unreadCount = 0 }: SidebarProps) {
@@ -125,6 +127,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     { name: 'Sales Room', href: '/nucleus/war-room', icon: Tv },
     { name: 'Sales Pipeline', href: '/nucleus/pipeline', icon: TrendingUp },
     { name: 'Customer Success', href: '/nucleus/customer-success', icon: HeartHandshake },
+    { name: 'Creative Studio', href: '/nucleus/creative-studio', icon: Sparkles },
     { name: 'Client Map', href: '/nucleus/client-map', icon: Map },
     { name: 'Finance', href: '/nucleus/finance', icon: Wallet },
     { name: 'Operations', href: '/nucleus/operations', icon: CheckSquare },
@@ -150,6 +153,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
         { name: 'Sales Room',         href: '/nucleus/war-room',           Icon: Tv },
         { name: 'Pipeline',          href: '/nucleus/pipeline',           Icon: TrendingUp },
         { name: 'Customer Success',  href: '/nucleus/customer-success',   Icon: HeartHandshake },
+        { name: 'Creative Studio',   href: '/nucleus/creative-studio',    Icon: Sparkles },
         { name: 'Client Map',        href: '/nucleus/client-map',         Icon: Map },
       ],
     },
@@ -186,6 +190,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   // More sheet items (founders mobile — everything not in the 3 main tabs)
   const moreSheetItems = [
     { name: 'Pipeline',         href: '/nucleus/pipeline',           Icon: TrendingUp },
+    { name: 'Creative Studio',  href: '/nucleus/creative-studio',    Icon: Sparkles },
     { name: 'Client Map',       href: '/nucleus/client-map',         Icon: Map },
     { name: 'Finance',          href: '/nucleus/finance',            Icon: Wallet },
     { name: 'Operations',       href: '/nucleus/operations',         Icon: CheckSquare },
