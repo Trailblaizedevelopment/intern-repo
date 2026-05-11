@@ -2,29 +2,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
 
   const { data, error } = await admin
     .from('campaign_prospects')
     .select('*')
-    .eq('campaign_id', params.id)
+    .eq('campaign_id', id)
     .order('created_at', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json((data ?? []).map(dbToFrontend));
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
 
   const body = await req.json();
-  // Support bulk insert (array) or single object
   const items = Array.isArray(body) ? body : [body];
-
-  const rows = items.map(p => frontendToDb(p, params.id));
+  const rows = items.map(p => frontendToDb(p, id));
 
   const { data, error } = await admin
     .from('campaign_prospects')
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json((data ?? []).map(dbToFrontend), { status: 201 });
 }
 
-export async function PATCH(req: NextRequest, { params: _params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: _params }: { params: Promise<{ id: string }> }) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
 
@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest, { params: _params }: { params: { i
   return NextResponse.json(dbToFrontend(data));
 }
 
-export async function DELETE(req: NextRequest, { params: _params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params: _params }: { params: Promise<{ id: string }> }) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
 
@@ -110,20 +110,20 @@ function dbToFrontend(row: Record<string, unknown>) {
 
 function frontendToDb(p: Record<string, unknown>, campaignId: string) {
   return {
-    id:                (p.id && typeof p.id === 'string' && !p.id.startsWith('api-')) ? p.id : undefined,
-    campaign_id:       campaignId,
-    org_name:          p.orgName ?? '',
-    school:            p.school ?? '',
-    contact_name:      p.contactName ?? '',
-    contact_email:     p.contactEmail ?? '',
-    contact_phone:     p.contactPhone ?? '',
-    contact_ig:        p.contactIg ?? '',
-    channel:           p.channel ?? '',
-    status:            p.status ?? 'not_contacted',
-    outreach_date:     p.outreachDate ?? null,
+    id:                 (p.id && typeof p.id === 'string' && !p.id.startsWith('api-')) ? p.id : undefined,
+    campaign_id:        campaignId,
+    org_name:           p.orgName ?? '',
+    school:             p.school ?? '',
+    contact_name:       p.contactName ?? '',
+    contact_email:      p.contactEmail ?? '',
+    contact_phone:      p.contactPhone ?? '',
+    contact_ig:         p.contactIg ?? '',
+    channel:            p.channel ?? '',
+    status:             p.status ?? 'not_contacted',
+    outreach_date:      p.outreachDate ?? null,
     last_activity_date: p.lastActivityDate ?? null,
-    assigned_to:       p.assignedTo ?? '',
-    notes:             p.notes ?? '',
-    deal_id:           p.dealId ?? null,
+    assigned_to:        p.assignedTo ?? '',
+    notes:              p.notes ?? '',
+    deal_id:            p.dealId ?? null,
   };
 }
