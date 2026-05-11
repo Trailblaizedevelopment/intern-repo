@@ -3,10 +3,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  ArrowLeft, Plus, Search, X, CheckCircle2, Trash2, Check,
+  ArrowLeft, Plus, Search, X, CheckCircle2, Trash2,
   Target, RefreshCw, Mail, MessageSquare, Instagram, Phone,
-  ChevronDown, ChevronUp, Building2, Users, TrendingUp,
-  Upload, Filter, AlertCircle, Zap, Calendar,
+  ChevronDown, ChevronUp, Building2, Users,
+  Upload, AlertCircle, Zap,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -133,6 +133,15 @@ const CAMPAIGN_TYPE_BADGE: Record<CampaignType, { color: string; bg: string }> =
 };
 
 const REPS = ['Owen', 'Ford', 'Adam', 'Katie', 'Hyatt'];
+
+const REP_COLORS: Record<string, string> = {
+  Owen:  '#7c3aed',
+  Ford:  '#0369a1',
+  Adam:  '#b45309',
+  Katie: '#be185d',
+  Hyatt: '#065f46',
+  Team:  '#374151',
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -836,82 +845,7 @@ function CampaignDetailView({
   );
 }
 
-// ─── Campaign List Card (upgraded) ────────────────────────────────────────────
-
-interface CampaignListCardProps {
-  campaign: Campaign;
-  prospects: CampaignProspect[];
-  onClick: () => void;
-  onDelete: (id: string) => void;
-}
-
-function CampaignListCard({ campaign, prospects, onClick, onDelete }: CampaignListCardProps) {
-  const { total, closed, demos } = useMemo(() => computeStats(prospects), [prospects]);
-  const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type];
-  const isActive = campaign.status === 'active';
-
-  return (
-    <div
-      onClick={onClick}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; (e.currentTarget as HTMLDivElement).style.borderColor = '#D1D5DB'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.05)'; (e.currentTarget as HTMLDivElement).style.borderColor = '#E5E7EB'; }}
-      style={{
-        background: '#fff',
-        border: '1px solid #E5E7EB',
-        borderRadius: 12,
-        padding: '14px 16px',
-        cursor: 'pointer',
-        transition: 'box-shadow 0.15s, border-color 0.15s',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        position: 'relative',
-      }}
-    >
-      {/* Status dot + delete */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 8, height: 8, borderRadius: 9999, background: isActive ? '#10b981' : '#9ca3af', flexShrink: 0 }} />
-          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 7px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg }}>
-            {CAMPAIGN_TYPE_LABELS[campaign.type]}
-          </span>
-        </div>
-        <button
-          onClick={e => { e.stopPropagation(); onDelete(campaign.id); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#D1D5DB', padding: 2, lineHeight: 1 }}
-          title="Delete"
-        >
-          <Trash2 size={13} />
-        </button>
-      </div>
-
-      {/* Name + school */}
-      <div>
-        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827', lineHeight: 1.3, marginBottom: 2 }}>{campaign.name}</div>
-        {campaign.school && campaign.school !== campaign.name && (
-          <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{campaign.school}</div>
-        )}
-      </div>
-
-      {/* Stats row */}
-      <div style={{ display: 'flex', gap: 14, marginTop: 2 }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#374151', lineHeight: 1 }}>{total || '—'}</div>
-          <div style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af', marginTop: 2 }}>Prospects</div>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#d97706', lineHeight: 1 }}>{demos || '—'}</div>
-          <div style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af', marginTop: 2 }}>Demos</div>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#059669', lineHeight: 1 }}>{closed || '—'}</div>
-          <div style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af', marginTop: 2 }}>Closed</div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// ─── Campaign List Card removed — list/table view only ───────────────────────
 
 // ─── Create Campaign Drawer ───────────────────────────────────────────────────
 
@@ -1074,7 +1008,6 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   const [search, setSearch] = useState('');
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'recent' | 'alpha' | 'prospects' | 'deals'>('recent');
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [visibleCount, setVisibleCount] = useState(20);
   const seededRef = useRef(false);
   const [hasLocalData, setHasLocalData] = useState(false);
@@ -1532,29 +1465,48 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
           <option value="deals">Most Deals</option>
         </select>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ marginLeft: 'auto' }}>
           <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
             {filteredCampaigns.length} campaign{filteredCampaigns.length !== 1 ? 's' : ''}
           </span>
-          {/* Card / List toggle */}
-          <div style={{ display: 'flex', background: '#F3F4F6', borderRadius: 8, padding: 2 }}>
-            <button
-              onClick={() => setViewMode('cards')}
-              title="Card view"
-              style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: viewMode === 'cards' ? '#ffffff' : 'transparent', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: viewMode === 'cards' ? '#111827' : '#6B7280', fontFamily: 'inherit', boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.1s' }}
-            >
-              Cards
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              title="List view"
-              style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: viewMode === 'list' ? '#ffffff' : 'transparent', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: viewMode === 'list' ? '#111827' : '#6B7280', fontFamily: 'inherit', boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.1s' }}
-            >
-              List
-            </button>
-          </div>
         </div>
       </div>
+
+      {/* Summary stats bar */}
+      {!loading && filteredCampaigns.length > 0 && (() => {
+        const totalProspects = filteredCampaigns.reduce((s, c) => {
+          return s + safeProspects.filter(p => p.campaignId === c.id).length + (c.rows?.length ?? 0);
+        }, 0);
+        const totalContacted = filteredCampaigns.reduce((s, c) => {
+          const cProspects = safeProspects.filter(p => p.campaignId === c.id);
+          return s + cProspects.filter(p => p.status !== 'not_contacted' && p.status !== 'hold_off' && p.status !== 'closed_lost').length;
+        }, 0);
+        const totalDemos = filteredCampaigns.reduce((s, c) => {
+          const cProspects = safeProspects.filter(p => p.campaignId === c.id);
+          return s + cProspects.filter(p => ['demo_booked', 'demo_completed', 'negotiating', 'closed_won'].includes(p.status)).length;
+        }, 0);
+        const totalClosed = filteredCampaigns.reduce((s, c) => {
+          const cProspects = safeProspects.filter(p => p.campaignId === c.id);
+          return s + cProspects.filter(p => p.status === 'closed_won').length;
+        }, 0);
+        return (
+          <div style={{
+            background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10,
+            padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+            fontSize: '0.8rem', color: '#6b7280',
+          }}>
+            <span style={{ fontWeight: 600, color: '#374151' }}>{filteredCampaigns.length} campaigns</span>
+            <span style={{ color: '#d1d5db' }}>·</span>
+            <span>{totalProspects} total prospects</span>
+            <span style={{ color: '#d1d5db' }}>·</span>
+            <span style={{ color: '#1d4ed8', fontWeight: 600 }}>{totalContacted} contacted</span>
+            <span style={{ color: '#d1d5db' }}>·</span>
+            <span style={{ color: '#d97706', fontWeight: 600 }}>{totalDemos} demos</span>
+            <span style={{ color: '#d1d5db' }}>·</span>
+            <span style={{ color: '#065f46', fontWeight: 600 }}>{totalClosed} closed</span>
+          </div>
+        );
+      })()}
 
       {/* Campaign content */}
       {loading ? (
@@ -1572,24 +1524,60 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
             <Plus size={15} /> New Campaign
           </button>
         </div>
-      ) : viewMode === 'list' ? (
-        /* ── Compact list view ── */
+      ) : (
+        /* ── Redesigned list/table view ── */
         <div className="module-table-container" style={{ borderRadius: 14, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                {['Campaign', 'Type', 'Status', 'Deals', 'Prospects', 'Last Activity', ''].map(h => (
-                  <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{h}</th>
+              <tr style={{ background: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
+                {[
+                  { label: '#',          w: 40  },
+                  { label: 'Campaign',   w: undefined },
+                  { label: 'Type',       w: 110 },
+                  { label: 'Rep',        w: 90  },
+                  { label: 'Prospects',  w: 90  },
+                  { label: 'Contacted %',w: 120 },
+                  { label: 'Demos',      w: 70  },
+                  { label: 'Closed',     w: 70  },
+                  { label: 'Last Active',w: 110 },
+                  { label: 'Status',     w: 90  },
+                  { label: '',           w: 40  },
+                ].map(h => (
+                  <th key={h.label} style={{
+                    padding: '9px 12px', textAlign: 'left', fontSize: '0.68rem', fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF',
+                    whiteSpace: 'nowrap', width: h.w,
+                  }}>{h.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {pagedCampaigns.map(campaign => {
+              {pagedCampaigns.map((campaign, idx) => {
                 const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type];
-                const statusBadge = { active: { label: 'Active', color: '#065f46', bg: '#d1fae5' }, paused: { label: 'Paused', color: '#b45309', bg: '#fef3c7' }, completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' } }[campaign.status];
-                const dealCount = (campaign.rows ?? []).filter(r => r.dealId).length;
-                const prospectCount = safeProspects.filter(p => p.campaignId === campaign.id).length + (campaign.rows?.length ?? 0);
-                const updatedDate = new Date(campaign.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const statusBadgeCfg = {
+                  active:    { label: 'Active',    color: '#065f46', bg: '#d1fae5' },
+                  paused:    { label: 'Paused',    color: '#b45309', bg: '#fef3c7' },
+                  completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' },
+                }[campaign.status];
+                const cProspects = safeProspects.filter(p => p.campaignId === campaign.id);
+                const prospectCount = cProspects.length + (campaign.rows?.length ?? 0);
+                const contactedCount = cProspects.filter(p =>
+                  p.status !== 'not_contacted' && p.status !== 'hold_off' && p.status !== 'closed_lost'
+                ).length;
+                const contactedPct = prospectCount > 0 ? Math.round((contactedCount / prospectCount) * 100) : 0;
+                const demoCount = cProspects.filter(p =>
+                  ['demo_booked', 'demo_completed', 'negotiating', 'closed_won'].includes(p.status)
+                ).length;
+                const closedCount = cProspects.filter(p => p.status === 'closed_won').length;
+                const lastActive = campaign.updatedAt;
+                const daysAgo = Math.floor((Date.now() - new Date(lastActive).getTime()) / (1000 * 60 * 60 * 24));
+                const activeColor = daysAgo < 3 ? '#059669' : daysAgo <= 7 ? '#d97706' : '#dc2626';
+                const lastActiveLabel = daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1d ago' : `${daysAgo}d ago`;
+                // Try to find an assigned rep from prospects
+                const repCounts: Record<string, number> = {};
+                cProspects.forEach(p => { if (p.assignedTo) repCounts[p.assignedTo] = (repCounts[p.assignedTo] ?? 0) + 1; });
+                const topRep = Object.entries(repCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
                 return (
                   <tr key={campaign.id}
                     style={{ borderBottom: '1px solid #F3F4F6', cursor: 'pointer', background: '#ffffff', transition: 'background 0.1s' }}
@@ -1597,27 +1585,81 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
                     onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#F9FAFB'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#ffffff'; }}
                   >
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: 9999, background: typeBadge.color, flexShrink: 0 }} />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>{campaign.name}</div>
-                          {campaign.school && campaign.school !== campaign.name && (
-                            <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{campaign.school}</div>
-                          )}
+                    {/* # */}
+                    <td style={{ padding: '10px 12px', fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600 }}>{idx + 1}</td>
+
+                    {/* Campaign name + school */}
+                    <td style={{ padding: '10px 12px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', lineHeight: 1.3 }}>{campaign.name}</div>
+                      {campaign.school && campaign.school !== campaign.name && (
+                        <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: 1 }}>{campaign.school}</div>
+                      )}
+                    </td>
+
+                    {/* Type badge */}
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg, whiteSpace: 'nowrap' }}>
+                        {CAMPAIGN_TYPE_LABELS[campaign.type]}
+                      </span>
+                    </td>
+
+                    {/* Rep */}
+                    <td style={{ padding: '10px 12px' }}>
+                      {topRep ? (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                          padding: '2px 8px 2px 3px', borderRadius: 9999, fontSize: '0.68rem', fontWeight: 700,
+                          background: REP_COLORS[topRep] ?? '#6b7280', color: '#fff', whiteSpace: 'nowrap',
+                        }}>
+                          <span style={{ width: 14, height: 14, borderRadius: 9999, background: 'rgba(255,255,255,0.25)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px' }}>
+                            {topRep[0]}
+                          </span>
+                          {topRep}
+                        </span>
+                      ) : <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>—</span>}
+                    </td>
+
+                    {/* Prospects */}
+                    <td style={{ padding: '10px 12px', fontSize: '0.875rem', color: '#374151', fontWeight: 600 }}>
+                      {prospectCount || '—'}
+                    </td>
+
+                    {/* Contacted % with mini bar */}
+                    <td style={{ padding: '10px 12px' }}>
+                      {prospectCount > 0 ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', minWidth: 32 }}>{contactedPct}%</span>
+                          <div style={{ width: 40, height: 5, background: '#e5e7eb', borderRadius: 9999, overflow: 'hidden', flexShrink: 0 }}>
+                            <div style={{ width: `${contactedPct}%`, height: '100%', background: '#6366f1', transition: 'width 0.3s', borderRadius: 9999 }} />
+                          </div>
                         </div>
-                      </div>
+                      ) : <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>—</span>}
                     </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg }}>{CAMPAIGN_TYPE_LABELS[campaign.type]}</span>
+
+                    {/* Demos */}
+                    <td style={{ padding: '10px 12px', fontSize: '0.875rem', fontWeight: 700, color: demoCount > 0 ? '#d97706' : '#9ca3af' }}>
+                      {demoCount || '—'}
                     </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: statusBadge.color, background: statusBadge.bg }}>{statusBadge.label}</span>
+
+                    {/* Closed */}
+                    <td style={{ padding: '10px 12px', fontSize: '0.875rem', fontWeight: 700, color: closedCount > 0 ? '#065f46' : '#9ca3af' }}>
+                      {closedCount || '—'}
                     </td>
-                    <td style={{ padding: '10px 14px', fontSize: '0.875rem', fontWeight: 700, color: dealCount > 0 ? '#1d4ed8' : '#9ca3af' }}>{dealCount || '—'}</td>
-                    <td style={{ padding: '10px 14px', fontSize: '0.875rem', color: '#374151' }}>{prospectCount || '—'}</td>
-                    <td style={{ padding: '10px 14px', fontSize: '0.8rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>{updatedDate}</td>
-                    <td style={{ padding: '10px 14px' }}>
+
+                    {/* Last Active */}
+                    <td style={{ padding: '10px 12px', fontSize: '0.8rem', fontWeight: 600, color: activeColor, whiteSpace: 'nowrap' }}>
+                      {lastActiveLabel}
+                    </td>
+
+                    {/* Status */}
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: statusBadgeCfg.color, background: statusBadgeCfg.bg, whiteSpace: 'nowrap' }}>
+                        {statusBadgeCfg.label}
+                      </span>
+                    </td>
+
+                    {/* Delete */}
+                    <td style={{ padding: '10px 12px' }}>
                       <button
                         onClick={e => { e.stopPropagation(); handleDeleteCampaign(campaign.id); }}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4 }}
@@ -1630,19 +1672,6 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
               })}
             </tbody>
           </table>
-        </div>
-      ) : (
-        /* ── Card view ── */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
-          {pagedCampaigns.map(campaign => (
-            <CampaignListCard
-              key={campaign.id}
-              campaign={campaign}
-              prospects={safeProspects.filter(p => p.campaignId === campaign.id)}
-              onClick={() => setSelectedCampaignId(campaign.id)}
-              onDelete={handleDeleteCampaign}
-            />
-          ))}
         </div>
       )}
 
