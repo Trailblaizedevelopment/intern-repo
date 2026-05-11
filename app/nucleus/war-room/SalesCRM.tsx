@@ -108,6 +108,33 @@ const REP_COLORS: Record<string, string> = {
   Team:  '#374151',
 };
 
+// Map known auth UUIDs → display names
+const UUID_TO_REP: Record<string, string> = {
+  '33ab5810-4d9f-485e-babb-a99b650a09e1': 'Owen',
+};
+
+const CATEGORY_OPTIONS = [
+  { value: 'all',                      label: 'All' },
+  { value: 'greek',                    label: 'Greek' },
+  { value: 'clubs',                    label: 'Clubs' },
+  { value: 'sports',                   label: 'Sports' },
+  { value: 'alumni_associations',      label: 'Alumni Associations' },
+  { value: 'professional_associations',label: 'Professional Associations' },
+  { value: 'country_clubs',            label: 'Country Clubs' },
+] as const;
+
+type CategoryFilter = typeof CATEGORY_OPTIONS[number]['value'];
+
+function isUUID(s: string | null | undefined): boolean {
+  return !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
+function resolveRep(rep: string | null | undefined): string | null {
+  if (!rep) return null;
+  if (isUUID(rep)) return UUID_TO_REP[rep.toLowerCase()] ?? null;
+  return rep;
+}
+
 const SLIPPING_STAGES: DealStage[] = ['first_demo', 'second_call', 'contract_sent'];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -163,7 +190,8 @@ function serializeDealNotes(notes: DealNote[]): string {
 
 // ─── Rep Badge ─────────────────────────────────────────────────────────────────
 
-function RepBadge({ rep }: { rep: string | null | undefined }) {
+function RepBadge({ rep: repRaw }: { rep: string | null | undefined }) {
+  const rep = resolveRep(repRaw);
   if (!rep) return <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>—</span>;
   const color = REP_COLORS[rep] ?? '#6b7280';
   return (
@@ -759,7 +787,7 @@ export function SalesCRM() {
   const [deals, setDeals] = useState<PipelineDealFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [ownerFilter, setOwnerFilter] = useState<string>('All');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [selectedDeal, setSelectedDeal] = useState<PipelineDealFull | null>(null);
   const [granolaNotes, setGranolaNotes] = useState<GranolaNote[] | null>(null);
   const granolaFetchedRef = useRef(false);
@@ -839,7 +867,7 @@ export function SalesCRM() {
   // ── Filters ──
   const { visibleDeals, archivedDeals } = useMemo(() => {
     let list = deals;
-    if (ownerFilter !== 'All') list = list.filter(d => d.assigned_to === ownerFilter);
+    if (categoryFilter !== 'all') list = list.filter(d => (d as any).category === categoryFilter || (!((d as any).category) && categoryFilter === 'greek'));
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(d =>
@@ -851,7 +879,7 @@ export function SalesCRM() {
     const archived = list.filter(d => d.stage === 'closed_lost' || d.stage === 'hold_off');
     const visible = list.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
     return { visibleDeals: visible, archivedDeals: archived };
-  }, [deals, ownerFilter, search]);
+  }, [deals, categoryFilter, search]);
 
   // ── Stats ──
   const stats = useMemo(() => {
@@ -925,20 +953,20 @@ export function SalesCRM() {
         </div>
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {['All', 'Owen', 'Ford', 'Adam', 'Katie', 'Hyatt', 'Team'].map(o => (
+          {CATEGORY_OPTIONS.map(opt => (
             <button
-              key={o}
-              onClick={() => setOwnerFilter(o)}
+              key={opt.value}
+              onClick={() => setCategoryFilter(opt.value as CategoryFilter)}
               style={{
                 padding: '6px 14px', borderRadius: '8px', fontSize: '0.8125rem',
-                fontWeight: ownerFilter === o ? 700 : 500, cursor: 'pointer',
-                border: `1px solid ${ownerFilter === o ? '#0F172A' : '#e5e7eb'}`,
-                background: ownerFilter === o ? '#0F172A' : '#ffffff',
-                color: ownerFilter === o ? '#ffffff' : '#374151',
-                fontFamily: 'inherit', transition: 'all 0.1s',
+                fontWeight: categoryFilter === opt.value ? 700 : 500, cursor: 'pointer',
+                border: `1px solid ${categoryFilter === opt.value ? '#0F172A' : '#e5e7eb'}`,
+                background: categoryFilter === opt.value ? '#0F172A' : '#ffffff',
+                color: categoryFilter === opt.value ? '#ffffff' : '#374151',
+                fontFamily: 'inherit', transition: 'all 0.1s', whiteSpace: 'nowrap',
               }}
             >
-              {o}
+              {opt.label}
             </button>
           ))}
         </div>
