@@ -71,7 +71,7 @@ interface PipelineStats {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'campaign_prospects_v1';
+
 
 const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string; bg: string; italic?: boolean }> = {
   not_contacted:  { label: 'Not Contacted',  color: '#6b7280', bg: '#f3f4f6' },
@@ -144,24 +144,7 @@ function todayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-function loadProspects(): CampaignProspect[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    // Guard against corrupted state (e.g., stored as object instead of array)
-    if (Array.isArray(parsed)) return parsed;
-    // Recover: if it's an object map, extract values
-    if (parsed && typeof parsed === 'object') return Object.values(parsed) as CampaignProspect[];
-    return [];
-  } catch { return []; }
-}
 
-function saveProspects(prospects: CampaignProspect[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(LS_KEY, JSON.stringify(prospects));
-}
 
 interface ProspectStats {
   total: number;
@@ -702,9 +685,9 @@ function CampaignDetailView({
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(p =>
-        p.orgName.toLowerCase().includes(q) ||
-        p.contactName.toLowerCase().includes(q) ||
-        p.contactEmail.toLowerCase().includes(q)
+        (p.orgName ?? '').toLowerCase().includes(q) ||
+        (p.contactName ?? '').toLowerCase().includes(q) ||
+        (p.contactEmail ?? '').toLowerCase().includes(q)
       );
     }
     return list;
@@ -863,84 +846,68 @@ interface CampaignListCardProps {
 }
 
 function CampaignListCard({ campaign, prospects, onClick, onDelete }: CampaignListCardProps) {
-  const stats = useMemo(() => computeStats(prospects), [prospects]);
-  const { total, contacted, replied, demos, closed } = stats;
+  const { total, closed, demos } = useMemo(() => computeStats(prospects), [prospects]);
   const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type];
-
-  const statusBadge = {
-    active:    { label: 'Active',    color: '#065f46', bg: '#d1fae5' },
-    paused:    { label: 'Paused',    color: '#b45309', bg: '#fef3c7' },
-    completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' },
-  }[campaign.status];
+  const isActive = campaign.status === 'active';
 
   return (
     <div
-      className="module-table-container"
-      style={{ borderRadius: 14, cursor: 'pointer', transition: 'box-shadow 0.15s' }}
       onClick={onClick}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}
+      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; (e.currentTarget as HTMLDivElement).style.borderColor = '#D1D5DB'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.05)'; (e.currentTarget as HTMLDivElement).style.borderColor = '#E5E7EB'; }}
+      style={{
+        background: '#fff',
+        border: '1px solid #E5E7EB',
+        borderRadius: 12,
+        padding: '14px 16px',
+        cursor: 'pointer',
+        transition: 'box-shadow 0.15s, border-color 0.15s',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        position: 'relative',
+      }}
     >
-      <div style={{ padding: '16px 20px' }}>
-        {/* Top row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-          <div style={{ width: 10, height: 10, borderRadius: 9999, background: typeBadge.color, flexShrink: 0, marginTop: 4 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{campaign.name}</span>
-              {campaign.school && campaign.school !== campaign.name && (
-                <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>{campaign.school}</span>
-              )}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg }}>
-                {CAMPAIGN_TYPE_LABELS[campaign.type]}
-              </span>
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: statusBadge.color, background: statusBadge.bg }}>
-                {statusBadge.label}
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={e => { e.stopPropagation(); onDelete(campaign.id); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4, flexShrink: 0 }}
-            title="Delete campaign"
-          >
-            <Trash2 size={14} />
-          </button>
+      {/* Status dot + delete */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 8, height: 8, borderRadius: 9999, background: isActive ? '#10b981' : '#9ca3af', flexShrink: 0 }} />
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 7px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg }}>
+            {CAMPAIGN_TYPE_LABELS[campaign.type]}
+          </span>
         </div>
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(campaign.id); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#D1D5DB', padding: 2, lineHeight: 1 }}
+          title="Delete"
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
 
-        {/* Stats row */}
-        {total > 0 && (
-          <>
-            <div style={{ display: 'flex', gap: 20, marginBottom: 10 }}>
-              {[
-                { label: 'Prospects', value: total,     color: '#374151' },
-                { label: 'Contacted', value: contacted, color: '#1d4ed8' },
-                { label: 'Replied',   value: replied,   color: '#059669' },
-                { label: 'Demos',     value: demos,     color: '#d97706' },
-                { label: 'Closed',    value: closed,    color: '#065f46' },
-              ].map(s => (
-                <div key={s.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.125rem', fontWeight: 700, color: s.color }}>{s.value}</div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9ca3af', marginTop: 1 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-            <FunnelBar {...stats} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-              <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
-                {total > 0 && contacted > 0 ? `${Math.round((contacted / total) * 100)}% contacted` : 'No outreach yet'}
-              </span>
-            </div>
-          </>
+      {/* Name + school */}
+      <div>
+        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827', lineHeight: 1.3, marginBottom: 2 }}>{campaign.name}</div>
+        {campaign.school && campaign.school !== campaign.name && (
+          <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{campaign.school}</div>
         )}
+      </div>
 
-        {total === 0 && (
-          <div style={{ padding: '8px 0', fontSize: '0.8125rem', color: '#9ca3af' }}>
-            Click to add prospects →
-          </div>
-        )}
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 14, marginTop: 2 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#374151', lineHeight: 1 }}>{total || '—'}</div>
+          <div style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af', marginTop: 2 }}>Prospects</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#d97706', lineHeight: 1 }}>{demos || '—'}</div>
+          <div style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af', marginTop: 2 }}>Demos</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#059669', lineHeight: 1 }}>{closed || '—'}</div>
+          <div style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af', marginTop: 2 }}>Closed</div>
+        </div>
       </div>
     </div>
   );
@@ -1110,10 +1077,30 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [visibleCount, setVisibleCount] = useState(20);
   const seededRef = useRef(false);
+  const [hasLocalData, setHasLocalData] = useState(false);
+  const [migrating, setMigrating] = useState(false);
+  const [migrated, setMigrated] = useState(false);
 
-  // Load prospects from localStorage on mount
+  // Load prospects from Supabase when a campaign is selected
   useEffect(() => {
-    setProspects(loadProspects());
+    if (!selectedCampaignId) return;
+    fetch(`/api/war-room/campaigns/${selectedCampaignId}/prospects`)
+      .then(r => r.json())
+      .then((data: unknown) => {
+        if (Array.isArray(data)) setProspects(data as CampaignProspect[]);
+      })
+      .catch(err => console.error('[campaign-crm] prospects fetch error:', err));
+  }, [selectedCampaignId]);
+
+  // Check for local data on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('campaign_prospects_v1');
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data) && data.length > 0) setHasLocalData(true);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   // Fetch campaigns from API
@@ -1145,51 +1132,6 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
       })
       .catch(err => console.error('[campaign-crm] schools error:', err));
   }, []);
-
-  // ── Power 5 prospect import ──────────────────────────────────────────────
-  useEffect(() => {
-    if (campaigns.length === 0 || loading) return;
-    if (localStorage.getItem('p5_prospects_seeded_v1')) return;
-    (async () => {
-      try {
-        const res = await fetch('/p5-prospects-seed.json');
-        if (!res.ok) return;
-        const seedData = await res.json();
-        const existing = loadProspects(); // always returns array
-        const existingIds = new Set(existing.map((p: CampaignProspect) => p.id));
-        const campaignBySchool: Record<string, string> = {};
-        campaigns.forEach((c: Campaign) => {
-          const name = (c.name || '').toLowerCase().trim();
-          campaignBySchool[name] = c.id;
-          const school = ((c as any).school || '').toLowerCase().trim();
-          if (school) campaignBySchool[school] = c.id;
-        });
-        const newProspects: CampaignProspect[] = [];
-        for (const p of seedData) {
-          const schoolLower = (p.school || '').toLowerCase().trim();
-          let campaignId = campaignBySchool[schoolLower];
-          if (!campaignId) {
-            for (const [cName, cId] of Object.entries(campaignBySchool)) {
-              if (schoolLower.includes(cName) || cName.includes(schoolLower)) {
-                campaignId = cId; break;
-              }
-            }
-          }
-          if (campaignId && !existingIds.has(p.id)) {
-            newProspects.push({ ...p, campaignId });
-            existingIds.add(p.id);
-          }
-        }
-        if (newProspects.length > 0) {
-          const updated = [...existing, ...newProspects];
-          saveProspects(updated);
-          setProspects(updated);
-          console.log(`[p5-seed] Imported ${newProspects.length} prospects from Power 5 database`);
-        }
-        localStorage.setItem('p5_prospects_seeded_v1', '1');
-      } catch (err) { console.error('[p5-seed]', err); }
-    })();
-  }, [campaigns, loading]);
 
   // Auto-seed from pipeline stats if no campaigns
   useEffect(() => {
@@ -1238,11 +1180,9 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
     }).catch(err => console.error('[campaign-crm] seed error:', err));
   }, [loading, stats]);
 
-  // Persist prospects to localStorage — always ensure array
+  // No-op helper kept for backwards compatibility with any remaining callers
   function persistProspects(updated: CampaignProspect[]) {
-    const safeUpdated = Array.isArray(updated) ? updated : [];
-    setProspects(safeUpdated);
-    saveProspects(safeUpdated);
+    setProspects(Array.isArray(updated) ? updated : []);
   }
 
   // Persist campaign to API
@@ -1283,35 +1223,85 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   }
 
   function handleUpdateProspect(id: string, updates: Partial<CampaignProspect>) {
-    const safeArr = Array.isArray(prospects) ? prospects : [];
-    // If this prospect came from API rows (not in localStorage yet), copy it first
-    const existing = safeArr.find(p => p.id === id);
-    if (!existing) {
-      // Find in the merged campaignProspects (which includes API rows)
-      const fromMerged = selectedProspects.find(p => p.id === id);
-      if (fromMerged) {
-        const newProspect = { ...fromMerged, ...updates };
-        persistProspects([...safeArr, newProspect]);
-        return;
-      }
-    }
-    const updated = safeArr.map(p => p.id === id ? { ...p, ...updates } : p);
-    persistProspects(updated);
+    // Optimistic update
+    setProspects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    // Persist to Supabase
+    fetch(`/api/war-room/campaigns/${selectedCampaignId}/prospects`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    }).catch(err => console.error('[campaign-crm] patch prospect error:', err));
   }
 
   function handleDeleteProspect(id: string) {
-    const safeArr = Array.isArray(prospects) ? prospects : [];
-    persistProspects(safeArr.filter(p => p.id !== id));
+    setProspects(prev => prev.filter(p => p.id !== id));
+    fetch(`/api/war-room/campaigns/${selectedCampaignId}/prospects?prospectId=${id}`, {
+      method: 'DELETE',
+    }).catch(err => console.error('[campaign-crm] delete prospect error:', err));
   }
 
-  function handleAddProspect(prospect: CampaignProspect) {
-    const safeArr = Array.isArray(prospects) ? prospects : [];
-    persistProspects([...safeArr, prospect]);
+  async function handleAddProspect(prospect: CampaignProspect) {
+    try {
+      const res = await fetch(`/api/war-room/campaigns/${prospect.campaignId}/prospects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prospect),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        const newProspect = Array.isArray(created) ? created[0] : created;
+        setProspects(prev => [...prev, newProspect]);
+      }
+    } catch (err) { console.error('[campaign-crm] add prospect error:', err); }
   }
 
-  function handleImportProspects(newProspects: CampaignProspect[]) {
-    const safeArr = Array.isArray(prospects) ? prospects : [];
-    persistProspects([...safeArr, ...newProspects]);
+  async function handleImportProspects(newProspects: CampaignProspect[]) {
+    if (!newProspects.length) return;
+    try {
+      const res = await fetch(`/api/war-room/campaigns/${newProspects[0].campaignId}/prospects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProspects),
+      });
+      if (res.ok) {
+        const created: CampaignProspect[] = await res.json();
+        setProspects(prev => [...prev, ...created]);
+      }
+    } catch (err) { console.error('[campaign-crm] import prospects error:', err); }
+  }
+
+  async function handleMigrateLocalData() {
+    setMigrating(true);
+    try {
+      const raw = localStorage.getItem('campaign_prospects_v1');
+      if (!raw) { setMigrating(false); return; }
+      const localProspects: CampaignProspect[] = JSON.parse(raw);
+      if (!Array.isArray(localProspects) || localProspects.length === 0) { setMigrating(false); return; }
+
+      // Group by campaignId
+      const byCampaign = localProspects.reduce<Record<string, CampaignProspect[]>>((acc, p) => {
+        if (!acc[p.campaignId]) acc[p.campaignId] = [];
+        acc[p.campaignId].push(p);
+        return acc;
+      }, {});
+
+      await Promise.all(Object.entries(byCampaign).map(([cId, cProspects]) =>
+        fetch(`/api/war-room/campaigns/${cId}/prospects`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cProspects),
+        })
+      ));
+
+      localStorage.removeItem('campaign_prospects_v1');
+      setHasLocalData(false);
+      setMigrated(true);
+    } catch (err) {
+      console.error('[migrate]', err);
+      alert('Migration failed — check console');
+    } finally {
+      setMigrating(false);
+    }
   }
 
   async function handleConvertToDeal(prospectId: string) {
@@ -1393,7 +1383,7 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
     if (statusFilter !== 'all') list = list.filter(c => c.status === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(c => c.name.toLowerCase().includes(q) || c.school.toLowerCase().includes(q));
+      list = list.filter(c => (c.name ?? '').toLowerCase().includes(q) || (c.school ?? '').toLowerCase().includes(q));
     }
     return [...list].sort((a, b) => {
       if (sortBy === 'alpha') return a.name.localeCompare(b.name);
@@ -1420,36 +1410,8 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   );
 
   const selectedProspects = useMemo(
-    () => {
-      if (!selectedCampaignId) return [];
-      // Merge localStorage prospects with API campaign rows
-      const lsProspects = prospects.filter(p => p.campaignId === selectedCampaignId);
-      const campaign = campaigns.find(c => c.id === selectedCampaignId);
-      const apiRows = (campaign as any)?.rows ?? [];
-      const existingOrgs = new Set(lsProspects.map(p => p.orgName.toLowerCase()));
-      const fromApi: CampaignProspect[] = apiRows
-        .filter((r: any) => r.chapterName && !existingOrgs.has(r.chapterName.toLowerCase()))
-        .map((r: any) => ({
-          id: r.id || `api-${Math.random().toString(36).slice(2)}`,
-          campaignId: selectedCampaignId,
-          orgName: r.chapterName || '',
-          school: (campaign as any)?.school || '',
-          contactName: r.contactName || '',
-          contactEmail: r.contactInfo || '',
-          contactPhone: '',
-          contactIg: '',
-          channel: (r.method as any) || '',
-          status: r.status === 'demo_booked' ? 'demo_booked' : r.status === 'closed_won' ? 'closed_won' : r.meetingBooked ? 'demo_booked' : r.method ? 'contacted' : 'not_contacted',
-          outreachDate: null,
-          lastActivityDate: null,
-          assignedTo: '',
-          notes: '',
-          dealId: null,
-          createdAt: ((campaign as any)?.created_at) || new Date().toISOString(),
-        } as CampaignProspect));
-      return [...lsProspects, ...fromApi];
-    },
-    [prospects, selectedCampaignId, campaigns]
+    () => prospects.filter(p => p.campaignId === selectedCampaignId),
+    [prospects, selectedCampaignId]
   );
 
   // ── Campaign Detail View ──
@@ -1484,6 +1446,28 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   // ── Campaign List View ──
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Local data migration banner */}
+      {hasLocalData && !migrated && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <AlertCircle size={16} color="#b45309" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '0.875rem', color: '#92400e', flex: 1 }}>
+            You have prospect data saved locally in this browser that isn&apos;t visible to other team members.
+          </span>
+          <button
+            onClick={handleMigrateLocalData}
+            disabled={migrating}
+            style={{ background: '#b45309', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: '0.8rem', fontWeight: 600, cursor: migrating ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: migrating ? 0.7 : 1, whiteSpace: 'nowrap' }}
+          >
+            {migrating ? 'Migrating…' : 'Migrate to Cloud'}
+          </button>
+        </div>
+      )}
+      {migrated && (
+        <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <CheckCircle2 size={16} color="#059669" />
+          <span style={{ fontSize: '0.875rem', color: '#065f46' }}>Local data migrated to cloud successfully! Everyone can now see your prospects.</span>
+        </div>
+      )}
       {/* Search bar — prominent at top */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <div className="module-search" style={{ flex: 1 }}>
@@ -1649,18 +1633,12 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
         </div>
       ) : (
         /* ── Card view ── */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
           {pagedCampaigns.map(campaign => (
             <CampaignListCard
               key={campaign.id}
               campaign={campaign}
-              prospects={[
-                ...safeProspects.filter(p => p.campaignId === campaign.id),
-                ...((campaign as any)?.rows ?? []).filter((r: any) => r.chapterName).map((r: any) => ({
-                  id: r.id, campaignId: campaign.id, orgName: r.chapterName,
-                  status: r.meetingBooked ? 'demo_booked' : r.method ? 'contacted' : 'not_contacted',
-                } as CampaignProspect))
-              ]}
+              prospects={safeProspects.filter(p => p.campaignId === campaign.id)}
               onClick={() => setSelectedCampaignId(campaign.id)}
               onDelete={handleDeleteCampaign}
             />
