@@ -241,7 +241,7 @@ function StatsDashboard({ prospects }: { prospects: CampaignProspect[] }) {
 // ─── Status Select ────────────────────────────────────────────────────────────
 
 function StatusSelect({ value, onChange }: { value: ProspectStatus; onChange: (v: ProspectStatus) => void }) {
-  const cfg = STATUS_CONFIG[value];
+  const cfg = STATUS_CONFIG[value] ?? STATUS_CONFIG['not_contacted'];
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <select
@@ -698,7 +698,7 @@ function CampaignDetailView({
   const [assignedFilter, setAssignedFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
-  const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type];
+  const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type] ?? { color: '#6b7280', bg: '#f3f4f6' };
 
   const filtered = useMemo(() => {
     let list = prospects;
@@ -871,13 +871,13 @@ interface CampaignListCardProps {
 function CampaignListCard({ campaign, prospects, onClick, onDelete }: CampaignListCardProps) {
   const stats = useMemo(() => computeStats(prospects), [prospects]);
   const { total, contacted, replied, demos, closed } = stats;
-  const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type];
+  const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type] ?? { color: '#6b7280', bg: '#f3f4f6' };
 
-  const statusBadge = {
+  const statusBadge = ({
     active:    { label: 'Active',    color: '#065f46', bg: '#d1fae5' },
     paused:    { label: 'Paused',    color: '#b45309', bg: '#fef3c7' },
     completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' },
-  }[campaign.status];
+  } as Record<string, { label: string; color: string; bg: string }>)[campaign.status] ?? { label: campaign.status ?? 'Unknown', color: '#6b7280', bg: '#f3f4f6' };
 
   return (
     <div
@@ -1587,8 +1587,8 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
             </thead>
             <tbody>
               {filteredCampaigns.map(campaign => {
-                const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type];
-                const statusBadge = { active: { label: 'Active', color: '#065f46', bg: '#d1fae5' }, paused: { label: 'Paused', color: '#b45309', bg: '#fef3c7' }, completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' } }[campaign.status];
+                const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type] ?? { color: '#6b7280', bg: '#f3f4f6' };
+                const statusBadge = ({ active: { label: 'Active', color: '#065f46', bg: '#d1fae5' }, paused: { label: 'Paused', color: '#b45309', bg: '#fef3c7' }, completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' } } as Record<string, {label:string;color:string;bg:string}>)[campaign.status] ?? { label: campaign.status ?? '', color: '#6b7280', bg: '#f3f4f6' };
                 const dealCount = (campaign.rows ?? []).filter(r => r.dealId).length;
                 const prospectCount = safeProspects.filter(p => p.campaignId === campaign.id).length + (campaign.rows?.length ?? 0);
                 const updatedDate = new Date(campaign.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
