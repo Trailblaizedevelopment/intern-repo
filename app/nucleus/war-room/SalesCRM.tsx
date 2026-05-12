@@ -2,12 +2,53 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, X, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { Search, X, RefreshCw, ChevronRight, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
+import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
+type LeadOwner = 'Owen' | 'Ford' | 'Adam' | 'Team' | 'Katie' | 'Hyatt';
+
+export interface PipelineDealFull {
+  id: string;
+  org_id: string | null;
+  contact_id: string | null;
+  assigned_to: string | null;
+  deal_type: 'local' | 'council' | 'national';
+  stage: DealStage;
+  value: number;
+  temperature: 'hot' | 'warm' | 'cold';
+  next_followup: string | null;
+  last_touched: string | null;
+  followup_count: number;
+  notes: string | null;
+  conference: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  organization?: {
+    id: string;
+    name: string;
+    school?: { id: string; name: string } | null;
+    national_org?: { id: string; name: string } | null;
+  } | null;
+  contact?: {
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+}
+
+interface DealNote {
+  ts: string;
+  text: string;
+  author?: string;
+}
+
+// ─── Seed Data (legacy SalesCRM leads — used as fallback only) ─────────────────
+
 type LeadStatus = 'Active' | 'Check In' | 'Hold Off';
-type LeadOwner = 'Owen' | 'Ford' | 'Adam' | 'Team';
 
 interface SalesLead {
   id: string;
@@ -25,102 +66,80 @@ interface SalesLead {
   updated_at: string;
 }
 
-// ─── Seed Data ─────────────────────────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
-const SEED_LEADS: Omit<SalesLead, 'id' | 'created_at' | 'updated_at'>[] = [
-  // ── ACTIVE ──
-  { org_name: 'Alabama KA',          school: 'Alabama',       contact_name: null,           owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Ole Miss ATO',        school: 'Ole Miss',      contact_name: null,           owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Ole Miss Phi Delt',   school: 'Ole Miss',      contact_name: null,           owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Ole Miss Sigma Pi',   school: 'Ole Miss',      contact_name: null,           owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Ole Miss Sigma Chi',  school: 'Ole Miss',      contact_name: null,           owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Boulder Theta Xi',    school: 'Colorado',      contact_name: 'Bryce Kallio', owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Tennessee SAE',       school: 'Tennessee',     contact_name: null,           owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Sigma Alpha Mu @ Miami', school: 'Miami (OH)', contact_name: null,           owner: 'Ford', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Theta Chi @ Indiana', school: 'Indiana',       contact_name: null,           owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'K2 Killers @ TAMU',   school: 'Texas A&M',     contact_name: 'Alex Winslow', owner: 'Owen', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Chapman AEPI',        school: 'Chapman',       contact_name: null,           owner: 'Adam', status: 'Active',    pipeline_value: null, last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  // ── CHECK IN ──
-  { org_name: 'KKG @ SMU',                         school: 'SMU',               contact_name: 'Claire Moore',  owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Lambda Chi @ OU',                   school: 'Oklahoma',          contact_name: 'Fiskecooper',   owner: 'Adam', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Theta Xi Nationals',                school: 'National',          contact_name: 'Armando',       owner: 'Owen', status: 'Check In', pipeline_value: 40000,   last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'Delta Psi (Mackay) @ Ole Miss',     school: 'Ole Miss',          contact_name: 'Hayes Hathorn', owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'TCU Sigma Chi',                     school: 'TCU',               contact_name: 'Lucas Rogers',  owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'TCU Phi Delt',                      school: 'TCU',               contact_name: 'Clyde Patton',  owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'TAMU ATO',                          school: 'Texas A&M',         contact_name: 'Jack Eggi',     owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'TAMU SigEp',                        school: 'Texas A&M',         contact_name: 'Will Oliver',   owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Clemson Beta',                      school: 'Clemson',           contact_name: 'William Dixon', owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Clemson FIJI',                      school: 'Clemson',           contact_name: 'Patrick',       owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'KA @ Clemson',                      school: 'Clemson',           contact_name: 'Jack Johnson',  owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'LSU KA',                            school: 'LSU',               contact_name: 'Ethan Carmouche',owner:'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'IFC LSU',                           school: 'LSU',               contact_name: 'Blake Ranlett', owner: 'Owen', status: 'Check In', pipeline_value: 20000,   last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'PIKE @ ASU',                        school: 'Arizona State',     contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Beta @ SMU',                        school: 'SMU',               contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'TAMU FIJI',                         school: 'Texas A&M',         contact_name: 'Blake Meary',   owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Auburn Theta Chi',                  school: 'Auburn',            contact_name: 'Joseph Couch',  owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Arkansas Kappa Sig',                school: 'Arkansas',          contact_name: 'Hudson Kincaid',owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Kappa Sig @ TCU',                   school: 'TCU',               contact_name: 'Sam Rivas',     owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'TCU Beta',                          school: 'TCU',               contact_name: 'Derek Yang',    owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Texas Tech Phi Delt',               school: 'Texas Tech',        contact_name: 'Luke Rumsey',   owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'IFC TCU',                           school: 'TCU',               contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 46000,   last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC Ole Miss',                      school: 'Ole Miss',          contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 20000,   last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC UMiami',                        school: 'Miami',             contact_name: 'Josh Sackett',  owner: 'Owen', status: 'Check In', pipeline_value: 20000,   last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'Alpha Delta Pi @ SC',               school: 'South Carolina',    contact_name: 'Momo Farmer',   owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Sigma Chi International (Lee Beauchamp)', school: 'National',  contact_name: 'Lee Beauchamp',  owner: 'Team', status: 'Check In', pipeline_value: 250000,  last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'SAM Nationals (via Hayden Demos)',  school: 'National',          contact_name: 'Hayden Demos',  owner: 'Ford', status: 'Check In', pipeline_value: 250000,  last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'Phi Delt @ Arizona',               school: 'Arizona',           contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Lambda Chi @ Eastern Illinois',    school: 'Eastern Illinois',  contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'ATO @ Oklahoma State',             school: 'Oklahoma State',    contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Sigma Chi @ Sacred Heart',         school: 'Sacred Heart',      contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Sigma Chi @ WL University',        school: 'Waterloo (Canada)', contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Alpha Chi Rho @ Robert Morris',    school: 'Robert Morris',     contact_name: null,            owner: 'Owen', status: 'Check In', pipeline_value: 3588,    last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  // ── HOLD OFF ──
-  { org_name: 'Arkansas Phi Delt',        school: 'Arkansas',      contact_name: 'Mason Harris',  owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Arkansas Chi Omega',       school: 'Arkansas',      contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Georgia Chi Phi',          school: 'Georgia',       contact_name: 'Boon Elliott',  owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Michigan State Phi Kap Sig',school: 'Michigan State',contact_name: 'Sam',          owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Boulder SAE',              school: 'Colorado',      contact_name: 'Nathan Wilson', owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Temple KDR',              school: 'Temple',         contact_name: 'Ben Santorini', owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Alabama KKG',             school: 'Alabama',        contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Alabama DKE',             school: 'Alabama',        contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Ole Miss KKG',            school: 'Ole Miss',       contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'South Alabama KA',        school: 'South Alabama',  contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'IFC Berkeley',            school: 'UC Berkeley',    contact_name: 'Jeff Woods',    owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC Georgia Tech',        school: 'Georgia Tech',   contact_name: 'Noah Pastula',  owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC Mississippi State',   school: 'Mississippi State',contact_name: null,          owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC Missouri',            school: 'Missouri',       contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC Alabama',             school: 'Alabama',        contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC Tennessee',           school: 'Tennessee',      contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC Michigan State',      school: 'Michigan State', contact_name: 'Cliff Kendall', owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC Auburn',              school: 'Auburn',         contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'IFC CNU',                 school: 'CNU',            contact_name: 'Jason Trager',  owner: 'Owen', status: 'Hold Off', pipeline_value: 20000, last_contact: null, next_step: null, notes: null, is_enterprise: true  },
-  { org_name: 'Alabama Sig Ep',          school: 'Alabama',        contact_name: 'Reid Patterson',owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Texas SAE',               school: 'Texas',          contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'LSU TKE',                 school: 'LSU',            contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Chapman Beta',            school: 'Chapman',        contact_name: null,            owner: 'Adam', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'TAMU PIKE',               school: 'Texas A&M',      contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Texas SigEp',             school: 'Texas',          contact_name: null,            owner: 'Owen', status: 'Hold Off', pipeline_value: 3588,  last_contact: null, next_step: null, notes: null, is_enterprise: false },
-  { org_name: 'Parrish Dallas (High School)', school: 'Parrish (Dallas)', contact_name: 'ssarles@parish.org', owner: 'Owen', status: 'Hold Off', pipeline_value: 0, last_contact: null, next_step: null, notes: null, is_enterprise: false },
+const PIPELINE_STAGES: DealStage[] = [
+  'lead',
+  'demo_booked',
+  'first_demo',
+  'second_call',
+  'contract_sent',
+  'closed_won',
 ];
 
-// ─── Status Config ─────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<LeadStatus, { color: string; bg: string; border: string; dot: string }> = {
-  'Active':    { color: '#065f46', bg: '#d1fae5', border: '#6ee7b7', dot: '#10b981' },
-  'Check In':  { color: '#92400e', bg: '#fef3c7', border: '#fcd34d', dot: '#f59e0b' },
-  'Hold Off':  { color: '#374151', bg: '#f3f4f6', border: '#d1d5db', dot: '#9ca3af' },
+const STAGE_LABELS: Record<DealStage, string> = {
+  lead:          'Lead',
+  demo_booked:   'Demo Booked',
+  first_demo:    'First Demo',
+  second_call:   'Second Call',
+  contract_sent: 'Contract Sent',
+  closed_won:    'Closed Won',
+  closed_lost:   'Closed Lost',
+  hold_off:      'Hold Off',
 };
 
-const OWNER_COLORS: Record<string, string> = {
-  Owen: '#0F172A',
-  Ford: '#2563eb',
-  Adam: '#10b981',
-  Team: '#7c3aed',
+const STAGE_COLORS: Record<DealStage, { color: string; bg: string; border: string }> = {
+  lead:          { color: '#6b7280', bg: '#f3f4f6',  border: '#d1d5db' },
+  demo_booked:   { color: '#1d4ed8', bg: '#eff6ff',  border: '#bfdbfe' },
+  first_demo:    { color: '#7c3aed', bg: '#f5f3ff',  border: '#ddd6fe' },
+  second_call:   { color: '#d97706', bg: '#fef3c7',  border: '#fcd34d' },
+  contract_sent: { color: '#be185d', bg: '#fdf2f8',  border: '#fbcfe8' },
+  closed_won:    { color: '#065f46', bg: '#d1fae5',  border: '#6ee7b7' },
+  closed_lost:   { color: '#dc2626', bg: '#fee2e2',  border: '#fca5a5' },
+  hold_off:      { color: '#9ca3af', bg: '#f9fafb',  border: '#e5e7eb' },
 };
+
+const REP_COLORS: Record<string, string> = {
+  Owen:  '#7c3aed',
+  Ford:  '#0369a1',
+  Adam:  '#b45309',
+  Katie: '#be185d',
+  Hyatt: '#065f46',
+  Team:  '#374151',
+};
+
+// Map known auth UUIDs → display names
+const UUID_TO_REP: Record<string, string> = {
+  '33ab5810-4d9f-485e-babb-a99b650a09e1': 'Owen',
+};
+
+const CATEGORY_OPTIONS = [
+  { value: 'all',                      label: 'All' },
+  { value: 'greek',                    label: 'Greek' },
+  { value: 'clubs',                    label: 'Clubs' },
+  { value: 'sports',                   label: 'Sports' },
+  { value: 'alumni_associations',      label: 'Alumni Associations' },
+  { value: 'professional_associations',label: 'Professional Associations' },
+  { value: 'country_clubs',            label: 'Country Clubs' },
+] as const;
+
+type CategoryFilter = typeof CATEGORY_OPTIONS[number]['value'];
+
+function isUUID(s: string | null | undefined): boolean {
+  return !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
+function resolveRep(rep: string | null | undefined): string | null {
+  if (!rep) return null;
+  if (isUUID(rep)) return UUID_TO_REP[rep.toLowerCase()] ?? null;
+  return rep;
+}
+
+const SLIPPING_STAGES: DealStage[] = ['first_demo', 'second_call', 'contract_sent'];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmt$(n: number | null): string {
+function fmt$(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—';
   if (n === 0) return '$0';
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -128,276 +147,636 @@ function fmt$(n: number | null): string {
   return `$${n.toLocaleString()}`;
 }
 
-function fmtDate(d: string | null): string {
-  if (!d) return '—';
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function daysSince(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const then = new Date(dateStr).getTime();
+  const now = Date.now();
+  return Math.floor((now - then) / (1000 * 60 * 60 * 24));
 }
 
-// ─── Status Badge ──────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: LeadStatus }) {
-  const cfg = STATUS_CONFIG[status];
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '5px',
-      padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem',
-      fontWeight: 600, color: cfg.color, background: cfg.bg,
-      border: `1px solid ${cfg.border}`, whiteSpace: 'nowrap',
-    }}>
-      <span style={{ width: '6px', height: '6px', borderRadius: '9999px', background: cfg.dot, flexShrink: 0 }} />
-      {status}
-    </span>
-  );
+function relativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'Never';
+  const days = daysSince(dateStr);
+  if (days === null) return '—';
+  if (days === 0) return 'Today';
+  if (days === 1) return '1d ago';
+  return `${days}d ago`;
 }
 
-// ─── Owner Chip ────────────────────────────────────────────────────────────────
+function activityColor(dateStr: string | null | undefined): string {
+  const days = daysSince(dateStr);
+  if (days === null) return '#dc2626';
+  if (days < 3) return '#059669';
+  if (days <= 7) return '#d97706';
+  return '#dc2626';
+}
 
-function OwnerChip({ owner }: { owner: string | null }) {
-  if (!owner) return <span style={{ color: '#9ca3af', fontSize: '0.8125rem' }}>—</span>;
-  const color = OWNER_COLORS[owner] ?? '#6b7280';
+function parseDealNotes(notesJson: string | null | undefined): DealNote[] {
+  if (!notesJson) return [];
+  try {
+    const parsed = JSON.parse(notesJson);
+    if (Array.isArray(parsed)) return parsed as DealNote[];
+  } catch { /* ignore */ }
+  // If it's plain text, wrap it as a single note
+  if (typeof notesJson === 'string' && notesJson.trim()) {
+    return [{ ts: '', text: notesJson, author: '' }];
+  }
+  return [];
+}
+
+function serializeDealNotes(notes: DealNote[]): string {
+  return JSON.stringify(notes);
+}
+
+// ─── Rep Badge ─────────────────────────────────────────────────────────────────
+
+function RepBadge({ rep: repRaw }: { rep: string | null | undefined }) {
+  const rep = resolveRep(repRaw);
+  if (!rep) return <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>—</span>;
+  const color = REP_COLORS[rep] ?? '#6b7280';
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '4px',
       padding: '2px 8px 2px 3px', borderRadius: '9999px',
-      background: color, color: '#fff', fontSize: '0.72rem', fontWeight: 700,
+      background: color, color: '#fff', fontSize: '0.7rem', fontWeight: 700,
+      whiteSpace: 'nowrap',
     }}>
       <span style={{
-        width: '18px', height: '18px', borderRadius: '9999px',
-        background: 'rgba(255,255,255,0.2)', display: 'inline-flex',
+        width: '16px', height: '16px', borderRadius: '9999px',
+        background: 'rgba(255,255,255,0.25)', display: 'inline-flex',
         alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 800,
       }}>
-        {owner[0]}
+        {rep[0]}
       </span>
-      {owner}
+      {rep}
     </span>
   );
 }
 
-// ─── Section Header ────────────────────────────────────────────────────────────
+// ─── Stage Badge ───────────────────────────────────────────────────────────────
 
-function SectionHeader({
-  status, count, collapsed, onToggle,
-}: { status: LeadStatus; count: number; collapsed: boolean; onToggle: () => void }) {
-  const cfg = STATUS_CONFIG[status];
-  const descriptions: Record<LeadStatus, string> = {
-    'Active': 'Closed — paying customers',
-    'Check In': 'Prospects in dialogue / need follow-up',
-    'Hold Off': 'Back burner / stalled',
-  };
+function StageBadge({ stage }: { stage: DealStage }) {
+  const cfg = STAGE_COLORS[stage];
   return (
-    <div
-      onClick={onToggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '10px',
-        padding: '10px 16px', cursor: 'pointer', userSelect: 'none',
-        background: cfg.bg, borderBottom: `1px solid ${cfg.border}`,
-        transition: 'background 0.1s',
-      }}
-    >
-      <span style={{ width: '10px', height: '10px', borderRadius: '9999px', background: cfg.dot, flexShrink: 0 }} />
-      <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: cfg.color, letterSpacing: '0.01em' }}>{status}</span>
-      <span style={{
-        fontSize: '0.72rem', fontWeight: 700, padding: '1px 8px',
-        borderRadius: '9999px', background: cfg.dot + '30', color: cfg.color,
-        border: `1px solid ${cfg.border}`,
-      }}>{count}</span>
-      <span style={{ fontSize: '0.75rem', color: cfg.color + 'aa', flex: 1 }}>{descriptions[status]}</span>
-      {collapsed ? <ChevronDown size={14} color={cfg.color} /> : <ChevronUp size={14} color={cfg.color} />}
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '3px 10px', borderRadius: '9999px', fontSize: '0.7rem',
+      fontWeight: 600, color: cfg.color, background: cfg.bg,
+      border: `1px solid ${cfg.border}`, whiteSpace: 'nowrap',
+    }}>
+      {STAGE_LABELS[stage]}
+    </span>
+  );
+}
+
+// ─── Stage Stepper ─────────────────────────────────────────────────────────────
+
+function StageStepper({ currentStage, onAdvance }: { currentStage: DealStage; onAdvance: (stage: DealStage) => void }) {
+  const currentIdx = PIPELINE_STAGES.indexOf(currentStage);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
+      {PIPELINE_STAGES.map((stage, idx) => {
+        const isActive = stage === currentStage;
+        const isPast = idx < currentIdx;
+        const cfg = STAGE_COLORS[stage];
+        return (
+          <React.Fragment key={stage}>
+            <button
+              onClick={() => onAdvance(stage)}
+              style={{
+                padding: '5px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600,
+                border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
+                background: isActive ? cfg.bg : isPast ? '#f0fdf4' : '#f9fafb',
+                color: isActive ? cfg.color : isPast ? '#059669' : '#9ca3af',
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.1s',
+                textDecoration: isPast ? 'line-through' : 'none',
+              }}
+              title={`Move to ${STAGE_LABELS[stage]}`}
+            >
+              {STAGE_LABELS[stage]}
+            </button>
+            {idx < PIPELINE_STAGES.length - 1 && (
+              <ChevronRight size={12} color="#d1d5db" style={{ flexShrink: 0 }} />
+            )}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
 
-// ─── Inline Editable Cell ──────────────────────────────────────────────────────
+// ─── Deal Detail Drawer ────────────────────────────────────────────────────────
 
-function EditableSelect<T extends string>({
-  value, options, onChange, placeholder,
-}: {
-  value: T | null;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-  placeholder?: string;
-}) {
+interface GranolaNote {
+  id: string;
+  title: string;
+  created_at: string;
+  summary?: string;
+  transcript?: string;
+}
+
+interface DealDrawerProps {
+  deal: PipelineDealFull;
+  granolaNotesCache: GranolaNote[] | null;
+  onClose: () => void;
+  onAdvanceStage: (dealId: string, stage: DealStage) => void;
+  onLogActivity: (dealId: string, text: string) => void;
+}
+
+function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity }: DealDrawerProps) {
+  const [activityInput, setActivityInput] = useState('');
+  const orgName = deal.organization?.name ?? 'Unknown Org';
+  const schoolName = deal.organization?.school?.name ?? '';
+  const contactName = deal.contact?.name ?? null;
+  const rep = deal.assigned_to;
+
+  // Parse existing notes/activity log
+  const activityLog = useMemo(() => parseDealNotes(deal.notes), [deal.notes]);
+
+  // Fuzzy match Granola notes
+  const matchedNotes = useMemo(() => {
+    if (!granolaNotesCache) return null;
+    const orgLower = orgName.toLowerCase();
+    const schoolLower = schoolName.toLowerCase();
+    return granolaNotesCache.filter(note => {
+      const titleLower = (note.title ?? '').toLowerCase();
+      return (
+        (orgLower && titleLower.includes(orgLower)) ||
+        (schoolLower && titleLower.includes(schoolLower))
+      );
+    });
+  }, [granolaNotesCache, orgName, schoolName]);
+
+  function handleLogActivity() {
+    const text = activityInput.trim();
+    if (!text) return;
+    onLogActivity(deal.id, text);
+    setActivityInput('');
+  }
+
   return (
-    <select
-      value={value ?? ''}
-      onChange={e => onChange(e.target.value as T)}
-      onClick={e => e.stopPropagation()}
-      style={{
-        background: 'transparent', border: 'none', outline: 'none',
-        fontSize: '0.8125rem', fontFamily: 'inherit', color: '#374151',
-        cursor: 'pointer', width: '100%', padding: 0,
-      }}
-    >
-      {placeholder && <option value="" disabled>{placeholder}</option>}
-      {options.map(o => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+      <div
+        style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }}
+        onClick={onClose}
+      />
+      <div style={{
+        width: 440, background: '#ffffff', display: 'flex', flexDirection: 'column',
+        height: '100%', borderLeft: '1px solid #e5e7eb', overflow: 'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#111827' }}>{orgName}</span>
+                <StageBadge stage={deal.stage} />
+              </div>
+              {schoolName && <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{schoolName}</div>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                {contactName && <span style={{ fontSize: '0.8rem', color: '#374151' }}>👤 {contactName}</span>}
+                <RepBadge rep={rep} />
+                {deal.value > 0 && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1d4ed8' }}>{fmt$(deal.value)}</span>}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4, flexShrink: 0 }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Stage Stepper */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
+              Stage Progression
+            </div>
+            <StageStepper currentStage={deal.stage} onAdvance={(stage) => onAdvanceStage(deal.id, stage)} />
+          </div>
+
+          {/* Granola Notes */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
+              Meeting Notes (Granola)
+            </div>
+            {matchedNotes === null ? (
+              <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic' }}>Loading notes…</div>
+            ) : matchedNotes.length === 0 ? (
+              <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic' }}>
+                No meeting notes found — notes auto-match from Granola by org/school name.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {matchedNotes.map(note => (
+                  <div key={note.id} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#111827', marginBottom: 4 }}>{note.title}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginBottom: 6 }}>
+                      {note.created_at ? new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                    </div>
+                    {(note.summary || note.transcript) && (
+                      <div style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.5 }}>
+                        {(note.summary || note.transcript || '').slice(0, 300)}
+                        {((note.summary || note.transcript || '').length > 300) ? '…' : ''}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Activity Log */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
+              Activity Log
+            </div>
+            {activityLog.length === 0 ? (
+              <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic' }}>No activity logged yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {activityLog.map((note, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '9999px', background: '#d1d5db', flexShrink: 0, marginTop: 6 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.4 }}>{note.text}</div>
+                      {note.ts && (
+                        <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 2 }}>
+                          {new Date(note.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Log Activity Input */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>
+            Log Activity
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              value={activityInput}
+              onChange={e => setActivityInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleLogActivity(); }}
+              placeholder="Add a note or follow-up…"
+              style={{
+                flex: 1, border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px',
+                fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', color: '#374151',
+              }}
+            />
+            <button
+              onClick={handleLogActivity}
+              disabled={!activityInput.trim()}
+              style={{
+                padding: '8px 16px', borderRadius: 10, border: 'none',
+                background: activityInput.trim() ? '#0F172A' : '#e5e7eb',
+                color: activityInput.trim() ? '#fff' : '#9ca3af',
+                fontSize: '0.8rem', fontWeight: 700, cursor: activityInput.trim() ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit', transition: 'all 0.1s', whiteSpace: 'nowrap',
+              }}
+            >
+              Log
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function EditableText({
-  value, onChange, placeholder,
-}: { value: string | null; onChange: (v: string) => void; placeholder?: string }) {
-  const [editing, setEditing] = useState(false);
-  const [local, setLocal] = useState(value ?? '');
-  const ref = useRef<HTMLInputElement>(null);
+// ─── Deal Card ─────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (editing) ref.current?.focus();
-  }, [editing]);
+interface DealCardProps {
+  deal: PipelineDealFull;
+  onClick: () => void;
+}
 
-  if (!editing) {
+function DealCard({ deal, onClick }: DealCardProps) {
+  const orgName = deal.organization?.name ?? 'Unknown';
+  const schoolName = deal.organization?.school?.name ?? null;
+  const contactName = deal.contact?.name ?? null;
+  const rep = deal.assigned_to;
+  const lastActivity = deal.last_touched ?? deal.updated_at;
+  const days = daysSince(lastActivity);
+  const actColor = activityColor(lastActivity);
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+        padding: '12px 14px', cursor: 'pointer', transition: 'box-shadow 0.12s, border-color 0.12s',
+        display: 'flex', flexDirection: 'column', gap: 8,
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)';
+        (e.currentTarget as HTMLDivElement).style.borderColor = '#d1d5db';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+        (e.currentTarget as HTMLDivElement).style.borderColor = '#e5e7eb';
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', lineHeight: 1.3 }}>{orgName}</div>
+        {schoolName && <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: 1 }}>{schoolName}</div>}
+        {contactName && <div style={{ fontSize: '0.75rem', color: '#374151', marginTop: 2 }}>{contactName}</div>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <RepBadge rep={rep} />
+        {deal.value > 0 && (
+          <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#1d4ed8' }}>{fmt$(deal.value)}</span>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '0.7rem', color: actColor, fontWeight: 600 }}>
+          {days === null ? 'No activity' : days === 0 ? 'Today' : `${days}d ago`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Needs Attention Section ────────────────────────────────────────────────────
+
+interface NeedsAttentionProps {
+  deals: PipelineDealFull[];
+  onOpenDeal: (deal: PipelineDealFull) => void;
+  onLogFollowup: (dealId: string, text: string) => void;
+}
+
+function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup }: NeedsAttentionProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [inputs, setInputs] = useState<Record<string, string>>({});
+
+  const slipping = useMemo(() => {
+    return deals.filter(d => {
+      if (!SLIPPING_STAGES.includes(d.stage)) return false;
+      const lastActivity = d.last_touched ?? d.updated_at;
+      const days = daysSince(lastActivity);
+      return days === null || days >= 3;
+    }).sort((a, b) => {
+      const daysA = daysSince(a.last_touched ?? a.updated_at) ?? 999;
+      const daysB = daysSince(b.last_touched ?? b.updated_at) ?? 999;
+      return daysB - daysA;
+    });
+  }, [deals]);
+
+  if (slipping.length === 0) {
     return (
-      <span
-        onClick={e => { e.stopPropagation(); setLocal(value ?? ''); setEditing(true); }}
-        style={{
-          display: 'block', minWidth: '80px', cursor: 'text',
-          color: value ? '#374151' : '#9ca3af', fontSize: '0.8125rem',
-          borderRadius: '4px', padding: '1px 4px',
-          transition: 'background 0.1s',
-        }}
-        title="Click to edit"
-      >
-        {value || placeholder || '—'}
-      </span>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: '#f0fdf4', border: '1px solid #6ee7b7', borderRadius: 12,
+        padding: '12px 18px',
+      }}>
+        <CheckCircle2 size={16} color="#059669" />
+        <span style={{ fontSize: '0.875rem', color: '#065f46', fontWeight: 600 }}>All deals on track ✓</span>
+      </div>
     );
   }
 
   return (
-    <input
-      ref={ref}
-      type="text"
-      value={local}
-      onClick={e => e.stopPropagation()}
-      onChange={e => setLocal(e.target.value)}
-      onBlur={() => { onChange(local); setEditing(false); }}
-      onKeyDown={e => { if (e.key === 'Enter') { onChange(local); setEditing(false); } if (e.key === 'Escape') setEditing(false); }}
-      style={{
-        border: '1px solid #6366f1', borderRadius: '6px', padding: '2px 6px',
-        fontSize: '0.8125rem', outline: 'none', fontFamily: 'inherit',
-        width: '100%', background: '#fff',
-      }}
-    />
+    <div style={{
+      background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14,
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        padding: '12px 18px', background: '#fff7ed', borderBottom: '1px solid #fed7aa',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <AlertCircle size={16} color="#ea580c" />
+        <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#9a3412' }}>
+          {slipping.length} deal{slipping.length !== 1 ? 's' : ''} need{slipping.length === 1 ? 's' : ''} attention
+        </span>
+        <span style={{ fontSize: '0.75rem', color: '#c2410c' }}>No follow-up in 3+ days at key stages</span>
+      </div>
+      <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {slipping.map(deal => {
+          const orgName = deal.organization?.name ?? 'Unknown';
+          const schoolName = deal.organization?.school?.name ?? '';
+          const lastActivity = deal.last_touched ?? deal.updated_at;
+          const days = daysSince(lastActivity);
+          const isRed = days === null || days > 7;
+          const isOpen = expandedId === deal.id;
+
+          return (
+            <div key={deal.id} style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span
+                      style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', cursor: 'pointer' }}
+                      onClick={() => onOpenDeal(deal)}
+                    >
+                      {orgName}
+                    </span>
+                    {schoolName && <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{schoolName}</span>}
+                    <StageBadge stage={deal.stage} />
+                    <RepBadge rep={deal.assigned_to} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                  <span style={{
+                    fontSize: '1rem', fontWeight: 800,
+                    color: isRed ? '#dc2626' : '#d97706',
+                  }}>
+                    {days === null ? '∞' : days}d
+                  </span>
+                  <button
+                    onClick={() => setExpandedId(isOpen ? null : deal.id)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8, border: '1px solid #fed7aa',
+                      background: '#fff7ed', color: '#9a3412', fontSize: '0.75rem', fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Log Follow-up
+                  </button>
+                </div>
+              </div>
+              {isOpen && (
+                <div style={{ padding: '0 14px 12px', display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="What happened or what's next…"
+                    value={inputs[deal.id] ?? ''}
+                    onChange={e => setInputs(prev => ({ ...prev, [deal.id]: e.target.value }))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const text = (inputs[deal.id] ?? '').trim();
+                        if (text) {
+                          onLogFollowup(deal.id, text);
+                          setInputs(prev => ({ ...prev, [deal.id]: '' }));
+                          setExpandedId(null);
+                        }
+                      }
+                    }}
+                    style={{
+                      flex: 1, border: '1px solid #e5e7eb', borderRadius: 8, padding: '7px 10px',
+                      fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', color: '#374151',
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => {
+                      const text = (inputs[deal.id] ?? '').trim();
+                      if (text) {
+                        onLogFollowup(deal.id, text);
+                        setInputs(prev => ({ ...prev, [deal.id]: '' }));
+                        setExpandedId(null);
+                      }
+                    }}
+                    disabled={!(inputs[deal.id] ?? '').trim()}
+                    style={{
+                      padding: '7px 14px', borderRadius: 8, border: 'none',
+                      background: (inputs[deal.id] ?? '').trim() ? '#9a3412' : '#e5e7eb',
+                      color: '#fff', fontSize: '0.8rem', fontWeight: 700,
+                      cursor: (inputs[deal.id] ?? '').trim() ? 'pointer' : 'not-allowed',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    Log
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
-// ─── Table Row ─────────────────────────────────────────────────────────────────
+// ─── Pipeline Kanban ───────────────────────────────────────────────────────────
 
-function LeadRow({
-  lead, onUpdate,
-}: { lead: SalesLead; onUpdate: (id: string, updates: Partial<SalesLead>) => void }) {
-  const isActive = lead.status === 'Active';
+interface PipelineKanbanProps {
+  deals: PipelineDealFull[];
+  archivedDeals: PipelineDealFull[];
+  onOpenDeal: (deal: PipelineDealFull) => void;
+}
 
-  function patch(updates: Partial<SalesLead>) {
-    onUpdate(lead.id, updates);
-    // Persist to API
-    fetch(`/api/sales-leads/${lead.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    }).catch(console.error);
-  }
+function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProps) {
+  const [showArchived, setShowArchived] = useState(false);
+
+  const byStage = useMemo(() => {
+    const map: Record<DealStage, PipelineDealFull[]> = {
+      lead: [], demo_booked: [], first_demo: [], second_call: [],
+      contract_sent: [], closed_won: [], closed_lost: [], hold_off: [],
+    };
+    for (const deal of deals) {
+      if (map[deal.stage]) map[deal.stage].push(deal);
+    }
+    return map;
+  }, [deals]);
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '2fr 1.5fr 1.3fr 90px 130px 90px 100px 1fr',
-      gap: 0,
-      padding: '0',
-      borderBottom: '1px solid #f3f4f6',
-      alignItems: 'stretch',
-      minHeight: '44px',
-      background: isActive ? '#fafffe' : '#ffffff',
-      transition: 'background 0.1s',
-    }}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = isActive ? '#f0fdf9' : '#fafafa'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = isActive ? '#fafffe' : '#ffffff'; }}
-    >
-      {/* Org Name */}
-      <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        {lead.is_enterprise && (
-          <span style={{
-            fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase',
-            letterSpacing: '0.06em', padding: '1px 5px', borderRadius: '4px',
-            background: '#dbeafe', color: '#1d4ed8', flexShrink: 0,
-          }}>ENT</span>
-        )}
-        <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>{lead.org_name}</span>
+    <div>
+      {/* Horizontal columns */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${PIPELINE_STAGES.length}, minmax(180px, 1fr))`,
+        gap: 12,
+        overflowX: 'auto',
+        paddingBottom: 8,
+      }}>
+        {PIPELINE_STAGES.map(stage => {
+          const stageCfg = STAGE_COLORS[stage];
+          const stageDeals = byStage[stage];
+          return (
+            <div key={stage} style={{ minWidth: 0 }}>
+              {/* Column header */}
+              <div style={{
+                padding: '8px 12px', borderRadius: '10px 10px 0 0',
+                background: stageCfg.bg, border: `1px solid ${stageCfg.border}`,
+                borderBottom: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: stageCfg.color }}>{STAGE_LABELS[stage]}</span>
+                <span style={{
+                  fontSize: '0.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px',
+                  background: stageCfg.color + '22', color: stageCfg.color,
+                }}>
+                  {stageDeals.length}
+                </span>
+              </div>
+              {/* Cards */}
+              <div style={{
+                border: `1px solid ${stageCfg.border}`, borderRadius: '0 0 10px 10px',
+                background: '#fafafa', padding: '8px', display: 'flex',
+                flexDirection: 'column', gap: 8, minHeight: 80,
+              }}>
+                {stageDeals.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', color: '#d1d5db', textAlign: 'center', padding: '16px 0', fontStyle: 'italic' }}>
+                    Empty
+                  </div>
+                ) : (
+                  stageDeals.map(deal => (
+                    <DealCard key={deal.id} deal={deal} onClick={() => onOpenDeal(deal)} />
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* School */}
-      <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.8125rem', color: '#6b7280' }}>{lead.school || '—'}</span>
-      </div>
-
-      {/* Contact */}
-      <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center' }}>
-        <EditableText
-          value={lead.contact_name}
-          onChange={v => patch({ contact_name: v || null })}
-          placeholder="—"
-        />
-      </div>
-
-      {/* Owner */}
-      <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center' }}>
-        <EditableSelect<LeadOwner>
-          value={lead.owner}
-          options={[
-            { value: 'Owen', label: 'Owen' },
-            { value: 'Ford', label: 'Ford' },
-            { value: 'Adam', label: 'Adam' },
-            { value: 'Team', label: 'Team' },
-          ]}
-          onChange={v => patch({ owner: v })}
-        />
-      </div>
-
-      {/* Status */}
-      <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'relative', width: '100%' }}>
-          <select
-            value={lead.status}
-            onChange={e => patch({ status: e.target.value as LeadStatus })}
-            onClick={e => e.stopPropagation()}
+      {/* Archived deals */}
+      {archivedDeals.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <button
+            onClick={() => setShowArchived(s => !s)}
             style={{
-              position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer',
-              width: '100%', zIndex: 1,
+              display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none',
+              cursor: 'pointer', color: '#6b7280', fontSize: '0.8rem', fontWeight: 600,
+              fontFamily: 'inherit', padding: '6px 0',
             }}
           >
-            <option value="Active">Active</option>
-            <option value="Check In">Check In</option>
-            <option value="Hold Off">Hold Off</option>
-          </select>
-          <StatusBadge status={lead.status} />
+            <ChevronDown
+              size={14}
+              style={{ transform: showArchived ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}
+            />
+            Archived / Closed Lost ({archivedDeals.length})
+          </button>
+          {showArchived && (
+            <div style={{
+              background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10,
+              marginTop: 8, display: 'flex', flexDirection: 'column', gap: 0, overflow: 'hidden',
+            }}>
+              {archivedDeals.map((deal, i) => (
+                <div
+                  key={deal.id}
+                  onClick={() => onOpenDeal(deal)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+                    borderBottom: i < archivedDeals.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    cursor: 'pointer', background: '#fff', transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = '#f9fafb'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = '#fff'; }}
+                >
+                  <span style={{ flex: 1, fontWeight: 600, fontSize: '0.8rem', color: '#374151' }}>
+                    {deal.organization?.name ?? 'Unknown'}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+                    {deal.organization?.school?.name ?? ''}
+                  </span>
+                  <StageBadge stage={deal.stage} />
+                  <RepBadge rep={deal.assigned_to} />
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{relativeTime(deal.last_touched ?? deal.updated_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Pipeline Value */}
-      <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center' }}>
-        {isActive ? (
-          <span style={{ fontSize: '0.8125rem', color: '#9ca3af', fontStyle: 'italic' }}>Closed</span>
-        ) : (
-          <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>
-            {fmt$(lead.pipeline_value)}
-          </span>
-        )}
-      </div>
-
-      {/* Last Contact */}
-      <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.8125rem', color: '#6b7280' }}>{fmtDate(lead.last_contact)}</span>
-      </div>
-
-      {/* Next Step */}
-      <div style={{ padding: '8px 16px 8px 12px', display: 'flex', alignItems: 'center' }}>
-        <EditableText
-          value={lead.next_step}
-          onChange={v => patch({ next_step: v || null })}
-          placeholder="Add next step…"
-        />
-      </div>
+      )}
     </div>
   );
 }
@@ -405,26 +784,27 @@ function LeadRow({
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function SalesCRM() {
-  const [leads, setLeads] = useState<SalesLead[]>([]);
+  const [deals, setDeals] = useState<PipelineDealFull[]>([]);
   const [loading, setLoading] = useState(true);
-  const [seeding, setSeeding] = useState(false);
   const [search, setSearch] = useState('');
-  const [ownerFilter, setOwnerFilter] = useState<string>('All');
-  const [collapsed, setCollapsed] = useState<Record<LeadStatus, boolean>>({
-    'Active': false,
-    'Check In': false,
-    'Hold Off': true, // Default collapsed
-  });
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [selectedDeal, setSelectedDeal] = useState<PipelineDealFull | null>(null);
+  const [granolaNotes, setGranolaNotes] = useState<GranolaNote[] | null>(null);
+  const granolaFetchedRef = useRef(false);
 
-  const fetchLeads = useCallback(async () => {
+  // ── Fetch deals ──
+  const fetchDeals = useCallback(async () => {
     try {
-      const res = await fetch('/api/sales-leads');
+      const res = await fetch('/api/pipeline/deals?limit=200');
       if (!res.ok) throw new Error('Failed');
-      const data: SalesLead[] = await res.json();
-      setLeads(data);
-      return data;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setDeals(data);
+        return data as PipelineDealFull[];
+      }
+      return [];
     } catch (err) {
-      console.error('[sales-crm] fetch error:', err);
+      console.error('[sales-crm] fetch deals error:', err);
       return [];
     } finally {
       setLoading(false);
@@ -432,116 +812,105 @@ export function SalesCRM() {
   }, []);
 
   useEffect(() => {
-    fetchLeads().then(async (data) => {
-      // Auto-seed if empty
-      if (data.length === 0) {
-        setSeeding(true);
-        try {
-          // Batch insert seed data via a seed endpoint approach
-          // We'll use POST on individual records
-          const inserted: SalesLead[] = [];
-          for (const seed of SEED_LEADS) {
-            const res = await fetch('/api/sales-leads', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(seed),
-            });
-            if (res.ok) {
-              inserted.push(await res.json());
-            }
-          }
-          if (inserted.length > 0) {
-            setLeads(inserted);
-          } else {
-            // POST not implemented on the GET route — use local seed as fallback display
-            // This gracefully handles the case where the DB table hasn't been migrated yet
-            const fakeSeed: SalesLead[] = SEED_LEADS.map((s, i) => ({
-              ...s,
-              id: `seed-${i}`,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }));
-            setLeads(fakeSeed);
-          }
-        } catch (err) {
-          console.error('[sales-crm] seed error:', err);
-        } finally {
-          setSeeding(false);
+    fetchDeals();
+  }, [fetchDeals]);
+
+  // ── Fetch Granola notes on mount ──
+  useEffect(() => {
+    if (granolaFetchedRef.current) return;
+    granolaFetchedRef.current = true;
+    fetch('/api/granola/notes')
+      .then(r => r.json())
+      .then((data: any) => {
+        if (Array.isArray(data?.notes)) {
+          setGranolaNotes(data.notes as GranolaNote[]);
         }
-      }
-    });
-  }, [fetchLeads]);
+      })
+      .catch(err => console.error('[sales-crm] granola error:', err));
+  }, []);
 
-  function handleUpdate(id: string, updates: Partial<SalesLead>) {
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+  // ── PATCH deal ──
+  async function patchDeal(dealId: string, updates: Record<string, any>) {
+    try {
+      await fetch(`/api/pipeline/deals/${dealId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+    } catch (err) {
+      console.error('[sales-crm] patch error:', err);
+    }
   }
 
-  function toggleSection(status: LeadStatus) {
-    setCollapsed(prev => ({ ...prev, [status]: !prev[status] }));
+  // ── Advance stage ──
+  function handleAdvanceStage(dealId: string, stage: DealStage) {
+    const now = new Date().toISOString();
+    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage, last_touched: now } : d));
+    if (selectedDeal?.id === dealId) setSelectedDeal(prev => prev ? { ...prev, stage, last_touched: now } : null);
+    patchDeal(dealId, { stage, last_touched: now });
   }
 
-  const filtered = useMemo(() => {
-    let list = leads;
-    if (ownerFilter !== 'All') list = list.filter(l => l.owner === ownerFilter);
+  // ── Log activity ──
+  function handleLogActivity(dealId: string, text: string) {
+    const deal = deals.find(d => d.id === dealId);
+    if (!deal) return;
+    const existingNotes = parseDealNotes(deal.notes);
+    const newNote: DealNote = { ts: new Date().toISOString(), text };
+    const updatedNotes = [newNote, ...existingNotes];
+    const notesJson = serializeDealNotes(updatedNotes);
+    const now = new Date().toISOString();
+    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, notes: notesJson, last_touched: now } : d));
+    if (selectedDeal?.id === dealId) setSelectedDeal(prev => prev ? { ...prev, notes: notesJson, last_touched: now } : null);
+    patchDeal(dealId, { notes: notesJson, last_touched: now });
+  }
+
+  // ── Filters ──
+  const { visibleDeals, archivedDeals } = useMemo(() => {
+    let list = deals;
+    if (categoryFilter !== 'all') list = list.filter(d => (d as any).category === categoryFilter || (!((d as any).category) && categoryFilter === 'greek'));
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(l =>
-        l.org_name.toLowerCase().includes(q) ||
-        (l.school ?? '').toLowerCase().includes(q) ||
-        (l.contact_name ?? '').toLowerCase().includes(q)
+      list = list.filter(d =>
+        (d.organization?.name ?? '').toLowerCase().includes(q) ||
+        (d.organization?.school?.name ?? '').toLowerCase().includes(q) ||
+        (d.contact?.name ?? '').toLowerCase().includes(q)
       );
     }
-    return list;
-  }, [leads, ownerFilter, search]);
+    const archived = list.filter(d => d.stage === 'closed_lost' || d.stage === 'hold_off');
+    const visible = list.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
+    return { visibleDeals: visible, archivedDeals: archived };
+  }, [deals, categoryFilter, search]);
 
-  const byStatus = useMemo(() => ({
-    'Active':   filtered.filter(l => l.status === 'Active'),
-    'Check In': filtered.filter(l => l.status === 'Check In'),
-    'Hold Off': filtered.filter(l => l.status === 'Hold Off'),
-  }), [filtered]);
-
-  const totalPipeline = useMemo(() =>
-    filtered
-      .filter(l => l.status !== 'Active' && l.pipeline_value)
-      .reduce((sum, l) => sum + (l.pipeline_value ?? 0), 0)
-  , [filtered]);
-
-  const TABLE_HEADERS = [
-    { label: 'Organization', flex: '2fr' },
-    { label: 'School',       flex: '1.5fr' },
-    { label: 'Contact',      flex: '1.3fr' },
-    { label: 'Owner',        flex: '90px' },
-    { label: 'Status',       flex: '130px' },
-    { label: 'Value',        flex: '90px' },
-    { label: 'Last Contact', flex: '100px' },
-    { label: 'Next Step',    flex: '1fr' },
-  ];
+  // ── Stats ──
+  const stats = useMemo(() => {
+    const total = deals.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off').length;
+    const pipeline = deals
+      .filter(d => !['closed_lost', 'hold_off', 'closed_won'].includes(d.stage) && d.value)
+      .reduce((s, d) => s + d.value, 0);
+    const closed = deals.filter(d => d.stage === 'closed_won').length;
+    const hot = deals.filter(d => ['first_demo', 'second_call', 'contract_sent'].includes(d.stage)).length;
+    return { total, pipeline, closed, hot };
+  }, [deals]);
 
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '10px', color: '#9ca3af' }}>
         <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} />
-        Loading CRM…
+        Loading pipeline…
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {seeding && (
-        <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '10px', padding: '10px 16px', fontSize: '0.875rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
-          Loading seed data…
-        </div>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Stats Row */}
+      {/* ── Stats Row ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
         {[
-          { label: 'Active Clients', value: leads.filter(l => l.status === 'Active').length, color: '#065f46', bg: '#d1fae5' },
-          { label: 'Check In',       value: leads.filter(l => l.status === 'Check In').length, color: '#92400e', bg: '#fef3c7' },
-          { label: 'Hold Off',       value: leads.filter(l => l.status === 'Hold Off').length, color: '#374151', bg: '#f3f4f6' },
-          { label: 'Pipeline Value', value: fmt$(totalPipeline), color: '#1e40af', bg: '#dbeafe' },
+          { label: 'Active Deals',   value: stats.total,          color: '#1e40af', bg: '#dbeafe' },
+          { label: 'Hot (Demo+)',    value: stats.hot,            color: '#92400e', bg: '#fef3c7' },
+          { label: 'Closed Won',     value: stats.closed,         color: '#065f46', bg: '#d1fae5' },
+          { label: 'Pipeline Value', value: fmt$(stats.pipeline), color: '#5b21b6', bg: '#f5f3ff' },
         ].map(stat => (
           <div key={stat.label} style={{
             background: stat.bg, border: `1px solid ${stat.color}30`,
@@ -553,9 +922,15 @@ export function SalesCRM() {
         ))}
       </div>
 
-      {/* Filter Bar */}
+      {/* ── Needs Attention (pinned top) ── */}
+      <NeedsAttentionSection
+        deals={deals}
+        onOpenDeal={setSelectedDeal}
+        onLogFollowup={handleLogActivity}
+      />
+
+      {/* ── Filter Bar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        {/* Search */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           flex: 1, minWidth: '200px', maxWidth: '360px',
@@ -568,7 +943,7 @@ export function SalesCRM() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search org, school, contact…"
-            style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontFamily: 'inherit', flex: 1, color: '#374151' }}
+            style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontFamily: 'inherit', flex: 1, color: '#374151', background: 'transparent' }}
           />
           {search && (
             <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex' }}>
@@ -577,78 +952,55 @@ export function SalesCRM() {
           )}
         </div>
 
-        {/* Owner Filter */}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {['All', 'Owen', 'Ford', 'Adam', 'Team'].map(o => (
+          {CATEGORY_OPTIONS.map(opt => (
             <button
-              key={o}
-              onClick={() => setOwnerFilter(o)}
+              key={opt.value}
+              onClick={() => setCategoryFilter(opt.value as CategoryFilter)}
               style={{
                 padding: '6px 14px', borderRadius: '8px', fontSize: '0.8125rem',
-                fontWeight: ownerFilter === o ? 700 : 500, cursor: 'pointer',
-                border: `1px solid ${ownerFilter === o ? '#0F172A' : '#e5e7eb'}`,
-                background: ownerFilter === o ? '#0F172A' : '#ffffff',
-                color: ownerFilter === o ? '#ffffff' : '#374151',
-                fontFamily: 'inherit', transition: 'all 0.1s',
+                fontWeight: categoryFilter === opt.value ? 700 : 500, cursor: 'pointer',
+                border: `1px solid ${categoryFilter === opt.value ? '#0F172A' : '#e5e7eb'}`,
+                background: categoryFilter === opt.value ? '#0F172A' : '#ffffff',
+                color: categoryFilter === opt.value ? '#ffffff' : '#374151',
+                fontFamily: 'inherit', transition: 'all 0.1s', whiteSpace: 'nowrap',
               }}
             >
-              {o}
+              {opt.label}
             </button>
           ))}
         </div>
+
+        <button
+          onClick={fetchDeals}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          <RefreshCw size={13} /> Refresh
+        </button>
       </div>
 
-      {/* CRM Table */}
-      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '14px', overflow: 'hidden' }}>
-        {/* Column Headers */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 1.5fr 1.3fr 90px 130px 90px 100px 1fr',
-          background: '#f9fafb', borderBottom: '2px solid #e5e7eb',
-          padding: '0',
-        }}>
-          {TABLE_HEADERS.map(h => (
-            <div key={h.label} style={{
-              padding: '9px 16px', fontSize: '0.68rem', fontWeight: 700,
-              textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af',
-            }}>{h.label}</div>
-          ))}
+      {/* ── Pipeline Kanban ── */}
+      {deals.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af', fontSize: '0.875rem' }}>
+          No deals in pipeline yet
         </div>
+      ) : (
+        <PipelineKanban
+          deals={visibleDeals}
+          archivedDeals={archivedDeals}
+          onOpenDeal={setSelectedDeal}
+        />
+      )}
 
-        {/* Sections */}
-        {(['Active', 'Check In', 'Hold Off'] as LeadStatus[]).map(status => {
-          const rows = byStatus[status];
-          return (
-            <div key={status}>
-              <SectionHeader
-                status={status}
-                count={rows.length}
-                collapsed={collapsed[status]}
-                onToggle={() => toggleSection(status)}
-              />
-              {!collapsed[status] && (
-                <>
-                  {rows.length === 0 ? (
-                    <div style={{ padding: '20px 16px', color: '#9ca3af', fontSize: '0.875rem', textAlign: 'center' }}>
-                      No {status.toLowerCase()} leads
-                      {(search || ownerFilter !== 'All') ? ' matching current filters' : ''}
-                    </div>
-                  ) : (
-                    rows.map(lead => (
-                      <LeadRow key={lead.id} lead={lead} onUpdate={handleUpdate} />
-                    ))
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {filtered.length === 0 && !loading && (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', fontSize: '0.875rem' }}>
-          No leads match your current filters
-        </div>
+      {/* ── Deal Detail Drawer ── */}
+      {selectedDeal && (
+        <DealDetailDrawer
+          deal={selectedDeal}
+          granolaNotesCache={granolaNotes}
+          onClose={() => setSelectedDeal(null)}
+          onAdvanceStage={handleAdvanceStage}
+          onLogActivity={handleLogActivity}
+        />
       )}
     </div>
   );

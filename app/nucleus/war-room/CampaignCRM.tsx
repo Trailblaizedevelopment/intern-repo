@@ -32,6 +32,7 @@ export interface CampaignProspect {
   assignedTo: string;
   notes: string;
   dealId: string | null;
+  category: 'greek' | 'clubs' | 'sports' | 'alumni_associations' | 'professional_associations' | 'country_clubs' | '';
   createdAt: string;
 }
 
@@ -442,6 +443,7 @@ function AddProspectDrawer({ campaign, onClose, onAdd }: AddProspectDrawerProps)
   const [contactIg, setContactIg] = useState('');
   const [channel, setChannel] = useState<CampaignProspect['channel']>('');
   const [assignedTo, setAssignedTo] = useState('');
+  const [category, setCategory] = useState<CampaignProspect['category']>('greek');
 
   function handleAdd() {
     if (!orgName.trim()) return;
@@ -461,6 +463,7 @@ function AddProspectDrawer({ campaign, onClose, onAdd }: AddProspectDrawerProps)
       assignedTo,
       notes: '',
       dealId: null,
+      category,
       createdAt: new Date().toISOString(),
     };
     onAdd(p);
@@ -538,6 +541,17 @@ function AddProspectDrawer({ campaign, onClose, onAdd }: AddProspectDrawerProps)
               {REPS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
+          <div>
+            <label style={labelStyle}>Category</label>
+            <select value={category} onChange={e => setCategory(e.target.value as CampaignProspect['category'])} style={{ ...inputStyle, cursor: 'pointer' }}>
+              <option value="greek">Greek</option>
+              <option value="clubs">Clubs</option>
+              <option value="sports">Sports</option>
+              <option value="alumni_associations">Alumni Associations</option>
+              <option value="professional_associations">Professional Associations</option>
+              <option value="country_clubs">Country Clubs</option>
+            </select>
+          </div>
         </div>
 
         <div style={{ padding: '16px 24px', borderTop: '1px solid #E5E7EB', display: 'flex', gap: 12 }}>
@@ -590,6 +604,7 @@ function ImportProspectsModal({ campaign, onClose, onImport }: ImportProspectsMo
       assignedTo,
       notes: '',
       dealId: null,
+      category: 'greek' as CampaignProspect['category'],
       createdAt: new Date().toISOString(),
     }));
     onImport(prospects);
