@@ -3,12 +3,13 @@ import { stripe, getPriceTier } from '@/lib/stripe';
 
 export const runtime = 'nodejs';
 
-// Internal bypass codes — these skip Stripe entirely and go straight to completion
-const INTERNAL_BYPASS_CODES = ['TRAILBLAIZE100', 'FOUNDER', 'INTERNAL'];
+// Internal bypass codes — these skip Stripe entirely and go straight to completion (free)
+const INTERNAL_BYPASS_CODES = ['TRAILBLAIZE100', 'FOUNDER', 'INTERNAL', 'NYUKAPPA'];
 
 // Discounted price codes — these override the normal tier price
 const DISCOUNTED_PRICE_CODES: Record<string, number> = {
   ADAM: 29,
+  MEMBER: 29,
 };
 
 /**
