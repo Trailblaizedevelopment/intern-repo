@@ -71,8 +71,6 @@ interface PipelineStats {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'campaign_prospects_v1';
-
 const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string; bg: string; italic?: boolean }> = {
   not_contacted:  { label: 'Not Contacted',  color: '#6b7280', bg: '#f3f4f6' },
   contacted:      { label: 'Contacted',      color: '#1d4ed8', bg: '#eff6ff' },
@@ -140,27 +138,20 @@ function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+/** Generate a valid UUID for new prospects (required by Supabase uuid column) */
+function newProspectId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback: build a UUID v4-shaped string
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 function todayISO(): string {
   return new Date().toISOString().split('T')[0];
-}
-
-function loadProspects(): CampaignProspect[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    // Guard against corrupted state (e.g., stored as object instead of array)
-    if (Array.isArray(parsed)) return parsed;
-    // Recover: if it's an object map, extract values
-    if (parsed && typeof parsed === 'object') return Object.values(parsed) as CampaignProspect[];
-    return [];
-  } catch { return []; }
-}
-
-function saveProspects(prospects: CampaignProspect[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(LS_KEY, JSON.stringify(prospects));
 }
 
 interface ProspectStats {
@@ -455,7 +446,7 @@ function AddProspectDrawer({ campaign, onClose, onAdd }: AddProspectDrawerProps)
   function handleAdd() {
     if (!orgName.trim()) return;
     const p: CampaignProspect = {
-      id: uid(),
+      id: newProspectId(),
       campaignId: campaign.id,
       orgName: orgName.trim(),
       school: campaign.school,
@@ -584,7 +575,7 @@ function ImportProspectsModal({ campaign, onClose, onImport }: ImportProspectsMo
   function handleImport() {
     if (!lines.length) return;
     const prospects: CampaignProspect[] = lines.map(line => ({
-      id: uid(),
+      id: newProspectId(),
       campaignId: campaign.id,
       orgName: line.trim(),
       school: campaign.school,
@@ -1108,12 +1099,17 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'recent' | 'alpha' | 'prospects' | 'deals'>('recent');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
-  const [visibleCount, setVisibleCount] = useState(20);
   const seededRef = useRef(false);
 
-  // Load prospects from localStorage on mount
+  // Fetch all prospects from Supabase on mount (shared across all users)
   useEffect(() => {
-    setProspects(loadProspects());
+    fetch('/api/war-room/prospects')
+      .then(r => r.json())
+      .then((data: unknown) => {
+        const arr = Array.isArray(data) ? data : [];
+        setProspects(arr as CampaignProspect[]);
+      })
+      .catch(err => console.error('[prospects] fetch error:', err));
   }, []);
 
   // Fetch campaigns from API
@@ -1145,51 +1141,6 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
       })
       .catch(err => console.error('[campaign-crm] schools error:', err));
   }, []);
-
-  // ── Power 5 prospect import ──────────────────────────────────────────────
-  useEffect(() => {
-    if (campaigns.length === 0 || loading) return;
-    if (localStorage.getItem('p5_prospects_seeded_v1')) return;
-    (async () => {
-      try {
-        const res = await fetch('/p5-prospects-seed.json');
-        if (!res.ok) return;
-        const seedData = await res.json();
-        const existing = loadProspects(); // always returns array
-        const existingIds = new Set(existing.map((p: CampaignProspect) => p.id));
-        const campaignBySchool: Record<string, string> = {};
-        campaigns.forEach((c: Campaign) => {
-          const name = (c.name || '').toLowerCase().trim();
-          campaignBySchool[name] = c.id;
-          const school = ((c as any).school || '').toLowerCase().trim();
-          if (school) campaignBySchool[school] = c.id;
-        });
-        const newProspects: CampaignProspect[] = [];
-        for (const p of seedData) {
-          const schoolLower = (p.school || '').toLowerCase().trim();
-          let campaignId = campaignBySchool[schoolLower];
-          if (!campaignId) {
-            for (const [cName, cId] of Object.entries(campaignBySchool)) {
-              if (schoolLower.includes(cName) || cName.includes(schoolLower)) {
-                campaignId = cId; break;
-              }
-            }
-          }
-          if (campaignId && !existingIds.has(p.id)) {
-            newProspects.push({ ...p, campaignId });
-            existingIds.add(p.id);
-          }
-        }
-        if (newProspects.length > 0) {
-          const updated = [...existing, ...newProspects];
-          saveProspects(updated);
-          setProspects(updated);
-          console.log(`[p5-seed] Imported ${newProspects.length} prospects from Power 5 database`);
-        }
-        localStorage.setItem('p5_prospects_seeded_v1', '1');
-      } catch (err) { console.error('[p5-seed]', err); }
-    })();
-  }, [campaigns, loading]);
 
   // Auto-seed from pipeline stats if no campaigns
   useEffect(() => {
@@ -1238,11 +1189,9 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
     }).catch(err => console.error('[campaign-crm] seed error:', err));
   }, [loading, stats]);
 
-  // Persist prospects to localStorage — always ensure array
+  // Update local prospect state (Supabase is source of truth — callers fire API requests)
   function persistProspects(updated: CampaignProspect[]) {
-    const safeUpdated = Array.isArray(updated) ? updated : [];
-    setProspects(safeUpdated);
-    saveProspects(safeUpdated);
+    setProspects(Array.isArray(updated) ? updated : []);
   }
 
   // Persist campaign to API
@@ -1284,34 +1233,57 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
 
   function handleUpdateProspect(id: string, updates: Partial<CampaignProspect>) {
     const safeArr = Array.isArray(prospects) ? prospects : [];
-    // If this prospect came from API rows (not in localStorage yet), copy it first
     const existing = safeArr.find(p => p.id === id);
     if (!existing) {
-      // Find in the merged campaignProspects (which includes API rows)
+      // Prospect came from legacy campaign rows JSONB — promote to campaign_prospects table
       const fromMerged = selectedProspects.find(p => p.id === id);
       if (fromMerged) {
-        const newProspect = { ...fromMerged, ...updates };
-        persistProspects([...safeArr, newProspect]);
-        return;
+        const promoted = { ...fromMerged, ...updates, id: newProspectId() };
+        persistProspects([...safeArr, promoted]);
+        fetch('/api/war-room/prospects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(promoted),
+        }).catch(err => console.error('[prospects] promote error:', err));
       }
+      return;
     }
     const updated = safeArr.map(p => p.id === id ? { ...p, ...updates } : p);
     persistProspects(updated);
+    fetch('/api/war-room/prospects', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    }).catch(err => console.error('[prospects] update error:', err));
   }
 
   function handleDeleteProspect(id: string) {
     const safeArr = Array.isArray(prospects) ? prospects : [];
     persistProspects(safeArr.filter(p => p.id !== id));
+    fetch(`/api/war-room/prospects?id=${id}`, { method: 'DELETE' })
+      .catch(err => console.error('[prospects] delete error:', err));
   }
 
   function handleAddProspect(prospect: CampaignProspect) {
     const safeArr = Array.isArray(prospects) ? prospects : [];
     persistProspects([...safeArr, prospect]);
+    fetch('/api/war-room/prospects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prospect),
+    }).catch(err => console.error('[prospects] add error:', err));
   }
 
   function handleImportProspects(newProspects: CampaignProspect[]) {
     const safeArr = Array.isArray(prospects) ? prospects : [];
     persistProspects([...safeArr, ...newProspects]);
+    if (newProspects.length > 0) {
+      fetch('/api/war-room/prospects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProspects),
+      }).catch(err => console.error('[prospects] bulk import error:', err));
+    }
   }
 
   async function handleConvertToDeal(prospectId: string) {
@@ -1479,7 +1451,6 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   }
 
   const safeProspects = Array.isArray(prospects) ? prospects : [];
-  const pagedCampaigns = filteredCampaigns.slice(0, visibleCount);
 
   // ── Campaign List View ──
   return (
@@ -1492,7 +1463,7 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
             type="text"
             placeholder="Search campaigns by name or school…"
             value={search}
-            onChange={e => { setSearch(e.target.value); setVisibleCount(20); }}
+            onChange={e => { setSearch(e.target.value); }}
             autoFocus={false}
           />
           {search && (
@@ -1511,7 +1482,7 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
         {/* Status filter pills */}
         <div style={{ display: 'flex', gap: 4 }}>
           {(['all', 'active', 'paused', 'completed'] as const).map(s => (
-            <button key={s} onClick={() => { setStatusFilter(s); setVisibleCount(20); }}
+            <button key={s} onClick={() => { setStatusFilter(s); }}
               style={{
                 padding: '5px 12px', fontSize: '0.8rem', borderRadius: 9999, fontWeight: 600,
                 border: '1px solid',
@@ -1529,7 +1500,7 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
         <div style={{ width: 1, height: 20, background: '#E5E7EB', flexShrink: 0 }} />
 
         {/* Type filter */}
-        <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setVisibleCount(20); }}
+        <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); }}
           style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '5px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
           <option value="all">All Types</option>
           <option value="founder_led">Founder-Led</option>
@@ -1540,7 +1511,7 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
         </select>
 
         {/* Sort */}
-        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+        <select value={sortBy} onChange={e => { setSortBy(e.target.value as typeof sortBy); }}
           style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '5px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
           <option value="recent">Most Recent</option>
           <option value="alpha">A → Z</option>
@@ -1600,7 +1571,7 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
               </tr>
             </thead>
             <tbody>
-              {pagedCampaigns.map(campaign => {
+              {filteredCampaigns.map(campaign => {
                 const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type];
                 const statusBadge = { active: { label: 'Active', color: '#065f46', bg: '#d1fae5' }, paused: { label: 'Paused', color: '#b45309', bg: '#fef3c7' }, completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' } }[campaign.status];
                 const dealCount = (campaign.rows ?? []).filter(r => r.dealId).length;
@@ -1650,7 +1621,7 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
       ) : (
         /* ── Card view ── */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {pagedCampaigns.map(campaign => (
+          {filteredCampaigns.map(campaign => (
             <CampaignListCard
               key={campaign.id}
               campaign={campaign}
@@ -1666,16 +1637,6 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
             />
           ))}
         </div>
-      )}
-
-      {/* Load more */}
-      {!loading && filteredCampaigns.length > visibleCount && (
-        <button
-          onClick={() => setVisibleCount(v => v + 20)}
-          style={{ alignSelf: 'center', padding: '8px 20px', fontSize: '0.875rem', fontWeight: 500, color: '#374151', border: '1px solid #E5E7EB', borderRadius: 9999, background: '#ffffff', cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          Load more ({filteredCampaigns.length - visibleCount} remaining)
-        </button>
       )}
 
       {showCreateDrawer && (
