@@ -629,7 +629,9 @@ function SetUpPage() {
   // Validation
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
 
-  const price = form.memberCount ? getPriceTier(Number(form.memberCount)) : null;
+  const price = form.memberCount
+    ? (promoCode === 'NYUKAPPA' ? 0 : promoCode === 'MEMBER' ? 29 : getPriceTier(Number(form.memberCount)))
+    : null;
 
   // Handle URL params on load
   useEffect(() => {
@@ -749,7 +751,7 @@ function SetUpPage() {
     try {
       const res = await fetch('/api/set-up/checkout', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, memberCount: Number(form.memberCount), agreedName, agreedAt: agreedAtISO }),
+        body: JSON.stringify({ ...form, memberCount: Number(form.memberCount), agreedName, agreedAt: agreedAtISO, discountCode: promoCode }),
       });
       const data = await res.json();
       if (!res.ok || data.error) {
@@ -1722,8 +1724,8 @@ function SetUpPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
             {[
               { icon: <Zap size={18} color="#0F172A" />, title: "What you're getting", desc: "Access to the full Trailblaize platform — alumni directory, message board, engagement tools, and ongoing support." },
-              { icon: <Calendar size={18} color="#0F172A" />, title: 'Your commitment', desc: promoCode === 'SAE' ? '6-month commitment starting today. After six months, cancel anytime with 30 days notice. No hidden fees.' : '12-month commitment starting today. After year one, cancel anytime with 30 days notice. No hidden fees.' },
-              { icon: <DollarSign size={18} color="#0F172A" />, title: 'What it costs', desc: price ? `$${price}/month · Billed monthly · Based on ${form.memberCount} members. Pricing reviewed at renewal.` : 'Pricing based on your member count.' },
+              { icon: <Calendar size={18} color="#0F172A" />, title: 'Your commitment', desc: promoCode === 'NYUKAPPA' ? 'Beta access — no payment required. Cancel anytime, no notice needed.' : promoCode === 'SAE' ? '6-month commitment starting today. After six months, cancel anytime with 30 days notice. No hidden fees.' : '12-month commitment starting today. After year one, cancel anytime with 30 days notice. No hidden fees.' },
+              { icon: <DollarSign size={18} color="#0F172A" />, title: 'What it costs', desc: promoCode === 'NYUKAPPA' ? 'Free · Beta access · No credit card required.' : price ? `$${price}/month · Billed monthly · Based on ${form.memberCount} members. Pricing reviewed at renewal.` : 'Pricing based on your member count.' },
               { icon: <Shield size={18} color="#0F172A" />, title: 'Your data', desc: "Your data belongs to you. We use it only to run the platform. Never sold. Export or delete anytime." },
             ].map((card) => (
               <div key={card.title} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px 20px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
@@ -1736,6 +1738,18 @@ function SetUpPage() {
             ))}
           </div>
 
+          {/* Promo code — always visible */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <input
+              type="text" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())}
+              placeholder="Promo code (optional)"
+              style={{ width: '180px', padding: '8px 12px', border: '1px solid #E5E7EB', borderRadius: '8px', fontSize: '0.875rem', fontFamily: 'inherit', color: '#111827', outline: 'none' }}
+            />
+            {promoCode === 'SAE' && <span style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 600 }}>✓ 6-month commitment applied</span>}
+            {promoCode === 'MEMBER' && <span style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 600 }}>✓ $29/month discount applied</span>}
+            {promoCode === 'NYUKAPPA' && <span style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 600 }}>✓ Free beta access applied</span>}
+          </div>
+
           <button type="button" onClick={() => setShowFullAgreement(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A', background: 'none', border: 'none', cursor: 'pointer', marginBottom: '12px', fontFamily: 'inherit' }}>
             {showFullAgreement ? 'Hide full agreement ↑' : 'Read full agreement ↓'}
@@ -1743,15 +1757,13 @@ function SetUpPage() {
 
           {showFullAgreement && (
             <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', marginBottom: '20px', maxHeight: '240px', overflowY: 'auto' }}>
-              <pre style={{ fontSize: '0.6875rem', color: '#6B7280', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>{promoCode === 'SAE' ? FULL_AGREEMENT.replace('twelve (12) months', 'six (6) months').replace('Initial Term', 'Initial Term (6 months)') : FULL_AGREEMENT}</pre>
-              <div style={{ marginTop: '12px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
-                <input
-                  type="text" value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                  placeholder="Code"
-                  style={{ width: '120px', padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'inherit', color: '#9CA3AF' }}
-                />
-                {promoCode === 'SAE' && <span style={{ fontSize: '0.7rem', color: '#10B981', marginLeft: '8px', fontWeight: 600 }}>6-month commitment applied</span>}
-              </div>
+              <pre style={{ fontSize: '0.6875rem', color: '#6B7280', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>
+                {promoCode === 'NYUKAPPA'
+                  ? FULL_AGREEMENT.replace('twelve (12) months', 'beta period').replace(/3\. FEES AND PAYMENT[\s\S]*?4\. CLIENT DATA/, '3. FEES AND PAYMENT\nThis is a free beta access agreement. No fees are charged during the beta period.\n\n4. CLIENT DATA')
+                  : promoCode === 'SAE'
+                  ? FULL_AGREEMENT.replace('twelve (12) months', 'six (6) months').replace('Initial Term', 'Initial Term (6 months)')
+                  : FULL_AGREEMENT}
+              </pre>
             </div>
           )}
 
@@ -1780,8 +1792,15 @@ function SetUpPage() {
 
           <div style={S.actions}>
             <button onClick={() => goToStep(2)} style={S.backBtn}>← Back</button>
-            <NavButton onClick={() => { if (canProceed) goToStep(4); }} disabled={!canProceed}>
-              Continue to Payment <ChevronRight size={16} />
+            <NavButton onClick={async () => {
+              if (!canProceed) return;
+              if (promoCode === 'NYUKAPPA') {
+                await handleCheckout(); // bypass — returns redirect URL, no Stripe
+              } else {
+                goToStep(4);
+              }
+            }} disabled={!canProceed || checkoutLoading}>
+              {checkoutLoading ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Setting up...</> : promoCode === 'NYUKAPPA' ? <>Complete Setup <ArrowRight size={16} /></> : <>Continue to Payment <ChevronRight size={16} /></>}
             </NavButton>
           </div>
         </Card>
@@ -1807,7 +1826,7 @@ function SetUpPage() {
             <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '12px', marginTop: '4px' }}>
               <Row label="Monthly Price" value={price ? `$${price}/month` : 'TBD'} />
             </div>
-            <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: 0 }}>Annual commitment, then month-to-month · Cancel after year one with 30 days notice</p>
+            <p style={{ fontSize: '0.75rem', color: '#9CA3AF', margin: 0 }}>{promoCode === 'SAE' ? '6-month commitment, then month-to-month' : 'Annual commitment, then month-to-month'} · Cancel after {promoCode === 'SAE' ? 'six months' : 'year one'} with 30 days notice</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: '#6B7280', marginBottom: '24px' }}>
             <Shield size={16} color="#9CA3AF" />
