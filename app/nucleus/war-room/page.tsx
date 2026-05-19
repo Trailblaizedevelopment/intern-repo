@@ -16,6 +16,7 @@ import {
   Instagram, Upload, CheckCircle2, Link2,
   Target, ExternalLink, Zap, BarChart3,
   ArrowLeft, LayoutDashboard, FileUp, Edit3,
+  CalendarCheck,
 } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 import { CampaignCRM } from './CampaignCRM';
@@ -2020,6 +2021,10 @@ export default function WarRoomPage() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: number; skipped: number; errors: number } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const autoSyncTriggeredRef = useRef(false);
 
   // Deal panel state
   const [panelDeal, setPanelDeal] = useState<any>(null);
@@ -2063,11 +2068,39 @@ export default function WarRoomPage() {
     finally { setStatsLoading(false); }
   }, []);
 
+  const syncCalendar = useCallback(async () => {
+    setSyncLoading(true);
+    setSyncResult(null);
+    setSyncError(null);
+    try {
+      const res = await fetch('/api/pipeline/sync-calendar', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Sync failed');
+      setSyncResult({ synced: data.synced ?? 0, skipped: data.skipped ?? 0, errors: data.errors ?? 0 });
+      fetchStats();
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Sync failed');
+    } finally {
+      setSyncLoading(false);
+    }
+  }, [fetchStats]);
+
   useEffect(() => {
     fetchStats();
     refreshRef.current = setInterval(fetchStats, 60_000);
     return () => { if (refreshRef.current) clearInterval(refreshRef.current); };
   }, [fetchStats]);
+
+  // Auto-sync if ?autoSync=true in URL
+  useEffect(() => {
+    if (autoSyncTriggeredRef.current) return;
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autoSync') === 'true') {
+      autoSyncTriggeredRef.current = true;
+      syncCalendar();
+    }
+  }, [syncCalendar]);
 
   return (
     <div style={{ minHeight: '100vh', background: '#F9FAFB' }}>
@@ -2082,6 +2115,27 @@ export default function WarRoomPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {lastRefreshed && <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Updated {lastRefreshed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
+              {syncResult && (
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065f46', background: '#d1fae5', padding: '3px 10px', borderRadius: '9999px' }}>
+                  ✓ {syncResult.synced} synced, {syncResult.skipped} skipped
+                </span>
+              )}
+              {syncError && (
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '3px 10px', borderRadius: '9999px' }}>
+                  ✗ {syncError}
+                </span>
+              )}
+              <button
+                onClick={syncCalendar}
+                disabled={syncLoading}
+                className="module-filter-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: syncLoading ? 0.7 : 1 }}
+              >
+                {syncLoading
+                  ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Syncing…</>
+                  : <><CalendarCheck size={14} /> Sync Calendar</>
+                }
+              </button>
               <button onClick={() => { setStatsLoading(true); fetchStats(); }}
                 className="module-filter-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <RefreshCw size={14} /> Refresh
