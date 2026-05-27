@@ -216,6 +216,7 @@ export function getNavigationItems(role: EmployeeRole, unreadCount?: number): Na
       // Interns: Dashboard, Sales Room, Connects, Team
       const internItems: NavItem[] = [
         { name: 'Dashboard', href: '/workspace', icon: 'LayoutDashboard' },
+        { name: 'Customer Success', href: '/nucleus/customer-success', icon: 'HeartHandshake' },
         { name: 'Sales Room', href: '/nucleus/war-room', icon: 'Tv' },
         { name: 'Connects', href: '/workspace/connects', icon: 'Phone' },
         { name: 'Team', href: '/workspace/team', icon: 'Users' },
