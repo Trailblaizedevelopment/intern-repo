@@ -470,9 +470,7 @@ function ActivationTimeline({ chapter }: { chapter: ChapterWithOnboarding }) {
     },
     {
       label: 'Submission received',
-      date: chapter.onboarding_completed
-        ? (typeof chapter.onboarding_completed === 'string' ? chapter.onboarding_completed : null)
-        : null,
+      date: chapter.onboarding_submitted_at ?? null,
     },
     {
       label: 'Alumni list uploaded',
