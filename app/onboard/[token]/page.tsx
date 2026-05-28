@@ -249,9 +249,11 @@ export default function OnboardingForm() {
     const errors: ValidationErrors = {};
 
     switch (section) {
-      case 1:
-        if (!university.trim()) errors.university = 'University is required';
-        if (!fraternity.trim()) errors.fraternity = 'Fraternity/Sorority is required';
+      case 2:
+        // Alumni list: must either upload a file OR check "no list yet"
+        if (!alumniFile && !noAlumniList) {
+          errors.alumni = 'Please upload your alumni list or check the box if you don\'t have one yet';
+        }
         break;
     }
 
@@ -261,16 +263,18 @@ export default function OnboardingForm() {
 
   // Navigation
   const goToSection = (section: number) => {
-    if (section < currentSection || validateSection(currentSection)) {
+    const isValid = section < currentSection || validateSection(currentSection);
+    if (isValid) {
       setCurrentSection(section);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // Scroll to first error
-      const firstErrorKey = Object.keys(validationErrors)[0];
-      const errorElement = document.querySelector(`[data-field="${firstErrorKey}"]`);
-      if (errorElement) {
-        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      // Scroll to first error — use a short delay so state has updated
+      setTimeout(() => {
+        const errorElement = document.querySelector('[data-field]');
+        if (errorElement) {
+          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
     }
   };
 
@@ -288,8 +292,8 @@ export default function OnboardingForm() {
 
   // Submit form
   const handleSubmit = async () => {
-    if (!validateSection(1)) {
-      setCurrentSection(1);
+    if (!chapterInfo) {
+      setError('Chapter information not loaded. Please refresh and try again.');
       return;
     }
 
@@ -673,6 +677,11 @@ export default function OnboardingForm() {
                 No problem! We&apos;ll help you gather contacts during onboarding.
               </p>
             )}
+            {validationErrors.alumni && (
+              <p className="error-message" style={{ marginTop: '0.75rem', color: '#ef4444', fontSize: '0.875rem' }} data-field="alumni">
+                {validationErrors.alumni}
+              </p>
+            )}
           </section>
         )}
 
@@ -742,7 +751,7 @@ export default function OnboardingForm() {
               Previous
             </button>
           )}
-          {currentSection < 4 && (
+          {currentSection < SECTIONS.length && (
             <button type="button" className="nav-btn next" onClick={nextSection}>
               Next
               <ChevronRight size={20} />
