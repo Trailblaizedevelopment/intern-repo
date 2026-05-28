@@ -21,7 +21,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  */
 
 const LINQ_BASE = 'https://api.linqapp.com/api/partner/v3';
-const AUTH_TOKEN = process.env.INTERNAL_API_KEY || '';
+const AUTH_TOKEN = process.env.INTERNAL_API_KEY || process.env.NEXT_PUBLIC_INTERNAL_API_KEY || '';
 
 // Our own Linq line phones — used to identify "outbound" vs "inbound" messages
 const OUR_LINE_PHONES = new Set(['+16462101111', '+16462178274', '+16462442696']);
@@ -126,7 +126,7 @@ async function fetchAllLinqChats(): Promise<LinqChatItem[]> {
     if (cursor) params.set('cursor', cursor);
 
     const res = await fetch(`${LINQ_BASE}/chats?${params}`, {
-      headers: { 'Authorization': `Token ${linqToken}` },
+      headers: { 'Authorization': `Bearer ${linqToken}` },
     });
 
     if (!res.ok) {
