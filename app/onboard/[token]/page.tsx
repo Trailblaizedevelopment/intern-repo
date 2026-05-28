@@ -410,7 +410,7 @@ export default function OnboardingForm() {
       {/* Header */}
       <header className="onboarding-header">
         <div className="onboarding-logo">
-          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" />
+          <img src="/logo.png" alt="Trailblaize" />
         </div>
         <h1>Chapter Onboarding</h1>
         {chapterInfo?.chapter_name && (

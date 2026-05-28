@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Head from 'next/head';
 
 export const metadata: Metadata = {
   title: "Trailblaize — Chapter Submission",
@@ -29,5 +30,17 @@ export default function OnboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      {children}
+    </>
+  );
 }

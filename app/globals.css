@@ -22607,32 +22607,39 @@ input:focus {
 
 .onboarding-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: #ffffff;
 }
 
 .onboarding-header {
-  background: linear-gradient(135deg, #1a2744 0%, #2d3a5c 100%);
-  padding: 2rem;
+  background: #ffffff;
+  padding: 1rem 2rem;
   text-align: center;
-  color: white;
+  color: #111827;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .onboarding-logo img {
-  height: 40px;
-  margin-bottom: 1rem;
-  filter: brightness(0) invert(1);
+  height: 48px;
+  margin-bottom: 0.5rem;
+  filter: none;
 }
 
 .onboarding-header h1 {
-  font-size: 1.75rem;
+  font-size: 1.25rem;
   font-weight: 600;
   margin: 0;
+  color: #111827;
+  font-family: 'Instrument Serif', Georgia, serif;
 }
 
 .onboarding-header .chapter-name {
-  font-size: 1rem;
-  opacity: 0.8;
-  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  color: #6b7280;
+  margin-top: 0.125rem;
 }
 
 /* Progress Stepper */
@@ -22667,34 +22674,34 @@ input:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f1f5f9;
-  color: #94a3b8;
+  background: #f3f4f6;
+  color: #9ca3af;
   transition: all 0.2s;
 }
 
 .onboarding-stepper .step.active .step-icon {
-  background: #14b8a6;
+  background: #111827;
   color: white;
 }
 
 .onboarding-stepper .step.completed .step-icon {
-  background: #10b981;
+  background: #111827;
   color: white;
 }
 
 .onboarding-stepper .step-title {
   font-size: 0.6875rem;
   font-weight: 500;
-  color: #94a3b8;
+  color: #9ca3af;
   text-align: center;
 }
 
 .onboarding-stepper .step.active .step-title {
-  color: #14b8a6;
+  color: #111827;
 }
 
 .onboarding-stepper .step.completed .step-title {
-  color: #10b981;
+  color: #374151;
 }
 
 .onboarding-stepper .step-connector {
@@ -22767,8 +22774,8 @@ input:focus {
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #14b8a6;
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+  border-color: #374151;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
 }
 
 .form-group input.error,
@@ -22921,8 +22928,8 @@ input:focus {
 }
 
 .channel-card.selected {
-  border-color: #14b8a6;
-  background: #f0fdfa;
+  border-color: #111827;
+  background: #f9fafb;
 }
 
 .channel-header {
@@ -22952,8 +22959,8 @@ input:focus {
 }
 
 .channel-card.selected .channel-header .checkmark {
-  background: #14b8a6;
-  border-color: #14b8a6;
+  background: #111827;
+  border-color: #111827;
 }
 
 .channel-header span:last-child {
@@ -23393,9 +23400,9 @@ input:focus {
   gap: 0.5rem;
   width: 100%;
   padding: 1rem 2rem;
-  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  background: #111827;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
   color: white;
@@ -23404,8 +23411,9 @@ input:focus {
 }
 
 .submit-btn:hover:not(:disabled) {
+  background: #1f2937;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .submit-btn:disabled {
@@ -23443,20 +23451,20 @@ input:focus {
 }
 
 .nav-btn:hover {
-  border-color: #14b8a6;
-  color: #14b8a6;
+  border-color: #374151;
+  color: #111827;
 }
 
 .nav-btn.next {
   margin-left: auto;
-  background: #1a2744;
-  border-color: #1a2744;
+  background: #111827;
+  border-color: #111827;
   color: white;
 }
 
 .nav-btn.next:hover {
-  background: #2d3a5c;
-  border-color: #2d3a5c;
+  background: #1f2937;
+  border-color: #1f2937;
 }
 
 /* Loading, Error, Success States */
@@ -23473,7 +23481,7 @@ input:focus {
 }
 
 .onboarding-loading svg {
-  color: #14b8a6;
+  color: #374151;
   margin-bottom: 1rem;
 }
 
@@ -23505,7 +23513,8 @@ input:focus {
 .onboarding-success .success-icon {
   width: 96px;
   height: 96px;
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -23514,7 +23523,7 @@ input:focus {
 }
 
 .onboarding-success .success-icon svg {
-  color: #10b981;
+  color: #111827;
 }
 
 .onboarding-success h1 {
@@ -23534,7 +23543,8 @@ input:focus {
 }
 
 .success-summary {
-  background: #f8fafc;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 1.5rem;
   margin-top: 2rem;
@@ -23547,6 +23557,60 @@ input:focus {
   font-weight: 600;
   color: #374151;
   margin: 0 0 1rem 0;
+}
+
+.schedule-call-card {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  text-align: center;
+  min-width: 300px;
+}
+
+.schedule-call-icon {
+  width: 52px;
+  height: 52px;
+  background: #111827;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  color: white;
+}
+
+.schedule-call-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.5rem;
+}
+
+.schedule-call-card p {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 1.25rem;
+}
+
+.schedule-call-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #111827;
+  color: white;
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.schedule-call-btn:hover {
+  background: #1f2937;
 }
 
 .summary-item {
