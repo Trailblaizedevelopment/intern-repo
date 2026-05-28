@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   MessageSquare, RefreshCw, CheckCheck, Flag,
-  Loader2, Send, User, ChevronLeft, AlertTriangle,
+  Loader2, Send, User, ChevronLeft, AlertTriangle, Search,
 } from 'lucide-react';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 
@@ -226,6 +226,16 @@ function ConvRow({ conv, isSelected, onClick }: ConvRowProps) {
             </span>
           </div>
 
+          {/* Row 1b: chapter name */}
+          {conv.chapter_name && (
+            <div style={{
+              fontSize: '0.72rem', color: '#6B7280', marginTop: 1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {conv.chapter_name}
+            </div>
+          )}
+
           {/* Row 2: message preview */}
           <div style={{
             marginTop: 2, fontSize: '0.75rem', color: '#9CA3AF',
@@ -301,7 +311,7 @@ function MessageBubble({ msg }: MessageBubbleProps) {
 interface ReplyBoxProps {
   convId: string;
   linqChatId: string | null;
-  onSent: () => void;
+  onSent: (text: string) => void;
   onError: (msg: string) => void;
 }
 
@@ -323,7 +333,7 @@ function ReplyBox({ convId, linqChatId, onSent, onError }: ReplyBoxProps) {
       });
       const json = await res.json();
       if (!res.ok) onError(json.error ?? 'Send failed');
-      else { setText(''); onSent(); }
+      else { setText(''); onSent(msg); }
     } catch (err) {
       onError(String(err));
     } finally {
@@ -390,7 +400,7 @@ interface ThreadPanelProps {
   onBack: () => void;
   onMarkHandled: () => void;
   onFlag: () => void;
-  onReplySent: () => void;
+  onReplySent: (text: string) => void;
   onReplyError: (msg: string) => void;
   messagesEndRef: React.RefObject<HTMLDivElement>;
 }
@@ -442,6 +452,14 @@ function ThreadPanel({
                 fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 10,
               }}>
                 {line.label}
+              </span>
+            )}
+            {conv.status === 'handled' && (
+              <span style={{
+                background: '#D1FAE5', color: '#065F46',
+                fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+              }}>
+                ✓ Handled
               </span>
             )}
           </div>
@@ -496,7 +514,7 @@ function ThreadPanel({
               : <Flag size={11} />}
             Flag
           </button>
-          {conv.status !== 'handled' && (
+          {conv.status !== 'handled' ? (
             <button
               onClick={onMarkHandled}
               disabled={handling}
@@ -512,6 +530,21 @@ function ThreadPanel({
               {handling
                 ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
                 : <CheckCheck size={11} />}
+              Done
+            </button>
+          ) : (
+            <button
+              disabled
+              style={{
+                padding: '5px 10px', borderRadius: 7,
+                border: '1px solid #D1FAE5',
+                background: '#F0FDF4', color: '#9CA3AF',
+                cursor: 'default',
+                fontSize: '0.73rem', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <CheckCheck size={11} />
               Done
             </button>
           )}
@@ -589,7 +622,13 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
   const [flagging, setFlagging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [search, setSearch] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Suppress unused variable warning for initialChapterName
+  void initialChapterName;
 
   const LIMIT = 50;
 
@@ -600,6 +639,17 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [search]);
+
   // ── Load conversations ──────────────────────────────────────────────────
 
   const loadConvs = useCallback(async (currentFilter: FilterKey, currentPage: number) => {
@@ -609,6 +659,7 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       const params = new URLSearchParams({
         page: String(currentPage),
         limit: String(LIMIT),
+        status: 'all',
       });
       if (initialChapterId) params.set('chapter_id', initialChapterId);
       if (currentFilter !== 'all') params.set('category', currentFilter);
@@ -625,6 +676,37 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       setError(String(err));
     } finally {
       setLoadingConvs(false);
+    }
+  }, [initialChapterId]);
+
+  // ── Silent background refresh (no loading flash, preserves selection) ──
+
+  const loadConvsSilent = useCallback(async (
+    currentFilter: FilterKey,
+    currentPage: number,
+    keepSelectedId?: string,
+  ) => {
+    try {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(LIMIT),
+        status: 'all',
+      });
+      if (initialChapterId) params.set('chapter_id', initialChapterId);
+      if (currentFilter !== 'all') params.set('category', currentFilter);
+
+      const res = await fetch(`${API}?${params}`, { headers: { Authorization: AUTH } });
+      if (!res.ok) return;
+      const json = await res.json();
+      const newConvs: LinqConversation[] = json.data ?? [];
+      setConvs(newConvs);
+      setTotal(json.total ?? 0);
+      if (keepSelectedId) {
+        const fresh = newConvs.find(c => c.id === keepSelectedId);
+        if (fresh) setSelectedConv(fresh);
+      }
+    } catch {
+      // silent — don't surface errors from background refresh
     }
   }, [initialChapterId]);
 
@@ -698,9 +780,13 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
       if (!res.ok) {
         showToast(json.error ?? 'Failed', 'error');
       } else {
-        showToast('Marked as handled', 'success');
-        setSelectedConv(null);
-        loadConvs(filter, page);
+        showToast('Marked as handled ✓', 'success');
+        // Update in-place: keep conversation selected, just update status badge
+        const updated = { ...selectedConv, status: 'handled' as const };
+        setSelectedConv(updated);
+        setConvs(prev => prev.map(c => c.id === selectedConv.id ? updated : c));
+        // Background refresh after 1.5s
+        setTimeout(() => loadConvsSilent(filter, page, selectedConv.id), 1500);
       }
     } catch (err) {
       showToast(String(err), 'error');
@@ -734,22 +820,54 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     }
   }
 
-  function handleReplySent() {
-    showToast('Reply sent', 'success');
+  function handleReplySent(sentText: string) {
+    showToast('Reply sent ✓', 'success');
+    const now = new Date().toISOString();
     if (selectedConv) {
+      // Update in-place: don't reload the whole list
+      const updated: LinqConversation = {
+        ...selectedConv,
+        last_message_at: now,
+        last_message_direction: 'outbound',
+        has_unread_reply: false,
+        last_message_text: sentText,
+      };
+      setSelectedConv(updated);
+      setConvs(prev => prev.map(c => c.id === selectedConv.id ? updated : c));
+      // Reload thread messages
       setLoadingMsgs(true);
       fetch(`${API}/${selectedConv.id}/messages`, { headers: { Authorization: AUTH } })
         .then(r => r.json())
         .then(json => setMessages(json.data ?? []))
         .finally(() => setLoadingMsgs(false));
+      // Background refresh after 2s (non-disruptive)
+      const currentSelectedId = selectedConv.id;
+      setTimeout(() => loadConvsSilent(filter, page, currentSelectedId), 2000);
     }
-    loadConvs(filter, page);
   }
 
-  // ── Layout ─────────────────────────────────────────────────────────────
+  // ── Derived state ──────────────────────────────────────────────────────
 
-  // Client-side filter on top of server results (safety net for mismatched field names)
-  const filteredConvs = applyClientFilter(convs, filter);
+  // Client-side filter on top of server results
+  const filterPassedConvs = applyClientFilter(convs, filter);
+
+  // Client-side search filter (debounced)
+  const filteredConvs = debouncedSearch
+    ? filterPassedConvs.filter(c => {
+        const q = debouncedSearch.toLowerCase();
+        return (
+          (c.contact_name ?? '').toLowerCase().includes(q) ||
+          (c.contact_phone ?? '').toLowerCase().includes(q) ||
+          (c.chapter_name ?? '').toLowerCase().includes(q) ||
+          (c.last_message_text ?? '').toLowerCase().includes(q)
+        );
+      })
+    : filterPassedConvs;
+
+  // Live count badges per filter (client-side, from full convs array)
+  const counts = Object.fromEntries(
+    FILTERS.map(f => [f.key, applyClientFilter(convs, f.key).length])
+  ) as Record<FilterKey, number>;
 
   const totalPages = Math.ceil(total / LIMIT);
 
@@ -794,15 +912,27 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
             key={f.key}
             onClick={() => setFilter(f.key)}
             style={{
-              padding: '5px 12px', borderRadius: 999, fontSize: '0.75rem', cursor: 'pointer',
+              padding: '5px 10px', borderRadius: 999, fontSize: '0.75rem', cursor: 'pointer',
               border: filter === f.key ? '1px solid #0F172A' : '1px solid #E5E7EB',
               background: filter === f.key ? '#0F172A' : '#fff',
               color: filter === f.key ? '#fff' : '#6B7280',
               fontWeight: filter === f.key ? 600 : 400,
               whiteSpace: 'nowrap', transition: 'all 0.1s',
+              display: 'flex', alignItems: 'center', gap: 4,
             }}
           >
             {f.label}
+            {counts[f.key] > 0 && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 16, height: 16, borderRadius: 999,
+                background: filter === f.key ? 'rgba(255,255,255,0.25)' : '#F3F4F6',
+                color: filter === f.key ? '#fff' : '#374151',
+                fontSize: '0.65rem', fontWeight: 700, padding: '0 4px',
+              }}>
+                {counts[f.key]}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -824,10 +954,41 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
     </div>
   );
 
+  // Search bar
+  const searchBar = (
+    <div style={{
+      padding: '8px 14px', borderBottom: '1px solid #E5E7EB', background: '#fff', flexShrink: 0,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 10px',
+      }}>
+        <Search size={13} style={{ color: '#9CA3AF', flexShrink: 0 }} />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search name, phone, chapter…"
+          style={{
+            flex: 1, border: 'none', background: 'transparent', outline: 'none',
+            fontSize: '0.8rem', color: '#111827', fontFamily: 'inherit',
+          }}
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 0, fontSize: '0.75rem' }}
+          >✕</button>
+        )}
+      </div>
+    </div>
+  );
+
   // Conversation list panel
   const convListPanel = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {filterBar}
+      {searchBar}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {loadingConvs ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9CA3AF', gap: 8 }}>
@@ -837,7 +998,7 @@ export default function ConversationsTab({ showToast, initialChapterId, initialC
         ) : filteredConvs.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', gap: 10 }}>
             <MessageSquare size={28} style={{ opacity: 0.2 }} />
-            <span style={{ fontSize: '0.8rem' }}>No conversations</span>
+            <span style={{ fontSize: '0.8rem' }}>{debouncedSearch ? 'No results' : 'No conversations'}</span>
           </div>
         ) : (
           filteredConvs.map(c => (
