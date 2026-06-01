@@ -25,11 +25,10 @@ const ALUMNI = [
 // ─── Q1 Options ───────────────────────────────────────────────────────────────
 
 const Q1_OPTIONS = [
-  { value: 'jobs',       label: 'Finding a job or internship',        emoji: '💼' },
-  { value: 'mentorship', label: 'Career mentorship & advice',         emoji: '🧭' },
-  { value: 'city',       label: 'Networking with brothers in my city',emoji: '📍' },
-  { value: 'touch',      label: 'Staying in touch with brothers',     emoji: '🤙' },
-  { value: 'giving',     label: 'Giving back to the chapter',         emoji: '🏛️' },
+  { value: 'jobs',        label: 'Finding a job or internship' },
+  { value: 'mentorship',  label: 'Career mentorship & advice' },
+  { value: 'city',        label: 'Networking with brothers in my city' },
+  { value: 'connections', label: 'Keep the connections I\'m building in school' },
 ];
 
 // ─── Q2 Options ───────────────────────────────────────────────────────────────
@@ -125,7 +124,7 @@ export default function InterestPage() {
       <div style={{ minHeight: '100vh', background: '#F7F5F1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');`}</style>
         <div style={{ maxWidth: 420, width: '100%', textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C4874A', fontFamily: 'Inter, sans-serif', marginBottom: 24 }}>Trailblaize</div>
+          <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: 24, display: 'inline-block', marginBottom: 24 }} />
           <div style={{ fontSize: 44, marginBottom: 16 }}>🤙</div>
           <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 30, color: '#1B2A4A', marginBottom: 12, lineHeight: 1.2 }}>
             Your network is waiting.
@@ -172,30 +171,32 @@ export default function InterestPage() {
 
       {/* Logo */}
       <div style={{ padding: '24px 24px 0', textAlign: 'center' }}>
-        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C4874A' }}>
-          Trailblaize
-        </span>
+        <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: 28, display: 'inline-block' }} />
       </div>
 
       {/* Hero */}
-      <div style={{ padding: '40px 24px 32px', textAlign: 'center', maxWidth: 520, margin: '0 auto' }}>
+      <div style={{ padding: '48px 28px 36px', textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
         <div style={{
-          display: 'inline-block', background: '#1B2A4A12', color: '#1B2A4A',
-          fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
-          padding: '5px 12px', borderRadius: 20, marginBottom: 20,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: '#fff', border: '1px solid #D9D4CC',
+          color: '#5C5449', fontSize: 12, fontWeight: 500,
+          letterSpacing: '0.04em', padding: '6px 14px',
+          borderRadius: 24, marginBottom: 28, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         }}>
-          Your Alumni Network
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#C4874A', display: 'inline-block' }} />
+          5,500+ members across 10 chapters already on Trailblaize
         </div>
         <h1 style={{
           fontFamily: "'Instrument Serif', Georgia, serif",
-          fontSize: 'clamp(28px, 7vw, 40px)',
-          color: '#1B2A4A', lineHeight: 1.2, marginBottom: 16,
+          fontSize: 'clamp(30px, 8vw, 44px)',
+          color: '#1B2A4A', lineHeight: 1.15, marginBottom: 20,
+          letterSpacing: '-0.01em',
         }}>
           Your chapter has been building this network for decades.
-          <em style={{ color: '#C4874A' }}> You just can't access it yet.</em>
+          <em style={{ color: '#C4874A', fontStyle: 'italic' }}> You just can't access it yet.</em>
         </h1>
-        <p style={{ fontSize: 16, color: '#5C5449', lineHeight: 1.7, marginBottom: 8 }}>
-          The average fraternity chapter has <strong>500+ alumni</strong> spread across every city, company, and industry you want to break into. Most members can name fewer than 10.
+        <p style={{ fontSize: 16, color: '#5C5449', lineHeight: 1.75, maxWidth: 460, margin: '0 auto' }}>
+          The average fraternity chapter has <strong style={{ color: '#1B2A4A' }}>500+ alumni</strong> spread across every city, company, and industry you want to break into. Most members can name fewer than 10.
         </p>
       </div>
 
@@ -240,7 +241,6 @@ export default function InterestPage() {
                   fontFamily: 'Inter, sans-serif', textAlign: 'left', width: '100%',
                 }}
               >
-                <span style={{ fontSize: 18, lineHeight: 1 }}>{opt.emoji}</span>
                 {opt.label}
                 {q1 === opt.value && <span style={{ marginLeft: 'auto', color: '#C4874A', fontSize: 16 }}>✓</span>}
               </button>
