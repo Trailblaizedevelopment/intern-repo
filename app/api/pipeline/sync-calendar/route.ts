@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { fetchCalendarEvents, refreshAccessToken } from '@/lib/google';
+import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 
 // ─── Employee ID → Name mapping ───────────────────────────────────────────────
 const EMPLOYEE_ID_TO_NAME: Record<string, string> = {
@@ -507,7 +508,10 @@ export async function POST(req: NextRequest) {
     const baseUrl = req.nextUrl.origin;
     const importRes = await fetch(`${baseUrl}/api/pipeline/import`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': INTERNAL_AUTH_HEADER,
+      },
       body: JSON.stringify({ rows: importRows, skipDuplicates: true }),
     });
 
