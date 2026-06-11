@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, X, RefreshCw, ChevronRight, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Search, X, RefreshCw, Plus, ChevronRight, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
 import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -105,8 +105,20 @@ const REP_COLORS: Record<string, string> = {
   Adam:  '#b45309',
   Katie: '#be185d',
   Hyatt: '#065f46',
+  Worth: '#0891b2',
   Team:  '#374151',
 };
+
+const ORG_TYPES = [
+  { value: 'fraternity', label: 'Fraternity' },
+  { value: 'sorority',   label: 'Sorority' },
+  { value: 'council',    label: 'IFC / Council' },
+  { value: 'national',   label: 'National' },
+  { value: 'sports',     label: 'Sports / Club' },
+  { value: 'other',      label: 'Other' },
+];
+
+const REP_OPTIONS = ['Owen', 'Ford', 'Adam', 'Hyatt', 'Worth', 'Katie'];
 
 // Map known auth UUIDs → display names
 const UUID_TO_REP: Record<string, string> = {
@@ -136,6 +148,289 @@ function resolveRep(rep: string | null | undefined): string | null {
 }
 
 const SLIPPING_STAGES: DealStage[] = ['first_demo', 'second_call', 'contract_sent'];
+
+// ─── Create Deal Drawer ────────────────────────────────────────────────────────
+
+interface CreateDealDrawerProps {
+  onClose: () => void;
+  onCreated: () => void;
+}
+
+function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
+  const [orgName, setOrgName]           = useState('');
+  const [schoolName, setSchoolName]     = useState('');
+  const [orgType, setOrgType]           = useState('fraternity');
+  const [stage, setStage]               = useState<DealStage>('lead');
+  const [temperature, setTemperature]   = useState<'hot' | 'warm' | 'cold'>('warm');
+  const [value, setValue]               = useState('3588');
+  const [assignedTo, setAssignedTo]     = useState('Owen');
+  const [contactName, setContactName]   = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [creating, setCreating]         = useState(false);
+  const [error, setError]               = useState<string | null>(null);
+
+  async function handleCreate() {
+    if (!orgName.trim()) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const row = {
+        org_name:      orgName.trim(),
+        org_type:      orgType,
+        school_name:   schoolName.trim() || undefined,
+        stage,
+        temperature,
+        value:         value || '3588',
+        assigned_to:   assignedTo,
+        contact_name:  contactName.trim() || undefined,
+        contact_email: contactEmail.trim() || undefined,
+        contact_phone: contactPhone.trim() || undefined,
+      };
+      const res = await fetch('/api/pipeline/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: [row], skipDuplicates: false }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Create failed');
+      const result = data.results?.[0];
+      if (result?.status === 'error') throw new Error(result.reason || 'Create failed');
+      onCreated();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create deal');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const TEMP_CFG = {
+    hot:  { label: '🔥 Hot',   bg: '#fee2e2', color: '#dc2626', border: '#fca5a5' },
+    warm: { label: '🌡 Warm',  bg: '#fef3c7', color: '#d97706', border: '#fcd34d' },
+    cold: { label: '🧊 Cold',  bg: '#e0f2fe', color: '#0284c7', border: '#7dd3fc' },
+  } as const;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+      <div
+        style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }}
+        onClick={onClose}
+      />
+      <div style={{
+        width: 460, background: '#fff', display: 'flex', flexDirection: 'column',
+        height: '100%', borderLeft: '1px solid #e5e7eb', overflow: 'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ fontWeight: 700, fontSize: '1rem', color: '#111827', margin: 0 }}>New Deal</h2>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '2px 0 0 0' }}>Manually add a deal to the pipeline</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* Org name */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>
+              Chapter / Org Name <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="text" value={orgName} onChange={e => setOrgName(e.target.value)}
+              placeholder="e.g. Sigma Chi, IFC, Theta Xi Nationals"
+              autoFocus
+              style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '9px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* School */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>
+              School
+            </label>
+            <input
+              type="text" value={schoolName} onChange={e => setSchoolName(e.target.value)}
+              placeholder="e.g. University of Alabama, TCU"
+              style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '9px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* Org type */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Type</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {ORG_TYPES.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setOrgType(opt.value)}
+                  style={{
+                    padding: '5px 12px', borderRadius: 8, fontSize: '0.8rem', fontFamily: 'inherit',
+                    cursor: 'pointer', fontWeight: orgType === opt.value ? 700 : 400,
+                    border: `1px solid ${orgType === opt.value ? '#0F172A' : '#e5e7eb'}`,
+                    background: orgType === opt.value ? '#0F172A' : '#fff',
+                    color: orgType === opt.value ? '#fff' : '#374151',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Stage */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Stage</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {PIPELINE_STAGES.map(s => {
+                const cfg = STAGE_COLORS[s];
+                const isActive = stage === s;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setStage(s)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8, fontSize: '0.8rem', fontFamily: 'inherit',
+                      cursor: 'pointer', fontWeight: isActive ? 700 : 400,
+                      border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
+                      background: isActive ? cfg.bg : '#fff',
+                      color: isActive ? cfg.color : '#9ca3af',
+                    }}
+                  >
+                    {STAGE_LABELS[s]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Temperature + Value */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Temp</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {(['hot', 'warm', 'cold'] as const).map(t => {
+                  const cfg = TEMP_CFG[t];
+                  const isActive = temperature === t;
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => setTemperature(t)}
+                      style={{
+                        flex: 1, padding: '5px 6px', borderRadius: 8, fontSize: '0.78rem',
+                        fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
+                        border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
+                        background: isActive ? cfg.bg : '#fff',
+                        color: isActive ? cfg.color : '#9ca3af',
+                      }}
+                    >
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ width: 110 }}>
+              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Value ($)</label>
+              <input
+                type="number" value={value} onChange={e => setValue(e.target.value)}
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          {/* Assigned to */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Assigned To</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {REP_OPTIONS.map(rep => {
+                const color = REP_COLORS[rep] ?? '#6b7280';
+                const isActive = assignedTo === rep;
+                return (
+                  <button
+                    key={rep}
+                    onClick={() => setAssignedTo(rep)}
+                    style={{
+                      padding: '5px 14px', borderRadius: 8, fontSize: '0.8rem',
+                      fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
+                      border: `1px solid ${isActive ? color : '#e5e7eb'}`,
+                      background: isActive ? color : '#fff',
+                      color: isActive ? '#fff' : '#374151',
+                    }}
+                  >
+                    {rep}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Contact (optional) */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>
+              Contact <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                type="text" value={contactName} onChange={e => setContactName(e.target.value)}
+                placeholder="Contact name"
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+              <input
+                type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)}
+                placeholder="Email address"
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+              <input
+                type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)}
+                placeholder="Phone number"
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 14px', fontSize: '0.8rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertCircle size={14} /> {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 10 }}>
+          <button
+            onClick={onClose}
+            style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={!orgName.trim() || creating}
+            style={{
+              flex: 2, padding: '10px', borderRadius: 10, border: 'none',
+              background: orgName.trim() && !creating ? '#0F172A' : '#e5e7eb',
+              color: orgName.trim() && !creating ? '#fff' : '#9ca3af',
+              fontSize: '0.875rem', fontWeight: 700,
+              cursor: orgName.trim() && !creating ? 'pointer' : 'not-allowed',
+              fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {creating
+              ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Creating…</>
+              : <><Plus size={14} /> Create Deal</>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -788,8 +1083,9 @@ export function SalesCRM() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
-  const [selectedDeal, setSelectedDeal] = useState<PipelineDealFull | null>(null);
-  const [granolaNotes, setGranolaNotes] = useState<GranolaNote[] | null>(null);
+  const [selectedDeal, setSelectedDeal]     = useState<PipelineDealFull | null>(null);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
+  const [granolaNotes, setGranolaNotes]     = useState<GranolaNote[] | null>(null);
   const granolaFetchedRef = useRef(false);
 
   // ── Fetch deals ──
@@ -977,6 +1273,18 @@ export function SalesCRM() {
         >
           <RefreshCw size={13} /> Refresh
         </button>
+        <button
+          onClick={() => setShowCreateDrawer(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 14px', borderRadius: 8, border: 'none',
+            background: '#0F172A', color: '#fff',
+            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Plus size={13} /> New Deal
+        </button>
       </div>
 
       {/* ── Pipeline Kanban ── */}
@@ -989,6 +1297,14 @@ export function SalesCRM() {
           deals={visibleDeals}
           archivedDeals={archivedDeals}
           onOpenDeal={setSelectedDeal}
+        />
+      )}
+
+      {/* ── Create Deal Drawer ── */}
+      {showCreateDrawer && (
+        <CreateDealDrawer
+          onClose={() => setShowCreateDrawer(false)}
+          onCreated={fetchDeals}
         />
       )}
 

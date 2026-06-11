@@ -85,6 +85,20 @@ const SCHOOL_ABBREVS: Record<string, string> = {
   'TEXAS TECH': 'Texas Tech University',
   'CINCINNATI': 'University of Cincinnati',
   'UCF': 'University of Central Florida',
+  'ECU': 'East Carolina University',
+  'DELAWARE': 'University of Delaware',
+  'ROBERT MORRIS': 'Robert Morris University',
+  'SACRED HEART': 'Sacred Heart University',
+  'EASTERN ILLINOIS': 'Eastern Illinois University',
+  'WILLIAM AND MARY': 'College of William and Mary',
+  'TULANE': 'Tulane University',
+  'TEMPLE': 'Temple University',
+  'DREXEL': 'Drexel University',
+  'FORDHAM': 'Fordham University',
+  'DEPAUL': 'DePaul University',
+  'CHAPMAN': 'Chapman University',
+  'SEWANEE': 'University of the South',
+  'SWANEE': 'University of the South',
   'HOUSTON': 'University of Houston',
   'BYU': 'Brigham Young University',
 };
@@ -150,14 +164,21 @@ function normalizeSchool(raw: string): string {
 }
 
 // Parse calendar event title into org + school
-// Patterns: "Sigma Chi @ Kentucky/Trailblaize", "IFC LSU/Trailblaize"
+// Handles multiple patterns:
+//   "Sigma Chi @ Kentucky/Trailblaize"  (legacy slash format)
+//   "Arizona Delta Chi + Trailblaize"   (new plus format used by Worth)
+//   "IFC LSU/Trailblaize"               (council format)
+//   "ECU Sigma Pi + Trailblaize"        (school-prefix format)
 function parseEventTitle(title: string): { orgName: string; schoolName: string | null; orgType: string } | null {
-  // Strip "/Trailblaize" suffix (case-insensitive)
-  let clean = title.replace(/\/trailblaize\s*$/i, '').trim();
+  // Strip trailing separator + "Trailblaize" in all common forms:
+  // "/Trailblaize", "+ Trailblaize", "— Trailblaize", "– Trailblaize"
+  let clean = title.replace(/\s*(?:\/|\+|\u2013|\u2014)\s*trailblaize\s*$/i, '').trim();
 
   // Try "org @ school" pattern
   if (clean.includes(' @ ')) {
-    const [orgPart, schoolPart] = clean.split(' @ ');
+    const atIdx = clean.indexOf(' @ ');
+    const orgPart = clean.slice(0, atIdx);
+    const schoolPart = clean.slice(atIdx + 3);
     const orgName = normalizeOrgName(orgPart.trim());
     const schoolName = normalizeSchool(schoolPart.trim());
     const orgType = inferOrgType(orgName);
@@ -171,7 +192,24 @@ function parseEventTitle(title: string): { orgName: string; schoolName: string |
     return { orgName: `${councilMatch[1]} ${schoolName}`, schoolName, orgType: 'council' };
   }
 
-  // If just has "Trailblaize" in title but no parse match, return null
+  // Try "[School abbreviation] [Org]" pattern — school key at the start
+  // e.g. "Arizona Delta Chi" → Delta Chi @ University of Arizona
+  //      "ECU Sigma Pi"      → Sigma Pi @ East Carolina University
+  const words = clean.split(/\s+/);
+  for (let i = 1; i <= Math.min(2, words.length - 1); i++) {
+    const schoolKey = words.slice(0, i).join(' ').toUpperCase();
+    if (SCHOOL_ABBREVS[schoolKey]) {
+      const orgCandidate = words.slice(i).join(' ').trim();
+      if (orgCandidate) {
+        return {
+          orgName: normalizeOrgName(orgCandidate),
+          schoolName: SCHOOL_ABBREVS[schoolKey],
+          orgType: inferOrgType(orgCandidate),
+        };
+      }
+    }
+  }
+
   return null;
 }
 
@@ -464,7 +502,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. POST to /api/pipeline/import
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // Use req.nextUrl.origin so this works correctly in all environments
+    // (avoids NEXT_PUBLIC_APP_URL / localhost fallback issues in production)
+    const baseUrl = req.nextUrl.origin;
     const importRes = await fetch(`${baseUrl}/api/pipeline/import`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
