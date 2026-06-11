@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
   const conference = url.searchParams.get('conference');
   const search = url.searchParams.get('search');
   const overdue = url.searchParams.get('overdue');
+  const limitParam = parseInt(url.searchParams.get('limit') ?? '500');
+  const safeLimit = Math.min(Math.max(limitParam, 1), 500);
 
   let query = admin
     .from('pipeline_deals')
@@ -22,7 +24,8 @@ export async function GET(req: NextRequest) {
       organization:organizations(*, school:schools(*), national_org:national_orgs(*)),
       contact:contacts(*)
     `)
-    .order('next_followup', { ascending: true, nullsFirst: false });
+    .order('next_followup', { ascending: true, nullsFirst: false })
+    .limit(safeLimit);
 
   if (stage && stage !== 'all') query = query.eq('stage', stage);
   if (assigned_to) query = query.eq('assigned_to', assigned_to);

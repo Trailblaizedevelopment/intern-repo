@@ -9,6 +9,12 @@ const EMPLOYEE_ID_TO_NAME: Record<string, string> = {
   '33ab5810-4d9f-485e-babb-a99b650a09e1': 'Owen',
   '3853cd9d-0773-4d04-b23f-20eb51717e0f': 'Ford',
   '66952c26-316d-4e9c-8fe1-4dd5743926ef': 'Adam',
+  '904e6a81-8046-44a5-9710-db893be0a094': 'Hyatt',
+  '6622b57d-1a17-49ae-b492-85906612954f': 'Ally',
+  'b51b7314-fbdc-496f-ae08-3af8aff29a39': 'Devin',
+  'eadecbba-91da-41da-adc5-9a5b1cb82d4c': 'Parker',
+  '5a848006-7f96-4c86-aa8d-3032ac0636ef': 'Riley',
+  '6b7763bb-9bc7-46fb-b677-3e39d0a5d927': 'Worth',
 };
 
 // ─── School abbreviation → Full name ─────────────────────────────────────────

@@ -206,6 +206,7 @@ const STAGE_CONF: Record<string, { label: string; color: string; bg: string }> =
   demo_booked:   { label: 'Demo Booked',   color: '#1d4ed8', bg: '#eff6ff' },
   first_demo:    { label: 'First Demo',    color: '#1d4ed8', bg: '#eff6ff' },
   second_call:   { label: 'Second Call',   color: '#7c3aed', bg: '#f5f3ff' },
+  timing:        { label: 'Bad Timing',    color: '#6d28d9', bg: '#f5f3ff' },
   contract_sent: { label: 'Contract Sent', color: '#b45309', bg: '#fffbeb' },
   closed_won:    { label: 'Closed Won',    color: '#065f46', bg: '#ecfdf5' },
 };
@@ -213,6 +214,7 @@ const STAGE_CONF: Record<string, { label: string; color: string; bg: string }> =
 const STAGE_OPTIONS = [
   { value: 'lead', label: 'New Lead' }, { value: 'demo_booked', label: 'Demo Booked' },
   { value: 'first_demo', label: 'First Demo' }, { value: 'second_call', label: 'Second Call' },
+  { value: 'timing', label: 'Bad Timing' },
   { value: 'contract_sent', label: 'Contract Sent' }, { value: 'closed_won', label: 'Closed Won' },
 ];
 

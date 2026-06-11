@@ -183,7 +183,7 @@ export interface ContactFollowup {
 // Legacy alias for backwards compatibility
 export type FundraisingContact = NetworkContact;
 
-export type DealStage = 'lead' | 'demo_booked' | 'first_demo' | 'second_call' | 'contract_sent' | 'closed_won' | 'closed_lost' | 'hold_off';
+export type DealStage = 'lead' | 'demo_booked' | 'first_demo' | 'second_call' | 'timing' | 'contract_sent' | 'closed_won' | 'closed_lost' | 'hold_off';
 
 export interface Deal {
   id: string;
@@ -221,6 +221,7 @@ export const STAGE_CONFIG: Record<DealStage, { label: string; points: number; em
   demo_booked: { label: 'Demo Booked', points: 25, emoji: '📅', color: '#3b82f6' },
   first_demo: { label: 'First Demo', points: 50, emoji: '🎬', color: '#8b5cf6' },
   second_call: { label: 'Second Call', points: 75, emoji: '🤝', color: '#f59e0b' },
+  timing: { label: 'Bad Timing', points: 0, emoji: '⏱️', color: '#6d28d9' },
   contract_sent: { label: 'Contract Sent', points: 100, emoji: '📝', color: '#ec4899' },
   closed_won: { label: 'Closed Won', points: 500, emoji: '🏆', color: '#10b981' },
   closed_lost: { label: 'Closed Lost', points: 0, emoji: '❌', color: '#ef4444' },

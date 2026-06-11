@@ -28,7 +28,7 @@ interface ImportResult {
   reason?: string;
 }
 
-const VALID_STAGES = ['lead', 'demo_booked', 'first_demo', 'second_call', 'contract_sent', 'closed_won', 'closed_lost', 'hold_off'];
+const VALID_STAGES = ['lead', 'demo_booked', 'first_demo', 'second_call', 'timing', 'contract_sent', 'closed_won', 'closed_lost', 'hold_off'];
 const VALID_TEMPS = ['hot', 'warm', 'cold'];
 const VALID_ORG_TYPES = ['fraternity', 'sorority', 'council', 'national', 'sports', 'other'];
 

@@ -73,6 +73,7 @@ const PIPELINE_STAGES: DealStage[] = [
   'demo_booked',
   'first_demo',
   'second_call',
+  'timing',
   'contract_sent',
   'closed_won',
 ];
@@ -82,6 +83,7 @@ const STAGE_LABELS: Record<DealStage, string> = {
   demo_booked:   'Demo Booked',
   first_demo:    'First Demo',
   second_call:   'Second Call',
+  timing:        'Bad Timing',
   contract_sent: 'Contract Sent',
   closed_won:    'Closed Won',
   closed_lost:   'Closed Lost',
@@ -93,6 +95,7 @@ const STAGE_COLORS: Record<DealStage, { color: string; bg: string; border: strin
   demo_booked:   { color: '#1d4ed8', bg: '#eff6ff',  border: '#bfdbfe' },
   first_demo:    { color: '#7c3aed', bg: '#f5f3ff',  border: '#ddd6fe' },
   second_call:   { color: '#d97706', bg: '#fef3c7',  border: '#fcd34d' },
+  timing:        { color: '#6d28d9', bg: '#f5f3ff',  border: '#c4b5fd' },
   contract_sent: { color: '#be185d', bg: '#fdf2f8',  border: '#fbcfe8' },
   closed_won:    { color: '#065f46', bg: '#d1fae5',  border: '#6ee7b7' },
   closed_lost:   { color: '#dc2626', bg: '#fee2e2',  border: '#fca5a5' },
@@ -123,19 +126,15 @@ const REP_OPTIONS = ['Owen', 'Ford', 'Adam', 'Hyatt', 'Worth', 'Katie'];
 // Map known auth UUIDs → display names
 const UUID_TO_REP: Record<string, string> = {
   '33ab5810-4d9f-485e-babb-a99b650a09e1': 'Owen',
+  '3853cd9d-0773-4d04-b23f-20eb51717e0f': 'Ford',
+  '66952c26-316d-4e9c-8fe1-4dd5743926ef': 'Adam',
+  '904e6a81-8046-44a5-9710-db893be0a094': 'Hyatt',
+  '6622b57d-1a17-49ae-b492-85906612954f': 'Ally',
+  'b51b7314-fbdc-496f-ae08-3af8aff29a39': 'Devin',
+  'eadecbba-91da-41da-adc5-9a5b1cb82d4c': 'Parker',
+  '5a848006-7f96-4c86-aa8d-3032ac0636ef': 'Riley',
+  '6b7763bb-9bc7-46fb-b677-3e39d0a5d927': 'Worth',
 };
-
-const CATEGORY_OPTIONS = [
-  { value: 'all',                      label: 'All' },
-  { value: 'greek',                    label: 'Greek' },
-  { value: 'clubs',                    label: 'Clubs' },
-  { value: 'sports',                   label: 'Sports' },
-  { value: 'alumni_associations',      label: 'Alumni Associations' },
-  { value: 'professional_associations',label: 'Professional Associations' },
-  { value: 'country_clubs',            label: 'Country Clubs' },
-] as const;
-
-type CategoryFilter = typeof CATEGORY_OPTIONS[number]['value'];
 
 function isUUID(s: string | null | undefined): boolean {
   return !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
@@ -576,14 +575,21 @@ interface DealDrawerProps {
   onClose: () => void;
   onAdvanceStage: (dealId: string, stage: DealStage) => void;
   onLogActivity: (dealId: string, text: string) => void;
+  onPatch?: (dealId: string, patch: Partial<PipelineDealFull>) => void;
 }
 
-function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity }: DealDrawerProps) {
+function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity, onPatch }: DealDrawerProps) {
   const [activityInput, setActivityInput] = useState('');
   const orgName = deal.organization?.name ?? 'Unknown Org';
   const schoolName = deal.organization?.school?.name ?? '';
-  const contactName = deal.contact?.name ?? null;
-  const rep = deal.assigned_to;
+
+  // Editable field state
+  const [editTemp, setEditTemp] = useState<'hot' | 'warm' | 'cold'>(deal.temperature ?? 'warm');
+  const [editValue, setEditValue] = useState<string>(String(deal.value ?? ''));
+  const [editRep, setEditRep] = useState<string>(resolveRep(deal.assigned_to) ?? '');
+  const [editFollowup, setEditFollowup] = useState<string>(deal.next_followup ?? '');
+  const [editContactName, setEditContactName] = useState<string>(deal.contact?.name ?? '');
+  const [editContactEmail, setEditContactEmail] = useState<string>(deal.contact?.email ?? '');
 
   // Parse existing notes/activity log
   const activityLog = useMemo(() => parseDealNotes(deal.notes), [deal.notes]);
@@ -609,6 +615,50 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
     setActivityInput('');
   }
 
+  async function handleSaveChanges() {
+    const patch: Record<string, unknown> = {};
+    if (editTemp !== deal.temperature) patch.temperature = editTemp;
+    const numVal = parseFloat(editValue);
+    if (!isNaN(numVal) && numVal !== deal.value) patch.value = numVal;
+    if (editRep && editRep !== resolveRep(deal.assigned_to)) patch.assigned_to = editRep;
+    if (editFollowup !== (deal.next_followup ?? '')) patch.next_followup = editFollowup || null;
+
+    if (Object.keys(patch).length > 0) {
+      onPatch?.(deal.id, patch as Partial<PipelineDealFull>);
+    }
+
+    // Handle contact edits
+    if (deal.contact?.id) {
+      const contactPatch: Record<string, string> = {};
+      if (editContactName !== (deal.contact?.name ?? '')) contactPatch.name = editContactName;
+      if (editContactEmail !== (deal.contact?.email ?? '')) contactPatch.email = editContactEmail;
+      if (Object.keys(contactPatch).length > 0) {
+        await fetch(`/api/pipeline/contacts/${deal.contact.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(contactPatch),
+        });
+      }
+    }
+    onClose();
+  }
+
+  function handleClosedLost() {
+    onAdvanceStage(deal.id, 'closed_lost');
+    onClose();
+  }
+
+  function handleHoldOff() {
+    onAdvanceStage(deal.id, 'hold_off');
+    onClose();
+  }
+
+  const TEMP_CFG = {
+    hot:  { label: '🔥 Hot',   bg: '#fee2e2', color: '#dc2626', border: '#fca5a5' },
+    warm: { label: '🌡 Warm',  bg: '#fef3c7', color: '#d97706', border: '#fcd34d' },
+    cold: { label: '🧊 Cold',  bg: '#e0f2fe', color: '#0284c7', border: '#7dd3fc' },
+  } as const;
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
       <div
@@ -616,7 +666,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
         onClick={onClose}
       />
       <div style={{
-        width: 440, background: '#ffffff', display: 'flex', flexDirection: 'column',
+        width: 480, background: '#ffffff', display: 'flex', flexDirection: 'column',
         height: '100%', borderLeft: '1px solid #e5e7eb', overflow: 'hidden',
       }}>
         {/* Header */}
@@ -628,11 +678,6 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
                 <StageBadge stage={deal.stage} />
               </div>
               {schoolName && <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{schoolName}</div>}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-                {contactName && <span style={{ fontSize: '0.8rem', color: '#374151' }}>👤 {contactName}</span>}
-                <RepBadge rep={rep} />
-                {deal.value > 0 && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1d4ed8' }}>{fmt$(deal.value)}</span>}
-              </div>
             </div>
             <button
               onClick={onClose}
@@ -643,13 +688,111 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Stage Stepper */}
           <div>
             <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
               Stage Progression
             </div>
             <StageStepper currentStage={deal.stage} onAdvance={(stage) => onAdvanceStage(deal.id, stage)} />
+          </div>
+
+          {/* Temperature */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Temperature</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['hot', 'warm', 'cold'] as const).map(t => {
+                const cfg = TEMP_CFG[t];
+                const isActive = editTemp === t;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setEditTemp(t)}
+                    style={{
+                      flex: 1, padding: '6px 8px', borderRadius: 8, fontSize: '0.8rem',
+                      fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
+                      border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
+                      background: isActive ? cfg.bg : '#fff',
+                      color: isActive ? cfg.color : '#9ca3af',
+                    }}
+                  >
+                    {cfg.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Value + Follow-up */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Value ($)</div>
+              <input
+                type="number"
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Next Follow-up</div>
+              <input
+                type="date"
+                value={editFollowup}
+                onChange={e => setEditFollowup(e.target.value)}
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          {/* Assigned To */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Assigned To</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {REP_OPTIONS.map(rep => {
+                const color = REP_COLORS[rep] ?? '#6b7280';
+                const isActive = editRep === rep;
+                return (
+                  <button
+                    key={rep}
+                    onClick={() => setEditRep(rep)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8, fontSize: '0.78rem',
+                      fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
+                      border: `1px solid ${isActive ? color : '#e5e7eb'}`,
+                      background: isActive ? color : '#fff',
+                      color: isActive ? '#fff' : '#374151',
+                    }}
+                  >
+                    {rep}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Contact Info */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Contact</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                type="text"
+                value={editContactName}
+                onChange={e => setEditContactName(e.target.value)}
+                placeholder="Contact name"
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+              <input
+                type="email"
+                value={editContactEmail}
+                onChange={e => setEditContactEmail(e.target.value)}
+                placeholder="Email address"
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+              {!deal.contact?.id && (
+                <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontStyle: 'italic' }}>No contact linked — contact edits will be skipped</div>
+              )}
+            </div>
           </div>
 
           {/* Granola Notes */}
@@ -711,7 +854,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
         </div>
 
         {/* Log Activity Input */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
+        <div style={{ padding: '12px 24px 0', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
           <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>
             Log Activity
           </div>
@@ -741,6 +884,40 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
               Log
             </button>
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ padding: '12px 24px 16px', background: '#f9fafb', display: 'flex', gap: 8 }}>
+          <button
+            onClick={handleClosedLost}
+            style={{
+              flex: 1, padding: '9px 8px', borderRadius: 10, border: 'none',
+              background: '#fee2e2', color: '#dc2626',
+              fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Closed Lost
+          </button>
+          <button
+            onClick={handleHoldOff}
+            style={{
+              flex: 1, padding: '9px 8px', borderRadius: 10, border: '1px solid #e5e7eb',
+              background: '#f9fafb', color: '#6b7280',
+              fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Hold Off
+          </button>
+          <button
+            onClick={handleSaveChanges}
+            style={{
+              flex: 2, padding: '9px 8px', borderRadius: 10, border: 'none',
+              background: '#0F172A', color: '#fff',
+              fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Save Changes
+          </button>
         </div>
       </div>
     </div>
@@ -964,7 +1141,7 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProp
   const byStage = useMemo(() => {
     const map: Record<DealStage, PipelineDealFull[]> = {
       lead: [], demo_booked: [], first_demo: [], second_call: [],
-      contract_sent: [], closed_won: [], closed_lost: [], hold_off: [],
+      timing: [], contract_sent: [], closed_won: [], closed_lost: [], hold_off: [],
     };
     for (const deal of deals) {
       if (map[deal.stage]) map[deal.stage].push(deal);
@@ -1082,7 +1259,6 @@ export function SalesCRM() {
   const [deals, setDeals] = useState<PipelineDealFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [selectedDeal, setSelectedDeal]     = useState<PipelineDealFull | null>(null);
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [granolaNotes, setGranolaNotes]     = useState<GranolaNote[] | null>(null);
@@ -1126,16 +1302,24 @@ export function SalesCRM() {
   }, []);
 
   // ── PATCH deal ──
-  async function patchDeal(dealId: string, updates: Record<string, any>) {
+  async function patchDeal(dealId: string, updates: Record<string, unknown>) {
     try {
       await fetch(`/api/pipeline/deals/${dealId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
+      fetchDeals();
     } catch (err) {
       console.error('[sales-crm] patch error:', err);
     }
+  }
+
+  // ── onPatch handler for drawer ──
+  function handlePatch(dealId: string, patch: Partial<PipelineDealFull>) {
+    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, ...patch } : d));
+    if (selectedDeal?.id === dealId) setSelectedDeal(prev => prev ? { ...prev, ...patch } : null);
+    patchDeal(dealId, patch as Record<string, unknown>);
   }
 
   // ── Advance stage ──
@@ -1163,7 +1347,6 @@ export function SalesCRM() {
   // ── Filters ──
   const { visibleDeals, archivedDeals } = useMemo(() => {
     let list = deals;
-    if (categoryFilter !== 'all') list = list.filter(d => (d as any).category === categoryFilter || (!((d as any).category) && categoryFilter === 'greek'));
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(d =>
@@ -1175,7 +1358,7 @@ export function SalesCRM() {
     const archived = list.filter(d => d.stage === 'closed_lost' || d.stage === 'hold_off');
     const visible = list.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
     return { visibleDeals: visible, archivedDeals: archived };
-  }, [deals, categoryFilter, search]);
+  }, [deals, search]);
 
   // ── Stats ──
   const stats = useMemo(() => {
@@ -1248,25 +1431,6 @@ export function SalesCRM() {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {CATEGORY_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setCategoryFilter(opt.value as CategoryFilter)}
-              style={{
-                padding: '6px 14px', borderRadius: '8px', fontSize: '0.8125rem',
-                fontWeight: categoryFilter === opt.value ? 700 : 500, cursor: 'pointer',
-                border: `1px solid ${categoryFilter === opt.value ? '#0F172A' : '#e5e7eb'}`,
-                background: categoryFilter === opt.value ? '#0F172A' : '#ffffff',
-                color: categoryFilter === opt.value ? '#ffffff' : '#374151',
-                fontFamily: 'inherit', transition: 'all 0.1s', whiteSpace: 'nowrap',
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
         <button
           onClick={fetchDeals}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
@@ -1316,6 +1480,7 @@ export function SalesCRM() {
           onClose={() => setSelectedDeal(null)}
           onAdvanceStage={handleAdvanceStage}
           onLogActivity={handleLogActivity}
+          onPatch={handlePatch}
         />
       )}
     </div>
