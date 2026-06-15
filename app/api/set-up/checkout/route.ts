@@ -10,6 +10,7 @@ const INTERNAL_BYPASS_CODES = ['TRAILBLAIZE100', 'FOUNDER', 'INTERNAL', 'NYUKAPP
 const DISCOUNTED_PRICE_CODES: Record<string, number> = {
   ADAM: 29,
   MEMBER: 29,
+  CONNECT: 49,
 };
 
 /**
