@@ -17,6 +17,26 @@ const OUTREACH_LINE_PHONES: Record<number, string> = {
 };
 const OUTREACH_LINE_NUMBERS = [2, 4, 5, 6, 7, 8, 9, 10, 11];
 
+const LINE_LABELS: Record<string, string> = {
+  '+16462178274': 'Adam',
+  '+14044239427': 'Line 4',
+  '+14045428435': 'Line 5',
+  '+19725590427': 'Line 6',
+  '+19725590438': 'Line 7',
+  '+15042234218': 'Line 8',
+  '+15042236050': 'Line 9',
+  '+12817773280': 'Line 10',
+  '+12817452268': 'Line 11',
+};
+
+function touchStageFromStatus(status: string | null): string | null {
+  if (!status) return null;
+  if (status === 'touch1_sent' || status === 'touch1_confirmed') return 'T1';
+  if (status === 'touch2_sent') return 'T2';
+  if (status === 'touch3_sent') return 'T3';
+  return null;
+}
+
 // ── Message builders ──────────────────────────────────────────────────────────
 
 function buildT1Message(firstName: string, fraternityName: string, school: string): string {
@@ -125,7 +145,7 @@ export async function POST(req: NextRequest) {
     // 2. Fetch chapter
     const { data: chapter, error: chErr } = await supabase
       .from('chapters')
-      .select('id, fraternity, school, alumni_join_link')
+      .select('id, fraternity, school, alumni_join_link, chapter_name')
       .eq('id', contact.chapter_id)
       .single();
 
@@ -215,6 +235,28 @@ export async function POST(req: NextRequest) {
       .from('alumni_contacts')
       .update({ linq_chat_id: chat.id })
       .eq('id', contact_id);
+
+    // Immediately surface this conversation in the Conversations tab
+    const newStatus = touch === 'T1' ? 'touch1_sent' : touch === 'T2' ? 'touch2_sent' : 'touch3_sent';
+    await supabase.from('linq_conversations').upsert({
+      linq_chat_id: chat.id,
+      line_phone: line.fromPhone,
+      line_label: LINE_LABELS[line.fromPhone] ?? null,
+      contact_id: contact_id,
+      contact_name: [contact.first_name, contact.last_name].filter(Boolean).join(' ') || null,
+      contact_phone: contact.phone_primary,
+      chapter_id: contact.chapter_id,
+      chapter_name: (chapter as { chapter_name?: string }).chapter_name ?? null,
+      outreach_status: newStatus,
+      touch_stage: touch,
+      status: 'active',
+      last_message_at: now,
+      last_message_text: message.slice(0, 200),
+      last_message_direction: 'outbound',
+      has_unread_reply: false,
+      is_urgent: false,
+      updated_at: now,
+    }, { onConflict: 'linq_chat_id', ignoreDuplicates: false });
 
     await updateLineLastUsed(supabase, line.lineNumber);
 

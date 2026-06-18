@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { createChat } from '@/lib/linq';
-import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 
 export const maxDuration = 300;
 
@@ -20,6 +19,18 @@ const OUTREACH_LINES = [
 
 // Per-line daily T1 cap — 45 new convos/line is the safe Linq limit
 const DAILY_CAP_PER_LINE = 45;
+
+const LINE_LABELS: Record<number, string> = {
+  2: 'Adam',
+  4: 'Line 4',
+  5: 'Line 5',
+  6: 'Line 6',
+  7: 'Line 7',
+  8: 'Line 8',
+  9: 'Line 9',
+  10: 'Line 10',
+  11: 'Line 11',
+};
 
 // Max contacts per single API call — at 1s delay this = ~200s, safely inside 300s Vercel limit
 const MAX_PER_CALL = 200;
@@ -169,7 +180,7 @@ export async function POST(req: NextRequest) {
     // Get chapter info
     const { data: chapter } = await supabase
       .from('chapters')
-      .select('fraternity, school, alumni_join_link')
+      .select('fraternity, school, alumni_join_link, chapter_name')
       .eq('id', chapter_id)
       .single();
     if (!chapter) return NextResponse.json({ error: 'Chapter not found' }, { status: 404 });
@@ -257,7 +268,31 @@ export async function POST(req: NextRequest) {
         }
 
         await supabase.from('alumni_contacts').update(updates).eq('id', contact.id);
-        results.sent++;
+
+        // Surface conversation in Conversations tab immediately
+        const convNow = new Date().toISOString();
+        const outreachStatusForConv = touch === 'T1' ? 'touch1_sent' : touch === 'T2' ? 'touch2_sent' : 'touch3_sent';
+        await supabase.from('linq_conversations').upsert({
+          linq_chat_id: chat.id,
+          line_phone: line.phone,
+          line_label: LINE_LABELS[line.number] ?? null,
+          contact_id: contact.id,
+          contact_name: [contact.first_name, contact.last_name].filter(Boolean).join(' ') || null,
+          contact_phone: contact.phone_primary,
+          chapter_id: chapter_id,
+          chapter_name: (chapter as { chapter_name?: string }).chapter_name ?? null,
+          outreach_status: outreachStatusForConv,
+          touch_stage: touch,
+          status: 'active',
+          last_message_at: convNow,
+          last_message_text: message.slice(0, 200),
+          last_message_direction: 'outbound',
+          has_unread_reply: false,
+          is_urgent: false,
+          updated_at: convNow,
+        }, { onConflict: 'linq_chat_id', ignoreDuplicates: false });
+
+        results.sent++
       } catch (e) {
         results.failed++;
         results.errors.push(`${contact.first_name} ${contact.last_name || ''} (${contact.id}): ${String(e)}`);
@@ -271,16 +306,6 @@ export async function POST(req: NextRequest) {
     }
 
     results.remaining = Math.max(0, (totalEligible ?? 0) - results.sent);
-
-    // Kick off a conversations sync in the background so the
-    // Conversations tab populates immediately after the bulk send.
-    // Fire-and-forget — don't block the response.
-    if (results.sent > 0) {
-      fetch(`${req.nextUrl.origin}/api/conversations/sync`, {
-        method: 'POST',
-        headers: { Authorization: INTERNAL_AUTH_HEADER },
-      }).catch(() => {}); // non-fatal
-    }
 
     return NextResponse.json({ success: true, ...results });
   } catch (err) {

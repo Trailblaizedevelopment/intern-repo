@@ -44,8 +44,8 @@ export async function GET(
   }
 
   try {
-    // Fetch up to 200 messages — sorted desc from Linq, we reverse to asc
-    const messages = await getMessages(conv.linq_chat_id, 200);
+    // Fetch up to 500 messages — sorted desc from Linq, we reverse to asc
+    const messages = await getMessages(conv.linq_chat_id, 500);
     // Linq returns newest first; reverse for chronological display
     const sorted = [...messages].sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
