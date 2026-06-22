@@ -5,7 +5,7 @@ import { X, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 /* ─── Types ─── */
-type OrgCategory = 'fraternity' | 'sorority' | 'council' | 'national' | 'sports' | 'country_club' | 'chamber' | 'other';
+type OrgCategory = 'fraternity' | 'sorority' | 'council' | 'national' | 'sports' | 'country_club' | 'other';
 
 interface School { id: string; name: string; state: string | null; conference: string | null; }
 interface NationalOrg { id: string; name: string; abbreviation: string | null; type: 'fraternity' | 'sorority'; }
@@ -23,7 +23,6 @@ const ORG_CATEGORIES: { key: OrgCategory; label: string; emoji: string; dealType
   { key: 'national', label: 'National HQ', emoji: '🌐', dealType: 'national' },
   { key: 'sports',       label: 'Sports Team / Club',       emoji: '⚽', dealType: 'local' },
   { key: 'country_club', label: 'Country Club',               emoji: '⛳', dealType: 'local' },
-  { key: 'chamber',      label: 'Chamber of Commerce',        emoji: '🏢', dealType: 'local' },
   { key: 'other',        label: 'Other Campus Org',           emoji: '🎓', dealType: 'local' },
 ];
 
@@ -45,7 +44,6 @@ const DEFAULT_VALUE: Record<OrgCategory, string> = {
   sorority:     '3588',
   sports:       '3588',
   country_club: '3588',
-  chamber:      '3588',
   other:        '3588',
   council:      '',
   national:     '',
@@ -256,7 +254,6 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
           next_followup: nextFollowup || null,
           last_touched: new Date().toISOString(),
           category: (orgCategory === 'country_club' ? 'country_clubs' :
-                     orgCategory === 'chamber' ? 'chamber' :
                      orgCategory === 'sports' ? 'sports' :
                      'greek'),
         }),

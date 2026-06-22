@@ -9,7 +9,7 @@ import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
 
 type LeadOwner = 'Owen' | 'Ford' | 'Adam' | 'Team' | 'Katie' | 'Hyatt';
 
-type CategoryFilter = 'all' | 'greek' | 'country_clubs' | 'chamber' | 'sports' | 'alumni_associations' | 'professional_associations';
+type CategoryFilter = 'all' | 'greek' | 'country_clubs' | 'sports' | 'alumni_associations' | 'professional_associations';
 
 export interface PipelineDealFull {
   id: string;
@@ -129,7 +129,6 @@ const CATEGORY_FILTERS: { value: CategoryFilter; label: string }[] = [
   { value: 'all',                       label: 'All' },
   { value: 'greek',                     label: 'Greek Life' },
   { value: 'country_clubs',             label: 'Country Clubs' },
-  { value: 'chamber',                   label: 'Chamber of Commerce' },
   { value: 'sports',                    label: 'Sports Teams' },
   { value: 'alumni_associations',       label: 'Alumni Associations' },
   { value: 'professional_associations', label: 'Professional Assoc.' },
@@ -1280,10 +1279,13 @@ export function SalesCRM() {
   // ── Fetch deals ──
   const fetchDeals = useCallback(async () => {
     try {
-      const res = await fetch('/api/pipeline/deals?limit=200');
+      const params = new URLSearchParams();
+      params.set('limit', '200');
+      if (categoryFilter && categoryFilter !== 'all') params.set('category', categoryFilter);
+      const res = await fetch(`/api/pipeline/deals?${params.toString()}`);
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setDeals(data);
         return data as PipelineDealFull[];
       }
@@ -1294,11 +1296,11 @@ export function SalesCRM() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [categoryFilter]);
 
   useEffect(() => {
     fetchDeals();
-  }, [fetchDeals]);
+  }, [fetchDeals, categoryFilter]);
 
   // ── Fetch Granola notes on mount ──
   useEffect(() => {
@@ -1366,12 +1368,6 @@ export function SalesCRM() {
         (d.organization?.name ?? '').toLowerCase().includes(q) ||
         (d.organization?.school?.name ?? '').toLowerCase().includes(q) ||
         (d.contact?.name ?? '').toLowerCase().includes(q)
-      );
-    }
-    if (categoryFilter !== 'all') {
-      list = list.filter(d =>
-        (d as any).category === categoryFilter ||
-        (!(d as any).category && categoryFilter === 'greek')
       );
     }
     const archived = list.filter(d => d.stage === 'closed_lost' || d.stage === 'hold_off');

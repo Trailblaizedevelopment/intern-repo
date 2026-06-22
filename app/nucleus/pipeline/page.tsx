@@ -379,7 +379,6 @@ function FilterDrawer({
     { key: 'sports',        label: '⚽ Sports' },
     { key: 'other',         label: '🎓 Other' },
     { key: 'country_clubs', label: '⛳ Country Club' },
-    { key: 'chamber',       label: '🏢 Chamber' },
   ];
 
   return (
@@ -749,10 +748,19 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   }
 
   /* ─── Data Loading ─── */
+  // DB-level category filtering for non-Greek verticals
+  const CATEGORY_VERTICALS = ['country_clubs', 'professional_associations', 'sports', 'alumni_associations'];
+
   const loadDeals = useCallback(async () => {
-    const res = await fetch('/api/pipeline/deals');
+    const params = new URLSearchParams();
+    // If filterOrgTypes has exactly one non-Greek category vertical, pass it as a DB filter
+    const categoryFilters = filterOrgTypes.filter(t => CATEGORY_VERTICALS.includes(t));
+    if (categoryFilters.length === 1 && filterOrgTypes.every(t => CATEGORY_VERTICALS.includes(t))) {
+      params.set('category', categoryFilters[0]);
+    }
+    const res = await fetch(`/api/pipeline/deals${params.toString() ? `?${params.toString()}` : ''}`);
     if (res.ok) setDeals(await res.json());
-  }, []);
+  }, [filterOrgTypes]);
 
   const loadSchools = useCallback(async () => {
     const res = await fetch('/api/pipeline/schools');

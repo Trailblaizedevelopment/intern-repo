@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const conference = url.searchParams.get('conference');
   const search = url.searchParams.get('search');
   const overdue = url.searchParams.get('overdue');
+  const category = url.searchParams.get('category');
   const limitParam = parseInt(url.searchParams.get('limit') ?? '500');
   const safeLimit = Math.min(Math.max(limitParam, 1), 500);
 
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
   if (deal_type) query = query.eq('deal_type', deal_type);
   if (temperature) query = query.eq('temperature', temperature);
   if (conference) query = query.eq('conference', conference);
+  if (category && category !== 'all') query = query.eq('category', category);
   if (school_id) query = query.eq('organization.school_id', school_id);
   if (overdue === 'true') {
     query = query.lt('next_followup', new Date().toISOString().split('T')[0]);
