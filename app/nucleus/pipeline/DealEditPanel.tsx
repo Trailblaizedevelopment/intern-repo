@@ -43,7 +43,7 @@ interface Props {
   onDeleted: () => void;
 }
 
-const STAGES: DealStage[] = ['lead', 'demo_booked', 'first_demo', 'second_call', 'contract_sent', 'closed_won', 'closed_lost', 'hold_off'];
+const STAGES: DealStage[] = ['lead', 'demo_booked', 'first_demo', 'second_call', 'timing', 'contract_sent', 'closed_won', 'closed_lost', 'hold_off'];
 
 const CONTACT_ROLES = [
   { value: 'president', label: 'President' },

@@ -994,7 +994,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
   }, [deals, activeTab, currentUser, filterStage, filterConference, filterType, filterTemp, filterAssigned, filterStages, filterConferences, filterTemps, filterOrgTypes, filterOverdueOnly, searchQuery]);
 
   const stats = useMemo(() => {
-    const active = filteredDeals.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
+    const active = filteredDeals.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off' && d.stage !== 'timing');
     const totalValue = active.reduce((s, d) => s + (d.value || 0), 0);
     const overdue = active.filter(d => followupUrgency(d.next_followup) === 'overdue').length;
     const goingCold = active.filter(d => {
@@ -1020,7 +1020,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     const urgency = followupUrgency(deal.next_followup);
     // BUG-5: prefer updated_at, fallback to last_touched, then created_at
     const days = daysAgo(deal.updated_at || deal.last_touched || deal.created_at);
-    const isGoingCold = days !== null && days >= 7 && deal.stage !== 'closed_lost' && deal.stage !== 'hold_off';
+    const isGoingCold = days !== null && days >= 7 && deal.stage !== 'closed_lost' && deal.stage !== 'hold_off' && deal.stage !== 'timing';
     const stageConf = STAGE_CONFIG[deal.stage];
     const assignee = showAssigned ? employees.find(e => e.id === deal.assigned_to) : null;
     const orgIcon = getOrgIcon(deal);
