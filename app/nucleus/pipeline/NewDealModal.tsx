@@ -5,7 +5,7 @@ import { X, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 /* ─── Types ─── */
-type OrgCategory = 'fraternity' | 'sorority' | 'council' | 'national' | 'sports' | 'other';
+type OrgCategory = 'fraternity' | 'sorority' | 'council' | 'national' | 'sports' | 'country_club' | 'chamber' | 'other';
 
 interface School { id: string; name: string; state: string | null; conference: string | null; }
 interface NationalOrg { id: string; name: string; abbreviation: string | null; type: 'fraternity' | 'sorority'; }
@@ -21,8 +21,10 @@ const ORG_CATEGORIES: { key: OrgCategory; label: string; emoji: string; dealType
   { key: 'sorority', label: 'Sorority Chapter', emoji: '🏠', dealType: 'local' },
   { key: 'council', label: 'IFC / PHC Council', emoji: '⚖️', dealType: 'council' },
   { key: 'national', label: 'National HQ', emoji: '🌐', dealType: 'national' },
-  { key: 'sports', label: 'Sports Team / Club', emoji: '⚽', dealType: 'local' },
-  { key: 'other', label: 'Other Campus Org', emoji: '🎓', dealType: 'local' },
+  { key: 'sports',       label: 'Sports Team / Club',       emoji: '⚽', dealType: 'local' },
+  { key: 'country_club', label: 'Country Club',               emoji: '⛳', dealType: 'local' },
+  { key: 'chamber',      label: 'Chamber of Commerce',        emoji: '🏢', dealType: 'local' },
+  { key: 'other',        label: 'Other Campus Org',           emoji: '🎓', dealType: 'local' },
 ];
 
 const PIPELINE_STAGES: DealStage[] = ['lead', 'demo_booked', 'first_demo', 'second_call', 'contract_sent', 'closed_won'];
@@ -39,12 +41,14 @@ const CONTACT_ROLES = [
 // TEAM_MEMBERS replaced by dynamic employees fetch (see BUG-4 fix below)
 
 const DEFAULT_VALUE: Record<OrgCategory, string> = {
-  fraternity: '3588',
-  sorority: '3588',
-  sports: '3588',
-  other: '3588',
-  council: '',
-  national: '',
+  fraternity:   '3588',
+  sorority:     '3588',
+  sports:       '3588',
+  country_club: '3588',
+  chamber:      '3588',
+  other:        '3588',
+  council:      '',
+  national:     '',
 };
 
 const TEMP_STYLE: Record<string, { bg: string; border: string; color: string }> = {
@@ -251,6 +255,10 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
           notes: notes.trim() || null,
           next_followup: nextFollowup || null,
           last_touched: new Date().toISOString(),
+          category: (orgCategory === 'country_club' ? 'country_clubs' :
+                     orgCategory === 'chamber' ? 'chamber' :
+                     orgCategory === 'sports' ? 'sports' :
+                     'greek'),
         }),
       });
       if (!dRes.ok) throw new Error('Failed to create deal');

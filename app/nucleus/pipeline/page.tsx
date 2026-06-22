@@ -372,12 +372,14 @@ function FilterDrawer({
 
   const STAGE_ENTRIES = Object.entries(STAGE_CONFIG) as [DealStage, typeof STAGE_CONFIG[DealStage]][];
   const ORG_TYPES = [
-    { key: 'fraternity', label: '🏛 Fraternity' },
-    { key: 'sorority', label: '🏠 Sorority' },
-    { key: 'council', label: '⚖️ Council' },
-    { key: 'national', label: '🌐 National' },
-    { key: 'sports', label: '⚽ Sports' },
-    { key: 'other', label: '🎓 Other' },
+    { key: 'fraternity',    label: '🏛 Fraternity' },
+    { key: 'sorority',      label: '🏠 Sorority' },
+    { key: 'council',       label: '⚖️ Council' },
+    { key: 'national',      label: '🌐 National' },
+    { key: 'sports',        label: '⚽ Sports' },
+    { key: 'other',         label: '🎓 Other' },
+    { key: 'country_clubs', label: '⛳ Country Club' },
+    { key: 'chamber',       label: '🏢 Chamber' },
   ];
 
   return (
@@ -966,7 +968,10 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
         result = result.filter(d => {
           const icon = getOrgIcon(d);
           const iconToType: Record<string, string> = { '🏛': 'fraternity', '🏠': 'sorority', '⚖️': 'council', '🌐': 'national', '⚽': 'sports', '🎓': 'other' };
-          return filterOrgTypes.includes(iconToType[icon] || d.deal_type);
+          const mappedType = iconToType[icon] || d.deal_type;
+          // Also check category field for non-Greek verticals
+          const dealCategory = (d as any).category || 'greek';
+          return filterOrgTypes.includes(mappedType) || filterOrgTypes.includes(dealCategory);
         });
       }
       if (filterAssigned) result = result.filter(d => d.assigned_to === filterAssigned);

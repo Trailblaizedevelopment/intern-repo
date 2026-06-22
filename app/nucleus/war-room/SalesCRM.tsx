@@ -9,6 +9,8 @@ import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
 
 type LeadOwner = 'Owen' | 'Ford' | 'Adam' | 'Team' | 'Katie' | 'Hyatt';
 
+type CategoryFilter = 'all' | 'greek' | 'country_clubs' | 'chamber' | 'sports' | 'alumni_associations' | 'professional_associations';
+
 export interface PipelineDealFull {
   id: string;
   org_id: string | null;
@@ -122,6 +124,16 @@ const ORG_TYPES = [
 ];
 
 const REP_OPTIONS = ['Owen', 'Ford', 'Adam', 'Hyatt', 'Worth', 'Katie'];
+
+const CATEGORY_FILTERS: { value: CategoryFilter; label: string }[] = [
+  { value: 'all',                       label: 'All' },
+  { value: 'greek',                     label: 'Greek Life' },
+  { value: 'country_clubs',             label: 'Country Clubs' },
+  { value: 'chamber',                   label: 'Chamber of Commerce' },
+  { value: 'sports',                    label: 'Sports Teams' },
+  { value: 'alumni_associations',       label: 'Alumni Associations' },
+  { value: 'professional_associations', label: 'Professional Assoc.' },
+];
 
 // Map known auth UUIDs → display names
 const UUID_TO_REP: Record<string, string> = {
@@ -1259,6 +1271,7 @@ export function SalesCRM() {
   const [deals, setDeals] = useState<PipelineDealFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [selectedDeal, setSelectedDeal]     = useState<PipelineDealFull | null>(null);
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [granolaNotes, setGranolaNotes]     = useState<GranolaNote[] | null>(null);
@@ -1355,6 +1368,12 @@ export function SalesCRM() {
         (d.contact?.name ?? '').toLowerCase().includes(q)
       );
     }
+    if (categoryFilter !== 'all') {
+      list = list.filter(d =>
+        (d as any).category === categoryFilter ||
+        (!(d as any).category && categoryFilter === 'greek')
+      );
+    }
     const archived = list.filter(d => d.stage === 'closed_lost' || d.stage === 'hold_off');
     const visible = list.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
     return { visibleDeals: visible, archivedDeals: archived };
@@ -1449,6 +1468,30 @@ export function SalesCRM() {
         >
           <Plus size={13} /> New Deal
         </button>
+      </div>
+
+      {/* Category Filter */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+        {CATEGORY_FILTERS.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setCategoryFilter(opt.value)}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 20,
+              fontSize: '0.8rem',
+              fontWeight: categoryFilter === opt.value ? 700 : 500,
+              cursor: 'pointer',
+              border: `1px solid ${categoryFilter === opt.value ? '#0F172A' : '#e5e7eb'}`,
+              background: categoryFilter === opt.value ? '#0F172A' : '#ffffff',
+              color: categoryFilter === opt.value ? '#ffffff' : '#374151',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {/* ── Pipeline Kanban ── */}
