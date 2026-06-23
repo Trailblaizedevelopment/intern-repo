@@ -40,6 +40,12 @@ export interface PipelineDealFull {
     email?: string | null;
     phone?: string | null;
   } | null;
+  deal_contacts?: {
+    id: string;
+    contact_id: string;
+    is_primary: boolean;
+    contact?: { id: string; name: string; email?: string | null; role?: string | null } | null;
+  }[];
 }
 
 interface DealNote {
@@ -116,13 +122,22 @@ const REP_COLORS: Record<string, string> = {
 };
 
 const ORG_TYPES = [
-  { value: 'fraternity', label: 'Fraternity' },
-  { value: 'sorority',   label: 'Sorority' },
-  { value: 'council',    label: 'IFC / Council' },
-  { value: 'national',   label: 'National' },
-  { value: 'sports',     label: 'Sports / Club' },
-  { value: 'other',      label: 'Other' },
+  { value: 'fraternity',            label: 'Fraternity' },
+  { value: 'sorority',              label: 'Sorority' },
+  { value: 'council',               label: 'IFC / Council' },
+  { value: 'national',              label: 'National' },
+  { value: 'sports',                label: 'Sports / Club' },
+  { value: 'country_club',          label: '⛳ Country Club' },
+  { value: 'professional_association', label: '🏢 Professional / Chamber' },
+  { value: 'other',                 label: 'Other' },
 ];
+
+const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
+  country_clubs:             { label: '⛳ Country Club',   color: '#16a34a' },
+  professional_associations: { label: '🏢 Professional',    color: '#2563eb' },
+  sports:                    { label: '⚽ Sports',          color: '#ea580c' },
+  alumni_associations:       { label: '🎓 Alumni Assoc.', color: '#7c3aed' },
+};
 
 const REP_OPTIONS = ['Owen', 'Ford', 'Adam', 'Hyatt', 'Worth', 'Drake', 'Bryce'];
 
@@ -160,7 +175,9 @@ function resolveRep(rep: string | null | undefined, empList: { id: string; name:
   if (!rep) return null;
   if (isUUID(rep)) {
     const match = empList.find(e => e.id.toLowerCase() === rep.toLowerCase());
-    return match?.name ?? UUID_TO_REP[rep.toLowerCase()] ?? null;
+    const fullName = match?.name ?? UUID_TO_REP[rep.toLowerCase()] ?? null;
+    // Return first name only so it matches REP_COLORS keys
+    return fullName ? fullName.split(' ')[0] : null;
   }
   return rep;
 }
@@ -793,7 +810,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
 
           {/* Contact Info */}
           <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Contact</div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Primary Contact</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <input
                 type="text"
@@ -814,6 +831,42 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
               )}
             </div>
           </div>
+
+          {/* Additional Contacts */}
+          {(() => {
+            const extras = (deal as any).deal_contacts?.filter((dc: any) => !dc.is_primary) ?? [];
+            return (
+              <div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>
+                  Additional Contacts
+                </div>
+                {extras.length === 0 && (
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic', marginBottom: 8 }}>No additional contacts</div>
+                )}
+                {extras.map((dc: any) => (
+                  <div key={dc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f9fafb', borderRadius: 8, marginBottom: 6, fontSize: '0.8rem' }}>
+                    <div>
+                      <span style={{ fontWeight: 600 }}>{dc.contact?.name ?? 'Unknown'}</span>
+                      {dc.contact?.role && <span style={{ color: '#6b7280', marginLeft: 6 }}>{dc.contact.role}</span>}
+                      {dc.contact?.email && <div style={{ color: '#6b7280', fontSize: '0.72rem' }}>{dc.contact.email}</div>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+                          method: 'DELETE',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ contact_id: dc.contact_id }),
+                        });
+                        onClose();
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.75rem', padding: '2px 6px' }}
+                    >✕</button>
+                  </div>
+                ))}
+                <AddContactRow dealId={deal.id} onAdded={onClose} />
+              </div>
+            );
+          })()}
 
           {/* Granola Notes */}
           <div>
@@ -952,6 +1005,54 @@ interface DealCardProps {
   employees?: { id: string; name: string }[];
 }
 
+function AddContactRow({ dealId, onAdded }: { dealId: string; onAdded: () => void }) {
+  const [name, setName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [role, setRole] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+
+  async function handleAdd() {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      // Create contact first
+      const cRes = await fetch('/api/pipeline/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email: email.trim() || null, role: role.trim() || null }),
+      });
+      if (!cRes.ok) return;
+      const contact = await cRes.json();
+      // Link to deal
+      await fetch(`/api/pipeline/deals/${dealId}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contact_id: contact.id, is_primary: false }),
+      });
+      setName(''); setEmail(''); setRole('');
+      onAdded();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputStyle = { width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '7px 10px', fontSize: '0.8rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6' }}>
+      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6b7280' }}>Add contact</div>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Name *" style={inputStyle} />
+      <input value={role} onChange={e => setRole(e.target.value)} placeholder="Role (e.g. Treasurer)" style={inputStyle} />
+      <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" style={inputStyle} />
+      <button
+        onClick={handleAdd}
+        disabled={saving || !name.trim()}
+        style={{ padding: '7px 12px', borderRadius: 8, background: name.trim() ? '#0F172A' : '#e5e7eb', color: name.trim() ? '#fff' : '#9ca3af', border: 'none', cursor: name.trim() ? 'pointer' : 'not-allowed', fontSize: '0.8rem', fontWeight: 600 }}
+      >{saving ? 'Adding…' : '+ Add Contact'}</button>
+    </div>
+  );
+}
+
 function DealCard({ deal, onClick, employees = [] }: DealCardProps) {
   const orgName = deal.organization?.name ?? 'Unknown';
   const schoolName = deal.organization?.school?.name ?? null;
@@ -993,6 +1094,18 @@ function DealCard({ deal, onClick, employees = [] }: DealCardProps) {
         <span style={{ fontSize: '0.7rem', color: actColor, fontWeight: 600 }}>
           {days === null ? 'No activity' : days === 0 ? 'Today' : `${days}d ago`}
         </span>
+        {(() => {
+          const cat = (deal as any).category;
+          const badge = cat && CATEGORY_BADGE[cat];
+          if (!badge) return null;
+          return (
+            <span style={{
+              fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              background: badge.color + '18', color: badge.color,
+              border: `1px solid ${badge.color}40`,
+            }}>{badge.label}</span>
+          );
+        })()}
       </div>
     </div>
   );

@@ -30,7 +30,14 @@ interface ImportResult {
 
 const VALID_STAGES = ['lead', 'demo_booked', 'first_demo', 'second_call', 'timing', 'contract_sent', 'closed_won', 'closed_lost', 'hold_off'];
 const VALID_TEMPS = ['hot', 'warm', 'cold'];
-const VALID_ORG_TYPES = ['fraternity', 'sorority', 'council', 'national', 'sports', 'other'];
+const VALID_ORG_TYPES = ['fraternity', 'sorority', 'council', 'national', 'sports', 'other', 'country_club', 'professional_association'];
+
+function categoryFor(orgType: string): string {
+  if (orgType === 'country_club') return 'country_clubs';
+  if (orgType === 'professional_association') return 'professional_associations';
+  if (orgType === 'sports') return 'sports';
+  return 'greek';
+}
 
 function dealTypeFor(orgType: string): 'local' | 'council' | 'national' {
   if (orgType === 'council') return 'council';
@@ -89,7 +96,11 @@ export async function POST(req: NextRequest) {
   function findEmployee(ref: string | undefined) {
     if (!ref) return null;
     const q = ref.toLowerCase().trim();
-    return employees.find(e => e.id === ref || e.name.toLowerCase() === q) || null;
+    return employees.find(e =>
+      e.id === ref ||
+      e.name.toLowerCase() === q ||
+      e.name.toLowerCase().startsWith(q + ' ') // first-name match e.g. "Owen" → "Owen Ridgeway"
+    ) || null;
   }
 
   const results: ImportResult[] = [];
@@ -207,6 +218,7 @@ export async function POST(req: NextRequest) {
       conference: row.conference?.trim() || school?.conference || null,
       notes: row.notes?.trim() || null,
       next_followup: row.next_followup?.trim() || null,
+      category: categoryFor(orgType),
       last_touched: new Date().toISOString(),
     }).select('id').single();
 
