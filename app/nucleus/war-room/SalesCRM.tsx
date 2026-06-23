@@ -156,9 +156,12 @@ function isUUID(s: string | null | undefined): boolean {
   return !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }
 
-function resolveRep(rep: string | null | undefined): string | null {
+function resolveRep(rep: string | null | undefined, empList: { id: string; name: string }[] = []): string | null {
   if (!rep) return null;
-  if (isUUID(rep)) return UUID_TO_REP[rep.toLowerCase()] ?? null;
+  if (isUUID(rep)) {
+    const match = empList.find(e => e.id.toLowerCase() === rep.toLowerCase());
+    return match?.name ?? UUID_TO_REP[rep.toLowerCase()] ?? null;
+  }
   return rep;
 }
 
@@ -500,8 +503,8 @@ function serializeDealNotes(notes: DealNote[]): string {
 
 // ─── Rep Badge ─────────────────────────────────────────────────────────────────
 
-function RepBadge({ rep: repRaw }: { rep: string | null | undefined }) {
-  const rep = resolveRep(repRaw);
+function RepBadge({ rep: repRaw, employees = [] }: { rep: string | null | undefined; employees?: { id: string; name: string }[] }) {
+  const rep = resolveRep(repRaw, employees);
   if (!rep) return <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>—</span>;
   const color = REP_COLORS[rep] ?? '#6b7280';
   return (
@@ -592,9 +595,10 @@ interface DealDrawerProps {
   onAdvanceStage: (dealId: string, stage: DealStage) => void;
   onLogActivity: (dealId: string, text: string) => void;
   onPatch?: (dealId: string, patch: Partial<PipelineDealFull>) => void;
+  employees?: { id: string; name: string }[];
 }
 
-function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity, onPatch }: DealDrawerProps) {
+function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity, onPatch, employees = [] }: DealDrawerProps) {
   const [activityInput, setActivityInput] = useState('');
   const orgName = deal.organization?.name ?? 'Unknown Org';
   const schoolName = deal.organization?.school?.name ?? '';
@@ -602,7 +606,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   // Editable field state
   const [editTemp, setEditTemp] = useState<'hot' | 'warm' | 'cold'>(deal.temperature ?? 'warm');
   const [editValue, setEditValue] = useState<string>(String(deal.value ?? ''));
-  const [editRep, setEditRep] = useState<string>(resolveRep(deal.assigned_to) ?? '');
+  const [editRep, setEditRep] = useState<string>(resolveRep(deal.assigned_to, employees) ?? '');
   const [editFollowup, setEditFollowup] = useState<string>(deal.next_followup ?? '');
   const [editContactName, setEditContactName] = useState<string>(deal.contact?.name ?? '');
   const [editContactEmail, setEditContactEmail] = useState<string>(deal.contact?.email ?? '');
@@ -636,7 +640,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
     if (editTemp !== deal.temperature) patch.temperature = editTemp;
     const numVal = parseFloat(editValue);
     if (!isNaN(numVal) && numVal !== deal.value) patch.value = numVal;
-    if (editRep && editRep !== resolveRep(deal.assigned_to)) patch.assigned_to = editRep;
+    if (editRep && editRep !== resolveRep(deal.assigned_to, employees)) patch.assigned_to = editRep;
     if (editFollowup !== (deal.next_followup ?? '')) patch.next_followup = editFollowup || null;
 
     if (Object.keys(patch).length > 0) {
@@ -945,9 +949,10 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
 interface DealCardProps {
   deal: PipelineDealFull;
   onClick: () => void;
+  employees?: { id: string; name: string }[];
 }
 
-function DealCard({ deal, onClick }: DealCardProps) {
+function DealCard({ deal, onClick, employees = [] }: DealCardProps) {
   const orgName = deal.organization?.name ?? 'Unknown';
   const schoolName = deal.organization?.school?.name ?? null;
   const contactName = deal.contact?.name ?? null;
@@ -979,7 +984,7 @@ function DealCard({ deal, onClick }: DealCardProps) {
         {contactName && <div style={{ fontSize: '0.75rem', color: '#374151', marginTop: 2 }}>{contactName}</div>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-        <RepBadge rep={rep} />
+        <RepBadge rep={rep} employees={employees} />
         {deal.value > 0 && (
           <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#1d4ed8' }}>{fmt$(deal.value)}</span>
         )}
@@ -999,9 +1004,10 @@ interface NeedsAttentionProps {
   deals: PipelineDealFull[];
   onOpenDeal: (deal: PipelineDealFull) => void;
   onLogFollowup: (dealId: string, text: string) => void;
+  employees?: { id: string; name: string }[];
 }
 
-function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup }: NeedsAttentionProps) {
+function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup, employees = [] }: NeedsAttentionProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [inputs, setInputs] = useState<Record<string, string>>({});
 
@@ -1068,7 +1074,7 @@ function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup }: NeedsAttent
                     </span>
                     {schoolName && <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{schoolName}</span>}
                     <StageBadge stage={deal.stage} />
-                    <RepBadge rep={deal.assigned_to} />
+                    <RepBadge rep={deal.assigned_to} employees={employees} />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
@@ -1149,9 +1155,10 @@ interface PipelineKanbanProps {
   deals: PipelineDealFull[];
   archivedDeals: PipelineDealFull[];
   onOpenDeal: (deal: PipelineDealFull) => void;
+  employees?: { id: string; name: string }[];
 }
 
-function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProps) {
+function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: PipelineKanbanProps) {
   const [showArchived, setShowArchived] = useState(false);
 
   const byStage = useMemo(() => {
@@ -1207,7 +1214,7 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProp
                   </div>
                 ) : (
                   stageDeals.map(deal => (
-                    <DealCard key={deal.id} deal={deal} onClick={() => onOpenDeal(deal)} />
+                    <DealCard key={deal.id} deal={deal} onClick={() => onOpenDeal(deal)} employees={employees} />
                   ))
                 )}
               </div>
@@ -1257,7 +1264,7 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProp
                     {deal.organization?.school?.name ?? ''}
                   </span>
                   <StageBadge stage={deal.stage} />
-                  <RepBadge rep={deal.assigned_to} />
+                  <RepBadge rep={deal.assigned_to} employees={employees} />
                   <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{relativeTime(deal.last_touched ?? deal.updated_at)}</span>
                 </div>
               ))}
@@ -1279,7 +1286,15 @@ export function SalesCRM() {
   const [selectedDeal, setSelectedDeal]     = useState<PipelineDealFull | null>(null);
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [granolaNotes, setGranolaNotes]     = useState<GranolaNote[] | null>(null);
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const granolaFetchedRef = useRef(false);
+
+  useEffect(() => {
+    fetch('/api/pipeline/employees')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setEmployees(data); })
+      .catch(() => {});
+  }, []);
 
   // ── Fetch deals ──
   const fetchDeals = useCallback(async () => {
@@ -1426,6 +1441,7 @@ export function SalesCRM() {
         deals={deals}
         onOpenDeal={setSelectedDeal}
         onLogFollowup={handleLogActivity}
+        employees={employees}
       />
 
       {/* ── Filter Bar ── */}
@@ -1505,6 +1521,7 @@ export function SalesCRM() {
           deals={visibleDeals}
           archivedDeals={archivedDeals}
           onOpenDeal={setSelectedDeal}
+          employees={employees}
         />
       )}
 
@@ -1525,6 +1542,7 @@ export function SalesCRM() {
           onAdvanceStage={handleAdvanceStage}
           onLogActivity={handleLogActivity}
           onPatch={handlePatch}
+          employees={employees}
         />
       )}
     </div>

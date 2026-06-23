@@ -165,6 +165,14 @@ const TEMP_BORDER: Record<string, string> = {
   cold: '#3b82f6',
 };
 
+const CATEGORY_LABEL: Record<string, { label: string; emoji: string; color: string }> = {
+  greek:                     { label: 'Greek',          emoji: '🏛',  color: '#6b7280' },
+  country_clubs:             { label: 'Country Club',   emoji: '⛳',  color: '#16a34a' },
+  professional_associations: { label: 'Professional',   emoji: '🏢',  color: '#2563eb' },
+  sports:                    { label: 'Sports',         emoji: '⚽',  color: '#ea580c' },
+  alumni_associations:       { label: 'Alumni Assoc.',  emoji: '🎓',  color: '#7c3aed' },
+};
+
 function followupStyle(dateStr: string | null): React.CSSProperties {
   if (!dateStr) return { color: 'var(--ws-text-secondary, #9ca3af)' };
   const now = new Date();
@@ -1040,7 +1048,7 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
     const days = daysAgo(deal.updated_at || deal.last_touched || deal.created_at);
     const isGoingCold = days !== null && days >= 7 && deal.stage !== 'closed_lost' && deal.stage !== 'hold_off' && deal.stage !== 'timing';
     const stageConf = STAGE_CONFIG[deal.stage];
-    const assignee = showAssigned ? employees.find(e => e.id === deal.assigned_to) : null;
+    const assignee = employees.find(e => e.id === deal.assigned_to) ?? null;
     const orgIcon = getOrgIcon(deal);
     const fupStyle = followupStyle(deal.next_followup);
     const isOverdueFup = deal.next_followup && new Date(deal.next_followup) < new Date();
@@ -1095,6 +1103,27 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
                 ⚠️ Value missing
               </span>
             )}
+            {(() => {
+              const cat = (deal as any).category;
+              if (cat && cat !== 'greek') {
+                const cfg = CATEGORY_LABEL[cat];
+                return (
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    padding: '2px 7px',
+                    borderRadius: 10,
+                    background: (cfg?.color || '#6b7280') + '18',
+                    color: cfg?.color || '#6b7280',
+                    border: `1px solid ${(cfg?.color || '#6b7280')}40`,
+                    marginLeft: 4,
+                  }}>
+                    {cfg?.emoji} {cfg?.label || cat}
+                  </span>
+                );
+              }
+              return null;
+            })()}
           </span>
           {(() => {
             const primaryContact = deal.deal_contacts?.find(dc => dc.is_primary)?.contact || deal.contact;
@@ -1211,8 +1240,8 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
           </div>
         </div>
 
-        {showAssigned && deal.assigned_to && (
-          <div className="pl2__deal-assigned">{assignee?.name || deal.assigned_to}</div>
+        {deal.assigned_to && (
+          <div className="pl2__deal-assigned">{assignee?.name || '—'}</div>
         )}
       </div>
     );
