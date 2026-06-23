@@ -189,16 +189,23 @@ const SLIPPING_STAGES: DealStage[] = ['first_demo', 'second_call', 'contract_sen
 interface CreateDealDrawerProps {
   onClose: () => void;
   onCreated: () => void;
+  employees?: { id: string; name: string }[];
 }
 
-function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
+function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDrawerProps) {
+  const salesReps = employees.filter(e =>
+    ['founder', 'cofounder', 'growth_intern', 'sales_intern'].includes((e as any).role ?? '')
+  ).concat(employees.filter(e => !['founder', 'cofounder', 'growth_intern', 'sales_intern'].includes((e as any).role ?? '') && employees.length <= 15));
+  // Fallback: if role filtering returns nothing (role not on object), show all employees
+  const repList = salesReps.length > 0 ? salesReps : employees;
+
   const [orgName, setOrgName]           = useState('');
   const [schoolName, setSchoolName]     = useState('');
   const [orgType, setOrgType]           = useState('fraternity');
   const [stage, setStage]               = useState<DealStage>('lead');
   const [temperature, setTemperature]   = useState<'hot' | 'warm' | 'cold'>('warm');
   const [value, setValue]               = useState('3588');
-  const [assignedTo, setAssignedTo]     = useState('Owen');
+  const [assignedTo, setAssignedTo]     = useState('');  // stores employee UUID
   const [contactName, setContactName]   = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -382,13 +389,14 @@ function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
           <div>
             <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Assigned To</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {REP_OPTIONS.map(rep => {
-                const color = REP_COLORS[rep] ?? '#6b7280';
-                const isActive = assignedTo === rep;
+              {repList.map(emp => {
+                const firstName = emp.name.split(' ')[0];
+                const color = REP_COLORS[firstName] ?? '#6b7280';
+                const isActive = assignedTo === emp.id;
                 return (
                   <button
-                    key={rep}
-                    onClick={() => setAssignedTo(rep)}
+                    key={emp.id}
+                    onClick={() => setAssignedTo(emp.id)}
                     style={{
                       padding: '5px 14px', borderRadius: 8, fontSize: '0.8rem',
                       fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
@@ -397,7 +405,7 @@ function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
                       color: isActive ? '#fff' : '#374151',
                     }}
                   >
-                    {rep}
+                    {firstName}
                   </button>
                 );
               })}
@@ -623,7 +631,8 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   // Editable field state
   const [editTemp, setEditTemp] = useState<'hot' | 'warm' | 'cold'>(deal.temperature ?? 'warm');
   const [editValue, setEditValue] = useState<string>(String(deal.value ?? ''));
-  const [editRep, setEditRep] = useState<string>(resolveRep(deal.assigned_to, employees) ?? '');
+  // Store UUID in editRep for saving; display uses resolveRep
+  const [editRep, setEditRep] = useState<string>(deal.assigned_to ?? '');
   const [editFollowup, setEditFollowup] = useState<string>(deal.next_followup ?? '');
   const [editContactName, setEditContactName] = useState<string>(deal.contact?.name ?? '');
   const [editContactEmail, setEditContactEmail] = useState<string>(deal.contact?.email ?? '');
@@ -657,7 +666,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
     if (editTemp !== deal.temperature) patch.temperature = editTemp;
     const numVal = parseFloat(editValue);
     if (!isNaN(numVal) && numVal !== deal.value) patch.value = numVal;
-    if (editRep && editRep !== resolveRep(deal.assigned_to, employees)) patch.assigned_to = editRep;
+    if (editRep !== (deal.assigned_to ?? '')) patch.assigned_to = editRep || null;
     if (editFollowup !== (deal.next_followup ?? '')) patch.next_followup = editFollowup || null;
 
     if (Object.keys(patch).length > 0) {
@@ -786,13 +795,14 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
           <div>
             <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Assigned To</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {REP_OPTIONS.map(rep => {
-                const color = REP_COLORS[rep] ?? '#6b7280';
-                const isActive = editRep === rep;
+              {employees.map(emp => {
+                const firstName = emp.name.split(' ')[0];
+                const color = REP_COLORS[firstName] ?? '#6b7280';
+                const isActive = editRep === emp.id;
                 return (
                   <button
-                    key={rep}
-                    onClick={() => setEditRep(rep)}
+                    key={emp.id}
+                    onClick={() => setEditRep(emp.id)}
                     style={{
                       padding: '5px 12px', borderRadius: 8, fontSize: '0.78rem',
                       fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
@@ -801,7 +811,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
                       color: isActive ? '#fff' : '#374151',
                     }}
                   >
-                    {rep}
+                    {firstName}
                   </button>
                 );
               })}
@@ -1643,6 +1653,7 @@ export function SalesCRM() {
         <CreateDealDrawer
           onClose={() => setShowCreateDrawer(false)}
           onCreated={fetchDeals}
+          employees={employees}
         />
       )}
 
