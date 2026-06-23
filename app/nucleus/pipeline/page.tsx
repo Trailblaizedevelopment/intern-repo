@@ -42,6 +42,11 @@ interface PipelineDeal {
     national_org?: { id: string; name: string; abbreviation: string; type?: string } | null;
   } | null;
   contact?: { id: string; name: string; email: string | null; phone: string | null; role: string | null } | null;
+  deal_contacts?: {
+    id: string;
+    is_primary: boolean;
+    contact: { id: string; name: string; email: string | null; phone: string | null; role: string | null } | null;
+  }[];
 }
 
 interface School {
@@ -1091,7 +1096,22 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
               </span>
             )}
           </span>
-          {deal.contact && <span className="pl2__deal-contact"><Users size={12} /> {deal.contact.name}</span>}
+          {(() => {
+            const primaryContact = deal.deal_contacts?.find(dc => dc.is_primary)?.contact || deal.contact;
+            const extraCount = Math.max(0, (deal.deal_contacts?.length ?? 0) - 1);
+            return primaryContact ? (
+              <span className="pl2__deal-contact">
+                <Users size={12} />
+                {primaryContact.name}
+                {primaryContact.role ? ` · ${primaryContact.role.replace('_', ' ')}` : ''}
+                {extraCount > 0 && (
+                  <span style={{ marginLeft: 4, background: '#e5e7eb', borderRadius: 10, padding: '1px 6px', fontSize: '0.7rem' }}>
+                    +{extraCount}
+                  </span>
+                )}
+              </span>
+            ) : null;
+          })()}
           {deal.value > 0 && <span className="pl2__deal-value">{formatCurrency(deal.value)}</span>}
         </div>
 
