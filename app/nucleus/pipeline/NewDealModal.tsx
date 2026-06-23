@@ -5,7 +5,7 @@ import { X, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 /* ─── Types ─── */
-type OrgCategory = 'fraternity' | 'sorority' | 'council' | 'national' | 'sports' | 'country_club' | 'other';
+type OrgCategory = 'fraternity' | 'sorority' | 'council' | 'national' | 'sports' | 'country_club' | 'professional_association' | 'other';
 
 interface School { id: string; name: string; state: string | null; conference: string | null; }
 interface NationalOrg { id: string; name: string; abbreviation: string | null; type: 'fraternity' | 'sorority'; }
@@ -22,7 +22,8 @@ const ORG_CATEGORIES: { key: OrgCategory; label: string; emoji: string; dealType
   { key: 'council', label: 'IFC / PHC Council', emoji: '⚖️', dealType: 'council' },
   { key: 'national', label: 'National HQ', emoji: '🌐', dealType: 'national' },
   { key: 'sports',       label: 'Sports Team / Club',       emoji: '⚽', dealType: 'local' },
-  { key: 'country_club', label: 'Country Club',               emoji: '⛳', dealType: 'local' },
+  { key: 'country_club',            label: 'Country Club',          emoji: '⛳', dealType: 'local' },
+  { key: 'professional_association', label: 'Professional / Chamber', emoji: '🏢', dealType: 'local' },
   { key: 'other',        label: 'Other Campus Org',           emoji: '🎓', dealType: 'local' },
 ];
 
@@ -44,6 +45,7 @@ const DEFAULT_VALUE: Record<OrgCategory, string> = {
   sorority:     '3588',
   sports:       '3588',
   country_club: '3588',
+  professional_association: '3588',
   other:        '3588',
   council:      '',
   national:     '',
@@ -255,6 +257,7 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
           last_touched: new Date().toISOString(),
           category: (orgCategory === 'country_club' ? 'country_clubs' :
                      orgCategory === 'sports' ? 'sports' :
+                     orgCategory === 'professional_association' ? 'professional_associations' :
                      'greek'),
         }),
       });
@@ -600,8 +603,8 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* ── Step 8: Assigned To (BUG-4: uses employee UUID) ── */}
-          {showOptional && (
+          {/* ── Step 8: Assigned To ── */}
+          {showStep4 && (
             <div className="ndm__section">
               <label className="ndm__label">Assigned To</label>
               <select className="ndm__select" value={assignedTo} onChange={e => setAssignedTo(e.target.value)}>

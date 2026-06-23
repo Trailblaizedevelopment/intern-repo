@@ -77,6 +77,7 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
   const [temperature, setTemperature] = useState<'hot' | 'warm' | 'cold'>(deal?.temperature || 'warm');
   const [value, setValue] = useState(deal?.value?.toString() || '');
   const [assignedTo, setAssignedTo] = useState(deal?.assigned_to || '');
+  const [category, setCategory] = useState((deal as any)?.category || 'greek');
   const [conference, setConference] = useState(deal?.conference || '');
   const [notes, setNotes] = useState(deal?.notes || '');
   const [nextFollowup, setNextFollowup] = useState(deal?.next_followup || '');
@@ -323,6 +324,7 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
             conference: conference.trim() || null,
             notes: notes.trim() || null,
             next_followup: nextFollowup || null,
+            category,
             last_touched: new Date().toISOString(),
             last_activity_at: new Date().toISOString(),
           }),
@@ -342,6 +344,7 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
             conference: conference.trim() || null,
             notes: notes.trim() || null,
             next_followup: nextFollowup || null,
+            category,
             last_touched: new Date().toISOString(),
             last_activity_at: new Date().toISOString(),
           }),
@@ -538,6 +541,19 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
                   {salesReps.map(e => (
                     <option key={e.id} value={e.id}>{e.name}</option>
                   ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="pl2__edit-row">
+              <div className="pl2__edit-field">
+                <label>Category</label>
+                <select value={category} onChange={e => setCategory(e.target.value)}>
+                  <option value="greek">🏙 Greek Life</option>
+                  <option value="country_clubs">⛳ Country Club</option>
+                  <option value="professional_associations">🏢 Professional / Chamber</option>
+                  <option value="sports">⚽ Sports Team</option>
+                  <option value="alumni_associations">🎓 Alumni Association</option>
                 </select>
               </div>
               <div className="pl2__edit-field">
