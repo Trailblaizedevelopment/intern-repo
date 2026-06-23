@@ -72,7 +72,7 @@ export function SmartSuggestions({
           title: 'Review Sales Pipeline',
           description: 'Check deal progress and upcoming closes',
           icon: TrendingUp,
-          href: '/nucleus/pipeline',
+          href: '/nucleus/war-room',
           color: '#f59e0b',
           priority: 'high'
         },

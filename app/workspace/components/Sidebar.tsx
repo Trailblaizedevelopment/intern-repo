@@ -125,7 +125,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const nucleusModules = [
     { name: 'Dashboard', href: '/nucleus', icon: Zap },
     { name: 'Sales Room', href: '/nucleus/war-room', icon: Tv },
-    { name: 'Sales Pipeline', href: '/nucleus/pipeline', icon: TrendingUp },
+    { name: 'Sales Room', href: '/nucleus/war-room', icon: TrendingUp },
     { name: 'Customer Success', href: '/nucleus/customer-success', icon: HeartHandshake },
     { name: 'Creative Studio', href: '/nucleus/creative-studio', icon: Sparkles },
     { name: 'Client Map', href: '/nucleus/client-map', icon: Map },
@@ -151,7 +151,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
       label: 'Command Center',
       items: [
         { name: 'Sales Room',         href: '/nucleus/war-room',           Icon: Tv },
-        { name: 'Pipeline',          href: '/nucleus/pipeline',           Icon: TrendingUp },
+        { name: 'Sales Room',       href: '/nucleus/war-room',            Icon: TrendingUp },
         { name: 'Customer Success',  href: '/nucleus/customer-success',   Icon: HeartHandshake },
         { name: 'Creative Studio',   href: '/nucleus/creative-studio',    Icon: Sparkles },
         { name: 'Client Map',        href: '/nucleus/client-map',         Icon: Map },
@@ -189,7 +189,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
 
   // More sheet items (founders mobile — everything not in the 3 main tabs)
   const moreSheetItems = [
-    { name: 'Pipeline',         href: '/nucleus/pipeline',           Icon: TrendingUp },
+    { name: 'Sales Room',      href: '/nucleus/war-room',            Icon: TrendingUp },
     { name: 'Creative Studio',  href: '/nucleus/creative-studio',    Icon: Sparkles },
     { name: 'Client Map',       href: '/nucleus/client-map',         Icon: Map },
     { name: 'Finance',          href: '/nucleus/finance',            Icon: Wallet },
@@ -220,7 +220,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     ? [
         { name: 'Home',     href: '/workspace',          icon: 'LayoutDashboard', badge: 0 },
         { name: 'Sales Room', href: '/nucleus/war-room',  icon: 'Tv',              badge: 0 },
-        { name: 'Pipeline', href: '/nucleus/pipeline',   icon: 'TrendingUp',      badge: 0 },
+        { name: 'Sales Room', href: '/nucleus/war-room',   icon: 'TrendingUp',      badge: 0 },
         { name: 'Connects', href: '/workspace/connects', icon: 'Phone',           badge: 0 },
       ]
     : isAmbassadorLeaderRole
@@ -239,7 +239,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
       ]
     : [
         { name: 'Dashboard', href: '/workspace',          icon: 'LayoutDashboard', badge: 0 },
-        { name: 'Pipeline',  href: '/nucleus/pipeline',   icon: 'TrendingUp',      badge: 0 },
+        { name: 'Sales Room',  href: '/nucleus/war-room',   icon: 'TrendingUp',      badge: 0 },
         { name: 'Projects',  href: '/workspace/projects', icon: 'Building2',       badge: 0 },
         { name: 'Tickets',   href: '/workspace/tickets',  icon: 'Ticket',          badge: openTicketCount },
       ];

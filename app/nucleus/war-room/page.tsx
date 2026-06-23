@@ -1975,7 +1975,7 @@ function StateDealPanel({ stateAbbr, deals, onClose }: {
                     <p style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{deal.organization?.name || '—'}</p>
                     <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '2px 0 0 0' }}>{deal.organization?.school?.name || '—'}</p>
                   </div>
-                  <Link href={`/nucleus/pipeline?deal=${deal.id}`} style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 600, padding: '6px 12px', borderRadius: '8px', background: '#0F172A', color: '#ffffff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  <Link href={`/nucleus/war-room`} style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 600, padding: '6px 12px', borderRadius: '8px', background: '#0F172A', color: '#ffffff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                     View Deal
                   </Link>
                 </div>

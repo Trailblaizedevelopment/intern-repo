@@ -266,7 +266,7 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
                   const rel = d.next_followup ? relativeDate(d.next_followup) : '';
                   const isOverdue = d.next_followup && new Date(d.next_followup) < now;
                   return (
-                    <Link key={d.id} href="/nucleus/pipeline" className="cc-list-row">
+                    <Link key={d.id} href="/nucleus/war-room" className="cc-list-row">
                       <span className="cc-list-stage">{STAGE_EMOJI[d.stage] || '📌'}</span>
                       <span className="cc-list-name">{d.contact_name || d.name}</span>
                       {rel && (
@@ -280,7 +280,7 @@ export function CommandCenter({ data, firstName }: CommandCenterProps) {
               </div>
             )}
             {myActiveDealsAll.length > 10 && (
-              <Link href="/nucleus/pipeline" className="cc-view-all">
+              <Link href="/nucleus/war-room" className="cc-view-all">
                 View all {myActiveDealsAll.length} <ArrowRight size={11} />
               </Link>
             )}

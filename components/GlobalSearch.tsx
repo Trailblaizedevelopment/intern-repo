@@ -155,7 +155,7 @@ export default function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       }
       // Contacts without a chapter_id have no navigable destination — just close.
     } else if (item.kind === 'deal') {
-      router.push(`/nucleus/pipeline?deal=${item.data.id}`);
+      router.push('/nucleus/war-room');
     }
     onClose();
   }, [router, onClose]);
