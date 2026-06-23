@@ -1169,6 +1169,25 @@ export default function PipelineV2({ initialTab = 'my-deals', lockedTab = false 
             >
               <Edit3 size={14} />
             </button>
+            {/* 📝 Full Edit */}
+            <button
+              onClick={(e) => { e.stopPropagation(); openDeal(deal); }}
+              title="Edit deal"
+              style={{
+                background: 'none',
+                border: '1px solid var(--ws-border, #e5e7eb)',
+                borderRadius: 6,
+                padding: '4px 8px',
+                cursor: 'pointer',
+                color: 'var(--ws-text-secondary, #6b7280)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: '0.75rem',
+              }}
+            >
+              <Edit2 size={12} /> Edit
+            </button>
           </div>
         </div>
 

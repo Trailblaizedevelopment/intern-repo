@@ -7,7 +7,7 @@ import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type LeadOwner = 'Owen' | 'Ford' | 'Adam' | 'Team' | 'Katie' | 'Hyatt';
+type LeadOwner = 'Owen' | 'Ford' | 'Adam' | 'Team' | 'Hyatt' | 'Drake' | 'Bryce';
 
 type CategoryFilter = 'all' | 'greek' | 'country_clubs' | 'sports' | 'alumni_associations' | 'professional_associations';
 
@@ -108,10 +108,11 @@ const REP_COLORS: Record<string, string> = {
   Owen:  '#7c3aed',
   Ford:  '#0369a1',
   Adam:  '#b45309',
-  Katie: '#be185d',
   Hyatt: '#065f46',
   Worth: '#0891b2',
   Team:  '#374151',
+  Drake: '#0ea5e9',
+  Bryce: '#8b5cf6',
 };
 
 const ORG_TYPES = [
@@ -123,7 +124,7 @@ const ORG_TYPES = [
   { value: 'other',      label: 'Other' },
 ];
 
-const REP_OPTIONS = ['Owen', 'Ford', 'Adam', 'Hyatt', 'Worth', 'Katie'];
+const REP_OPTIONS = ['Owen', 'Ford', 'Adam', 'Hyatt', 'Worth', 'Drake', 'Bryce'];
 
 const CATEGORY_FILTERS: { value: CategoryFilter; label: string }[] = [
   { value: 'all',                       label: 'All' },
