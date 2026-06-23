@@ -22,13 +22,13 @@ import dynamic from 'next/dynamic';
 
 // Lazy-load NewDealModal to keep initial bundle small
 const NewDealModal = dynamic(
-  () => import('@/app/nucleus/pipeline/NewDealModal'),
+  () => import('@/components/NewDealModal'),
   { ssr: false }
 );
 
 // Lazy-load DealEditPanel
 const DealEditPanel = dynamic(
-  () => import('@/app/nucleus/pipeline/DealEditPanel'),
+  () => import('@/components/DealEditPanel'),
   { ssr: false }
 );
 

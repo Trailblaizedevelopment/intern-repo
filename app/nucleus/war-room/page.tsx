@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
-const DealEditPanel = dynamic(() => import('@/app/nucleus/pipeline/DealEditPanel'), { ssr: false });
+const DealEditPanel = dynamic(() => import('@/components/DealEditPanel'), { ssr: false });
 import { ComposableMap, Geographies, Geography as GeographyBase } from 'react-simple-maps';
 const Geography = GeographyBase as any;
 import {

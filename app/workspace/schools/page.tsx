@@ -1,20 +1,14 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
 /**
- * Schools — Intern Workspace Page
- *
- * Renders the existing pipeline "Schools" tab, locked to read-only view.
- * Pulls from the same schools/organizations/pipeline_deals data as Nucleus.
- * No editing — interns can browse school → chapter → stage, but can't modify.
+ * Schools page — redirects to Sales Room CRM.
+ * Pipeline page was removed 2026-06-23. Sales Room is the single source of truth.
  */
-
-import { ToastProvider } from '@/components/Toast';
-import PipelineV2 from '@/app/nucleus/pipeline/page';
-
 export default function SchoolsPage() {
-  return (
-    <ToastProvider>
-      <PipelineV2 initialTab="schools" lockedTab={true} />
-    </ToastProvider>
-  );
+  const router = useRouter();
+  useEffect(() => { router.replace('/nucleus/war-room'); }, [router]);
+  return <div style={{ padding: 40, color: '#6b7280' }}>Redirecting to Sales Room…</div>;
 }
