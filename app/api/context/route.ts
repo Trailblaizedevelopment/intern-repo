@@ -55,8 +55,8 @@ export async function GET(request: NextRequest) {
     // ── Pipeline / Deals ──
     if (scope === 'all' || scope === 'pipeline') {
       const { data: deals } = await supabase
-        .from('deals')
-        .select('id, name, school, stage, value, owner, next_step, next_step_date, contact_name, contact_email, contact_phone, notes, created_at, updated_at')
+        .from('pipeline_deals')
+        .select('id, org:org_id(name, school:school_id(name, conference), national_org:national_org_id(name, abbreviation)), stage, value, temperature, deal_type, category, assigned_to, contact:contact_id(name, email, phone), notes, last_touched, created_at, updated_at')
         .order('updated_at', { ascending: false })
         .limit(100);
       result.deals = deals || [];
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
         .eq('outreach_status', 'signed_up');
 
       const { count: totalDeals } = await supabase
-        .from('deals')
+        .from('pipeline_deals')
         .select('id', { count: 'exact', head: true });
 
       result.metrics = {

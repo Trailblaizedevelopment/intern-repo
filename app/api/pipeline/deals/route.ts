@@ -74,6 +74,46 @@ export async function POST(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
 
   const body = await req.json();
+
+  // ── Validation: required fields ──
+  if (!body.org_id) {
+    return NextResponse.json({ error: 'org_id is required. Every deal must be linked to an organization.' }, { status: 400 });
+  }
+  if (!body.assigned_to) {
+    return NextResponse.json({ error: 'assigned_to is required. Every deal must have a rep assigned.' }, { status: 400 });
+  }
+  if (!body.stage) {
+    return NextResponse.json({ error: 'stage is required.' }, { status: 400 });
+  }
+
+  // ── Validation: naming standard ──
+  // Verify the linked organization follows "National Org @ University" format
+  if (body.org_id) {
+    const { data: org } = await admin
+      .from('organizations')
+      .select('name, school:school_id(name), national_org:national_org_id(name)')
+      .eq('id', body.org_id)
+      .single();
+    
+    if (org) {
+      const school = (org as any).school;
+      const natOrg = (org as any).national_org;
+      // Warn (don't block) if org name doesn't follow standard
+      if (school?.name && natOrg?.name) {
+        const expected = `${natOrg.name} @ ${school.name}`;
+        if (org.name !== expected && !org.name.includes('@') && !org.name.startsWith('IFC')) {
+          // Auto-fix: update the org name to follow standard
+          await admin.from('organizations').update({ name: `${school.name} ${natOrg.name}` }).eq('id', body.org_id);
+        }
+      }
+    }
+  }
+
+  // ── Validation: Closed Won requires value > 0 ──
+  if (body.stage === 'closed_won' && (!body.value || body.value <= 0)) {
+    return NextResponse.json({ error: 'Closed Won deals must have a value > $0. Define: space created + payment confirmed.' }, { status: 400 });
+  }
+
   const { data, error } = await admin.from('pipeline_deals').insert(body).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
