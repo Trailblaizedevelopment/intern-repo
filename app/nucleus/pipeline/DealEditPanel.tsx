@@ -5,6 +5,12 @@ import { X, Trash2, Building2, Phone, Mail, Plus, Clock } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 /* ─── Types ─── */
+interface DealContact {
+  id: string;
+  is_primary: boolean;
+  contact: { id: string; name: string; email: string | null; phone: string | null; role: string | null } | null;
+}
+
 interface PipelineDeal {
   id: string;
   org_id: string | null;
@@ -27,6 +33,7 @@ interface PipelineDeal {
     national_org?: { id: string; name: string; abbreviation: string } | null;
   } | null;
   contact?: { id: string; name: string; email: string | null; phone: string | null; role: string | null } | null;
+  deal_contacts?: DealContact[];
 }
 
 interface Employee { id: string; name: string; role: string; }
@@ -74,11 +81,22 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
   const [notes, setNotes] = useState(deal?.notes || '');
   const [nextFollowup, setNextFollowup] = useState(deal?.next_followup || '');
 
-  // Contact fields
+  // Contact fields (for new deal creation)
   const [contactName, setContactName] = useState(deal?.contact?.name || '');
   const [contactPhone, setContactPhone] = useState(deal?.contact?.phone || '');
   const [contactEmail, setContactEmail] = useState(deal?.contact?.email || '');
   const [contactRole, setContactRole] = useState(deal?.contact?.role || 'president');
+
+  // Multi-contact state (for existing deals)
+  const [dealContacts, setDealContacts] = useState<DealContact[]>(deal?.deal_contacts || []);
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [addContactSearch, setAddContactSearch] = useState('');
+  const [orgContacts, setOrgContacts] = useState<{ id: string; name: string; email: string | null; phone: string | null; role: string | null }[]>([]);
+  const [addContactLoading, setAddContactLoading] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+  const [newContactRole, setNewContactRole] = useState('president');
+  const [useNewContact, setUseNewContact] = useState(false);
 
   // New deal org fields
   const [orgName, setOrgName] = useState('');
@@ -117,6 +135,98 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
   }, [deal]);
 
   useEffect(() => { loadActivities(); }, [loadActivities]);
+
+  // Reload deal contacts from the deal prop when it changes (after saves)
+  useEffect(() => {
+    setDealContacts(deal?.deal_contacts || []);
+  }, [deal]);
+
+  async function loadOrgContacts() {
+    if (!deal?.org_id) return;
+    setAddContactLoading(true);
+    try {
+      const res = await fetch(`/api/pipeline/contacts?org_id=${deal.org_id}`);
+      if (res.ok) setOrgContacts(await res.json());
+    } catch { /* graceful */ }
+    finally { setAddContactLoading(false); }
+  }
+
+  async function removeContact(contactId: string) {
+    if (!deal) return;
+    await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: contactId }),
+    });
+    setDealContacts(prev => prev.filter(dc => dc.contact?.id !== contactId));
+  }
+
+  async function setPrimaryContact(contactId: string) {
+    if (!deal) return;
+    await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: contactId, is_primary: true }),
+    });
+    setDealContacts(prev => prev.map(dc => ({
+      ...dc,
+      is_primary: dc.contact?.id === contactId,
+    })));
+  }
+
+  async function addExistingContact(contactId: string) {
+    if (!deal) return;
+    const isPrimary = dealContacts.length === 0;
+    const res = await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: contactId, is_primary: isPrimary }),
+    });
+    if (res.ok) {
+      const contact = orgContacts.find(c => c.id === contactId);
+      if (contact) {
+        setDealContacts(prev => [
+          ...prev.map(dc => isPrimary ? { ...dc, is_primary: false } : dc),
+          { id: '', is_primary: isPrimary, contact },
+        ]);
+      }
+    }
+    setShowAddContact(false);
+    setAddContactSearch('');
+  }
+
+  async function addNewContact() {
+    if (!deal || !newContactName.trim()) return;
+    // 1. Create contact
+    const cRes = await fetch('/api/pipeline/contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        org_id: deal.org_id,
+        name: newContactName.trim(),
+        email: newContactEmail.trim() || null,
+        role: newContactRole || 'president',
+      }),
+    });
+    if (!cRes.ok) return;
+    const created = await cRes.json();
+    // 2. Link to deal
+    const isPrimary = dealContacts.length === 0;
+    await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: created.id, is_primary: isPrimary }),
+    });
+    setDealContacts(prev => [
+      ...prev.map(dc => isPrimary ? { ...dc, is_primary: false } : dc),
+      { id: '', is_primary: isPrimary, contact: { id: created.id, name: created.name, email: created.email, phone: created.phone, role: created.role } },
+    ]);
+    setShowAddContact(false);
+    setNewContactName('');
+    setNewContactEmail('');
+    setNewContactRole('president');
+    setUseNewContact(false);
+  }
 
   async function submitActivity() {
     if (!deal || !logOutcome.trim()) return;

@@ -23,7 +23,12 @@ export async function GET(req: NextRequest) {
     .select(`
       *,
       organization:organizations(*, school:schools(*), national_org:national_orgs(*)),
-      contact:contacts(*)
+      contact:contacts(*),
+      deal_contacts(
+        id,
+        is_primary,
+        contact:contacts(id, name, email, phone, role)
+      )
     `)
     .order('next_followup', { ascending: true, nullsFirst: false })
     .limit(safeLimit);

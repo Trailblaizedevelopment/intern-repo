@@ -146,6 +146,10 @@ const UUID_TO_REP: Record<string, string> = {
   'eadecbba-91da-41da-adc5-9a5b1cb82d4c': 'Parker',
   '5a848006-7f96-4c86-aa8d-3032ac0636ef': 'Riley',
   '6b7763bb-9bc7-46fb-b677-3e39d0a5d927': 'Worth',
+  'eef2dbc3-6460-4a81-a214-f294d1cc6dd7': 'Bryce',
+  '3581905c-804c-4445-b5f6-038f46186edd': 'Drake',
+  'af913838-31d9-40d4-953b-8203a8dda173': 'Luke',
+  'd13d8438-d878-4abc-afe1-5b1a14974449': 'Michael',
 };
 
 function isUUID(s: string | null | undefined): boolean {
