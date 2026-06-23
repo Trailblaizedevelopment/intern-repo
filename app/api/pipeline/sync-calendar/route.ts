@@ -371,6 +371,20 @@ async function fetchGranolaNotesInternal(): Promise<any[]> {
 }
 
 export async function POST(req: NextRequest) {
+  // ─── DISABLED: Calendar sync into pipeline is killed (2026-06-23) ───────────
+  // Granola + Google Calendar imports were polluting the pipeline with meeting
+  // records instead of real deals. This route now returns a deprecation notice.
+  // TODO: Re-implement to write to a separate 'meetings' table for the
+  //       nucleus/war-room Meetings tab.
+  return NextResponse.json({
+    synced: 0,
+    skipped: 0,
+    errors: 0,
+    message: 'Calendar sync into pipeline is disabled. Meeting data will be routed to the Meetings tab instead.',
+    deprecated: true,
+  });
+
+  // ─── Original code below (preserved for migration to meetings table) ────────
   const searchParams = req.nextUrl.searchParams;
   const dryRun = searchParams.get('dryRun') === 'true';
   const lookbackDays = parseInt(searchParams.get('days') || '120');
