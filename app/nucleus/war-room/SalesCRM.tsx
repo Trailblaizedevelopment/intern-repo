@@ -184,6 +184,19 @@ function resolveRep(rep: string | null | undefined, empList: { id: string; name:
 
 const SLIPPING_STAGES: DealStage[] = ['first_demo', 'second_call', 'contract_sent'];
 
+// ─── Mobile Detection ────────────────────────────────────────────────────────
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    function check() { setIsMobile(window.innerWidth < 768); }
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
 // ─── Create Deal Drawer ────────────────────────────────────────────────────────
 
 interface CreateDealDrawerProps {
@@ -193,6 +206,7 @@ interface CreateDealDrawerProps {
 }
 
 function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDrawerProps) {
+  const isMobile = useIsMobile();
   const salesReps = employees.filter(e =>
     ['founder', 'cofounder', 'growth_intern', 'sales_intern'].includes((e as any).role ?? '')
   ).concat(employees.filter(e => !['founder', 'cofounder', 'growth_intern', 'sales_intern'].includes((e as any).role ?? '') && employees.length <= 15));
@@ -254,17 +268,32 @@ function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDraw
   } as const;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
+      alignItems: isMobile ? 'flex-end' : 'stretch',
+    }}>
       <div
-        style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }}
+        style={{ flex: 1, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
         onClick={onClose}
       />
-      <div style={{
+      <div style={isMobile ? {
+        width: '100%', maxHeight: '92vh', background: '#fff', display: 'flex',
+        flexDirection: 'column', borderRadius: '20px 20px 0 0',
+        overflow: 'hidden', borderTop: '1px solid #e5e7eb',
+      } : {
         width: 460, background: '#fff', display: 'flex', flexDirection: 'column',
         height: '100%', borderLeft: '1px solid #e5e7eb', overflow: 'hidden',
       }}>
+        {/* Drag handle (mobile only) */}
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#d1d5db' }} />
+          </div>
+        )}
         {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: isMobile ? '12px 20px 12px' : '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h2 style={{ fontWeight: 700, fontSize: '1rem', color: '#111827', margin: 0 }}>New Deal</h2>
             <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '2px 0 0 0' }}>Manually add a deal to the pipeline</p>
@@ -275,7 +304,7 @@ function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDraw
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 20px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
           {/* Org name */}
           <div>
@@ -445,7 +474,7 @@ function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDraw
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 10 }}>
+        <div style={{ padding: isMobile ? '12px 20px 28px' : '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 10 }}>
           <button
             onClick={onClose}
             style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit' }}
@@ -624,6 +653,7 @@ interface DealDrawerProps {
 }
 
 function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity, onPatch, employees = [] }: DealDrawerProps) {
+  const isMobile = useIsMobile();
   const [activityInput, setActivityInput] = useState('');
   const orgName = deal.organization?.name ?? 'Unknown Org';
   const schoolName = deal.organization?.school?.name ?? '';
@@ -715,17 +745,32 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   } as const;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
+      alignItems: isMobile ? 'flex-end' : 'stretch',
+    }}>
       <div
-        style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }}
+        style={{ flex: 1, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
         onClick={onClose}
       />
-      <div style={{
+      <div style={isMobile ? {
+        width: '100%', height: '94vh', background: '#ffffff', display: 'flex',
+        flexDirection: 'column', borderRadius: '20px 20px 0 0',
+        overflow: 'hidden', borderTop: '1px solid #e5e7eb',
+      } : {
         width: 480, background: '#ffffff', display: 'flex', flexDirection: 'column',
         height: '100%', borderLeft: '1px solid #e5e7eb', overflow: 'hidden',
       }}>
+        {/* Drag handle (mobile only) */}
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', background: '#f9fafb' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#d1d5db' }} />
+          </div>
+        )}
         {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+        <div style={{ padding: isMobile ? '12px 20px 12px' : '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
@@ -743,7 +788,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 20px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Stage Stepper */}
           <div>
             <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
@@ -950,7 +995,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
         </div>
 
         {/* Log Activity Input */}
-        <div style={{ padding: '12px 24px 0', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
+        <div style={{ padding: isMobile ? '12px 20px 0' : '12px 24px 0', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
           <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>
             Log Activity
           </div>
@@ -983,7 +1028,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
         </div>
 
         {/* Action Buttons */}
-        <div style={{ padding: '12px 24px 16px', background: '#f9fafb', display: 'flex', gap: 8 }}>
+        <div style={{ padding: isMobile ? '12px 20px 28px' : '12px 24px 16px', background: '#f9fafb', display: 'flex', gap: 8 }}>
           <button
             onClick={handleClosedLost}
             style={{
@@ -1297,8 +1342,126 @@ interface PipelineKanbanProps {
   employees?: { id: string; name: string }[];
 }
 
-function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: PipelineKanbanProps) {
+// ─── Mobile Pipeline View ────────────────────────────────────────────────────────────
+
+function MobilePipelineView({ deals, archivedDeals, onOpenDeal, employees = [] }: PipelineKanbanProps) {
+  const [activeStage, setActiveStage] = useState<DealStage | 'all'>('all');
   const [showArchived, setShowArchived] = useState(false);
+
+  const countByStage = useMemo(() => {
+    const map: Record<string, number> = { all: deals.length };
+    for (const s of PIPELINE_STAGES) map[s] = deals.filter(d => d.stage === s).length;
+    return map;
+  }, [deals]);
+
+  const filteredDeals = useMemo(() =>
+    activeStage === 'all' ? deals : deals.filter(d => d.stage === activeStage),
+    [deals, activeStage]
+  );
+
+  const activeStageColor = activeStage !== 'all' ? STAGE_COLORS[activeStage as DealStage] : null;
+
+  return (
+    <div>
+      {/* Stage tabs - horizontal scroll */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 10, marginBottom: 4 }}>
+        <button
+          onClick={() => setActiveStage('all')}
+          style={{
+            padding: '6px 14px', borderRadius: 20, fontSize: '0.8rem',
+            fontWeight: activeStage === 'all' ? 700 : 500, cursor: 'pointer',
+            border: `1px solid ${activeStage === 'all' ? '#0F172A' : '#e5e7eb'}`,
+            background: activeStage === 'all' ? '#0F172A' : '#fff',
+            color: activeStage === 'all' ? '#fff' : '#374151',
+            whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit',
+          }}
+        >All ({countByStage.all})</button>
+        {PIPELINE_STAGES.map(stage => {
+          const cfg = STAGE_COLORS[stage];
+          const isActive = activeStage === stage;
+          return (
+            <button
+              key={stage}
+              onClick={() => setActiveStage(stage)}
+              style={{
+                padding: '6px 12px', borderRadius: 20, fontSize: '0.8rem',
+                fontWeight: isActive ? 700 : 500, cursor: 'pointer',
+                border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
+                background: isActive ? cfg.bg : '#fff',
+                color: isActive ? cfg.color : '#6b7280',
+                whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit',
+              }}
+            >
+              {STAGE_LABELS[stage]}
+              {countByStage[stage] > 0 && (
+                <span style={{
+                  marginLeft: 5, background: isActive ? cfg.color : '#e5e7eb',
+                  color: isActive ? '#fff' : '#6b7280',
+                  borderRadius: '9999px', padding: '0 5px', fontSize: '0.7rem', fontWeight: 700,
+                }}>{countByStage[stage]}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeStageColor && (
+        <div style={{
+          padding: '8px 14px', borderRadius: 10, marginBottom: 10,
+          background: activeStageColor.bg, border: `1px solid ${activeStageColor.border}`,
+          fontSize: '0.8rem', fontWeight: 700, color: activeStageColor.color,
+        }}>
+          {STAGE_LABELS[activeStage as DealStage]} — {filteredDeals.length} deal{filteredDeals.length !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {filteredDeals.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af', fontSize: '0.875rem' }}>No deals in this stage</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {filteredDeals.map(deal => (
+            <DealCard key={deal.id} deal={deal} onClick={() => onOpenDeal(deal)} employees={employees} />
+          ))}
+        </div>
+      )}
+
+      {archivedDeals.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <button
+            onClick={() => setShowArchived(s => !s)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'inherit', padding: '6px 0' }}
+          >
+            <ChevronDown size={14} style={{ transform: showArchived ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />
+            Archived / Closed Lost ({archivedDeals.length})
+          </button>
+          {showArchived && (
+            <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, marginTop: 8, overflow: 'hidden' }}>
+              {archivedDeals.map((deal, i) => (
+                <div
+                  key={deal.id} onClick={() => onOpenDeal(deal)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: i < archivedDeals.length - 1 ? '1px solid #f3f4f6' : 'none', cursor: 'pointer', background: '#fff' }}
+                >
+                  <span style={{ flex: 1, fontWeight: 600, fontSize: '0.8rem', color: '#374151', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {deal.organization?.name ?? 'Unknown'}
+                  </span>
+                  <StageBadge stage={deal.stage} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: PipelineKanbanProps) {
+  const isMobile = useIsMobile();
+  const [showArchived, setShowArchived] = useState(false);
+
+  if (isMobile) {
+    return <MobilePipelineView deals={deals} archivedDeals={archivedDeals} onOpenDeal={onOpenDeal} employees={employees} />;
+  }
 
   const byStage = useMemo(() => {
     const map: Record<DealStage, PipelineDealFull[]> = {
@@ -1418,6 +1581,7 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: Pi
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function SalesCRM() {
+  const isMobile = useIsMobile();
   const [deals, setDeals] = useState<PipelineDealFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -1558,7 +1722,7 @@ export function SalesCRM() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* ── Stats Row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? '8px' : '12px' }}>
         {[
           { label: 'Active Deals',   value: stats.total,          color: '#1e40af', bg: '#dbeafe' },
           { label: 'Hot (Demo+)',    value: stats.hot,            color: '#92400e', bg: '#fef3c7' },
@@ -1567,10 +1731,10 @@ export function SalesCRM() {
         ].map(stat => (
           <div key={stat.label} style={{
             background: stat.bg, border: `1px solid ${stat.color}30`,
-            borderRadius: '12px', padding: '16px',
+            borderRadius: '12px', padding: isMobile ? '12px' : '16px',
           }}>
             <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: stat.color + 'aa', margin: '0 0 4px 0' }}>{stat.label}</p>
-            <p style={{ fontSize: '1.75rem', fontWeight: 800, color: stat.color, margin: 0, lineHeight: 1 }}>{stat.value}</p>
+            <p style={{ fontSize: isMobile ? '1.4rem' : '1.75rem', fontWeight: 800, color: stat.color, margin: 0, lineHeight: 1 }}>{stat.value}</p>
           </div>
         ))}
       </div>
@@ -1584,46 +1748,73 @@ export function SalesCRM() {
       />
 
       {/* ── Filter Bar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          flex: 1, minWidth: '200px', maxWidth: '360px',
-          background: '#ffffff', border: '1px solid #e5e7eb',
-          borderRadius: '10px', padding: '8px 12px',
-        }}>
-          <Search size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search org, school, contact…"
-            style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontFamily: 'inherit', flex: 1, color: '#374151', background: 'transparent' }}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex' }}>
-              <X size={13} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            flex: 1,
+            background: '#ffffff', border: '1px solid #e5e7eb',
+            borderRadius: '10px', padding: '9px 12px',
+          }}>
+            <Search size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search org, school, contact…"
+              style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontFamily: 'inherit', flex: 1, color: '#374151', background: 'transparent' }}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex' }}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          {!isMobile && (
+            <button
+              onClick={fetchDeals}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+            >
+              <RefreshCw size={13} /> Refresh
+            </button>
+          )}
+          {!isMobile && (
+            <button
+              onClick={() => setShowCreateDrawer(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                padding: '8px 14px', borderRadius: 8, border: 'none',
+                background: '#0F172A', color: '#fff',
+                fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Plus size={13} /> New Deal
             </button>
           )}
         </div>
-
-        <button
-          onClick={fetchDeals}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          <RefreshCw size={13} /> Refresh
-        </button>
-        <button
-          onClick={() => setShowCreateDrawer(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', borderRadius: 8, border: 'none',
-            background: '#0F172A', color: '#fff',
-            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <Plus size={13} /> New Deal
-        </button>
+        {/* Mobile action row */}
+        {isMobile && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={fetchDeals}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <RefreshCw size={13} />
+            </button>
+            <button
+              onClick={() => setShowCreateDrawer(true)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '9px 14px', borderRadius: 8, border: 'none',
+                background: '#0F172A', color: '#fff',
+                fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <Plus size={14} /> New Deal
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Category Filter */}

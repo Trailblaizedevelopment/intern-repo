@@ -243,15 +243,22 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          deal_name: finalOrgName,
           org_id: orgId,
           contact_id: contactId,
+          contact_name: contactName.trim() || null,
+          contact_email: contactEmail.trim() || null,
+          contact_phone: contactPhone.trim() || null,
           deal_type: dealType,
           stage,
           value: parseInt(value) || 0,
           temperature,
           assigned_to: assignedTo || null,
+          university: selectedSchool?.name || null,
+          national_org: (orgCategory === 'fraternity' || orgCategory === 'sorority')
+            ? (nationalOrgName ? nationalOrgName.replace(/\s*\(.*?\)\s*$/, '').trim() : null)
+            : null,
           conference: selectedSchool?.conference || null,
-          // national/sports/other without school: school_id and national_org_id are null (handled in org creation above)
           notes: notes.trim() || null,
           next_followup: nextFollowup || null,
           last_touched: new Date().toISOString(),
@@ -261,7 +268,10 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
                      'greek'),
         }),
       });
-      if (!dRes.ok) throw new Error('Failed to create deal');
+      if (!dRes.ok) {
+        const errBody = await dRes.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Failed to create deal');
+      }
 
       onCreated();
     } catch (e: any) {
