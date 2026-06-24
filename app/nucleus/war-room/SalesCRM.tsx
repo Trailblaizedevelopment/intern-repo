@@ -636,6 +636,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   const [editFollowup, setEditFollowup] = useState<string>(deal.next_followup ?? '');
   const [editContactName, setEditContactName] = useState<string>(deal.contact?.name ?? '');
   const [editContactEmail, setEditContactEmail] = useState<string>(deal.contact?.email ?? '');
+  const [editContactPhone, setEditContactPhone] = useState<string>(deal.contact?.phone ?? '');
 
   // Parse existing notes/activity log
   const activityLog = useMemo(() => parseDealNotes(deal.notes), [deal.notes]);
@@ -662,6 +663,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   }
 
   async function handleSaveChanges() {
+    // Build deal-level patch (non-contact fields)
     const patch: Record<string, unknown> = {};
     if (editTemp !== deal.temperature) patch.temperature = editTemp;
     const numVal = parseFloat(editValue);
@@ -669,15 +671,22 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
     if (editRep !== (deal.assigned_to ?? '')) patch.assigned_to = editRep || null;
     if (editFollowup !== (deal.next_followup ?? '')) patch.next_followup = editFollowup || null;
 
+    // Build contact flat-field patch (these live on the deal row too)
+    if (editContactName !== (deal.contact?.name ?? '')) patch.contact_name = editContactName || null;
+    if (editContactEmail !== (deal.contact?.email ?? '')) patch.contact_email = editContactEmail || null;
+    if (editContactPhone !== (deal.contact?.phone ?? '')) patch.contact_phone = editContactPhone || null;
+
+    // Single patch call for the deal (covers both deal fields and contact flat fields)
     if (Object.keys(patch).length > 0) {
       onPatch?.(deal.id, patch as Partial<PipelineDealFull>);
     }
 
-    // Handle contact edits
+    // Also update the contacts table if a contact record is linked
     if (deal.contact?.id) {
-      const contactPatch: Record<string, string> = {};
-      if (editContactName !== (deal.contact?.name ?? '')) contactPatch.name = editContactName;
-      if (editContactEmail !== (deal.contact?.email ?? '')) contactPatch.email = editContactEmail;
+      const contactPatch: Record<string, string | null> = {};
+      if (editContactName !== (deal.contact?.name ?? '')) contactPatch.name = editContactName || null;
+      if (editContactEmail !== (deal.contact?.email ?? '')) contactPatch.email = editContactEmail || null;
+      if (editContactPhone !== (deal.contact?.phone ?? '')) contactPatch.phone = editContactPhone || null;
       if (Object.keys(contactPatch).length > 0) {
         await fetch(`/api/pipeline/contacts/${deal.contact.id}`, {
           method: 'PATCH',
@@ -836,9 +845,13 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
                 placeholder="Email address"
                 style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
               />
-              {!deal.contact?.id && (
-                <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontStyle: 'italic' }}>No contact linked — contact edits will be skipped</div>
-              )}
+              <input
+                type="tel"
+                value={editContactPhone}
+                onChange={e => setEditContactPhone(e.target.value)}
+                placeholder="Phone number"
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
             </div>
           </div>
 
@@ -1021,6 +1034,8 @@ function AddContactRow({ dealId, onAdded }: { dealId: string; onAdded: () => voi
   const [role, setRole] = React.useState('');
   const [saving, setSaving] = React.useState(false);
 
+  const [phone, setPhone] = React.useState('');
+
   async function handleAdd() {
     if (!name.trim()) return;
     setSaving(true);
@@ -1029,7 +1044,7 @@ function AddContactRow({ dealId, onAdded }: { dealId: string; onAdded: () => voi
       const cRes = await fetch('/api/pipeline/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.trim() || null, role: role.trim() || null }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, role: role.trim() || null }),
       });
       if (!cRes.ok) return;
       const contact = await cRes.json();
@@ -1039,7 +1054,7 @@ function AddContactRow({ dealId, onAdded }: { dealId: string; onAdded: () => voi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contact_id: contact.id, is_primary: false }),
       });
-      setName(''); setEmail(''); setRole('');
+      setName(''); setEmail(''); setPhone(''); setRole('');
       onAdded();
     } finally {
       setSaving(false);
@@ -1054,6 +1069,7 @@ function AddContactRow({ dealId, onAdded }: { dealId: string; onAdded: () => voi
       <input value={name} onChange={e => setName(e.target.value)} placeholder="Name *" style={inputStyle} />
       <input value={role} onChange={e => setRole(e.target.value)} placeholder="Role (e.g. Treasurer)" style={inputStyle} />
       <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" style={inputStyle} />
+      <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" style={inputStyle} />
       <button
         onClick={handleAdd}
         disabled={saving || !name.trim()}
