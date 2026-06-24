@@ -208,6 +208,7 @@ export async function POST(req: NextRequest) {
 
     // Create deal
     const { data: newDeal, error: dealErr } = await admin.from('pipeline_deals').insert({
+      deal_name: finalOrgName,
       org_id: orgId,
       contact_id: contactId,
       deal_type: dealTypeFor(orgType),
@@ -215,6 +216,11 @@ export async function POST(req: NextRequest) {
       temperature,
       value,
       assigned_to: employee?.id || null,
+      university: school?.name || null,
+      national_org: nationalOrg?.name || null,
+      contact_name: row.contact_name?.trim() || null,
+      contact_email: row.contact_email?.trim() || null,
+      contact_phone: row.contact_phone?.trim() || null,
       conference: row.conference?.trim() || school?.conference || null,
       notes: row.notes?.trim() || null,
       next_followup: row.next_followup?.trim() || null,
