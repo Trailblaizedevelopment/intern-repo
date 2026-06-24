@@ -1459,10 +1459,7 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: Pi
   const isMobile = useIsMobile();
   const [showArchived, setShowArchived] = useState(false);
 
-  if (isMobile) {
-    return <MobilePipelineView deals={deals} archivedDeals={archivedDeals} onOpenDeal={onOpenDeal} employees={employees} />;
-  }
-
+  // Must be declared before any conditional returns (Rules of Hooks)
   const byStage = useMemo(() => {
     const map: Record<DealStage, PipelineDealFull[]> = {
       lead: [], demo_booked: [], first_demo: [], second_call: [],
@@ -1473,6 +1470,10 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: Pi
     }
     return map;
   }, [deals]);
+
+  if (isMobile) {
+    return <MobilePipelineView deals={deals} archivedDeals={archivedDeals} onOpenDeal={onOpenDeal} employees={employees} />;
+  }
 
   return (
     <div>
