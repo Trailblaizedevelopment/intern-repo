@@ -1439,7 +1439,7 @@ export function SalesCRM() {
   const fetchDeals = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      params.set('limit', '200');
+      params.set('limit', '500');
       if (categoryFilter && categoryFilter !== 'all') params.set('category', categoryFilter);
       const res = await fetch(`/api/pipeline/deals?${params.toString()}`);
       if (!res.ok) throw new Error('Failed');
