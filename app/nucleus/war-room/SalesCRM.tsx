@@ -667,6 +667,10 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   const [editContactName, setEditContactName] = useState<string>(deal.contact?.name ?? '');
   const [editContactEmail, setEditContactEmail] = useState<string>(deal.contact?.email ?? '');
   const [editContactPhone, setEditContactPhone] = useState<string>(deal.contact?.phone ?? '');
+  const [editAdvisorName, setEditAdvisorName] = useState<string>((deal as any).advisor_name ?? '');
+  const [editAdvisorEmail, setEditAdvisorEmail] = useState<string>((deal as any).advisor_email ?? '');
+  const [editAdvisorPhone, setEditAdvisorPhone] = useState<string>((deal as any).advisor_phone ?? '');
+  const [editAdvisorMet, setEditAdvisorMet] = useState<boolean>((deal as any).advisor_met ?? false);
 
   // Parse existing notes/activity log
   const activityLog = useMemo(() => parseDealNotes(deal.notes), [deal.notes]);
@@ -705,6 +709,10 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
     if (editContactName !== (deal.contact?.name ?? '')) patch.contact_name = editContactName || null;
     if (editContactEmail !== (deal.contact?.email ?? '')) patch.contact_email = editContactEmail || null;
     if (editContactPhone !== (deal.contact?.phone ?? '')) patch.contact_phone = editContactPhone || null;
+    if (editAdvisorName !== ((deal as any).advisor_name ?? '')) patch.advisor_name = editAdvisorName || null;
+    if (editAdvisorEmail !== ((deal as any).advisor_email ?? '')) patch.advisor_email = editAdvisorEmail || null;
+    if (editAdvisorPhone !== ((deal as any).advisor_phone ?? '')) patch.advisor_phone = editAdvisorPhone || null;
+    if (editAdvisorMet !== ((deal as any).advisor_met ?? false)) patch.advisor_met = editAdvisorMet;
 
     // Single patch call for the deal (covers both deal fields and contact flat fields)
     if (Object.keys(patch).length > 0) {
@@ -935,6 +943,46 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
               </div>
             );
           })()}
+
+          {/* Advisor */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
+              Advisor
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                value={editAdvisorName}
+                onChange={e => setEditAdvisorName(e.target.value)}
+                placeholder="Advisor name"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={editAdvisorPhone}
+                  onChange={e => setEditAdvisorPhone(e.target.value)}
+                  placeholder="Phone"
+                  type="tel"
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem' }}
+                />
+                <input
+                  value={editAdvisorEmail}
+                  onChange={e => setEditAdvisorEmail(e.target.value)}
+                  placeholder="Email"
+                  type="email"
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem' }}
+                />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={editAdvisorMet}
+                  onChange={e => setEditAdvisorMet(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#C9A84C' }}
+                />
+                Met with advisor
+              </label>
+            </div>
+          </div>
 
           {/* Granola Notes */}
           <div>
