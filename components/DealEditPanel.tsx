@@ -87,6 +87,10 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
   const [contactPhone, setContactPhone] = useState(deal?.contact?.phone || '');
   const [contactEmail, setContactEmail] = useState(deal?.contact?.email || '');
   const [contactRole, setContactRole] = useState(deal?.contact?.role || 'president');
+  const [advisorName, setAdvisorName] = useState((deal as any)?.advisor_name || '');
+  const [advisorEmail, setAdvisorEmail] = useState((deal as any)?.advisor_email || '');
+  const [advisorPhone, setAdvisorPhone] = useState((deal as any)?.advisor_phone || '');
+  const [advisorMet, setAdvisorMet] = useState((deal as any)?.advisor_met ?? false);
 
   // Multi-contact state (for existing deals)
   const [dealContacts, setDealContacts] = useState<DealContact[]>(deal?.deal_contacts || []);
@@ -347,6 +351,10 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
             category,
             last_touched: new Date().toISOString(),
             last_activity_at: new Date().toISOString(),
+            advisor_name: advisorName.trim() || null,
+            advisor_email: advisorEmail.trim() || null,
+            advisor_phone: advisorPhone.trim() || null,
+            advisor_met: advisorMet,
           }),
         });
         if (!dRes.ok) throw new Error('Failed to update deal');
@@ -821,6 +829,50 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
                 )}
               </>
             )}
+          </div>
+
+          {/* ── Advisor ── */}
+          <div className="pl2__edit-section">
+            <h3 className="pl2__edit-section-title">Advisor</h3>
+            <div className="pl2__edit-field">
+              <label>Advisor Name</label>
+              <input
+                value={advisorName}
+                onChange={e => setAdvisorName(e.target.value)}
+                placeholder="Dr. Jane Smith"
+              />
+            </div>
+            <div className="pl2__edit-row">
+              <div className="pl2__edit-field">
+                <label><Phone size={11} /> Phone</label>
+                <input
+                  type="tel"
+                  value={advisorPhone}
+                  onChange={e => setAdvisorPhone(e.target.value)}
+                  placeholder="+1 555 000 0000"
+                />
+              </div>
+              <div className="pl2__edit-field">
+                <label><Mail size={11} /> Email</label>
+                <input
+                  type="email"
+                  value={advisorEmail}
+                  onChange={e => setAdvisorEmail(e.target.value)}
+                  placeholder="advisor@school.edu"
+                />
+              </div>
+            </div>
+            <div className="pl2__edit-field" style={{ marginTop: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={advisorMet}
+                  onChange={e => setAdvisorMet(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#C9A84C' }}
+                />
+                <span>Met with advisor</span>
+              </label>
+            </div>
           </div>
 
           {/* ── Notes ── */}

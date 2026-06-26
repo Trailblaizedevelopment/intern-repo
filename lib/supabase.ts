@@ -1067,6 +1067,10 @@ export interface PipelineDeal {
   followup_count: number;
   notes: string | null;
   conference: string | null;
+  advisor_name: string | null;
+  advisor_email: string | null;
+  advisor_phone: string | null;
+  advisor_met: boolean;
   created_at: string;
   updated_at: string;
 }
