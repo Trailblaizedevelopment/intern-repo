@@ -7,7 +7,9 @@ import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type LeadOwner = 'Owen' | 'Ford' | 'Adam' | 'Team' | 'Katie' | 'Hyatt';
+type LeadOwner = 'Owen' | 'Ford' | 'Adam' | 'Team' | 'Hyatt' | 'Drake' | 'Bryce';
+
+type CategoryFilter = 'all' | 'greek' | 'country_clubs' | 'sports' | 'alumni_associations' | 'professional_associations';
 
 export interface PipelineDealFull {
   id: string;
@@ -38,6 +40,12 @@ export interface PipelineDealFull {
     email?: string | null;
     phone?: string | null;
   } | null;
+  deal_contacts?: {
+    id: string;
+    contact_id: string;
+    is_primary: boolean;
+    contact?: { id: string; name: string; email?: string | null; role?: string | null } | null;
+  }[];
 }
 
 interface DealNote {
@@ -106,22 +114,41 @@ const REP_COLORS: Record<string, string> = {
   Owen:  '#7c3aed',
   Ford:  '#0369a1',
   Adam:  '#b45309',
-  Katie: '#be185d',
   Hyatt: '#065f46',
   Worth: '#0891b2',
   Team:  '#374151',
+  Drake: '#0ea5e9',
+  Bryce: '#8b5cf6',
 };
 
 const ORG_TYPES = [
-  { value: 'fraternity', label: 'Fraternity' },
-  { value: 'sorority',   label: 'Sorority' },
-  { value: 'council',    label: 'IFC / Council' },
-  { value: 'national',   label: 'National' },
-  { value: 'sports',     label: 'Sports / Club' },
-  { value: 'other',      label: 'Other' },
+  { value: 'fraternity',            label: 'Fraternity' },
+  { value: 'sorority',              label: 'Sorority' },
+  { value: 'council',               label: 'IFC / Council' },
+  { value: 'national',              label: 'National' },
+  { value: 'sports',                label: 'Sports / Club' },
+  { value: 'country_club',          label: '⛳ Country Club' },
+  { value: 'professional_association', label: '🏢 Professional / Chamber' },
+  { value: 'other',                 label: 'Other' },
 ];
 
-const REP_OPTIONS = ['Owen', 'Ford', 'Adam', 'Hyatt', 'Worth', 'Katie'];
+const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
+  country_clubs:             { label: '⛳ Country Club',   color: '#16a34a' },
+  professional_associations: { label: '🏢 Professional',    color: '#2563eb' },
+  sports:                    { label: '⚽ Sports',          color: '#ea580c' },
+  alumni_associations:       { label: '🎓 Alumni Assoc.', color: '#7c3aed' },
+};
+
+const REP_OPTIONS = ['Owen', 'Ford', 'Adam', 'Hyatt', 'Worth', 'Drake', 'Bryce'];
+
+const CATEGORY_FILTERS: { value: CategoryFilter; label: string }[] = [
+  { value: 'all',                       label: 'All' },
+  { value: 'greek',                     label: 'Greek Life' },
+  { value: 'country_clubs',             label: 'Country Clubs' },
+  { value: 'sports',                    label: 'Sports Teams' },
+  { value: 'alumni_associations',       label: 'Alumni Associations' },
+  { value: 'professional_associations', label: 'Professional Assoc.' },
+];
 
 // Map known auth UUIDs → display names
 const UUID_TO_REP: Record<string, string> = {
@@ -134,35 +161,65 @@ const UUID_TO_REP: Record<string, string> = {
   'eadecbba-91da-41da-adc5-9a5b1cb82d4c': 'Parker',
   '5a848006-7f96-4c86-aa8d-3032ac0636ef': 'Riley',
   '6b7763bb-9bc7-46fb-b677-3e39d0a5d927': 'Worth',
+  'eef2dbc3-6460-4a81-a214-f294d1cc6dd7': 'Bryce',
+  '3581905c-804c-4445-b5f6-038f46186edd': 'Drake',
+  'af913838-31d9-40d4-953b-8203a8dda173': 'Luke',
+  'd13d8438-d878-4abc-afe1-5b1a14974449': 'Michael',
 };
 
 function isUUID(s: string | null | undefined): boolean {
   return !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }
 
-function resolveRep(rep: string | null | undefined): string | null {
+function resolveRep(rep: string | null | undefined, empList: { id: string; name: string }[] = []): string | null {
   if (!rep) return null;
-  if (isUUID(rep)) return UUID_TO_REP[rep.toLowerCase()] ?? null;
+  if (isUUID(rep)) {
+    const match = empList.find(e => e.id.toLowerCase() === rep.toLowerCase());
+    const fullName = match?.name ?? UUID_TO_REP[rep.toLowerCase()] ?? null;
+    // Return first name only so it matches REP_COLORS keys
+    return fullName ? fullName.split(' ')[0] : null;
+  }
   return rep;
 }
 
 const SLIPPING_STAGES: DealStage[] = ['first_demo', 'second_call', 'contract_sent'];
+
+// ─── Mobile Detection ────────────────────────────────────────────────────────
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    function check() { setIsMobile(window.innerWidth < 768); }
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
 
 // ─── Create Deal Drawer ────────────────────────────────────────────────────────
 
 interface CreateDealDrawerProps {
   onClose: () => void;
   onCreated: () => void;
+  employees?: { id: string; name: string }[];
 }
 
-function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
+function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDrawerProps) {
+  const isMobile = useIsMobile();
+  const salesReps = employees.filter(e =>
+    ['founder', 'cofounder', 'growth_intern', 'sales_intern'].includes((e as any).role ?? '')
+  ).concat(employees.filter(e => !['founder', 'cofounder', 'growth_intern', 'sales_intern'].includes((e as any).role ?? '') && employees.length <= 15));
+  // Fallback: if role filtering returns nothing (role not on object), show all employees
+  const repList = salesReps.length > 0 ? salesReps : employees;
+
   const [orgName, setOrgName]           = useState('');
   const [schoolName, setSchoolName]     = useState('');
   const [orgType, setOrgType]           = useState('fraternity');
   const [stage, setStage]               = useState<DealStage>('lead');
   const [temperature, setTemperature]   = useState<'hot' | 'warm' | 'cold'>('warm');
   const [value, setValue]               = useState('3588');
-  const [assignedTo, setAssignedTo]     = useState('Owen');
+  const [assignedTo, setAssignedTo]     = useState('');  // stores employee UUID
   const [contactName, setContactName]   = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -211,17 +268,32 @@ function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
   } as const;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
+      alignItems: isMobile ? 'flex-end' : 'stretch',
+    }}>
       <div
-        style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }}
+        style={{ flex: 1, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
         onClick={onClose}
       />
-      <div style={{
+      <div style={isMobile ? {
+        width: '100%', maxHeight: '92vh', background: '#fff', display: 'flex',
+        flexDirection: 'column', borderRadius: '20px 20px 0 0',
+        overflow: 'hidden', borderTop: '1px solid #e5e7eb',
+      } : {
         width: 460, background: '#fff', display: 'flex', flexDirection: 'column',
         height: '100%', borderLeft: '1px solid #e5e7eb', overflow: 'hidden',
       }}>
+        {/* Drag handle (mobile only) */}
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#d1d5db' }} />
+          </div>
+        )}
         {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: isMobile ? '12px 20px 12px' : '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h2 style={{ fontWeight: 700, fontSize: '1rem', color: '#111827', margin: 0 }}>New Deal</h2>
             <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '2px 0 0 0' }}>Manually add a deal to the pipeline</p>
@@ -232,7 +304,7 @@ function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 20px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
           {/* Org name */}
           <div>
@@ -346,13 +418,14 @@ function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
           <div>
             <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Assigned To</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {REP_OPTIONS.map(rep => {
-                const color = REP_COLORS[rep] ?? '#6b7280';
-                const isActive = assignedTo === rep;
+              {repList.map(emp => {
+                const firstName = emp.name.split(' ')[0];
+                const color = REP_COLORS[firstName] ?? '#6b7280';
+                const isActive = assignedTo === emp.id;
                 return (
                   <button
-                    key={rep}
-                    onClick={() => setAssignedTo(rep)}
+                    key={emp.id}
+                    onClick={() => setAssignedTo(emp.id)}
                     style={{
                       padding: '5px 14px', borderRadius: 8, fontSize: '0.8rem',
                       fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
@@ -361,7 +434,7 @@ function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
                       color: isActive ? '#fff' : '#374151',
                     }}
                   >
-                    {rep}
+                    {firstName}
                   </button>
                 );
               })}
@@ -401,7 +474,7 @@ function CreateDealDrawer({ onClose, onCreated }: CreateDealDrawerProps) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 10 }}>
+        <div style={{ padding: isMobile ? '12px 20px 28px' : '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 10 }}>
           <button
             onClick={onClose}
             style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit' }}
@@ -484,8 +557,8 @@ function serializeDealNotes(notes: DealNote[]): string {
 
 // ─── Rep Badge ─────────────────────────────────────────────────────────────────
 
-function RepBadge({ rep: repRaw }: { rep: string | null | undefined }) {
-  const rep = resolveRep(repRaw);
+function RepBadge({ rep: repRaw, employees = [] }: { rep: string | null | undefined; employees?: { id: string; name: string }[] }) {
+  const rep = resolveRep(repRaw, employees);
   if (!rep) return <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>—</span>;
   const color = REP_COLORS[rep] ?? '#6b7280';
   return (
@@ -576,9 +649,11 @@ interface DealDrawerProps {
   onAdvanceStage: (dealId: string, stage: DealStage) => void;
   onLogActivity: (dealId: string, text: string) => void;
   onPatch?: (dealId: string, patch: Partial<PipelineDealFull>) => void;
+  employees?: { id: string; name: string }[];
 }
 
-function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity, onPatch }: DealDrawerProps) {
+function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity, onPatch, employees = [] }: DealDrawerProps) {
+  const isMobile = useIsMobile();
   const [activityInput, setActivityInput] = useState('');
   const orgName = deal.organization?.name ?? 'Unknown Org';
   const schoolName = deal.organization?.school?.name ?? '';
@@ -586,10 +661,16 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   // Editable field state
   const [editTemp, setEditTemp] = useState<'hot' | 'warm' | 'cold'>(deal.temperature ?? 'warm');
   const [editValue, setEditValue] = useState<string>(String(deal.value ?? ''));
-  const [editRep, setEditRep] = useState<string>(resolveRep(deal.assigned_to) ?? '');
+  // Store UUID in editRep for saving; display uses resolveRep
+  const [editRep, setEditRep] = useState<string>(deal.assigned_to ?? '');
   const [editFollowup, setEditFollowup] = useState<string>(deal.next_followup ?? '');
   const [editContactName, setEditContactName] = useState<string>(deal.contact?.name ?? '');
   const [editContactEmail, setEditContactEmail] = useState<string>(deal.contact?.email ?? '');
+  const [editContactPhone, setEditContactPhone] = useState<string>(deal.contact?.phone ?? '');
+  const [editAdvisorName, setEditAdvisorName] = useState<string>((deal as any).advisor_name ?? '');
+  const [editAdvisorEmail, setEditAdvisorEmail] = useState<string>((deal as any).advisor_email ?? '');
+  const [editAdvisorPhone, setEditAdvisorPhone] = useState<string>((deal as any).advisor_phone ?? '');
+  const [editAdvisorMet, setEditAdvisorMet] = useState<boolean>((deal as any).advisor_met ?? false);
 
   // Parse existing notes/activity log
   const activityLog = useMemo(() => parseDealNotes(deal.notes), [deal.notes]);
@@ -616,22 +697,34 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   }
 
   async function handleSaveChanges() {
+    // Build deal-level patch (non-contact fields)
     const patch: Record<string, unknown> = {};
     if (editTemp !== deal.temperature) patch.temperature = editTemp;
     const numVal = parseFloat(editValue);
     if (!isNaN(numVal) && numVal !== deal.value) patch.value = numVal;
-    if (editRep && editRep !== resolveRep(deal.assigned_to)) patch.assigned_to = editRep;
+    if (editRep !== (deal.assigned_to ?? '')) patch.assigned_to = editRep || null;
     if (editFollowup !== (deal.next_followup ?? '')) patch.next_followup = editFollowup || null;
 
+    // Build contact flat-field patch (these live on the deal row too)
+    if (editContactName !== (deal.contact?.name ?? '')) patch.contact_name = editContactName || null;
+    if (editContactEmail !== (deal.contact?.email ?? '')) patch.contact_email = editContactEmail || null;
+    if (editContactPhone !== (deal.contact?.phone ?? '')) patch.contact_phone = editContactPhone || null;
+    if (editAdvisorName !== ((deal as any).advisor_name ?? '')) patch.advisor_name = editAdvisorName || null;
+    if (editAdvisorEmail !== ((deal as any).advisor_email ?? '')) patch.advisor_email = editAdvisorEmail || null;
+    if (editAdvisorPhone !== ((deal as any).advisor_phone ?? '')) patch.advisor_phone = editAdvisorPhone || null;
+    if (editAdvisorMet !== ((deal as any).advisor_met ?? false)) patch.advisor_met = editAdvisorMet;
+
+    // Single patch call for the deal (covers both deal fields and contact flat fields)
     if (Object.keys(patch).length > 0) {
       onPatch?.(deal.id, patch as Partial<PipelineDealFull>);
     }
 
-    // Handle contact edits
+    // Also update the contacts table if a contact record is linked
     if (deal.contact?.id) {
-      const contactPatch: Record<string, string> = {};
-      if (editContactName !== (deal.contact?.name ?? '')) contactPatch.name = editContactName;
-      if (editContactEmail !== (deal.contact?.email ?? '')) contactPatch.email = editContactEmail;
+      const contactPatch: Record<string, string | null> = {};
+      if (editContactName !== (deal.contact?.name ?? '')) contactPatch.name = editContactName || null;
+      if (editContactEmail !== (deal.contact?.email ?? '')) contactPatch.email = editContactEmail || null;
+      if (editContactPhone !== (deal.contact?.phone ?? '')) contactPatch.phone = editContactPhone || null;
       if (Object.keys(contactPatch).length > 0) {
         await fetch(`/api/pipeline/contacts/${deal.contact.id}`, {
           method: 'PATCH',
@@ -660,17 +753,32 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
   } as const;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
+      alignItems: isMobile ? 'flex-end' : 'stretch',
+    }}>
       <div
-        style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)' }}
+        style={{ flex: 1, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
         onClick={onClose}
       />
-      <div style={{
+      <div style={isMobile ? {
+        width: '100%', height: '94vh', background: '#ffffff', display: 'flex',
+        flexDirection: 'column', borderRadius: '20px 20px 0 0',
+        overflow: 'hidden', borderTop: '1px solid #e5e7eb',
+      } : {
         width: 480, background: '#ffffff', display: 'flex', flexDirection: 'column',
         height: '100%', borderLeft: '1px solid #e5e7eb', overflow: 'hidden',
       }}>
+        {/* Drag handle (mobile only) */}
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', background: '#f9fafb' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#d1d5db' }} />
+          </div>
+        )}
         {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+        <div style={{ padding: isMobile ? '12px 20px 12px' : '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
@@ -688,7 +796,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 20px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Stage Stepper */}
           <div>
             <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
@@ -749,13 +857,14 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
           <div>
             <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Assigned To</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {REP_OPTIONS.map(rep => {
-                const color = REP_COLORS[rep] ?? '#6b7280';
-                const isActive = editRep === rep;
+              {employees.map(emp => {
+                const firstName = emp.name.split(' ')[0];
+                const color = REP_COLORS[firstName] ?? '#6b7280';
+                const isActive = editRep === emp.id;
                 return (
                   <button
-                    key={rep}
-                    onClick={() => setEditRep(rep)}
+                    key={emp.id}
+                    onClick={() => setEditRep(emp.id)}
                     style={{
                       padding: '5px 12px', borderRadius: 8, fontSize: '0.78rem',
                       fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
@@ -764,7 +873,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
                       color: isActive ? '#fff' : '#374151',
                     }}
                   >
-                    {rep}
+                    {firstName}
                   </button>
                 );
               })}
@@ -773,7 +882,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
 
           {/* Contact Info */}
           <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Contact</div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Primary Contact</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <input
                 type="text"
@@ -789,9 +898,89 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
                 placeholder="Email address"
                 style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
               />
-              {!deal.contact?.id && (
-                <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontStyle: 'italic' }}>No contact linked — contact edits will be skipped</div>
-              )}
+              <input
+                type="tel"
+                value={editContactPhone}
+                onChange={e => setEditContactPhone(e.target.value)}
+                placeholder="Phone number"
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          {/* Additional Contacts */}
+          {(() => {
+            const extras = (deal as any).deal_contacts?.filter((dc: any) => !dc.is_primary) ?? [];
+            return (
+              <div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>
+                  Additional Contacts
+                </div>
+                {extras.length === 0 && (
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic', marginBottom: 8 }}>No additional contacts</div>
+                )}
+                {extras.map((dc: any) => (
+                  <div key={dc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f9fafb', borderRadius: 8, marginBottom: 6, fontSize: '0.8rem' }}>
+                    <div>
+                      <span style={{ fontWeight: 600 }}>{dc.contact?.name ?? 'Unknown'}</span>
+                      {dc.contact?.role && <span style={{ color: '#6b7280', marginLeft: 6 }}>{dc.contact.role}</span>}
+                      {dc.contact?.email && <div style={{ color: '#6b7280', fontSize: '0.72rem' }}>{dc.contact.email}</div>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+                          method: 'DELETE',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ contact_id: dc.contact_id }),
+                        });
+                        onClose();
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.75rem', padding: '2px 6px' }}
+                    >✕</button>
+                  </div>
+                ))}
+                <AddContactRow dealId={deal.id} onAdded={onClose} />
+              </div>
+            );
+          })()}
+
+          {/* Advisor */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
+              Advisor
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                value={editAdvisorName}
+                onChange={e => setEditAdvisorName(e.target.value)}
+                placeholder="Advisor name"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={editAdvisorPhone}
+                  onChange={e => setEditAdvisorPhone(e.target.value)}
+                  placeholder="Phone"
+                  type="tel"
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem' }}
+                />
+                <input
+                  value={editAdvisorEmail}
+                  onChange={e => setEditAdvisorEmail(e.target.value)}
+                  placeholder="Email"
+                  type="email"
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem' }}
+                />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={editAdvisorMet}
+                  onChange={e => setEditAdvisorMet(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#C9A84C' }}
+                />
+                Met with advisor
+              </label>
             </div>
           </div>
 
@@ -854,7 +1043,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
         </div>
 
         {/* Log Activity Input */}
-        <div style={{ padding: '12px 24px 0', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
+        <div style={{ padding: isMobile ? '12px 20px 0' : '12px 24px 0', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
           <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>
             Log Activity
           </div>
@@ -887,7 +1076,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
         </div>
 
         {/* Action Buttons */}
-        <div style={{ padding: '12px 24px 16px', background: '#f9fafb', display: 'flex', gap: 8 }}>
+        <div style={{ padding: isMobile ? '12px 20px 28px' : '12px 24px 16px', background: '#f9fafb', display: 'flex', gap: 8 }}>
           <button
             onClick={handleClosedLost}
             style={{
@@ -929,9 +1118,61 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
 interface DealCardProps {
   deal: PipelineDealFull;
   onClick: () => void;
+  employees?: { id: string; name: string }[];
 }
 
-function DealCard({ deal, onClick }: DealCardProps) {
+function AddContactRow({ dealId, onAdded }: { dealId: string; onAdded: () => void }) {
+  const [name, setName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [role, setRole] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+
+  const [phone, setPhone] = React.useState('');
+
+  async function handleAdd() {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      // Create contact first
+      const cRes = await fetch('/api/pipeline/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, role: role.trim() || null }),
+      });
+      if (!cRes.ok) return;
+      const contact = await cRes.json();
+      // Link to deal
+      await fetch(`/api/pipeline/deals/${dealId}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contact_id: contact.id, is_primary: false }),
+      });
+      setName(''); setEmail(''); setPhone(''); setRole('');
+      onAdded();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputStyle = { width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '7px 10px', fontSize: '0.8rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6' }}>
+      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6b7280' }}>Add contact</div>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Name *" style={inputStyle} />
+      <input value={role} onChange={e => setRole(e.target.value)} placeholder="Role (e.g. Treasurer)" style={inputStyle} />
+      <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" style={inputStyle} />
+      <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" style={inputStyle} />
+      <button
+        onClick={handleAdd}
+        disabled={saving || !name.trim()}
+        style={{ padding: '7px 12px', borderRadius: 8, background: name.trim() ? '#0F172A' : '#e5e7eb', color: name.trim() ? '#fff' : '#9ca3af', border: 'none', cursor: name.trim() ? 'pointer' : 'not-allowed', fontSize: '0.8rem', fontWeight: 600 }}
+      >{saving ? 'Adding…' : '+ Add Contact'}</button>
+    </div>
+  );
+}
+
+function DealCard({ deal, onClick, employees = [] }: DealCardProps) {
   const orgName = deal.organization?.name ?? 'Unknown';
   const schoolName = deal.organization?.school?.name ?? null;
   const contactName = deal.contact?.name ?? null;
@@ -963,7 +1204,7 @@ function DealCard({ deal, onClick }: DealCardProps) {
         {contactName && <div style={{ fontSize: '0.75rem', color: '#374151', marginTop: 2 }}>{contactName}</div>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-        <RepBadge rep={rep} />
+        <RepBadge rep={rep} employees={employees} />
         {deal.value > 0 && (
           <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#1d4ed8' }}>{fmt$(deal.value)}</span>
         )}
@@ -972,6 +1213,18 @@ function DealCard({ deal, onClick }: DealCardProps) {
         <span style={{ fontSize: '0.7rem', color: actColor, fontWeight: 600 }}>
           {days === null ? 'No activity' : days === 0 ? 'Today' : `${days}d ago`}
         </span>
+        {(() => {
+          const cat = (deal as any).category;
+          const badge = cat && CATEGORY_BADGE[cat];
+          if (!badge) return null;
+          return (
+            <span style={{
+              fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              background: badge.color + '18', color: badge.color,
+              border: `1px solid ${badge.color}40`,
+            }}>{badge.label}</span>
+          );
+        })()}
       </div>
     </div>
   );
@@ -983,9 +1236,10 @@ interface NeedsAttentionProps {
   deals: PipelineDealFull[];
   onOpenDeal: (deal: PipelineDealFull) => void;
   onLogFollowup: (dealId: string, text: string) => void;
+  employees?: { id: string; name: string }[];
 }
 
-function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup }: NeedsAttentionProps) {
+function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup, employees = [] }: NeedsAttentionProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [inputs, setInputs] = useState<Record<string, string>>({});
 
@@ -1052,7 +1306,7 @@ function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup }: NeedsAttent
                     </span>
                     {schoolName && <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{schoolName}</span>}
                     <StageBadge stage={deal.stage} />
-                    <RepBadge rep={deal.assigned_to} />
+                    <RepBadge rep={deal.assigned_to} employees={employees} />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
@@ -1133,11 +1387,127 @@ interface PipelineKanbanProps {
   deals: PipelineDealFull[];
   archivedDeals: PipelineDealFull[];
   onOpenDeal: (deal: PipelineDealFull) => void;
+  employees?: { id: string; name: string }[];
 }
 
-function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProps) {
+// ─── Mobile Pipeline View ────────────────────────────────────────────────────────────
+
+function MobilePipelineView({ deals, archivedDeals, onOpenDeal, employees = [] }: PipelineKanbanProps) {
+  const [activeStage, setActiveStage] = useState<DealStage | 'all'>('all');
   const [showArchived, setShowArchived] = useState(false);
 
+  const countByStage = useMemo(() => {
+    const map: Record<string, number> = { all: deals.length };
+    for (const s of PIPELINE_STAGES) map[s] = deals.filter(d => d.stage === s).length;
+    return map;
+  }, [deals]);
+
+  const filteredDeals = useMemo(() =>
+    activeStage === 'all' ? deals : deals.filter(d => d.stage === activeStage),
+    [deals, activeStage]
+  );
+
+  const activeStageColor = activeStage !== 'all' ? STAGE_COLORS[activeStage as DealStage] : null;
+
+  return (
+    <div>
+      {/* Stage tabs - horizontal scroll */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 10, marginBottom: 4 }}>
+        <button
+          onClick={() => setActiveStage('all')}
+          style={{
+            padding: '6px 14px', borderRadius: 20, fontSize: '0.8rem',
+            fontWeight: activeStage === 'all' ? 700 : 500, cursor: 'pointer',
+            border: `1px solid ${activeStage === 'all' ? '#0F172A' : '#e5e7eb'}`,
+            background: activeStage === 'all' ? '#0F172A' : '#fff',
+            color: activeStage === 'all' ? '#fff' : '#374151',
+            whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit',
+          }}
+        >All ({countByStage.all})</button>
+        {PIPELINE_STAGES.map(stage => {
+          const cfg = STAGE_COLORS[stage];
+          const isActive = activeStage === stage;
+          return (
+            <button
+              key={stage}
+              onClick={() => setActiveStage(stage)}
+              style={{
+                padding: '6px 12px', borderRadius: 20, fontSize: '0.8rem',
+                fontWeight: isActive ? 700 : 500, cursor: 'pointer',
+                border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
+                background: isActive ? cfg.bg : '#fff',
+                color: isActive ? cfg.color : '#6b7280',
+                whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit',
+              }}
+            >
+              {STAGE_LABELS[stage]}
+              {countByStage[stage] > 0 && (
+                <span style={{
+                  marginLeft: 5, background: isActive ? cfg.color : '#e5e7eb',
+                  color: isActive ? '#fff' : '#6b7280',
+                  borderRadius: '9999px', padding: '0 5px', fontSize: '0.7rem', fontWeight: 700,
+                }}>{countByStage[stage]}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeStageColor && (
+        <div style={{
+          padding: '8px 14px', borderRadius: 10, marginBottom: 10,
+          background: activeStageColor.bg, border: `1px solid ${activeStageColor.border}`,
+          fontSize: '0.8rem', fontWeight: 700, color: activeStageColor.color,
+        }}>
+          {STAGE_LABELS[activeStage as DealStage]} — {filteredDeals.length} deal{filteredDeals.length !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {filteredDeals.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af', fontSize: '0.875rem' }}>No deals in this stage</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {filteredDeals.map(deal => (
+            <DealCard key={deal.id} deal={deal} onClick={() => onOpenDeal(deal)} employees={employees} />
+          ))}
+        </div>
+      )}
+
+      {archivedDeals.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <button
+            onClick={() => setShowArchived(s => !s)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'inherit', padding: '6px 0' }}
+          >
+            <ChevronDown size={14} style={{ transform: showArchived ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />
+            Archived / Closed Lost ({archivedDeals.length})
+          </button>
+          {showArchived && (
+            <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, marginTop: 8, overflow: 'hidden' }}>
+              {archivedDeals.map((deal, i) => (
+                <div
+                  key={deal.id} onClick={() => onOpenDeal(deal)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: i < archivedDeals.length - 1 ? '1px solid #f3f4f6' : 'none', cursor: 'pointer', background: '#fff' }}
+                >
+                  <span style={{ flex: 1, fontWeight: 600, fontSize: '0.8rem', color: '#374151', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {deal.organization?.name ?? 'Unknown'}
+                  </span>
+                  <StageBadge stage={deal.stage} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: PipelineKanbanProps) {
+  const isMobile = useIsMobile();
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Must be declared before any conditional returns (Rules of Hooks)
   const byStage = useMemo(() => {
     const map: Record<DealStage, PipelineDealFull[]> = {
       lead: [], demo_booked: [], first_demo: [], second_call: [],
@@ -1148,6 +1518,10 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProp
     }
     return map;
   }, [deals]);
+
+  if (isMobile) {
+    return <MobilePipelineView deals={deals} archivedDeals={archivedDeals} onOpenDeal={onOpenDeal} employees={employees} />;
+  }
 
   return (
     <div>
@@ -1191,7 +1565,7 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProp
                   </div>
                 ) : (
                   stageDeals.map(deal => (
-                    <DealCard key={deal.id} deal={deal} onClick={() => onOpenDeal(deal)} />
+                    <DealCard key={deal.id} deal={deal} onClick={() => onOpenDeal(deal)} employees={employees} />
                   ))
                 )}
               </div>
@@ -1241,7 +1615,7 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProp
                     {deal.organization?.school?.name ?? ''}
                   </span>
                   <StageBadge stage={deal.stage} />
-                  <RepBadge rep={deal.assigned_to} />
+                  <RepBadge rep={deal.assigned_to} employees={employees} />
                   <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{relativeTime(deal.last_touched ?? deal.updated_at)}</span>
                 </div>
               ))}
@@ -1256,21 +1630,34 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal }: PipelineKanbanProp
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function SalesCRM() {
+  const isMobile = useIsMobile();
   const [deals, setDeals] = useState<PipelineDealFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [selectedDeal, setSelectedDeal]     = useState<PipelineDealFull | null>(null);
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [granolaNotes, setGranolaNotes]     = useState<GranolaNote[] | null>(null);
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const granolaFetchedRef = useRef(false);
+
+  useEffect(() => {
+    fetch('/api/pipeline/employees')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setEmployees(data); })
+      .catch(() => {});
+  }, []);
 
   // ── Fetch deals ──
   const fetchDeals = useCallback(async () => {
     try {
-      const res = await fetch('/api/pipeline/deals?limit=200');
+      const params = new URLSearchParams();
+      params.set('limit', '500');
+      if (categoryFilter && categoryFilter !== 'all') params.set('category', categoryFilter);
+      const res = await fetch(`/api/pipeline/deals?${params.toString()}`);
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setDeals(data);
         return data as PipelineDealFull[];
       }
@@ -1281,11 +1668,11 @@ export function SalesCRM() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [categoryFilter]);
 
   useEffect(() => {
     fetchDeals();
-  }, [fetchDeals]);
+  }, [fetchDeals, categoryFilter]);
 
   // ── Fetch Granola notes on mount ──
   useEffect(() => {
@@ -1384,7 +1771,7 @@ export function SalesCRM() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* ── Stats Row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? '8px' : '12px' }}>
         {[
           { label: 'Active Deals',   value: stats.total,          color: '#1e40af', bg: '#dbeafe' },
           { label: 'Hot (Demo+)',    value: stats.hot,            color: '#92400e', bg: '#fef3c7' },
@@ -1393,10 +1780,10 @@ export function SalesCRM() {
         ].map(stat => (
           <div key={stat.label} style={{
             background: stat.bg, border: `1px solid ${stat.color}30`,
-            borderRadius: '12px', padding: '16px',
+            borderRadius: '12px', padding: isMobile ? '12px' : '16px',
           }}>
             <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: stat.color + 'aa', margin: '0 0 4px 0' }}>{stat.label}</p>
-            <p style={{ fontSize: '1.75rem', fontWeight: 800, color: stat.color, margin: 0, lineHeight: 1 }}>{stat.value}</p>
+            <p style={{ fontSize: isMobile ? '1.4rem' : '1.75rem', fontWeight: 800, color: stat.color, margin: 0, lineHeight: 1 }}>{stat.value}</p>
           </div>
         ))}
       </div>
@@ -1406,49 +1793,101 @@ export function SalesCRM() {
         deals={deals}
         onOpenDeal={setSelectedDeal}
         onLogFollowup={handleLogActivity}
+        employees={employees}
       />
 
       {/* ── Filter Bar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          flex: 1, minWidth: '200px', maxWidth: '360px',
-          background: '#ffffff', border: '1px solid #e5e7eb',
-          borderRadius: '10px', padding: '8px 12px',
-        }}>
-          <Search size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search org, school, contact…"
-            style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontFamily: 'inherit', flex: 1, color: '#374151', background: 'transparent' }}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex' }}>
-              <X size={13} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            flex: 1,
+            background: '#ffffff', border: '1px solid #e5e7eb',
+            borderRadius: '10px', padding: '9px 12px',
+          }}>
+            <Search size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search org, school, contact…"
+              style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontFamily: 'inherit', flex: 1, color: '#374151', background: 'transparent' }}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex' }}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          {!isMobile && (
+            <button
+              onClick={fetchDeals}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+            >
+              <RefreshCw size={13} /> Refresh
+            </button>
+          )}
+          {!isMobile && (
+            <button
+              onClick={() => setShowCreateDrawer(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                padding: '8px 14px', borderRadius: 8, border: 'none',
+                background: '#0F172A', color: '#fff',
+                fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Plus size={13} /> New Deal
             </button>
           )}
         </div>
+        {/* Mobile action row */}
+        {isMobile && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={fetchDeals}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <RefreshCw size={13} />
+            </button>
+            <button
+              onClick={() => setShowCreateDrawer(true)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '9px 14px', borderRadius: 8, border: 'none',
+                background: '#0F172A', color: '#fff',
+                fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <Plus size={14} /> New Deal
+            </button>
+          </div>
+        )}
+      </div>
 
-        <button
-          onClick={fetchDeals}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          <RefreshCw size={13} /> Refresh
-        </button>
-        <button
-          onClick={() => setShowCreateDrawer(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', borderRadius: 8, border: 'none',
-            background: '#0F172A', color: '#fff',
-            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <Plus size={13} /> New Deal
-        </button>
+      {/* Category Filter */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+        {CATEGORY_FILTERS.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setCategoryFilter(opt.value)}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 20,
+              fontSize: '0.8rem',
+              fontWeight: categoryFilter === opt.value ? 700 : 500,
+              cursor: 'pointer',
+              border: `1px solid ${categoryFilter === opt.value ? '#0F172A' : '#e5e7eb'}`,
+              background: categoryFilter === opt.value ? '#0F172A' : '#ffffff',
+              color: categoryFilter === opt.value ? '#ffffff' : '#374151',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {/* ── Pipeline Kanban ── */}
@@ -1461,6 +1900,7 @@ export function SalesCRM() {
           deals={visibleDeals}
           archivedDeals={archivedDeals}
           onOpenDeal={setSelectedDeal}
+          employees={employees}
         />
       )}
 
@@ -1469,6 +1909,7 @@ export function SalesCRM() {
         <CreateDealDrawer
           onClose={() => setShowCreateDrawer(false)}
           onCreated={fetchDeals}
+          employees={employees}
         />
       )}
 
@@ -1481,6 +1922,7 @@ export function SalesCRM() {
           onAdvanceStage={handleAdvanceStage}
           onLogActivity={handleLogActivity}
           onPatch={handlePatch}
+          employees={employees}
         />
       )}
     </div>

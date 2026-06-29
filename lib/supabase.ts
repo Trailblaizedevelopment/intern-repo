@@ -342,8 +342,9 @@ export function getOwenStage(deal: {
     deal.stage === 'second_call'
   ) return 'hot';
 
-  // 5. Hold-off = back burner
+  // 5. Hold-off or bad timing = back burner
   if (deal.stage === 'hold_off') return 'back_burner';
+  if (deal.stage === 'timing') return 'back_burner';
 
   // 6. Everything else (new leads, closed_lost) → back burner
   return 'back_burner';
@@ -1066,6 +1067,10 @@ export interface PipelineDeal {
   followup_count: number;
   notes: string | null;
   conference: string | null;
+  advisor_name: string | null;
+  advisor_email: string | null;
+  advisor_phone: string | null;
+  advisor_met: boolean;
   created_at: string;
   updated_at: string;
 }

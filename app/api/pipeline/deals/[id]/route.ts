@@ -8,22 +8,35 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data, error } = await admin
     .from('pipeline_deals')
-    .select(`*, organization:organizations(*, school:schools(*), national_org:national_orgs(*)), contact:contacts(*)`)
+    .select('*')
     .eq('id', id)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json(data);
+
+  // Shape for backward compatibility
+  const shaped = {
+    ...data,
+    organization: {
+      name: data.deal_name || '',
+      school: { name: data.university || '' },
+      national_org: { name: data.national_org || '' },
+    },
+    contact: data.contact_name ? {
+      name: data.contact_name,
+      email: data.contact_email,
+      phone: data.contact_phone,
+    } : null,
+  };
+
+  return NextResponse.json(shaped);
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
   const { id } = await params;
-  const body = await req.json();
-
-  // BUG-5: always stamp updated_at on every PATCH
-  const payload = { ...body, updated_at: new Date().toISOString() };
+  const payload = await req.json();
 
   const { data, error } = await admin.from('pipeline_deals').update(payload).eq('id', id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -37,5 +50,5 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { error } = await admin.from('pipeline_deals').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ ok: true });
 }

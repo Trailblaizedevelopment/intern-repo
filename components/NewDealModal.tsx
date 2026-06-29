@@ -5,7 +5,7 @@ import { X, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 /* ─── Types ─── */
-type OrgCategory = 'fraternity' | 'sorority' | 'council' | 'national' | 'sports' | 'other';
+type OrgCategory = 'fraternity' | 'sorority' | 'council' | 'national' | 'sports' | 'country_club' | 'professional_association' | 'other';
 
 interface School { id: string; name: string; state: string | null; conference: string | null; }
 interface NationalOrg { id: string; name: string; abbreviation: string | null; type: 'fraternity' | 'sorority'; }
@@ -21,8 +21,10 @@ const ORG_CATEGORIES: { key: OrgCategory; label: string; emoji: string; dealType
   { key: 'sorority', label: 'Sorority Chapter', emoji: '🏠', dealType: 'local' },
   { key: 'council', label: 'IFC / PHC Council', emoji: '⚖️', dealType: 'council' },
   { key: 'national', label: 'National HQ', emoji: '🌐', dealType: 'national' },
-  { key: 'sports', label: 'Sports Team / Club', emoji: '⚽', dealType: 'local' },
-  { key: 'other', label: 'Other Campus Org', emoji: '🎓', dealType: 'local' },
+  { key: 'sports',       label: 'Sports Team / Club',       emoji: '⚽', dealType: 'local' },
+  { key: 'country_club',            label: 'Country Club',          emoji: '⛳', dealType: 'local' },
+  { key: 'professional_association', label: 'Professional / Chamber', emoji: '🏢', dealType: 'local' },
+  { key: 'other',        label: 'Other Campus Org',           emoji: '🎓', dealType: 'local' },
 ];
 
 const PIPELINE_STAGES: DealStage[] = ['lead', 'demo_booked', 'first_demo', 'second_call', 'contract_sent', 'closed_won'];
@@ -39,12 +41,14 @@ const CONTACT_ROLES = [
 // TEAM_MEMBERS replaced by dynamic employees fetch (see BUG-4 fix below)
 
 const DEFAULT_VALUE: Record<OrgCategory, string> = {
-  fraternity: '3588',
-  sorority: '3588',
-  sports: '3588',
-  other: '3588',
-  council: '',
-  national: '',
+  fraternity:   '3588',
+  sorority:     '3588',
+  sports:       '3588',
+  country_club: '3588',
+  professional_association: '3588',
+  other:        '3588',
+  council:      '',
+  national:     '',
 };
 
 const TEMP_STYLE: Record<string, { bg: string; border: string; color: string }> = {
@@ -239,21 +243,35 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          deal_name: finalOrgName,
           org_id: orgId,
           contact_id: contactId,
+          contact_name: contactName.trim() || null,
+          contact_email: contactEmail.trim() || null,
+          contact_phone: contactPhone.trim() || null,
           deal_type: dealType,
           stage,
           value: parseInt(value) || 0,
           temperature,
           assigned_to: assignedTo || null,
+          university: selectedSchool?.name || null,
+          national_org: (orgCategory === 'fraternity' || orgCategory === 'sorority')
+            ? (nationalOrgName ? nationalOrgName.replace(/\s*\(.*?\)\s*$/, '').trim() : null)
+            : null,
           conference: selectedSchool?.conference || null,
-          // national/sports/other without school: school_id and national_org_id are null (handled in org creation above)
           notes: notes.trim() || null,
           next_followup: nextFollowup || null,
           last_touched: new Date().toISOString(),
+          category: (orgCategory === 'country_club' ? 'country_clubs' :
+                     orgCategory === 'sports' ? 'sports' :
+                     orgCategory === 'professional_association' ? 'professional_associations' :
+                     'greek'),
         }),
       });
-      if (!dRes.ok) throw new Error('Failed to create deal');
+      if (!dRes.ok) {
+        const errBody = await dRes.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Failed to create deal');
+      }
 
       onCreated();
     } catch (e: any) {
@@ -595,8 +613,8 @@ export default function NewDealModal({ onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* ── Step 8: Assigned To (BUG-4: uses employee UUID) ── */}
-          {showOptional && (
+          {/* ── Step 8: Assigned To ── */}
+          {showStep4 && (
             <div className="ndm__section">
               <label className="ndm__label">Assigned To</label>
               <select className="ndm__select" value={assignedTo} onChange={e => setAssignedTo(e.target.value)}>

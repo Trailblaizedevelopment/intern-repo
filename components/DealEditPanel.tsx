@@ -5,6 +5,12 @@ import { X, Trash2, Building2, Phone, Mail, Plus, Clock } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 /* ─── Types ─── */
+interface DealContact {
+  id: string;
+  is_primary: boolean;
+  contact: { id: string; name: string; email: string | null; phone: string | null; role: string | null } | null;
+}
+
 interface PipelineDeal {
   id: string;
   org_id: string | null;
@@ -27,6 +33,7 @@ interface PipelineDeal {
     national_org?: { id: string; name: string; abbreviation: string } | null;
   } | null;
   contact?: { id: string; name: string; email: string | null; phone: string | null; role: string | null } | null;
+  deal_contacts?: DealContact[];
 }
 
 interface Employee { id: string; name: string; role: string; }
@@ -43,7 +50,7 @@ interface Props {
   onDeleted: () => void;
 }
 
-const STAGES: DealStage[] = ['lead', 'demo_booked', 'first_demo', 'second_call', 'contract_sent', 'closed_won', 'closed_lost', 'hold_off'];
+const STAGES: DealStage[] = ['lead', 'demo_booked', 'first_demo', 'second_call', 'timing', 'contract_sent', 'closed_won', 'closed_lost', 'hold_off'];
 
 const CONTACT_ROLES = [
   { value: 'president', label: 'President' },
@@ -70,15 +77,31 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
   const [temperature, setTemperature] = useState<'hot' | 'warm' | 'cold'>(deal?.temperature || 'warm');
   const [value, setValue] = useState(deal?.value?.toString() || '');
   const [assignedTo, setAssignedTo] = useState(deal?.assigned_to || '');
+  const [category, setCategory] = useState((deal as any)?.category || 'greek');
   const [conference, setConference] = useState(deal?.conference || '');
   const [notes, setNotes] = useState(deal?.notes || '');
   const [nextFollowup, setNextFollowup] = useState(deal?.next_followup || '');
 
-  // Contact fields
+  // Contact fields (for new deal creation)
   const [contactName, setContactName] = useState(deal?.contact?.name || '');
   const [contactPhone, setContactPhone] = useState(deal?.contact?.phone || '');
   const [contactEmail, setContactEmail] = useState(deal?.contact?.email || '');
   const [contactRole, setContactRole] = useState(deal?.contact?.role || 'president');
+  const [advisorName, setAdvisorName] = useState((deal as any)?.advisor_name || '');
+  const [advisorEmail, setAdvisorEmail] = useState((deal as any)?.advisor_email || '');
+  const [advisorPhone, setAdvisorPhone] = useState((deal as any)?.advisor_phone || '');
+  const [advisorMet, setAdvisorMet] = useState((deal as any)?.advisor_met ?? false);
+
+  // Multi-contact state (for existing deals)
+  const [dealContacts, setDealContacts] = useState<DealContact[]>(deal?.deal_contacts || []);
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [addContactSearch, setAddContactSearch] = useState('');
+  const [orgContacts, setOrgContacts] = useState<{ id: string; name: string; email: string | null; phone: string | null; role: string | null }[]>([]);
+  const [addContactLoading, setAddContactLoading] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+  const [newContactRole, setNewContactRole] = useState('president');
+  const [useNewContact, setUseNewContact] = useState(false);
 
   // New deal org fields
   const [orgName, setOrgName] = useState('');
@@ -117,6 +140,98 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
   }, [deal]);
 
   useEffect(() => { loadActivities(); }, [loadActivities]);
+
+  // Reload deal contacts from the deal prop when it changes (after saves)
+  useEffect(() => {
+    setDealContacts(deal?.deal_contacts || []);
+  }, [deal]);
+
+  async function loadOrgContacts() {
+    if (!deal?.org_id) return;
+    setAddContactLoading(true);
+    try {
+      const res = await fetch(`/api/pipeline/contacts?org_id=${deal.org_id}`);
+      if (res.ok) setOrgContacts(await res.json());
+    } catch { /* graceful */ }
+    finally { setAddContactLoading(false); }
+  }
+
+  async function removeContact(contactId: string) {
+    if (!deal) return;
+    await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: contactId }),
+    });
+    setDealContacts(prev => prev.filter(dc => dc.contact?.id !== contactId));
+  }
+
+  async function setPrimaryContact(contactId: string) {
+    if (!deal) return;
+    await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: contactId, is_primary: true }),
+    });
+    setDealContacts(prev => prev.map(dc => ({
+      ...dc,
+      is_primary: dc.contact?.id === contactId,
+    })));
+  }
+
+  async function addExistingContact(contactId: string) {
+    if (!deal) return;
+    const isPrimary = dealContacts.length === 0;
+    const res = await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: contactId, is_primary: isPrimary }),
+    });
+    if (res.ok) {
+      const contact = orgContacts.find(c => c.id === contactId);
+      if (contact) {
+        setDealContacts(prev => [
+          ...prev.map(dc => isPrimary ? { ...dc, is_primary: false } : dc),
+          { id: '', is_primary: isPrimary, contact },
+        ]);
+      }
+    }
+    setShowAddContact(false);
+    setAddContactSearch('');
+  }
+
+  async function addNewContact() {
+    if (!deal || !newContactName.trim()) return;
+    // 1. Create contact
+    const cRes = await fetch('/api/pipeline/contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        org_id: deal.org_id,
+        name: newContactName.trim(),
+        email: newContactEmail.trim() || null,
+        role: newContactRole || 'president',
+      }),
+    });
+    if (!cRes.ok) return;
+    const created = await cRes.json();
+    // 2. Link to deal
+    const isPrimary = dealContacts.length === 0;
+    await fetch(`/api/pipeline/deals/${deal.id}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: created.id, is_primary: isPrimary }),
+    });
+    setDealContacts(prev => [
+      ...prev.map(dc => isPrimary ? { ...dc, is_primary: false } : dc),
+      { id: '', is_primary: isPrimary, contact: { id: created.id, name: created.name, email: created.email, phone: created.phone, role: created.role } },
+    ]);
+    setShowAddContact(false);
+    setNewContactName('');
+    setNewContactEmail('');
+    setNewContactRole('president');
+    setUseNewContact(false);
+  }
 
   async function submitActivity() {
     if (!deal || !logOutcome.trim()) return;
@@ -213,6 +328,7 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
             conference: conference.trim() || null,
             notes: notes.trim() || null,
             next_followup: nextFollowup || null,
+            category,
             last_touched: new Date().toISOString(),
             last_activity_at: new Date().toISOString(),
           }),
@@ -232,8 +348,13 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
             conference: conference.trim() || null,
             notes: notes.trim() || null,
             next_followup: nextFollowup || null,
+            category,
             last_touched: new Date().toISOString(),
             last_activity_at: new Date().toISOString(),
+            advisor_name: advisorName.trim() || null,
+            advisor_email: advisorEmail.trim() || null,
+            advisor_phone: advisorPhone.trim() || null,
+            advisor_met: advisorMet,
           }),
         });
         if (!dRes.ok) throw new Error('Failed to update deal');
@@ -430,6 +551,19 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="pl2__edit-row">
+              <div className="pl2__edit-field">
+                <label>Category</label>
+                <select value={category} onChange={e => setCategory(e.target.value)}>
+                  <option value="greek">🏙 Greek Life</option>
+                  <option value="country_clubs">⛳ Country Club</option>
+                  <option value="professional_associations">🏢 Professional / Chamber</option>
+                  <option value="sports">⚽ Sports Team</option>
+                  <option value="alumni_associations">🎓 Alumni Association</option>
+                </select>
+              </div>
               <div className="pl2__edit-field">
                 <label>Next Follow-up</label>
                 <input
@@ -444,12 +578,268 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
           {/* ── Contact ── */}
           <div className="pl2__edit-section">
             <h3 className="pl2__edit-section-title">Contact</h3>
+
+            {/* New deal: single contact form */}
+            {isNew && (
+              <>
+                <div className="pl2__edit-field">
+                  <label>Name</label>
+                  <input
+                    value={contactName}
+                    onChange={e => setContactName(e.target.value)}
+                    placeholder="John Smith"
+                  />
+                </div>
+                <div className="pl2__edit-row">
+                  <div className="pl2__edit-field">
+                    <label><Phone size={11} /> Phone</label>
+                    <input
+                      type="tel"
+                      value={contactPhone}
+                      onChange={e => setContactPhone(e.target.value)}
+                      placeholder="+1 555 000 0000"
+                    />
+                  </div>
+                  <div className="pl2__edit-field">
+                    <label><Mail size={11} /> Email</label>
+                    <input
+                      type="email"
+                      value={contactEmail}
+                      onChange={e => setContactEmail(e.target.value)}
+                      placeholder="john@school.edu"
+                    />
+                  </div>
+                </div>
+                <div className="pl2__edit-field">
+                  <label>Role</label>
+                  <select value={contactRole} onChange={e => setContactRole(e.target.value)}>
+                    {CONTACT_ROLES.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Existing deal: multi-contact list */}
+            {!isNew && (
+              <>
+                {/* Contact list */}
+                {dealContacts.length === 0 && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#9ca3af)', padding: '4px 0 8px' }}>
+                    No contacts linked yet.
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                  {dealContacts.map((dc, idx) => (
+                    <div key={dc.contact?.id || idx} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', borderRadius: 10,
+                      background: 'var(--ws-bg,#f9fafb)',
+                      border: `1.5px solid ${dc.is_primary ? '#C9A84C' : 'var(--ws-border,#e5e7eb)'}`,
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{dc.contact?.name || 'Unknown'}</span>
+                          {dc.is_primary && (
+                            <span style={{
+                              fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px',
+                              borderRadius: 10, background: '#C9A84C22', color: '#C9A84C',
+                            }}>⭐ Primary</span>
+                          )}
+                        </div>
+                        {dc.contact?.role && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--ws-text-secondary,#6b7280)', marginTop: 1 }}>
+                            {dc.contact.role.replace('_', ' ')}
+                          </div>
+                        )}
+                        {dc.contact?.email && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--ws-text-secondary,#6b7280)', display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
+                            <Mail size={10} /> {dc.contact.email}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        {!dc.is_primary && (
+                          <button
+                            onClick={() => dc.contact && setPrimaryContact(dc.contact.id)}
+                            title="Set as primary"
+                            style={{
+                              padding: '4px 8px', borderRadius: 6, fontSize: '0.72rem',
+                              border: '1px solid var(--ws-border,#e5e7eb)',
+                              background: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                              color: 'var(--ws-text-secondary,#6b7280)',
+                            }}
+                          >
+                            Set primary
+                          </button>
+                        )}
+                        <button
+                          onClick={() => dc.contact && removeContact(dc.contact.id)}
+                          title="Remove contact"
+                          style={{
+                            padding: '4px 6px', borderRadius: 6,
+                            border: '1px solid var(--ws-border,#e5e7eb)',
+                            background: 'none', cursor: 'pointer',
+                            color: '#ef4444', fontSize: '0.8rem', lineHeight: 1,
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add contact section */}
+                {!showAddContact ? (
+                  <button
+                    onClick={() => { setShowAddContact(true); loadOrgContacts(); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '7px 12px', borderRadius: 8, fontSize: '0.8rem',
+                      border: '1.5px dashed var(--ws-border,#e5e7eb)',
+                      background: 'none', cursor: 'pointer', color: 'var(--ws-text-secondary,#6b7280)',
+                      fontWeight: 500, width: '100%', justifyContent: 'center',
+                    }}
+                  >
+                    <Plus size={13} /> Add Contact
+                  </button>
+                ) : (
+                  <div style={{
+                    background: 'var(--ws-bg,#f9fafb)', borderRadius: 10,
+                    padding: 12, border: '1px solid var(--ws-border,#e5e7eb)',
+                  }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <button
+                        onClick={() => setUseNewContact(false)}
+                        style={{
+                          flex: 1, padding: '6px', borderRadius: 6, fontSize: '0.8rem',
+                          border: `1.5px solid ${!useNewContact ? '#C9A84C' : 'var(--ws-border,#e5e7eb)'}`,
+                          background: !useNewContact ? '#C9A84C18' : 'none',
+                          color: !useNewContact ? '#C9A84C' : 'inherit', cursor: 'pointer', fontWeight: 500,
+                        }}
+                      >Existing</button>
+                      <button
+                        onClick={() => setUseNewContact(true)}
+                        style={{
+                          flex: 1, padding: '6px', borderRadius: 6, fontSize: '0.8rem',
+                          border: `1.5px solid ${useNewContact ? '#C9A84C' : 'var(--ws-border,#e5e7eb)'}`,
+                          background: useNewContact ? '#C9A84C18' : 'none',
+                          color: useNewContact ? '#C9A84C' : 'inherit', cursor: 'pointer', fontWeight: 500,
+                        }}
+                      >New</button>
+                    </div>
+
+                    {!useNewContact ? (
+                      <>
+                        <input
+                          value={addContactSearch}
+                          onChange={e => setAddContactSearch(e.target.value)}
+                          placeholder="Search contacts..."
+                          style={{
+                            width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: '0.85rem',
+                            border: '1.5px solid var(--ws-border,#e5e7eb)',
+                            background: 'var(--ws-surface,#fff)', boxSizing: 'border-box', marginBottom: 6,
+                          }}
+                        />
+                        {addContactLoading ? (
+                          <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#9ca3af)', padding: '4px 0' }}>Loading...</div>
+                        ) : (
+                          <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {orgContacts
+                              .filter(c =>
+                                !dealContacts.some(dc => dc.contact?.id === c.id) &&
+                                (!addContactSearch || c.name.toLowerCase().includes(addContactSearch.toLowerCase()))
+                              )
+                              .map(c => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => addExistingContact(c.id)}
+                                  style={{
+                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                                    padding: '7px 10px', borderRadius: 7,
+                                    border: '1px solid var(--ws-border,#e5e7eb)',
+                                    background: 'var(--ws-surface,#fff)', cursor: 'pointer',
+                                    textAlign: 'left',
+                                  }}
+                                >
+                                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{c.name}</span>
+                                  {c.role && <span style={{ fontSize: '0.75rem', color: 'var(--ws-text-secondary,#6b7280)' }}>{c.role.replace('_', ' ')}</span>}
+                                </button>
+                              ))}
+                            {orgContacts.filter(c =>
+                              !dealContacts.some(dc => dc.contact?.id === c.id) &&
+                              (!addContactSearch || c.name.toLowerCase().includes(addContactSearch.toLowerCase()))
+                            ).length === 0 && (
+                              <div style={{ fontSize: '0.8rem', color: 'var(--ws-text-secondary,#9ca3af)' }}>No matching contacts</div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <input
+                          value={newContactName}
+                          onChange={e => setNewContactName(e.target.value)}
+                          placeholder="Name *"
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: '0.85rem', border: '1.5px solid var(--ws-border,#e5e7eb)', background: 'var(--ws-surface,#fff)', boxSizing: 'border-box' }}
+                        />
+                        <input
+                          value={newContactEmail}
+                          onChange={e => setNewContactEmail(e.target.value)}
+                          placeholder="Email"
+                          type="email"
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: '0.85rem', border: '1.5px solid var(--ws-border,#e5e7eb)', background: 'var(--ws-surface,#fff)', boxSizing: 'border-box' }}
+                        />
+                        <select
+                          value={newContactRole}
+                          onChange={e => setNewContactRole(e.target.value)}
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: '0.85rem', border: '1.5px solid var(--ws-border,#e5e7eb)', background: 'var(--ws-surface,#fff)' }}
+                        >
+                          {CONTACT_ROLES.map(r => (
+                            <option key={r.value} value={r.value}>{r.label}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={addNewContact}
+                          disabled={!newContactName.trim()}
+                          style={{
+                            padding: '8px', borderRadius: 7, background: '#C9A84C', border: 'none',
+                            color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                            opacity: newContactName.trim() ? 1 : 0.5,
+                          }}
+                        >
+                          Create &amp; Add
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => { setShowAddContact(false); setAddContactSearch(''); setUseNewContact(false); }}
+                      style={{
+                        marginTop: 8, width: '100%', padding: '6px', borderRadius: 7,
+                        border: '1px solid var(--ws-border,#e5e7eb)', background: 'none',
+                        cursor: 'pointer', fontSize: '0.8rem', color: 'var(--ws-text-secondary,#6b7280)',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* ── Advisor ── */}
+          <div className="pl2__edit-section">
+            <h3 className="pl2__edit-section-title">Advisor</h3>
             <div className="pl2__edit-field">
-              <label>Name</label>
+              <label>Advisor Name</label>
               <input
-                value={contactName}
-                onChange={e => setContactName(e.target.value)}
-                placeholder="John Smith"
+                value={advisorName}
+                onChange={e => setAdvisorName(e.target.value)}
+                placeholder="Dr. Jane Smith"
               />
             </div>
             <div className="pl2__edit-row">
@@ -457,8 +847,8 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
                 <label><Phone size={11} /> Phone</label>
                 <input
                   type="tel"
-                  value={contactPhone}
-                  onChange={e => setContactPhone(e.target.value)}
+                  value={advisorPhone}
+                  onChange={e => setAdvisorPhone(e.target.value)}
                   placeholder="+1 555 000 0000"
                 />
               </div>
@@ -466,19 +856,22 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
                 <label><Mail size={11} /> Email</label>
                 <input
                   type="email"
-                  value={contactEmail}
-                  onChange={e => setContactEmail(e.target.value)}
-                  placeholder="john@school.edu"
+                  value={advisorEmail}
+                  onChange={e => setAdvisorEmail(e.target.value)}
+                  placeholder="advisor@school.edu"
                 />
               </div>
             </div>
-            <div className="pl2__edit-field">
-              <label>Role</label>
-              <select value={contactRole} onChange={e => setContactRole(e.target.value)}>
-                {CONTACT_ROLES.map(r => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
+            <div className="pl2__edit-field" style={{ marginTop: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={advisorMet}
+                  onChange={e => setAdvisorMet(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#C9A84C' }}
+                />
+                <span>Met with advisor</span>
+              </label>
             </div>
           </div>
 

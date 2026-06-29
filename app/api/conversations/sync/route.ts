@@ -1,13 +1,12 @@
 /**
  * POST /api/conversations/sync
- * Light sync: pull latest from Linq across all lines, upsert new chats,
- * update last_message fields, set has_unread_reply, and auto-classify status.
+ * Sync Linq conversations into the linq_conversations table.
  *
- * Classification rules (applied per conversation, based on inbound messages):
- *   - unresponsive: no inbound messages at all
- *   - active: most recent inbound is affirmative
- *   - flagged: most recent inbound is NOT affirmative
- *   - handled: NEVER auto-set (preserved from manual action)
+ * - Fetches recent chats from all active lines
+ * - Updates last_message fields, has_unread_reply, outreach_status, touch_stage
+ * - Reverse sync: creates rows for any alumni_contacts with linq_chat_id missing from linq_conversations
+ * - Never auto-classifies status based on message content (status is owned by the outreach pipeline)
+ * - Preserves 'handled' status and clears has_unread_reply for handled conversations
  *
  * Requires: Authorization: Bearer <internal_token>
  */
@@ -23,35 +22,42 @@ function checkAuth(req: NextRequest): boolean {
   return (req.headers.get('Authorization') || '') === `Bearer ${INTERNAL_TOKEN}`;
 }
 
-// ── Affirmative detection ───────────────────────────────────────────────────
-const AFFIRMATIVE = new Set([
-  'yes', 'yep', 'yeah', 'yea', 'sure', 'correct',
-  "that's me", 'thats me', 'absolutely', 'definitely',
-  'yup', 'uh huh', 'mhm', 'for sure', 'sounds right',
-  'right', "that's right", 'thats right',
-]);
-
-function isAffirmative(text: string): boolean {
-  return AFFIRMATIVE.has(text.toLowerCase().trim());
+function touchStageFromStatus(status: string | null): string | null {
+  if (!status) return null;
+  if (status === 'touch1_sent' || status === 'touch1_confirmed') return 'T1';
+  if (status === 'touch2_sent') return 'T2';
+  if (status === 'touch3_sent') return 'T3';
+  return null;
 }
 
-type AutoStatus = 'active' | 'flagged' | 'unresponsive';
+// Line number → phone mapping for reverse sync
+const LINE_PHONE_MAP: Record<number, string> = {
+  1: '+16462101111',
+  2: '+16462178274',
+  3: '+16462442696',
+  4: '+14044239427',
+  5: '+14045428435',
+  6: '+19725590427',
+  7: '+19725590438',
+  8: '+15042234218',
+  9: '+15042236050',
+  10: '+12817773280',
+  11: '+12817452268',
+};
 
-function classifyStatus(msgs: { is_from_me: boolean; parts: { type: string; value: string }[] }[]): AutoStatus {
-  // Find inbound messages (messages not sent by us)
-  const inbound = msgs.filter(m => !m.is_from_me);
-
-  if (inbound.length === 0) {
-    return 'unresponsive';
-  }
-
-  // msgs are newest-first, so find the first inbound (= most recent inbound)
-  const mostRecent = inbound[0];
-  const text = mostRecent.parts
-    ?.find((p: { type: string; value: string }) => p.type === 'text')?.value ?? '';
-
-  return isAffirmative(text) ? 'active' : 'flagged';
-}
+const LINE_LABEL_MAP: Record<number, string> = {
+  1: 'Owen',
+  2: 'Adam',
+  3: 'Ford',
+  4: 'Line 4',
+  5: 'Line 5',
+  6: 'Line 6',
+  7: 'Line 7',
+  8: 'Line 8',
+  9: 'Line 9',
+  10: 'Line 10',
+  11: 'Line 11',
+};
 
 export async function POST(req: NextRequest) {
   if (!checkAuth(req)) {
@@ -65,9 +71,10 @@ export async function POST(req: NextRequest) {
 
   const errors: string[] = [];
   let processed = 0;
+  const BATCH = 50;
 
   try {
-    // Fetch most recent chats (1 page per line = up to 150) for quick sync
+    // ── Step 1: Fetch recent chats from all Linq lines ─────────────────────
     const allChats: Array<{ chat: LinqChat; line: typeof LINQ_LINES[number] }> = [];
 
     await Promise.allSettled(
@@ -83,24 +90,17 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // For each chat, fetch messages to determine status and last_message fields
+    // ── Step 2: Fetch messages for each chat ──────────────────────────────
     const upserts: Record<string, unknown>[] = [];
-    // Map linq_chat_id → computed auto-status
-    const statusMap: Record<string, AutoStatus> = {};
 
     await Promise.allSettled(
       allChats.map(async ({ chat, line }) => {
         try {
-          // Fetch up to 20 messages to find recent inbound and classify
           const msgs = await getMessages(chat.id, 20);
           const lastMsg = msgs[0] ?? null;
 
           const isInbound = lastMsg ? !lastMsg.is_from_me : false;
           const lastMsgAt = lastMsg?.created_at ?? chat.updated_at;
-          const autoStatus = classifyStatus(msgs);
-
-          statusMap[chat.id] = autoStatus;
-
           const contactPhone = chat.handles.find(h => !h.is_me)?.handle ?? null;
 
           upserts.push({
@@ -125,8 +125,7 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // ── Enrich upserts with chapter_id + chapter_name ─────────────────────
-    // Collect unique contact phones from all chats being upserted
+    // ── Step 3: Enrich with chapter_id, chapter_name ───────────────────────
     const contactPhones = [
       ...new Set(
         allChats
@@ -140,10 +139,8 @@ export async function POST(req: NextRequest) {
 
     const phoneToChapterId = new Map<string, string>();
     const chapterNameMap = new Map<string, string>();
-    const BATCH = 50;
 
     if (contactPhones.length > 0) {
-      // Batch query alumni_contacts for chapter_id
       for (let i = 0; i < contactPhones.length; i += BATCH) {
         const batch = contactPhones.slice(i, i + BATCH);
         const { data: contacts } = await supabase
@@ -157,7 +154,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Batch query chapters for chapter_name
       const allChapterIds = [...new Set(phoneToChapterId.values())];
       for (let i = 0; i < allChapterIds.length; i += BATCH) {
         const batch = allChapterIds.slice(i, i + BATCH);
@@ -170,7 +166,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Add chapter fields to each upsert record
       for (const upsert of upserts) {
         const phone = upsert.contact_phone as string | undefined;
         if (!phone) continue;
@@ -182,35 +177,51 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Enrich upserts with contact_name from alumni_contacts ─────────────
+    // ── Step 4: Enrich with contact_name, contact_id, outreach_status, touch_stage ──
     const upsertChatIds = [
       ...new Set(upserts.map(u => u.linq_chat_id as string).filter(Boolean)),
     ];
 
     if (upsertChatIds.length > 0) {
-      const chatIdNameMap = new Map<string, string>();
+      const contactEnrichMap = new Map<string, {
+        name: string;
+        id: string;
+        outreach_status: string | null;
+      }>();
+
       for (let i = 0; i < upsertChatIds.length; i += BATCH) {
         const batch = upsertChatIds.slice(i, i + BATCH);
-        const { data: nameContacts } = await supabase
+        const { data: enrichContacts } = await supabase
           .from('alumni_contacts')
-          .select('linq_chat_id, first_name, last_name')
+          .select('linq_chat_id, first_name, last_name, id, outreach_status')
           .in('linq_chat_id', batch);
-        for (const c of nameContacts ?? []) {
+
+        for (const c of enrichContacts ?? []) {
           if (c.linq_chat_id) {
             const name = [c.first_name, c.last_name].filter(Boolean).join(' ').trim();
-            if (name) chatIdNameMap.set(c.linq_chat_id, name);
+            contactEnrichMap.set(c.linq_chat_id, {
+              name: name || '',
+              id: c.id,
+              outreach_status: c.outreach_status ?? null,
+            });
           }
         }
       }
+
       for (const upsert of upserts) {
         const chatId = upsert.linq_chat_id as string | undefined;
-        if (chatId && chatIdNameMap.has(chatId)) {
-          upsert.contact_name = chatIdNameMap.get(chatId);
+        if (!chatId) continue;
+        const enriched = contactEnrichMap.get(chatId);
+        if (enriched) {
+          if (enriched.name) upsert.contact_name = enriched.name;
+          upsert.contact_id = enriched.id;
+          upsert.outreach_status = enriched.outreach_status;
+          upsert.touch_stage = touchStageFromStatus(enriched.outreach_status);
         }
       }
     }
 
-    // ── Batch upsert base fields (no status — preserve existing) ───────────
+    // ── Step 5: Batch upsert (no status field — preserves existing status) ─
     for (let i = 0; i < upserts.length; i += BATCH) {
       const batch = upserts.slice(i, i + BATCH);
       const { error } = await supabase
@@ -221,37 +232,90 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Batch status updates — grouped by new status, never touch 'handled' ─
-    const byStatus: Record<AutoStatus, string[]> = {
-      active: [],
-      flagged: [],
-      unresponsive: [],
-    };
-    for (const [chatId, newStatus] of Object.entries(statusMap)) {
-      byStatus[newStatus].push(chatId);
+    // ── Step 6: Reset has_unread_reply for 'handled' conversations ─────────
+    // The upsert may have set has_unread_reply=true on handled convs; correct that.
+    const inboundChatIds = upserts
+      .filter(u => u.has_unread_reply === true)
+      .map(u => u.linq_chat_id as string)
+      .filter(Boolean);
+
+    if (inboundChatIds.length > 0) {
+      for (let i = 0; i < inboundChatIds.length; i += BATCH) {
+        const batch = inboundChatIds.slice(i, i + BATCH);
+        await supabase
+          .from('linq_conversations')
+          .update({ has_unread_reply: false })
+          .in('linq_chat_id', batch)
+          .eq('status', 'handled');
+      }
     }
 
-    const now = new Date().toISOString();
-    for (const [newStatus, chatIds] of Object.entries(byStatus) as [AutoStatus, string[]][]) {
-      if (chatIds.length === 0) continue;
+    // ── Step 7: Reverse sync — create rows for any alumni_contacts with ────
+    // linq_chat_id that don't have a corresponding linq_conversations row yet.
+    const alreadyUpsertedChatIds = new Set(upserts.map(u => u.linq_chat_id as string).filter(Boolean));
 
-      // Process in batches to avoid URL length limits on .in()
-      for (let i = 0; i < chatIds.length; i += BATCH) {
-        const batchIds = chatIds.slice(i, i + BATCH);
+    const { data: linkedContacts } = await supabase
+      .from('alumni_contacts')
+      .select('id, linq_chat_id, first_name, last_name, phone_primary, outreach_status, chapter_id, assigned_line')
+      .not('linq_chat_id', 'is', null)
+      .limit(5000);
+
+    const missingContacts = (linkedContacts || []).filter(
+      c => c.linq_chat_id && !alreadyUpsertedChatIds.has(c.linq_chat_id)
+    );
+
+    if (missingContacts.length > 0) {
+      // Fetch chapter names for missing contacts
+      const missingChapterIds = [...new Set(missingContacts.map(c => c.chapter_id).filter(Boolean) as string[])];
+      const missingChapterNameMap = new Map<string, string>();
+
+      for (let i = 0; i < missingChapterIds.length; i += BATCH) {
+        const batch = missingChapterIds.slice(i, i + BATCH);
+        const { data: chaps } = await supabase
+          .from('chapters')
+          .select('id, chapter_name')
+          .in('id', batch);
+        for (const ch of chaps ?? []) {
+          if (ch.id && ch.chapter_name) missingChapterNameMap.set(ch.id, ch.chapter_name);
+        }
+      }
+
+      const reverseUpserts = missingContacts.map(c => ({
+        linq_chat_id: c.linq_chat_id,
+        line_phone: c.assigned_line ? LINE_PHONE_MAP[c.assigned_line as number] ?? null : null,
+        line_label: c.assigned_line ? LINE_LABEL_MAP[c.assigned_line as number] ?? null : null,
+        contact_id: c.id,
+        contact_name: [c.first_name, c.last_name].filter(Boolean).join(' ') || null,
+        contact_phone: c.phone_primary,
+        chapter_id: c.chapter_id ?? null,
+        chapter_name: c.chapter_id ? missingChapterNameMap.get(c.chapter_id) ?? null : null,
+        outreach_status: c.outreach_status ?? null,
+        touch_stage: touchStageFromStatus(c.outreach_status ?? null),
+        status: 'active',
+        has_unread_reply: false,
+        is_urgent: false,
+        updated_at: new Date().toISOString(),
+      }));
+
+      // ignoreDuplicates: true — only inserts new rows, never overwrites existing
+      for (let i = 0; i < reverseUpserts.length; i += BATCH) {
+        const batch = reverseUpserts.slice(i, i + BATCH);
         const { error } = await supabase
           .from('linq_conversations')
-          .update({ status: newStatus, updated_at: now })
-          .in('linq_chat_id', batchIds)
-          .neq('status', 'handled'); // never overwrite manually handled
-
+          .upsert(batch, { onConflict: 'linq_chat_id', ignoreDuplicates: true });
         if (error) {
-          errors.push(`Status update (${newStatus}) batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
+          errors.push(`Reverse sync batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
         }
       }
     }
 
     return NextResponse.json({
-      data: { processed, total: allChats.length, errors },
+      data: {
+        processed,
+        total: allChats.length,
+        reverse_synced: missingContacts.length,
+        errors,
+      },
     });
   } catch (err) {
     console.error('[conversations/sync]', err);

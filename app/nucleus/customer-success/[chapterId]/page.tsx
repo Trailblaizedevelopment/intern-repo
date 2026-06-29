@@ -41,7 +41,19 @@ interface SubmissionData {
     estimated_alumni?: number; alumni_list_url?: string;
   };
   executives: { full_name: string; position: string; email: string }[];
-  outreach_channels: { channel_type: string; facebook_member_count?: number; email_subscriber_count?: number; linkedin_member_count?: number; description?: string }[];
+  outreach_channels: {
+    channel_type: string;
+    facebook_url?: string;
+    facebook_member_count?: number;
+    email_platform?: string;
+    email_subscriber_count?: number;
+    instagram_handle?: string;
+    instagram_follower_count?: number;
+    linkedin_url?: string;
+    linkedin_member_count?: number;
+    website_url?: string;
+    description?: string;
+  }[];
   submitted_at: string | null;
 }
 
@@ -65,6 +77,7 @@ const OUTREACH_CHANNEL_LABELS: Record<string, string> = {
   facebook_group: 'Facebook Group', linkedin_group: 'LinkedIn Group',
   groupme: 'GroupMe', slack: 'Slack', discord: 'Discord',
   email_newsletter: 'Email Newsletter', website: 'Website', other: 'Other',
+  instagram: 'Instagram', chapter_website: 'Chapter Website',
 };
 
 const TABS: { id: DashTab; label: string; icon?: string }[] = [
@@ -195,6 +208,14 @@ export default function ChapterDashboardPage() {
   }, [chapterId]);
 
   useEffect(() => { fetchChapter(); fetchAlumniStats(); }, [fetchChapter, fetchAlumniStats]);
+
+  // Auto-load submission when chapter has one
+  useEffect(() => {
+    if (chapter?.onboarding_submitted_at && !submission && !loadingSubmission) {
+      viewSubmission();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapter?.id, chapter?.onboarding_submitted_at]);
 
   useEffect(() => {
     if (!chapter) return;
@@ -489,9 +510,11 @@ export default function ChapterDashboardPage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <button
                 onClick={viewSubmission}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem', transition: 'all 0.15s' }}
+                style={chapter?.onboarding_submitted_at
+                  ? { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #10b981', background: 'rgba(16,185,129,0.08)', color: '#10b981', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, transition: 'all 0.15s' }
+                  : { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem', transition: 'all 0.15s' }}
               >
-                <Eye size={13} /> Submission
+                <Eye size={13} /> {chapter?.onboarding_submitted_at ? '✓ View Submission' : 'Submission'}
               </button>
               <button
                 onClick={() => setShowEditModal(true)}
@@ -559,7 +582,25 @@ export default function ChapterDashboardPage() {
       {/* ── Tab Content ── */}
       <main style={{ maxWidth: 1400, margin: '0 auto', padding: '24px' }}>
         {activeTab === 'setup' && (
-          <SetUpTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} onOpenWizard={() => setShowWizard(true)} />
+          <>
+            <SetUpTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} onOpenWizard={() => setShowWizard(true)} />
+            {chapter.onboarding_submitted_at && submission && (
+              <div style={{ maxWidth: 720, marginTop: 24 }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 12 }}>📋 Onboarding Submission</div>
+                <SubmissionView submission={submission} />
+              </div>
+            )}
+            {chapter.onboarding_submitted_at && !submission && (
+              <div style={{ maxWidth: 720, marginTop: 24 }}>
+                <button
+                  onClick={viewSubmission}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', borderRadius: 10, border: '1.5px solid #10b981', background: 'rgba(16,185,129,0.06)', color: '#10b981', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, width: '100%' }}
+                >
+                  <Eye size={16} /> Load Onboarding Submission (received {new Date(chapter.onboarding_submitted_at).toLocaleDateString()})
+                </button>
+              </div>
+            )}
+          </>
         )}
         {activeTab === 'outreach' && (
           <MergedOutreachTab chapter={chapter} showToast={showToast} onUpdate={fetchChapter} />
@@ -816,6 +857,31 @@ function SubmissionView({ submission }: { submission: SubmissionData }) {
           </div>
         )}
       </div>
+      {submission.outreach_channels.length > 0 && (
+        <div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 10 }}>Outreach Channels</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {submission.outreach_channels.map((ch, i) => {
+              const label = OUTREACH_CHANNEL_LABELS[ch.channel_type] || ch.channel_type;
+              const details: string[] = [];
+              if (ch.facebook_member_count) details.push(`${ch.facebook_member_count} members`);
+              if (ch.email_subscriber_count) details.push(`${ch.email_subscriber_count} subscribers`);
+              if (ch.instagram_follower_count) details.push(`${ch.instagram_follower_count} followers`);
+              if (ch.linkedin_member_count) details.push(`${ch.linkedin_member_count} members`);
+              if (ch.email_platform) details.push(ch.email_platform);
+              if (ch.description) details.push(ch.description);
+              const url = ch.facebook_url || ch.linkedin_url || ch.website_url || (ch.instagram_handle ? `https://instagram.com/${ch.instagram_handle.replace('@','')}` : null);
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#ffffff', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem' }}>
+                  <div style={{ fontWeight: 600, flex: 1, color: '#111827' }}>{label}</div>
+                  {details.length > 0 && <div style={{ color: '#6b7280', fontSize: '0.78rem' }}>{details.join(' · ')}</div>}
+                  {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontSize: '0.78rem', textDecoration: 'none' }}>↗</a>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {submission.executives.length > 0 && (
         <div>
           <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 10 }}>Executive Board</div>

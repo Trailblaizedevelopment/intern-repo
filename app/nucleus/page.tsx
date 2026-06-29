@@ -20,7 +20,7 @@ const modules = [
     title: 'Sales Pipeline',
     description: 'Track deals and manage opportunities.',
     icon: TrendingUp,
-    href: '/nucleus/pipeline',
+    href: '/nucleus/war-room',
   },
   {
     title: 'Customer Success',
