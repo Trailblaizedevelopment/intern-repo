@@ -244,6 +244,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     type T1Contact = {
       id: string;
       first_name: string;
+      last_name: string | null;
       phone_primary: string | null;
       chapter_id: string;
       outreach_status: string;
@@ -281,11 +282,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         //  atomic claim below — this is belt-and-suspenders protection.)
         for (const cid of pinnedIds.t1) {
           const c = contactMap.get(cid);
-          if (c) t1Pool.push(c as T1Contact);
+          if (c) t1Pool.push(c as unknown as T1Contact);
         }
         for (const cid of [...pinnedIds.t2, ...pinnedIds.t3]) {
           const c = contactMap.get(cid);
-          if (c) t2t3Pool.push(c as T1Contact & { touch1_sent_at?: string; touch2_sent_at?: string });
+          if (c) t2t3Pool.push(c as unknown as T1Contact & { touch1_sent_at?: string; touch2_sent_at?: string });
         }
       }
     } else {
@@ -314,7 +315,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         const remaining = totalT1Cap - t1Pool.length;
         const { data: chContacts } = await supabase
           .from('alumni_contacts')
-          .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id')
+          .select('id, first_name, last_name, phone_primary, chapter_id, outreach_status, is_imessage, linq_chat_id')
           .eq('chapter_id', chId)
           .eq('outreach_status', 'not_contacted')
           .is('touch1_sent_at', null)
@@ -329,7 +330,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       const [t2Res, t3Res] = await Promise.all([
         supabase
           .from('alumni_contacts')
-          .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at, linq_chat_id')
+          .select('id, first_name, last_name, phone_primary, chapter_id, outreach_status, is_imessage, touch1_sent_at, linq_chat_id')
           .in('outreach_status', ['touch1_sent', 'touch1_confirmed'])
           .is('touch2_sent_at', null)
           .not('is_imessage', 'is', false)
@@ -338,7 +339,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           .limit(activeLineNumbers.length * T2T3_CAP_PER_LINE + 50),
         supabase
           .from('alumni_contacts')
-          .select('id, first_name, phone_primary, chapter_id, outreach_status, is_imessage, touch2_sent_at, linq_chat_id')
+          .select('id, first_name, last_name, phone_primary, chapter_id, outreach_status, is_imessage, touch2_sent_at, linq_chat_id')
           .eq('outreach_status', 'touch2_sent')
           .is('touch3_sent_at', null)
           .not('is_imessage', 'is', false)
@@ -423,10 +424,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const chapterIds = [...new Set(allContacts.map(c => c.chapter_id).filter(Boolean))];
     const { data: chapters } = await supabase
       .from('chapters')
-      .select('id, fraternity, school, alumni_join_link')
+      .select('id, fraternity, school, alumni_join_link, chapter_name')
       .in('id', chapterIds);
-    const chapterMap: Record<string, { fraternity_name: string; university: string; alumni_join_link: string | null }> = {};
-    for (const ch of (chapters || [])) chapterMap[ch.id] = { fraternity_name: ch.fraternity, university: ch.school, alumni_join_link: ch.alumni_join_link };
+    const chapterMap: Record<string, { fraternity_name: string; university: string; alumni_join_link: string | null; chapter_name: string | null }> = {};
+    for (const ch of (chapters || [])) chapterMap[ch.id] = { fraternity_name: ch.fraternity, university: ch.school, alumni_join_link: ch.alumni_join_link, chapter_name: ch.chapter_name ?? null };
 
     // 5. Send — two-phase approach for reliable SMS detection.
     //
@@ -596,6 +597,39 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
               .update({ linq_chat_id: chat.id })
               .eq('id', contact.id);
           }
+
+          // Upsert to linq_conversations so the Conversations tab shows the new chat
+          // immediately — don't rely on the background sync cron.
+          const convOutreachStatus =
+            status === 'not_contacted'                          ? 'touch1_sent' :
+            (status === 'touch1_sent' || status === 'touch1_confirmed') ? 'touch2_sent' :
+            'touch3_sent';
+          const convTouchStage =
+            status === 'not_contacted'                          ? 'T1' :
+            (status === 'touch1_sent' || status === 'touch1_confirmed') ? 'T2' :
+            'T3';
+          const lineLabel = lineConfigMap[lineNum]?.label ?? null;
+          const contactName = [contact.first_name, (contact as T1Contact).last_name]
+            .filter(Boolean).join(' ') || null;
+          await supabase.from('linq_conversations').upsert({
+            linq_chat_id: chat.id,
+            line_phone: fromPhone,
+            line_label: lineLabel,
+            contact_id: contact.id,
+            contact_name: contactName,
+            contact_phone: contact.phone_primary,
+            chapter_id: contact.chapter_id,
+            chapter_name: chapter.chapter_name,
+            outreach_status: convOutreachStatus,
+            touch_stage: convTouchStage,
+            status: 'active',
+            last_message_at: now,
+            last_message_text: message.slice(0, 200),
+            last_message_direction: 'outbound',
+            has_unread_reply: false,
+            is_urgent: false,
+            updated_at: now,
+          }, { onConflict: 'linq_chat_id', ignoreDuplicates: false });
 
           results.sent++;
           if (status === 'not_contacted') results.t1_sent++;
