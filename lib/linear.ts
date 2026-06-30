@@ -16,6 +16,19 @@ export const LINEAR_CONFIG = {
 const LINEAR_API_URL = 'https://api.linear.app';
 const LINEAR_OAUTH_URL = 'https://linear.app/oauth';
 
+/** Personal API key Authorization header (raw key or Bearer-prefixed). */
+export function getLinearApiKeyHeader(): string {
+  const key = (process.env.LINEAR_API_KEY || '').trim();
+  if (!key) return '';
+  return key.startsWith('Bearer ') ? key : key;
+}
+
+export function assertLinearApiKeyConfigured(): void {
+  if (!getLinearApiKeyHeader()) {
+    throw new Error('LINEAR_API_KEY is not configured');
+  }
+}
+
 // Generate OAuth URL for user authorization
 export function getLinearAuthUrl(state?: string): string {
   const params = new URLSearchParams({

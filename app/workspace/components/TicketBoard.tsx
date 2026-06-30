@@ -39,6 +39,23 @@ import ModalOverlay from '@/components/ModalOverlay';
 import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 
+const LINEAR_JSON_HEADERS: HeadersInit = {
+  'Content-Type': 'application/json',
+  Authorization: INTERNAL_AUTH_HEADER,
+};
+
+async function parseLinearApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const json = await res.json();
+    if (typeof json.error === 'string') return json.error;
+    if (json.error?.message) return json.error.message;
+    if (json.details) return `${fallback}: ${json.details}`;
+  } catch {
+    // ignore JSON parse errors
+  }
+  return `${fallback} (HTTP ${res.status})`;
+}
+
 // ═══════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════
@@ -285,7 +302,10 @@ export function TicketBoard() {
     setLinearLoading(true);
     setLinearError(null);
     try {
-      const res = await fetch('/api/linear/issues?source=cache');
+      const res = await fetch('/api/linear/issues?source=cache', {
+        headers: LINEAR_JSON_HEADERS,
+      });
+      if (!res.ok) throw new Error(await parseLinearApiError(res, 'Failed to load Linear issues'));
       const json = await res.json();
       if (json.error) throw new Error(json.error.message || String(json.error));
       setLinearIssues(json.data || json.issues || []);
@@ -300,7 +320,14 @@ export function TicketBoard() {
     setLinearSyncing(true);
     setLinearError(null);
     try {
-      await fetch('/api/linear/sync', { method: 'POST' });
+      const res = await fetch('/api/linear/sync', {
+        method: 'POST',
+        headers: LINEAR_JSON_HEADERS,
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error(await parseLinearApiError(res, 'Sync failed'));
+      const json = await res.json();
+      if (json.error) throw new Error(typeof json.error === 'string' ? json.error : json.error.message || 'Sync failed');
       await fetchLinearIssues();
     } catch (err: unknown) {
       setLinearError(err instanceof Error ? err.message : 'Sync failed');
@@ -308,6 +335,8 @@ export function TicketBoard() {
       setLinearSyncing(false);
     }
   };
+
+  useEffect(() => { fetchLinearIssues(); }, [fetchLinearIssues]);
 
   // ── Grouped tickets for Kanban ──
 
@@ -580,15 +609,13 @@ export function TicketBoard() {
       )}
 
       {/* ── Linear Issues ── */}
-      {(linearIssues.length > 0 || linearLoading || linearError) && (
-        <LinearIssuesSection
-          issues={linearIssues}
-          loading={linearLoading}
-          error={linearError}
-          onSync={syncLinear}
-          syncing={linearSyncing}
-        />
-      )}
+      <LinearIssuesSection
+        issues={linearIssues}
+        loading={linearLoading}
+        error={linearError}
+        onSync={syncLinear}
+        syncing={linearSyncing}
+      />
 
       {showCreateModal && (
         <CreateTicketModal
@@ -1023,6 +1050,8 @@ function LinearIssuesSection({
   issues,
   loading,
   error,
+  onSync,
+  syncing,
 }: {
   issues: LinearIssue[];
   loading: boolean;
@@ -1048,7 +1077,19 @@ function LinearIssuesSection({
           Linear Issues
           {issues.length > 0 && <span className="tkt__column-count">{issues.length}</span>}
         </h3>
-        {error && <span className="tkt__linear-error">{error}</span>}
+        <div className="tkt__linear-header-actions">
+          {error && <span className="tkt__linear-error">{error}</span>}
+          <button
+            type="button"
+            className="tkt__linear-sync-btn"
+            onClick={onSync}
+            disabled={syncing}
+            title="Sync issues from Linear"
+          >
+            <RefreshCw size={14} className={syncing ? 'tkt__spinner' : ''} />
+            {syncing ? 'Syncing...' : 'Sync'}
+          </button>
+        </div>
       </div>
 
       {loading ? (

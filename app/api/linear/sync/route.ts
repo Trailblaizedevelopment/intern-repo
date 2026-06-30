@@ -1,17 +1,18 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { getLinearApiKeyHeader, assertLinearApiKeyConfigured } from '@/lib/linear';
 
-const LINEAR_API_KEY = process.env.LINEAR_API_KEY || '';
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
 const LINEAR_GRAPHQL = 'https://api.linear.app/graphql';
 
 async function linearGQL(query: string, variables?: Record<string, unknown>) {
+  assertLinearApiKeyConfigured();
   const response = await fetch(LINEAR_GRAPHQL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: LINEAR_API_KEY,
+      Authorization: getLinearApiKeyHeader(),
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -32,6 +33,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    assertLinearApiKeyConfigured();
+
     const body = await request.json().catch(() => ({}));
     const teamId = body.teamId || LINEAR_TEAM_ID;
 
@@ -184,6 +187,8 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error syncing Linear data:', error);
-    return NextResponse.json({ error: 'Failed to sync data', details: String(error) }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to sync data';
+    const status = message.includes('LINEAR_API_KEY is not configured') ? 503 : 500;
+    return NextResponse.json({ error: message, details: String(error) }, { status });
   }
 }
