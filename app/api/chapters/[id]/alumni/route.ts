@@ -20,6 +20,7 @@ interface AlumniContact {
   is_imessage: boolean | null;
   year: number | null;
   platform_chapter_id: string | null;
+  platform_user_id: string | null;
 }
 
 interface ExternalProfile {
@@ -114,7 +115,7 @@ export async function GET(
     .from('alumni_contacts')
     .select(
       'id, chapter_id, first_name, last_name, phone_primary, email, outreach_status, ' +
-      'touch1_sent_at, touch2_sent_at, touch3_sent_at, is_imessage, year, platform_chapter_id'
+      'touch1_sent_at, touch2_sent_at, touch3_sent_at, is_imessage, year, platform_chapter_id, platform_user_id'
     )
     .eq('chapter_id', id)
     .limit(10000); // Supabase default row cap is 1000 — explicitly raise to 10000 for large chapters (2783+ contacts)
@@ -274,7 +275,9 @@ export async function GET(
       phone: contact.phone_primary || profile?.phone || null,
       linkedin_url: profile?.linkedin_url || null,
       outreach_status: contact.outreach_status,
-      platform_joined: !!profile,
+      // platform_joined: true if dynamic merge found a profile OR if the webhook
+      // already tagged this contact as signed_up (covers broken/missing chapter mappings)
+      platform_joined: !!profile || contact.outreach_status === 'signed_up' || !!contact.platform_user_id,
       last_active_at: profile?.last_active_at || null,
       member_status: profile?.member_status || null,
       engagement_score: profile ? calcEngagement(profile) : 0,
