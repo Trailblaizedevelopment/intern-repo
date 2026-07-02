@@ -583,21 +583,23 @@ function ContactCard({ contact, log, claim, status, onCallClick, onTextClick, on
       {/* Phone */}
       {contact.phone && <div style={{ fontSize: '0.8rem', color: '#374151', fontWeight: 500, marginBottom: 8 }}>📞 {fmtPhone(contact.phone)}</div>}
 
-      {/* Tags */}
-      {log?.tags && log.tags.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-          {log.tags.slice(0, 3).map(t => <TagPill key={t} tag={t} />)}
-          {log.tags.length > 3 && <span style={{ fontSize: '0.7rem', color: '#9ca3af', alignSelf: 'center' }}>+{log.tags.length - 3}</span>}
-        </div>
-      )}
-
-      {/* Notes preview */}
-      {log?.notes && <div style={{ fontSize: '0.75rem', color: '#374151', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 8 }}>{log.notes}</div>}
-
-      {/* Follow-up */}
-      {log?.followUpDate && (
-        <div style={{ fontSize: '0.7rem', fontWeight: 600, marginBottom: 8, padding: '2px 8px', borderRadius: 9999, display: 'inline-block', background: overdueFollowUp ? '#fef3c7' : '#f0fdf4', color: overdueFollowUp ? '#92400e' : '#15803d' }}>
-          {overdueFollowUp ? '⚠️ ' : '📅 '}Follow-up: {log.followUpDate}
+      {/* Compact log indicators — full detail in profile drawer */}
+      {(log?.tags?.length || log?.notes || log?.followUpDate) && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+          {log?.tags && log.tags.length > 0 && (
+            <span style={{ fontSize: '0.7rem', color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 9999 }}>
+              🏷 {log.tags.length} tag{log.tags.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {log?.notes && (
+            <span style={{ fontSize: '0.7rem', color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 9999 }}>📝 Notes</span>
+          )}
+          {overdueFollowUp && (
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '1px 7px', borderRadius: 9999 }}>⚠️ Overdue</span>
+          )}
+          {log?.followUpDate && !overdueFollowUp && (
+            <span style={{ fontSize: '0.7rem', color: '#15803d', background: '#f0fdf4', padding: '1px 7px', borderRadius: 9999 }}>📅 {log.followUpDate}</span>
+          )}
         </div>
       )}
 
