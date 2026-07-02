@@ -37,6 +37,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import { Tooltip } from '@/components/Tooltip';
+import { HorizontalScrollNav } from '@/components/HorizontalScrollNav';
 import { useToast } from '@/components/Toast';
 import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
@@ -595,7 +596,13 @@ export function TicketBoard() {
           <p>Loading tickets...</p>
         </div>
       ) : viewMode === 'board' ? (
-        <div className="tkt__board">
+        <HorizontalScrollNav
+          className="tkt__board-shell"
+          viewportClassName="tkt__board"
+          controlsClassName="tkt__board-nav"
+          itemSelector=".tkt__column"
+          ariaLabel="Ticket board columns"
+        >
           {STATUS_COLUMNS.map(col => (
             <div
               key={col.key}
@@ -625,7 +632,7 @@ export function TicketBoard() {
               </div>
             </div>
           ))}
-        </div>
+        </HorizontalScrollNav>
       ) : viewMode === 'list' ? (
         <TicketListView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : viewMode === 'timeline' ? (
