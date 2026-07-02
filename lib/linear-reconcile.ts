@@ -132,7 +132,7 @@ export async function reconcileLinearIssuesToTickets(
     const batch = tickets.slice(i, i + BATCH_SIZE);
     const externalIds = batch
       .map(ticket => ticket.external_id)
-      .filter((id): id is string => Boolean(id));
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
     const existingIds = new Set<string>();
     if (externalIds.length > 0) {
@@ -151,8 +151,9 @@ export async function reconcileLinearIssuesToTickets(
     }
 
     for (const ticket of batch) {
-      if (!ticket.external_id) continue;
-      if (existingIds.has(ticket.external_id)) updated += 1;
+      const externalId = ticket.external_id;
+      if (typeof externalId !== 'string' || !externalId) continue;
+      if (existingIds.has(externalId)) updated += 1;
       else created += 1;
     }
 

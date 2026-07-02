@@ -176,7 +176,6 @@ export async function GET(request: NextRequest) {
         {
           assignee_id: assigneeId,
           creator_id: creatorId,
-          project,
         }
       );
 
