@@ -143,6 +143,7 @@ export async function POST(request: NextRequest) {
     let linearUrl: string | null = null;
     let ticketStatus = 'open';
     let linearLabelNames = labels || [];
+    const appTab = project || 'Web App';
 
     if (shouldCreateInLinear) {
       let assigneeEmail: string | null = null;
@@ -153,16 +154,6 @@ export async function POST(request: NextRequest) {
           .eq('id', assignee_id)
           .maybeSingle();
         assigneeEmail = assignee?.email ?? null;
-      }
-
-      let crmProjectName: string | null = project || null;
-      if (project_id) {
-        const { data: crmProject } = await supabase
-          .from('projects')
-          .select('name')
-          .eq('id', project_id)
-          .maybeSingle();
-        if (crmProject?.name) crmProjectName = crmProject.name;
       }
 
       let parentLinearIssueId: string | null = null;
@@ -187,8 +178,7 @@ export async function POST(request: NextRequest) {
           priority: priority || 'medium',
           assigneeEmail,
           dueDate: due_date || null,
-          projectName: project || null,
-          crmProjectName,
+          app: appTab,
           parentLinearIssueId,
           labelNames: labels || [],
         });
@@ -239,7 +229,7 @@ export async function POST(request: NextRequest) {
         status: ticketStatus,
         due_date: due_date || null,
         labels: linearLabelNames,
-        project: project || 'Web App',
+        project: appTab,
         project_id: project_id || null,
         parent_ticket_id: parent_ticket_id || null,
         milestone_id: milestone_id || null,

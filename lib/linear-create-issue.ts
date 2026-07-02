@@ -6,6 +6,11 @@ import {
   type TicketPriority,
   type TicketType,
 } from '@/lib/linear-ticket-map';
+import {
+  getLinearMobileProjectId,
+  getLinearMobileProjectName,
+  mapCrmAppToLinearProjectName,
+} from '@/lib/linear-project-map';
 
 export const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
 
@@ -16,8 +21,8 @@ export interface CreateLinearIssueInput {
   priority?: TicketPriority;
   assigneeEmail?: string | null;
   dueDate?: string | null;
-  projectName?: string | null;
-  crmProjectName?: string | null;
+  /** CRM App tab: Web App | Mobile App — drives Linear project assignment. */
+  app?: string | null;
   parentLinearIssueId?: string | null;
   labelNames?: string[];
   teamId?: string;
@@ -98,13 +103,23 @@ async function resolveLinearUserIdByEmail(email: string): Promise<string | null>
 
 async function resolveLinearProjectId(
   supabase: SupabaseClient,
-  projectName?: string | null
+  linearProjectName?: string | null
 ): Promise<string | null> {
-  if (!projectName?.trim()) return null;
+  if (!linearProjectName?.trim()) return null;
+
+  const mobileProjectId = getLinearMobileProjectId();
+  const mobileProjectName = getLinearMobileProjectName();
+  if (
+    mobileProjectId &&
+    linearProjectName.trim().toLowerCase() === mobileProjectName.toLowerCase()
+  ) {
+    return mobileProjectId;
+  }
+
   const { data } = await supabase
     .from('linear_projects')
     .select('id')
-    .ilike('name', projectName.trim())
+    .ilike('name', linearProjectName.trim())
     .limit(1)
     .maybeSingle();
   return data?.id ?? null;
@@ -168,7 +183,7 @@ export async function createLinearIssue(
     labelNames.unshift(typeLabel);
   }
 
-  const linearProjectName = input.crmProjectName ?? input.projectName;
+  const linearProjectName = mapCrmAppToLinearProjectName(input.app);
   const [assigneeId, projectId, labelIds] = await Promise.all([
     input.assigneeEmail
       ? resolveLinearUserIdByEmail(input.assigneeEmail)

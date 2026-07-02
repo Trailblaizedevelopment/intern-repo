@@ -3,6 +3,10 @@
  * Used by CSV import, sync→reconcile (phase 2), and dual-write create (phase 3).
  */
 
+import {
+  mapLinearProjectNameToCrmApp,
+} from '@/lib/linear-project-map';
+
 export type TicketStatus =
   | 'backlog'
   | 'todo'
@@ -114,7 +118,6 @@ export interface LinearIssueForTicket {
   estimate?: number | null;
   due_date?: string | null;
   url?: string | null;
-  url?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   completed_at?: string | null;
@@ -125,7 +128,8 @@ export interface LinearIssueForTicket {
 export interface TicketRowFromLinearOptions {
   assignee_id?: string | null;
   creator_id?: string | null;
-  project?: string | null;
+  /** Override app tab when reconciling (defaults from Linear project name). */
+  app?: string | null;
 }
 
 export function mapLinearStateToTicketStatus(
@@ -214,7 +218,7 @@ export function buildTicketRowFromLinearIssue(
     assignee_id: options.assignee_id ?? null,
     creator_id: options.creator_id ?? null,
     labels,
-    project: options.project ?? issue.project_name ?? null,
+    project: options.app ?? mapLinearProjectNameToCrmApp(issue.project_name),
     story_points: issue.estimate ?? null,
     due_date: issue.due_date ?? null,
     resolved_at,

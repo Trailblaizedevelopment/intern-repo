@@ -2,7 +2,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { assertLinearApiKeyConfigured, linearGQLWithApiKey } from '@/lib/linear';
-import { reconcileLinearIssuesToTickets } from '@/lib/linear-reconcile';
+import {
+  archiveTicketsRemovedFromLinear,
+  pruneStaleLinearIssues,
+  reconcileLinearIssuesToTickets,
+} from '@/lib/linear-reconcile';
 import { syncLinearWorkflowStates } from '@/lib/linear-workflow-states';
 
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
@@ -25,7 +29,16 @@ export async function POST(request: NextRequest) {
     const incremental = body.incremental === true;
 
     const supabase = getSupabaseAdmin();
-    const syncResults = { teams: 0, projects: 0, issues: 0, labels: 0, tickets: 0, workflowStates: 0 };
+    const syncResults = {
+      teams: 0,
+      projects: 0,
+      issues: 0,
+      labels: 0,
+      tickets: 0,
+      workflowStates: 0,
+      prunedIssues: 0,
+      archivedTickets: 0,
+    };
 
     let lastSyncAt: string | null = null;
     if (incremental) {
@@ -107,6 +120,7 @@ export async function POST(request: NextRequest) {
     // Sync issues — paginate through all (or incremental delta)
     let hasNextPage = true;
     let cursor: string | null = null;
+    const syncedIssueIds = new Set<string>();
 
     while (hasNextPage) {
       const issuesData = await linearGQLWithApiKey(`
@@ -137,6 +151,7 @@ export async function POST(request: NextRequest) {
       cursor = issuesPage?.pageInfo?.endCursor ?? null;
 
       for (const issue of issueNodes) {
+        syncedIssueIds.add(issue.id);
         await supabase.from('linear_issues').upsert({
           id: issue.id,
           identifier: issue.identifier,
@@ -181,6 +196,16 @@ export async function POST(request: NextRequest) {
 
       // Safety: if no cursor, stop
       if (!cursor) hasNextPage = false;
+    }
+
+    if (!incremental && syncedIssueIds.size > 0) {
+      syncResults.prunedIssues = await pruneStaleLinearIssues(
+        supabase,
+        teamId,
+        syncedIssueIds
+      );
+      const archiveResult = await archiveTicketsRemovedFromLinear(supabase, teamId);
+      syncResults.archivedTickets = archiveResult.archived;
     }
 
     const reconcileResult = await reconcileLinearIssuesToTickets(supabase, teamId);

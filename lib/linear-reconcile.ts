@@ -120,7 +120,6 @@ export async function reconcileLinearIssuesToTickets(
 
     return buildTicketRowFromLinearIssue(linearIssue, {
       assignee_id: assigneeEmail ? employeeByEmail[assigneeEmail] ?? null : null,
-      project: projectName(row.linear_projects),
     });
   });
 
@@ -142,6 +141,122 @@ export async function reconcileLinearIssuesToTickets(
   }
 
   return { reconciled, errors };
+}
+
+/**
+ * Mark a CRM ticket canceled when its Linear issue was deleted.
+ */
+export async function archiveTicketByExternalId(
+  supabase: SupabaseClient,
+  externalId: string
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('tickets')
+    .update({
+      status: 'canceled',
+      resolved_at: new Date().toISOString(),
+    })
+    .eq('external_id', externalId)
+    .neq('status', 'canceled')
+    .select('id');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data ?? []).length;
+}
+
+/**
+ * Archive CRM tickets linked to Linear issues no longer in the cache for a team.
+ * Run after full sync cache prune or when Linear deletes an issue.
+ */
+export async function archiveTicketsRemovedFromLinear(
+  supabase: SupabaseClient,
+  teamId: string
+): Promise<{ archived: number }> {
+  const { data: issues, error: issuesError } = await supabase
+    .from('linear_issues')
+    .select('id')
+    .eq('team_id', teamId);
+
+  if (issuesError) {
+    throw new Error(issuesError.message);
+  }
+
+  const activeSet = new Set((issues ?? []).map((row) => row.id));
+
+  const { data: linkedTickets, error: ticketsError } = await supabase
+    .from('tickets')
+    .select('id, external_id')
+    .not('external_id', 'is', null)
+    .neq('status', 'canceled');
+
+  if (ticketsError) {
+    throw new Error(ticketsError.message);
+  }
+
+  const toArchive = (linkedTickets ?? []).filter(
+    (ticket) => ticket.external_id && !activeSet.has(ticket.external_id)
+  );
+
+  if (toArchive.length === 0) {
+    return { archived: 0 };
+  }
+
+  const { error: updateError } = await supabase
+    .from('tickets')
+    .update({
+      status: 'canceled',
+      resolved_at: new Date().toISOString(),
+    })
+    .in(
+      'id',
+      toArchive.map((ticket) => ticket.id)
+    );
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return { archived: toArchive.length };
+}
+
+/**
+ * Remove cached Linear issues for a team that are no longer returned by the API.
+ */
+export async function pruneStaleLinearIssues(
+  supabase: SupabaseClient,
+  teamId: string,
+  activeIssueIds: Set<string>
+): Promise<number> {
+  const { data: cached, error } = await supabase
+    .from('linear_issues')
+    .select('id')
+    .eq('team_id', teamId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const staleIds = (cached ?? [])
+    .map((row) => row.id)
+    .filter((id) => !activeIssueIds.has(id));
+
+  if (staleIds.length === 0) {
+    return 0;
+  }
+
+  await supabase.from('linear_issue_labels').delete().in('issue_id', staleIds);
+  const { error: deleteError } = await supabase
+    .from('linear_issues')
+    .delete()
+    .in('id', staleIds);
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  return staleIds.length;
 }
 
 /**
@@ -213,7 +328,6 @@ export async function reconcileLinearIssueById(
 
   const ticketRow = buildTicketRowFromLinearIssue(linearIssue, {
     assignee_id: assigneeEmail ? employeeByEmail[assigneeEmail] ?? null : null,
-    project: projectName(cached.linear_projects),
   });
 
   const { error } = await supabase

@@ -8,7 +8,7 @@ import {
   LinearWebhookPayload,
   LinearWebhookAction
 } from '@/lib/linear';
-import { reconcileLinearIssueById } from '@/lib/linear-reconcile';
+import { reconcileLinearIssueById, archiveTicketByExternalId } from '@/lib/linear-reconcile';
 
 /**
  * POST /api/linear/webhooks
@@ -149,11 +149,13 @@ async function handleIssueEvent(
   };
 
   if (action === 'remove') {
-    // Delete the issue
-    await supabase
-      .from('linear_issues')
-      .delete()
-      .eq('id', issueData.id);
+    await supabase.from('linear_issue_labels').delete().eq('issue_id', issueData.id);
+    await supabase.from('linear_issues').delete().eq('id', issueData.id);
+    try {
+      await archiveTicketByExternalId(supabase, issueData.id);
+    } catch (err) {
+      console.warn(`Failed to archive CRM ticket for removed Linear issue ${issueData.id}:`, err);
+    }
     return;
   }
 
