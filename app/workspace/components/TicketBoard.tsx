@@ -11,9 +11,7 @@ import {
   ChevronDown,
   Clock,
   AlertTriangle,
-  Bug,
   Sparkles,
-  AlertCircle,
   User,
   MessageSquare,
   Activity,
@@ -21,9 +19,6 @@ import {
   Bell,
   BellOff,
   Loader2,
-  Zap,
-  Target,
-  Layers,
   CalendarDays,
   BarChart3,
   GanttChart,
@@ -165,12 +160,12 @@ const STATUS_COLUMNS: { key: TicketStatus; label: string; color: string }[] = [
   { key: 'canceled', label: 'Canceled', color: '#ef4444' },
 ];
 
-const PRIORITY_CONFIG: Record<TicketPriority, { label: string; color: string; icon: string }> = {
-  none: { label: 'None', color: '#d1d5db', icon: '—' },
-  low: { label: 'Low', color: '#6b7280', icon: '▽' },
-  medium: { label: 'Medium', color: '#3b82f6', icon: '■' },
-  high: { label: 'High', color: '#f59e0b', icon: '▲' },
-  critical: { label: 'Critical', color: '#ef4444', icon: '⚡' },
+const PRIORITY_CONFIG: Record<TicketPriority, { label: string; color: string }> = {
+  none: { label: 'None', color: '#d1d5db' },
+  low: { label: 'Low', color: '#6b7280' },
+  medium: { label: 'Medium', color: '#3b82f6' },
+  high: { label: 'High', color: '#f59e0b' },
+  critical: { label: 'Critical', color: '#ef4444' },
 };
 
 const PRIORITY_BAR_COLORS: Record<TicketPriority, string> = {
@@ -181,13 +176,13 @@ const PRIORITY_BAR_COLORS: Record<TicketPriority, string> = {
   critical: '#ef4444',
 };
 
-const TYPE_CONFIG: Record<TicketType, { label: string; icon: typeof Bug; color: string }> = {
-  bug: { label: 'Bug', icon: Bug, color: '#ef4444' },
-  feature_request: { label: 'Feature', icon: Sparkles, color: '#8b5cf6' },
-  issue: { label: 'Issue', icon: AlertCircle, color: '#f59e0b' },
-  improvement: { label: 'Improvement', icon: Zap, color: '#10b981' },
-  task: { label: 'Task', icon: Target, color: '#3b82f6' },
-  epic: { label: 'Epic', icon: Layers, color: '#f59e0b' },
+const TYPE_CONFIG: Record<TicketType, { label: string; color: string }> = {
+  bug: { label: 'Bug', color: '#db2777' },
+  feature_request: { label: 'Feature', color: '#7c3aed' },
+  issue: { label: 'Issue', color: '#ca8a04' },
+  improvement: { label: 'Improvement', color: '#059669' },
+  task: { label: 'Task', color: '#6366f1' },
+  epic: { label: 'Epic', color: '#0d9488' },
 };
 
 const LINEAR_SYNC_HELP = (
@@ -665,7 +660,7 @@ export function TicketBoard() {
         ))}
         <div className="tkt__tab-actions">
           {linearError && <span className="tkt__linear-error">{linearError}</span>}
-          <Tooltip content="New ticket" side="bottom" align="end">
+          <Tooltip content="New ticket" side="bottom" align="end" compact>
             <button
               type="button"
               className="tkt__round-btn tkt__round-btn--create"
@@ -831,18 +826,20 @@ function LinearTicketLink({
 // ═══════════════════════════════════════════
 
 function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onClick: () => void; onDragStart: () => void }) {
-  const TypeIcon = TYPE_CONFIG[ticket.type]?.icon || AlertCircle;
   const priorityCfg = PRIORITY_CONFIG[ticket.priority];
   const typeCfg = TYPE_CONFIG[ticket.type];
-  const visibleLabels = ticket.labels?.slice(0, 2) ?? [];
-  const extraLabelCount = (ticket.labels?.length ?? 0) - visibleLabels.length;
+  const platformBadge =
+    ticket.project === 'Mobile App'
+      ? { key: 'mobile' as const, label: 'Mobile' }
+      : ticket.project
+        ? { key: 'web' as const, label: 'Web' }
+        : null;
 
   return (
     <div
       className="tkt__card"
       onClick={onClick}
       draggable
-      title={ticket.title}
       onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(); }}
     >
       <div className="tkt__card-header">
@@ -864,38 +861,47 @@ function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onCl
         )}
       </div>
 
-      <h4 className="tkt__card-title">{ticket.title}</h4>
+      <h4 className="tkt__card-title" title={ticket.title}>{ticket.title}</h4>
 
       <div className="tkt__card-footer">
         <div className="tkt__card-footer-left">
-          {ticket.project && (
-            <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
-              {ticket.project === 'Mobile App' ? 'Mobile' : 'Web'}
+          {platformBadge && (
+            <span className={`tkt__project-badge tkt__project-badge--${platformBadge.key}`}>
+              {platformBadge.label}
             </span>
-          )}
-          {visibleLabels.map(label => (
-            <span key={label} className="tkt__label-pill tkt__label-pill--card">{label}</span>
-          ))}
-          {extraLabelCount > 0 && (
-            <span className="tkt__label-pill tkt__label-pill--card tkt__label-more">+{extraLabelCount}</span>
           )}
         </div>
-        <div className="tkt__card-footer-right">
+        <div
+          className="tkt__card-footer-right"
+          onMouseEnter={e => e.stopPropagation()}
+        >
           {ticket.priority !== 'none' && (
-            <span className="tkt__card-priority" style={{ color: priorityCfg.color }} title={priorityCfg.label}>
-              {priorityCfg.icon}
-            </span>
+            <Tooltip content={`Priority: ${priorityCfg.label}`} side="top" align="end" delayMs={250} compact>
+              <span
+                className="tkt__priority-dot"
+                style={{ backgroundColor: priorityCfg.color }}
+                role="img"
+                aria-label={`Priority: ${priorityCfg.label}`}
+              />
+            </Tooltip>
           )}
           {typeCfg && (
-            <span className="tkt__card-type-icon" style={{ color: typeCfg.color }} title={typeCfg.label}>
-              <TypeIcon size={12} />
-            </span>
+            <Tooltip content={`Type: ${typeCfg.label}`} side="top" align="end" delayMs={250} compact>
+              <span
+                className="tkt__type-dot"
+                style={{ backgroundColor: typeCfg.color }}
+                role="img"
+                aria-label={`Type: ${typeCfg.label}`}
+              />
+            </Tooltip>
           )}
           {ticket.due_date && (
-            <span className="tkt__card-due" title={`Due: ${ticket.due_date}`}>
-              <CalendarDays size={11} />
-              {new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </span>
+            <Tooltip content={`Due ${new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`} side="top" align="end" delayMs={250} compact>
+              <span className="tkt__card-due">
+                <CalendarDays size={11} />
+                {new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            </Tooltip>
           )}
         </div>
       </div>
@@ -974,7 +980,7 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
       ) : (
         sorted.map(ticket => {
           const statusCol = STATUS_COLUMNS.find(s => s.key === ticket.status);
-          const TypeIcon = TYPE_CONFIG[ticket.type]?.icon || AlertCircle;
+          const typeCfg = TYPE_CONFIG[ticket.type];
           return (
             <div key={ticket.id} className="tkt__list-row" onClick={() => onTicketClick(ticket)}>
               <span className="tkt__list-col tkt__list-col--id">
@@ -983,16 +989,11 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
               </span>
               <span className="tkt__list-col tkt__list-col--title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ticket.title}
-                {ticket.labels && ticket.labels.length > 0 && (
-                  <span className="tkt__labels tkt__labels--inline">
-                    {ticket.labels.slice(0, 2).map(l => <span key={l} className="tkt__label-pill tkt__label-pill--sm">{l}</span>)}
-                  </span>
-                )}
               </span>
               <span className="tkt__list-col tkt__list-col--project">
                 {ticket.project && (
                   <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
-                    {ticket.project === 'Mobile App' ? '📱' : '🌐'} {ticket.project}
+                    {ticket.project === 'Mobile App' ? 'Mobile' : 'Web'}
                   </span>
                 )}
               </span>
@@ -1000,12 +1001,18 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
                 <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
               </span>
               <span className="tkt__list-col tkt__list-col--priority" style={{ flexShrink: 0 }}>
-                <span style={{ color: PRIORITY_CONFIG[ticket.priority].color }}>
-                  {PRIORITY_CONFIG[ticket.priority].icon} {PRIORITY_CONFIG[ticket.priority].label}
+                <span className="tkt__list-priority">
+                  <span className="tkt__priority-dot" style={{ backgroundColor: PRIORITY_CONFIG[ticket.priority].color }} />
+                  {PRIORITY_CONFIG[ticket.priority].label}
                 </span>
               </span>
               <span className="tkt__list-col tkt__list-col--type">
-                <TypeIcon size={12} style={{ color: TYPE_CONFIG[ticket.type]?.color }} /> {TYPE_CONFIG[ticket.type]?.label}
+                {typeCfg && (
+                  <span className="tkt__list-type">
+                    <span className="tkt__type-dot" style={{ backgroundColor: typeCfg.color }} />
+                    {typeCfg.label}
+                  </span>
+                )}
               </span>
               <span className="tkt__list-col tkt__list-col--assignee">{ticket.assignee?.name || 'Unassigned'}</span>
               <span className="tkt__list-col tkt__list-col--date">
@@ -1577,7 +1584,7 @@ function TicketDetailPanel({
   };
 
   const statusCol = STATUS_COLUMNS.find(s => s.key === ticket.status);
-  const TypeIcon = TYPE_CONFIG[ticket.type]?.icon || AlertCircle;
+  const typeCfg = TYPE_CONFIG[ticket.type];
 
   return (
     <ModalOverlay className="tkt__overlay" onClose={onClose}>
@@ -1635,8 +1642,9 @@ function TicketDetailPanel({
             </div>
             <div className="tkt__meta-row">
               <label>Type</label>
-              <span style={{ color: TYPE_CONFIG[ticket.type]?.color || '#6b7280', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <TypeIcon size={14} /> {TYPE_CONFIG[ticket.type]?.label || ticket.type}
+              <span className="tkt__list-type">
+                {typeCfg && <span className="tkt__type-dot" style={{ backgroundColor: typeCfg.color }} />}
+                {typeCfg?.label || ticket.type}
               </span>
             </div>
             <div className="tkt__meta-row">

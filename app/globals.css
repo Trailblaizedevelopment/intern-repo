@@ -27828,9 +27828,10 @@ body { background: #FAFAFA; }
 
 /* ── Shared floating tooltip (portal) ── */
 .ui-tooltip {
-  width: 280px;
-  padding: 0.7rem 0.8rem;
-  border-radius: 10px;
+  width: max-content;
+  max-width: 280px;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
   border: 1px solid var(--ws-border, #e5e7eb);
   background: #fff;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
@@ -27839,6 +27840,22 @@ body { background: #FAFAFA; }
   color: var(--ws-text-secondary, #4b5563);
   text-align: left;
   pointer-events: none;
+  white-space: normal;
+  box-sizing: border-box;
+}
+
+.ui-tooltip--compact {
+  padding: 0.3rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  width: max-content;
+  max-width: max-content;
+}
+
+.ui-tooltip__label {
+  display: block;
+  white-space: nowrap;
 }
 
 .ui-tooltip__title {
@@ -28284,6 +28301,25 @@ body { background: #FAFAFA; }
   line-height: 1;
 }
 
+.tkt__priority-dot,
+.tkt__type-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.tkt__list-priority,
+.tkt__list-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ws-text-secondary, #6b7280);
+  font-size: 0.78rem;
+}
+
 .tkt__card-title {
   font-size: 0.8rem;
   font-weight: 500;
@@ -28316,12 +28352,9 @@ body { background: #FAFAFA; }
 .tkt__card-footer-right {
   flex-shrink: 0;
   margin-left: auto;
-}
-
-.tkt__card-type-icon {
   display: inline-flex;
   align-items: center;
-  opacity: 0.85;
+  gap: 0.35rem;
 }
 
 .tkt__card-bottom {

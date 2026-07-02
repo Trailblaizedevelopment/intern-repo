@@ -12,6 +12,7 @@ interface TooltipProps {
   side?: TooltipSide;
   align?: TooltipAlign;
   className?: string;
+  compact?: boolean;
   delayMs?: number;
 }
 
@@ -31,11 +32,12 @@ export function Tooltip({
   side = 'bottom',
   align = 'center',
   className = '',
+  compact = false,
   delayMs = 0,
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [style, setStyle] = useState<React.CSSProperties>({});
+  const [positionStyle, setPositionStyle] = useState<React.CSSProperties>({});
   const anchorRef = useRef<HTMLElement | null>(null);
   const tooltipId = useId();
   const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,7 +66,7 @@ export function Tooltip({
     if (align === 'end') transform.push('translateX(-100%)');
     if (side === 'top') transform.push('translateY(-100%)');
 
-    setStyle({
+    setPositionStyle({
       position: 'fixed',
       top,
       left,
@@ -105,10 +107,12 @@ export function Tooltip({
     ref: mergeRefs(anchorRef, childRef),
     'aria-describedby': open ? tooltipId : undefined,
     onMouseEnter: (e: React.MouseEvent) => {
+      e.stopPropagation();
       children.props.onMouseEnter?.(e);
       show();
     },
     onMouseLeave: (e: React.MouseEvent) => {
+      e.stopPropagation();
       children.props.onMouseLeave?.(e);
       hide();
     },
@@ -122,11 +126,36 @@ export function Tooltip({
     },
   });
 
+  const tooltipContent =
+    typeof content === 'string' ? content.trim().replace(/\s+/g, ' ') : content;
+
+  const tooltipClasses = [
+    'ui-tooltip',
+    compact ? 'ui-tooltip--compact' : '',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   const tooltipNode =
     open && mounted
       ? createPortal(
-          <div id={tooltipId} role="tooltip" className={`ui-tooltip ${className}`.trim()} style={style}>
-            {content}
+          <div
+            id={tooltipId}
+            role="tooltip"
+            className={tooltipClasses}
+            style={{
+              ...positionStyle,
+              ...(compact
+                ? { width: 'max-content', maxWidth: 'max-content' }
+                : { width: 'max-content', maxWidth: 280 }),
+            }}
+          >
+            {typeof tooltipContent === 'string' ? (
+              <span className="ui-tooltip__label">{tooltipContent}</span>
+            ) : (
+              tooltipContent
+            )}
           </div>,
           document.body
         )
