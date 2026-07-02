@@ -27521,34 +27521,59 @@ body { background: #FAFAFA; }
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .tkt__search {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.35rem 0.65rem;
+  height: 34px;
+  padding: 0 0.75rem;
   background: var(--ws-bg-secondary, #f3f4f6);
   border: 1px solid transparent;
-  border-radius: 7px;
-  transition: all 0.15s ease;
+  border-radius: 999px;
+  flex: 1;
+  min-width: 0;
+  max-width: 300px;
 }
 
 .tkt__search:focus-within {
-  background: white;
-  border-color: var(--ws-border, #e5e7eb);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+  background: var(--ws-bg-secondary, #f3f4f6);
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .tkt__search svg { color: #9ca3af; flex-shrink: 0; }
-.tkt__search input {
+
+.tkt__search input[type="text"] {
   border: none;
+  border-radius: 0;
   background: transparent;
   font-size: 0.8rem;
   color: var(--ws-text, #111827);
   outline: none;
-  width: 150px;
+  box-shadow: none;
+  width: 100%;
+  min-width: 12rem;
+  height: 100%;
+  padding: 0;
+  line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
 }
+
+.tkt__search input[type="text"]:focus,
+.tkt__search input[type="text"]:focus-visible {
+  outline: none;
+  outline-offset: 0;
+  border: none;
+  box-shadow: none !important;
+}
+
 .tkt__search input::placeholder { color: #9ca3af; }
 
 .tkt__icon-btn {
@@ -27613,22 +27638,6 @@ body { background: #FAFAFA; }
   background: var(--ws-text, #111827);
   color: white;
 }
-
-.tkt__create-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.85rem;
-  background: var(--ws-text, #111827);
-  color: white;
-  border: none;
-  border-radius: 7px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
-}
-.tkt__create-btn:hover { opacity: 0.85; }
 
 /* ── Notifications ── */
 .tkt__notif-wrapper { position: relative; }
@@ -27762,36 +27771,50 @@ body { background: #FAFAFA; }
   color: #6366f1;
 }
 
-.tkt__linear-sync {
+.tkt__tab-actions {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   margin-left: auto;
   padding-right: 0.25rem;
+  flex-shrink: 0;
 }
 
-.tkt__linear-sync-btn {
+.tkt__round-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 2rem;
   height: 2rem;
   padding: 0;
-  background: #5e6ad2;
-  color: #fff;
   border: none;
   border-radius: 999px;
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.tkt__round-btn--create {
+  background: #111827;
+  color: #fff;
+}
+
+.tkt__round-btn--create:hover {
+  background: #1f2937;
+}
+
+.tkt__round-btn--sync {
+  background: #5e6ad2;
+  color: #fff;
   box-shadow: 0 1px 2px rgba(94, 106, 210, 0.25);
 }
 
-.tkt__linear-sync-btn:hover:not(:disabled) {
+.tkt__round-btn--sync:hover:not(:disabled) {
   background: #4f5bb5;
 }
 
-.tkt__linear-sync-btn:disabled {
+.tkt__round-btn--sync:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
@@ -27901,7 +27924,52 @@ body { background: #FAFAFA; }
   font-weight: 600;
 }
 
-/* ── Filters ── */
+/* ── Filters dropdown ── */
+.dropdown-panel {
+  border-radius: 10px;
+  border: 1px solid var(--ws-border, #e5e7eb);
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.tkt__filter-dropdown {
+  width: 280px;
+  padding: 0.75rem;
+}
+
+.tkt__filter-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--ws-border, #e5e7eb);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ws-text, #111827);
+}
+
+.tkt__filter-dropdown .tkt__filter-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  margin-bottom: 0.6rem;
+}
+
+.tkt__filter-dropdown .tkt__filter-group:last-child {
+  margin-bottom: 0;
+}
+
+.tkt__filter-dropdown .tkt__filter-group label {
+  font-size: 0.68rem;
+}
+
+.tkt__filter-dropdown .tkt__filter-group select {
+  width: 100%;
+}
+
+/* ── Filters (legacy bar — kept for reference) ── */
 .tkt__filters {
   display: flex;
   align-items: center;
@@ -30016,19 +30084,15 @@ body { background: #FAFAFA; }
 
   .tkt__header-right::-webkit-scrollbar { display: none; }
 
-  /* Pin "New Ticket" button first in the row — always visible without scrolling */
-  .tkt__create-btn {
-    order: -1;
-    flex-shrink: 0;
+  .tkt__search {
+    flex: 1 1 auto;
+    min-width: 10rem;
+    max-width: none;
   }
 
-  /* Search: don't expand to 100% in a scrollable row */
-  .tkt__search {
-    flex-shrink: 1;
-    min-width: 120px;
-    max-width: 200px;
+  .tkt__search input {
+    min-width: 0;
   }
-  .tkt__search input { width: 100%; }
 
   /* ── Ticket Detail: full-screen slide-over ── */
   .tkt__detail {

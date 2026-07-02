@@ -21,7 +21,6 @@ import {
   Bell,
   BellOff,
   Loader2,
-  Ticket,
   Zap,
   Target,
   Layers,
@@ -36,6 +35,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
+import { Dropdown } from '@/components/Dropdown';
 import { Tooltip } from '@/components/Tooltip';
 import { HorizontalScrollNav } from '@/components/HorizontalScrollNav';
 import { useToast } from '@/components/Toast';
@@ -52,6 +52,9 @@ const LINEAR_JSON_HEADERS: HeadersInit = {
   'Content-Type': 'application/json',
   Authorization: INTERNAL_AUTH_HEADER,
 };
+
+const LINEAR_AUTO_SYNC_MS = 24 * 60 * 60 * 1000;
+const LINEAR_AUTO_SYNC_STORAGE_KEY = 'linear-last-auto-sync';
 
 async function parseLinearApiError(res: Response, fallback: string): Promise<string> {
   try {
@@ -195,6 +198,129 @@ const LINEAR_SYNC_HELP = (
   </>
 );
 
+interface TicketFiltersDropdownProps {
+  filterStatus: string;
+  filterAssignee: string;
+  filterPriority: string;
+  filterType: string;
+  filterProject: string;
+  filterLinearOnly: boolean;
+  activeFilterCount: number;
+  employees: Employee[];
+  currentEmployee: Employee | null;
+  uniqueProjects: string[];
+  onStatusChange: (value: string) => void;
+  onAssigneeChange: (value: string) => void;
+  onPriorityChange: (value: string) => void;
+  onTypeChange: (value: string) => void;
+  onProjectChange: (value: string) => void;
+  onLinearOnlyChange: (value: boolean) => void;
+  onClear: () => void;
+}
+
+function TicketFiltersDropdown({
+  filterStatus,
+  filterAssignee,
+  filterPriority,
+  filterType,
+  filterProject,
+  filterLinearOnly,
+  activeFilterCount,
+  employees,
+  currentEmployee,
+  uniqueProjects,
+  onStatusChange,
+  onAssigneeChange,
+  onPriorityChange,
+  onTypeChange,
+  onProjectChange,
+  onLinearOnlyChange,
+  onClear,
+}: TicketFiltersDropdownProps) {
+  return (
+    <Dropdown
+      align="end"
+      panelClassName="tkt__filter-dropdown"
+      trigger={
+        <button
+          type="button"
+          className={`tkt__icon-btn ${activeFilterCount > 0 ? 'active' : ''}`}
+          title="Filters"
+          aria-label="Filter tickets"
+        >
+          <Filter size={16} />
+          {activeFilterCount > 0 && <span className="tkt__filter-count">{activeFilterCount}</span>}
+        </button>
+      }
+    >
+      <div className="tkt__filter-dropdown-header">
+        <span>Filters</span>
+        {activeFilterCount > 0 && (
+          <button type="button" className="tkt__clear-filters" onClick={onClear}>
+            Clear all
+          </button>
+        )}
+      </div>
+      <div className="tkt__filter-group">
+        <label htmlFor="tkt-filter-status">Status</label>
+        <select id="tkt-filter-status" value={filterStatus} onChange={e => onStatusChange(e.target.value)}>
+          <option value="">All</option>
+          <option value="active">Active</option>
+          {STATUS_COLUMNS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </select>
+      </div>
+      <div className="tkt__filter-group">
+        <label htmlFor="tkt-filter-assignee">Assignee</label>
+        <select id="tkt-filter-assignee" value={filterAssignee} onChange={e => onAssigneeChange(e.target.value)}>
+          <option value="">Anyone</option>
+          {currentEmployee && <option value={currentEmployee.id}>Me</option>}
+          {employees.filter(e => e.id !== currentEmployee?.id).map(e => (
+            <option key={e.id} value={e.id}>{e.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="tkt__filter-group">
+        <label htmlFor="tkt-filter-priority">Priority</label>
+        <select id="tkt-filter-priority" value={filterPriority} onChange={e => onPriorityChange(e.target.value)}>
+          <option value="">Any</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div className="tkt__filter-group">
+        <label htmlFor="tkt-filter-type">Type</label>
+        <select id="tkt-filter-type" value={filterType} onChange={e => onTypeChange(e.target.value)}>
+          <option value="">Any</option>
+          {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+      </div>
+      {uniqueProjects.length > 0 && (
+        <div className="tkt__filter-group">
+          <label htmlFor="tkt-filter-project">Project</label>
+          <select id="tkt-filter-project" value={filterProject} onChange={e => onProjectChange(e.target.value)}>
+            <option value="">Any</option>
+            {uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="tkt__filter-group tkt__filter-group--checkbox">
+        <label className="tkt__filter-checkbox" htmlFor="tkt-filter-linear">
+          <input
+            id="tkt-filter-linear"
+            type="checkbox"
+            checked={filterLinearOnly}
+            onChange={e => onLinearOnlyChange(e.target.checked)}
+          />
+          Linear-linked only
+        </label>
+      </div>
+    </Dropdown>
+  );
+}
+
 // ═══════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
@@ -211,7 +337,6 @@ export function TicketBoard() {
   const [viewMode, setViewMode] = useState<ViewMode>('board');
   const [projectTab, setProjectTab] = useState<ProjectTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
@@ -307,7 +432,7 @@ export function TicketBoard() {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
-  const syncLinear = useCallback(async (fullSync = false, options?: { quiet?: boolean }) => {
+  const syncLinear = useCallback(async (fullSync = false, options?: { quiet?: boolean }): Promise<boolean> => {
     setLinearSyncing(true);
     setLinearError(null);
     try {
@@ -328,20 +453,42 @@ export function TicketBoard() {
         const toast = formatLinearSyncToast(json, fullSync);
         showToast(toast.message, toast.type);
       }
+      return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Sync failed';
       setLinearError(message);
       if (!options?.quiet) {
         showToast(message, 'error', 6000);
       }
+      return false;
     } finally {
       setLinearSyncing(false);
     }
   }, [fetchTickets, showToast]);
 
-  // Light incremental pull every 5 minutes while the board is open
+  // Incremental pull at most once per day (persists across visits via localStorage)
   useEffect(() => {
-    const interval = setInterval(() => syncLinear(false, { quiet: true }), 5 * 60 * 1000);
+    const runAutoSyncIfDue = async () => {
+      try {
+        const last = localStorage.getItem(LINEAR_AUTO_SYNC_STORAGE_KEY);
+        const lastMs = last ? Number(last) : 0;
+        if (Number.isFinite(lastMs) && Date.now() - lastMs < LINEAR_AUTO_SYNC_MS) return;
+      } catch {
+        // localStorage unavailable — still attempt sync
+      }
+
+      const ok = await syncLinear(false, { quiet: true });
+      if (!ok) return;
+
+      try {
+        localStorage.setItem(LINEAR_AUTO_SYNC_STORAGE_KEY, String(Date.now()));
+      } catch {
+        // ignore
+      }
+    };
+
+    void runAutoSyncIfDue();
+    const interval = setInterval(() => void runAutoSyncIfDue(), LINEAR_AUTO_SYNC_MS);
     return () => clearInterval(interval);
   }, [syncLinear]);
 
@@ -409,6 +556,15 @@ export function TicketBoard() {
     setDragOverStatus(null);
   };
 
+  const clearFilters = () => {
+    setFilterStatus('');
+    setFilterAssignee('');
+    setFilterPriority('');
+    setFilterType('');
+    setFilterProject('');
+    setFilterLinearOnly(false);
+  };
+
   const handleDrop = async (newStatus: TicketStatus) => {
     setDragOverStatus(null);
     if (!dragTicketId) return;
@@ -423,7 +579,6 @@ export function TicketBoard() {
       {/* ── Header ── */}
       <header className="tkt__header">
         <div className="tkt__header-left">
-          <Ticket size={22} />
           <h1>Tickets</h1>
         </div>
         <div className="tkt__header-right">
@@ -437,14 +592,25 @@ export function TicketBoard() {
             />
           </div>
 
-          <button
-            className={`tkt__icon-btn ${showFilters ? 'active' : ''}`}
-            onClick={() => setShowFilters(!showFilters)}
-            title="Filters"
-          >
-            <Filter size={16} />
-            {activeFilterCount > 0 && <span className="tkt__filter-count">{activeFilterCount}</span>}
-          </button>
+          <TicketFiltersDropdown
+            filterStatus={filterStatus}
+            filterAssignee={filterAssignee}
+            filterPriority={filterPriority}
+            filterType={filterType}
+            filterProject={filterProject}
+            filterLinearOnly={filterLinearOnly}
+            activeFilterCount={activeFilterCount}
+            employees={employees}
+            currentEmployee={currentEmployee}
+            uniqueProjects={uniqueProjects}
+            onStatusChange={setFilterStatus}
+            onAssigneeChange={setFilterAssignee}
+            onPriorityChange={setFilterPriority}
+            onTypeChange={setFilterType}
+            onProjectChange={setFilterProject}
+            onLinearOnlyChange={setFilterLinearOnly}
+            onClear={clearFilters}
+          />
 
           <div className="tkt__view-toggle">
             <button className={viewMode === 'board' ? 'active' : ''} onClick={() => setViewMode('board')} title="Board">
@@ -479,10 +645,6 @@ export function TicketBoard() {
               />
             )}
           </div>
-
-          <button className="tkt__create-btn" onClick={() => setShowCreateModal(true)}>
-            <Plus size={16} /> New Ticket
-          </button>
         </div>
       </header>
 
@@ -501,12 +663,22 @@ export function TicketBoard() {
             <span className="tkt__project-tab-count">{projectTab === tab || tab === 'all' ? projectTabCounts[tab] : '—'}</span>
           </button>
         ))}
-        <div className="tkt__linear-sync">
+        <div className="tkt__tab-actions">
           {linearError && <span className="tkt__linear-error">{linearError}</span>}
+          <Tooltip content="New ticket" side="bottom" align="end">
+            <button
+              type="button"
+              className="tkt__round-btn tkt__round-btn--create"
+              onClick={() => setShowCreateModal(true)}
+              aria-label="New ticket"
+            >
+              <Plus size={16} />
+            </button>
+          </Tooltip>
           <Tooltip content={LINEAR_SYNC_HELP} side="bottom" align="end">
             <button
               type="button"
-              className="tkt__linear-sync-btn"
+              className="tkt__round-btn tkt__round-btn--sync"
               onClick={e => syncLinear(e.shiftKey)}
               disabled={linearSyncing}
               aria-label="Sync with Linear. Shift+click for full sync."
@@ -517,77 +689,6 @@ export function TicketBoard() {
           </Tooltip>
         </div>
       </div>
-
-      {/* ── Filters ── */}
-      {showFilters && (
-        <div className="tkt__filters">
-          <div className="tkt__filter-group">
-            <label>Status</label>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="">All</option>
-              <option value="active">Active</option>
-              {STATUS_COLUMNS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-          </div>
-          <div className="tkt__filter-group">
-            <label>Assignee</label>
-            <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
-              <option value="">Anyone</option>
-              {currentEmployee && <option value={currentEmployee.id}>Me</option>}
-              {employees.filter(e => e.id !== currentEmployee?.id).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
-          </div>
-          <div className="tkt__filter-group">
-            <label>Priority</label>
-            <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-              <option value="">Any</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-              <option value="none">None</option>
-            </select>
-          </div>
-          <div className="tkt__filter-group">
-            <label>Type</label>
-            <select value={filterType} onChange={e => setFilterType(e.target.value)}>
-              <option value="">Any</option>
-              {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-          </div>
-          {uniqueProjects.length > 0 && (
-            <div className="tkt__filter-group">
-              <label>Project</label>
-              <select value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-                <option value="">Any</option>
-                {uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-          )}
-          <div className="tkt__filter-group tkt__filter-group--checkbox">
-            <label className="tkt__filter-checkbox">
-              <input
-                type="checkbox"
-                checked={filterLinearOnly}
-                onChange={e => setFilterLinearOnly(e.target.checked)}
-              />
-              Linear-linked only
-            </label>
-          </div>
-          {activeFilterCount > 0 && (
-            <button className="tkt__clear-filters" onClick={() => {
-              setFilterStatus('');
-              setFilterAssignee('');
-              setFilterPriority('');
-              setFilterType('');
-              setFilterProject('');
-              setFilterLinearOnly(false);
-            }}>
-              Clear all
-            </button>
-          )}
-        </div>
-      )}
 
       {/* ── Content ── */}
       {loading ? (
