@@ -1,26 +1,9 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { getLinearApiKeyHeader, assertLinearApiKeyConfigured } from '@/lib/linear';
+import { assertLinearApiKeyConfigured, linearGQLWithApiKey } from '@/lib/linear';
 
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
-const LINEAR_GRAPHQL = 'https://api.linear.app/graphql';
-
-async function linearGQL(query: string, variables?: Record<string, unknown>) {
-  assertLinearApiKeyConfigured();
-  const response = await fetch(LINEAR_GRAPHQL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: getLinearApiKeyHeader(),
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  if (!response.ok) throw new Error(`Linear API error: ${response.status}`);
-  const result = await response.json();
-  if (result.errors) throw new Error(result.errors[0]?.message || 'GraphQL error');
-  return result.data;
-}
 
 /**
  * POST /api/linear/sync
@@ -42,7 +25,7 @@ export async function POST(request: NextRequest) {
     const syncResults = { teams: 0, projects: 0, issues: 0, labels: 0 };
 
     // Sync teams
-    const teamsData = await linearGQL(`
+    const teamsData = await linearGQLWithApiKey(`
       query { teams { nodes { id name key description } } }
     `);
     const teams = teamsData?.teams?.nodes ?? [];
@@ -57,10 +40,10 @@ export async function POST(request: NextRequest) {
       syncResults.teams++;
     }
 
-    // Sync projects for team
-    const projectsData = await linearGQL(`
-      query($teamId: String) {
-        projects(filter: { team: { id: { eq: $teamId } } }) {
+    // Sync projects for team (ProjectFilter uses accessibleTeams, not team)
+    const projectsData = await linearGQLWithApiKey(`
+      query($teamId: ID!) {
+        projects(filter: { accessibleTeams: { id: { eq: $teamId } } }) {
           nodes { id name description icon color state startDate targetDate progress }
         }
       }
@@ -83,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Sync labels
-    const labelsData = await linearGQL(`
+    const labelsData = await linearGQLWithApiKey(`
       query($teamId: String!) {
         team(id: $teamId) { labels { nodes { id name color description } } }
       }
@@ -106,7 +89,7 @@ export async function POST(request: NextRequest) {
     let cursor: string | null = null;
 
     while (hasNextPage) {
-      const issuesData = await linearGQL(`
+      const issuesData = await linearGQLWithApiKey(`
         query($filter: IssueFilter, $first: Int, $after: String) {
           issues(filter: $filter, first: $first, after: $after, orderBy: updatedAt) {
             pageInfo { hasNextPage endCursor }
