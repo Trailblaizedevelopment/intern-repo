@@ -73,6 +73,31 @@ export const LINEAR_LABEL_TO_TICKET_TYPE: Record<string, TicketType> = {
   'tasks-mvp': 'task',
 };
 
+/** CRM priority → Linear numeric priority (0–4) */
+export const TICKET_PRIORITY_TO_LINEAR_PRIORITY: Record<TicketPriority, number> = {
+  none: 0,
+  critical: 1,
+  high: 2,
+  medium: 3,
+  low: 4,
+};
+
+/** CRM type → default Linear label name for issueCreate */
+export const TICKET_TYPE_TO_LINEAR_LABEL: Partial<Record<TicketType, string>> = {
+  bug: 'Bug',
+  feature_request: 'Feature',
+  improvement: 'Enhancement',
+  task: 'tasks-mvp',
+};
+
+export function mapTicketPriorityToLinearPriority(priority: TicketPriority): number {
+  return TICKET_PRIORITY_TO_LINEAR_PRIORITY[priority] ?? 0;
+}
+
+export function mapTicketTypeToLinearLabel(type: TicketType): string | null {
+  return TICKET_TYPE_TO_LINEAR_LABEL[type] ?? null;
+}
+
 /** Cached `linear_issues` row or live API issue fields used for ticket upsert */
 export interface LinearIssueForTicket {
   id: string;
@@ -88,6 +113,7 @@ export interface LinearIssueForTicket {
   project_name?: string | null;
   estimate?: number | null;
   due_date?: string | null;
+  url?: string | null;
   url?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -179,6 +205,7 @@ export function buildTicketRowFromLinearIssue(
     external_id: issue.id,
     linear_identifier: issue.identifier,
     linear_id: issue.id,
+    linear_url: issue.url ?? null,
     title: issue.title,
     description: issue.description ?? null,
     type,

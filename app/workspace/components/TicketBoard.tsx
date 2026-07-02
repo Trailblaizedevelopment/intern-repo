@@ -38,6 +38,7 @@ import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
 import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
+import { hasLinearLink, resolveLinearTicketUrl } from '@/lib/linear-issue-url';
 
 const LINEAR_JSON_HEADERS: HeadersInit = {
   'Content-Type': 'application/json',
@@ -79,6 +80,7 @@ interface TicketData {
   reviewer_id: string | null;
   external_id: string | null;
   linear_identifier: string | null;
+  linear_url: string | null;
   labels: string[];
   project: string | null;
   project_id: string | null;
@@ -674,6 +676,36 @@ async function handleStatusChange(
 }
 
 // ═══════════════════════════════════════════
+// LINEAR LINK
+// ═══════════════════════════════════════════
+
+function LinearTicketLink({
+  ticket,
+  className = 'tkt__linear-link',
+}: {
+  ticket: Pick<TicketData, 'linear_url' | 'linear_identifier' | 'external_id'>;
+  className?: string;
+}) {
+  const url = resolveLinearTicketUrl(ticket);
+  const label = ticket.linear_identifier;
+  if (!url || !label) return null;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      title="Open in Linear"
+      onClick={e => e.stopPropagation()}
+    >
+      {label}
+      <ExternalLink size={10} />
+    </a>
+  );
+}
+
+// ═══════════════════════════════════════════
 // TICKET CARD (Kanban)
 // ═══════════════════════════════════════════
 
@@ -690,7 +722,7 @@ function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onCl
     >
       <div className="tkt__card-top">
         <span className="tkt__card-number">#{ticket.number}</span>
-        {ticket.external_id && <span className="tkt__card-external-id">{ticket.external_id}</span>}
+        {hasLinearLink(ticket) && <LinearTicketLink ticket={ticket} className="tkt__card-external-id tkt__linear-link" />}
         <span className="tkt__card-priority" style={{ color: priorityCfg.color }}>{priorityCfg.icon}</span>
       </div>
       <h4 className="tkt__card-title">{ticket.title}</h4>
@@ -805,7 +837,7 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
             <div key={ticket.id} className="tkt__list-row" onClick={() => onTicketClick(ticket)}>
               <span className="tkt__list-col tkt__list-col--id">
                 {ticket.number}
-                {ticket.external_id && <span className="tkt__external-id">{ticket.external_id}</span>}
+                {hasLinearLink(ticket) && <LinearTicketLink ticket={ticket} className="tkt__external-id tkt__linear-link" />}
               </span>
               <span className="tkt__list-col tkt__list-col--title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ticket.title}
@@ -1244,11 +1276,15 @@ function CreateTicketModal({
           project: projectApp || 'Web App',
           project_id: projectId || null,
           parent_ticket_id: parentTicketId || null,
+          create_in_linear: true,
         }),
       });
       const result = await res.json();
-      if (result.error) alert(result.error.message);
-      else onCreated();
+      if (result.error) {
+        alert(result.error.message);
+        return;
+      }
+      onCreated();
     } catch (err) {
       console.error('Error creating ticket:', err);
     } finally {
@@ -1377,7 +1413,7 @@ function CreateTicketModal({
           <button className="tkt__btn-secondary" onClick={onClose}>Cancel</button>
           <button className="tkt__btn-primary" onClick={handleSubmit} disabled={!title.trim() || creating}>
             {creating ? <Loader2 size={14} className="tkt__spinner" /> : <Plus size={14} />}
-            {creating ? 'Creating...' : 'Create Ticket'}
+            {creating ? 'Creating in Linear...' : 'Create Ticket'}
           </button>
         </div>
       </div>
@@ -1533,7 +1569,9 @@ function TicketDetailPanel({
         <div className="tkt__detail-header">
           <div className="tkt__detail-header-left">
             <span className="tkt__detail-number">#{ticket.number}</span>
-            {ticket.external_id && <span className="tkt__detail-external-id">{ticket.external_id}</span>}
+            {hasLinearLink(ticket) && (
+              <LinearTicketLink ticket={ticket} className="tkt__detail-external-id tkt__linear-link" />
+            )}
             <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

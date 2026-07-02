@@ -29899,6 +29899,19 @@ body { background: #FAFAFA; }
   letter-spacing: 0.02em;
 }
 
+.tkt__linear-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tkt__linear-link:hover {
+  text-decoration: underline;
+  color: #7c3aed;
+}
+
 .tkt__external-id {
   font-size: 0.62rem;
   font-weight: 600;

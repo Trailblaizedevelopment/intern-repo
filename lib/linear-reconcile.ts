@@ -20,6 +20,7 @@ interface CachedLinearIssueRow {
   updated_at: string | null;
   completed_at: string | null;
   canceled_at: string | null;
+  url: string | null;
   linear_projects?: { name: string } | { name: string }[] | null;
 }
 
@@ -46,7 +47,7 @@ export async function reconcileLinearIssuesToTickets(
     .select(`
       id, identifier, title, description, priority, priority_label,
       state_type, state_name, assignee_email,
-      estimate, due_date, created_at, updated_at, completed_at, canceled_at,
+      estimate, due_date, created_at, updated_at, completed_at, canceled_at, url,
       linear_projects ( name )
     `)
     .eq('team_id', teamId);
@@ -113,6 +114,7 @@ export async function reconcileLinearIssuesToTickets(
       updated_at: row.updated_at,
       completed_at: row.completed_at,
       canceled_at: row.canceled_at,
+      url: row.url,
       label_names,
     };
 

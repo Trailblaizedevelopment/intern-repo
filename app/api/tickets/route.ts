@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { parseLinearIdentifierSearch } from '@/lib/linear-ticket-map';
+import {
+  mapLinearStateToTicketStatus,
+  parseLinearIdentifierSearch,
+} from '@/lib/linear-ticket-map';
+import {
+  cacheCreatedLinearIssue,
+  createLinearIssue,
+  htmlToLinearDescription,
+  LINEAR_TEAM_ID,
+} from '@/lib/linear-create-issue';
+import { getLinearApiKeyHeader } from '@/lib/linear';
 
 const TICKET_SELECT = `
   *,
@@ -107,6 +117,8 @@ export async function POST(request: NextRequest) {
       story_points,
       external_id,
       linear_identifier,
+      create_in_linear,
+      skip_linear,
     } = body;
 
     if (!title) {
@@ -114,6 +126,100 @@ export async function POST(request: NextRequest) {
         { data: null, error: { message: 'Title is required', code: 'VALIDATION_ERROR' } },
         { status: 400 }
       );
+    }
+
+    const shouldCreateInLinear =
+      !external_id &&
+      !skip_linear &&
+      create_in_linear !== false &&
+      Boolean(getLinearApiKeyHeader());
+
+    let linearIssueId = external_id || null;
+    let linearIdentifier = linear_identifier || null;
+    let linearUrl: string | null = null;
+    let ticketStatus = 'open';
+    let linearLabelNames = labels || [];
+
+    if (shouldCreateInLinear) {
+      let assigneeEmail: string | null = null;
+      if (assignee_id) {
+        const { data: assignee } = await supabase
+          .from('employees')
+          .select('email')
+          .eq('id', assignee_id)
+          .maybeSingle();
+        assigneeEmail = assignee?.email ?? null;
+      }
+
+      let crmProjectName: string | null = project || null;
+      if (project_id) {
+        const { data: crmProject } = await supabase
+          .from('projects')
+          .select('name')
+          .eq('id', project_id)
+          .maybeSingle();
+        if (crmProject?.name) crmProjectName = crmProject.name;
+      }
+
+      let parentLinearIssueId: string | null = null;
+      if (parent_ticket_id) {
+        const { data: parentTicket } = await supabase
+          .from('tickets')
+          .select('external_id')
+          .eq('id', parent_ticket_id)
+          .maybeSingle();
+        parentLinearIssueId = parentTicket?.external_id ?? null;
+      }
+
+      const linearDescription = description
+        ? htmlToLinearDescription(description)
+        : null;
+
+      try {
+        const created = await createLinearIssue(supabase, {
+          title: title.trim(),
+          description: linearDescription,
+          type: type || 'bug',
+          priority: priority || 'medium',
+          assigneeEmail,
+          dueDate: due_date || null,
+          projectName: project || null,
+          crmProjectName,
+          parentLinearIssueId,
+          labelNames: labels || [],
+        });
+
+        linearIssueId = created.id;
+        linearIdentifier = created.identifier;
+        linearUrl = created.url ?? null;
+        linearLabelNames = created.label_names?.length
+          ? created.label_names
+          : linearLabelNames;
+        ticketStatus = mapLinearStateToTicketStatus(
+          created.state_type,
+          created.state_name
+        );
+
+        try {
+          await cacheCreatedLinearIssue(supabase, {
+            ...created,
+            team_id: LINEAR_TEAM_ID,
+          });
+        } catch (cacheErr) {
+          console.warn('Failed to cache created Linear issue:', cacheErr);
+        }
+      } catch (linearErr) {
+        const message =
+          linearErr instanceof Error ? linearErr.message : 'Failed to create Linear issue';
+        console.error('Linear create failed:', linearErr);
+        return NextResponse.json(
+          {
+            data: null,
+            error: { message: `Linear create failed: ${message}`, code: 'LINEAR_CREATE_FAILED' },
+          },
+          { status: 502 }
+        );
+      }
     }
 
     // Create the ticket
@@ -126,18 +232,19 @@ export async function POST(request: NextRequest) {
         priority: priority || 'medium',
         assignee_id: assignee_id || null,
         creator_id: creator_id || null,
-        status: 'open',
+        status: ticketStatus,
         due_date: due_date || null,
-        labels: labels || [],
+        labels: linearLabelNames,
         project: project || 'Web App',
         project_id: project_id || null,
         parent_ticket_id: parent_ticket_id || null,
         milestone_id: milestone_id || null,
         sprint: sprint || null,
         story_points: story_points || null,
-        external_id: external_id || null,
-        linear_identifier: linear_identifier || null,
-        linear_id: external_id || null,
+        external_id: linearIssueId,
+        linear_identifier: linearIdentifier,
+        linear_id: linearIssueId,
+        linear_url: linearUrl,
       }])
       .select(TICKET_SELECT)
       .single();
@@ -152,7 +259,7 @@ export async function POST(request: NextRequest) {
       ticket_id: ticket.id,
       actor_id: creator_id || null,
       action: 'created',
-      to_value: 'open',
+      to_value: ticketStatus,
     }]);
 
     // Notify assignee if assigned on creation
