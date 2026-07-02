@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
       issues: 0,
       labels: 0,
       tickets: 0,
+      ticketsCreated: 0,
+      ticketsUpdated: 0,
       workflowStates: 0,
       prunedIssues: 0,
       archivedTickets: 0,
@@ -210,6 +212,8 @@ export async function POST(request: NextRequest) {
 
     const reconcileResult = await reconcileLinearIssuesToTickets(supabase, teamId);
     syncResults.tickets = reconcileResult.reconciled;
+    syncResults.ticketsCreated = reconcileResult.created;
+    syncResults.ticketsUpdated = reconcileResult.updated;
     if (reconcileResult.errors.length > 0) {
       console.error('Linear reconcile errors:', reconcileResult.errors);
     }

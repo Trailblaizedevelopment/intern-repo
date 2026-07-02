@@ -39,7 +39,7 @@ function projectName(
 export async function reconcileLinearIssuesToTickets(
   supabase: SupabaseClient,
   teamId: string
-): Promise<{ reconciled: number; errors: string[] }> {
+): Promise<{ reconciled: number; created: number; updated: number; errors: string[] }> {
   const errors: string[] = [];
 
   const { data: issues, error: issuesError } = await supabase
@@ -58,7 +58,7 @@ export async function reconcileLinearIssuesToTickets(
 
   const rows = (issues ?? []) as CachedLinearIssueRow[];
   if (rows.length === 0) {
-    return { reconciled: 0, errors };
+    return { reconciled: 0, created: 0, updated: 0, errors };
   }
 
   const issueIds = rows.map((r) => r.id);
@@ -125,9 +125,37 @@ export async function reconcileLinearIssuesToTickets(
 
   const BATCH_SIZE = 50;
   let reconciled = 0;
+  let created = 0;
+  let updated = 0;
 
   for (let i = 0; i < tickets.length; i += BATCH_SIZE) {
     const batch = tickets.slice(i, i + BATCH_SIZE);
+    const externalIds = batch
+      .map(ticket => ticket.external_id)
+      .filter((id): id is string => Boolean(id));
+
+    const existingIds = new Set<string>();
+    if (externalIds.length > 0) {
+      const { data: existingRows, error: existingError } = await supabase
+        .from('tickets')
+        .select('external_id')
+        .in('external_id', externalIds);
+
+      if (existingError) {
+        errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1} lookup: ${existingError.message}`);
+      } else {
+        for (const row of existingRows ?? []) {
+          if (row.external_id) existingIds.add(row.external_id);
+        }
+      }
+    }
+
+    for (const ticket of batch) {
+      if (!ticket.external_id) continue;
+      if (existingIds.has(ticket.external_id)) updated += 1;
+      else created += 1;
+    }
+
     const { data, error } = await supabase
       .from('tickets')
       .upsert(batch, { onConflict: 'external_id' })
@@ -140,7 +168,7 @@ export async function reconcileLinearIssuesToTickets(
     }
   }
 
-  return { reconciled, errors };
+  return { reconciled, created, updated, errors };
 }
 
 /**

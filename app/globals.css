@@ -24593,27 +24593,73 @@ input:focus {
    ================================================================ */
 
 /* ====== CRM Toast Notification System ====== */
-.crm-toast {
+.crm-toast-stack {
   position: fixed;
-  z-index: 9999;
-  padding: 12px 20px;
+  z-index: 10001;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.crm-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
   border-radius: 10px;
   background: #1e293b;
   color: white;
   font-size: 0.875rem;
   font-weight: 500;
+  line-height: 1.4;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  white-space: nowrap;
-  pointer-events: none;
-  /* Desktop: top-right */
-  top: 24px;
-  right: 24px;
+  pointer-events: auto;
   transform: translateX(120%);
-  transition: transform 0.2s ease-out;
+  opacity: 0;
+  animation: crm-toast-in 0.22s ease-out forwards;
 }
 
-.crm-toast-enter {
-  transform: translateX(0);
+@keyframes crm-toast-in {
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.crm-toast-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.crm-toast-text {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+}
+
+.crm-toast-dismiss {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: -2px -4px 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+}
+
+.crm-toast-dismiss:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .crm-toast-success {
@@ -24629,15 +24675,24 @@ input:focus {
 }
 
 @media (max-width: 1023px) {
-  .crm-toast {
+  .crm-toast-stack {
     top: auto;
-    right: auto;
+    right: 16px;
+    left: 16px;
     bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-    left: 50%;
-    transform: translateX(-50%) translateY(60px);
+    max-width: none;
   }
-  .crm-toast-enter {
-    transform: translateX(-50%) translateY(0);
+
+  .crm-toast {
+    transform: translateY(60px);
+    animation-name: crm-toast-in-mobile;
+  }
+
+  @keyframes crm-toast-in-mobile {
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
 }
 
@@ -27683,15 +27738,92 @@ body { background: #FAFAFA; }
   color: #6366f1;
 }
 
+.tkt__linear-sync {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  padding-right: 0.25rem;
+}
+
+.tkt__linear-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: #5e6ad2;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 1px 2px rgba(94, 106, 210, 0.25);
+}
+
+.tkt__linear-sync-btn:hover:not(:disabled) {
+  background: #4f5bb5;
+}
+
+.tkt__linear-sync-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.tkt__linear-error {
+  font-size: 0.7rem;
+  color: #ef4444;
+  max-width: 10rem;
+  line-height: 1.3;
+}
+
+/* ── Shared floating tooltip (portal) ── */
+.ui-tooltip {
+  width: 280px;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--ws-border, #e5e7eb);
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--ws-text-secondary, #4b5563);
+  text-align: left;
+  pointer-events: none;
+}
+
+.ui-tooltip__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ws-text, #111827);
+}
+
+.ui-tooltip p {
+  margin: 0 0 0.35rem;
+}
+
+.ui-tooltip p:last-child {
+  margin-bottom: 0;
+}
+
+.ui-tooltip strong {
+  color: var(--ws-text, #111827);
+  font-weight: 600;
+}
+
 /* ── Project Badge ── */
 .tkt__project-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  font-size: 0.65rem;
+  gap: 0.15rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  padding: 0.15rem 0.45rem;
-  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
@@ -27824,138 +27956,218 @@ body { background: #FAFAFA; }
 .tkt__spinner { animation: tkt-spin 0.8s linear infinite; }
 @keyframes tkt-spin { to { transform: rotate(360deg); } }
 
-/* ── Kanban Board ── */
+/* ── Kanban Board (Linear-inspired) ── */
 .tkt__board {
   display: flex;
   gap: 0.75rem;
-  padding: 1rem 1.25rem;
+  padding: 0.75rem 1rem 1rem;
   overflow-x: auto;
+  overflow-y: hidden;
   flex: 1;
   min-height: 0;
+  align-items: stretch;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.tkt__board::-webkit-scrollbar {
+  height: 8px;
+}
+
+.tkt__board::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
 }
 
 .tkt__column {
-  flex: 1;
-  min-width: 220px;
-  max-width: 300px;
+  flex: 0 0 272px;
+  width: 272px;
+  min-width: 272px;
+  max-width: 272px;
   display: flex;
   flex-direction: column;
-  background: var(--ws-bg-secondary, #f9fafb);
-  border-radius: 10px;
+  background: #f4f5f8;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
   overflow: hidden;
+  max-height: 100%;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .tkt__column-header {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--ws-border, #e5e7eb);
-  font-size: 0.78rem;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #e8eaed;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--ws-text, #111827);
-}
-
-.tkt__column-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  color: #3f4250;
+  background: #f4f5f8;
+  position: sticky;
+  top: 0;
+  z-index: 2;
   flex-shrink: 0;
 }
 
-.tkt__column-label { flex: 1; }
+.tkt__column-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.tkt__column-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .tkt__column-count {
   font-size: 0.68rem;
-  color: var(--ws-text-secondary, #9ca3af);
-  background: white;
-  padding: 1px 6px;
-  border-radius: 4px;
+  color: #6b7280;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  padding: 1px 7px;
+  border-radius: 999px;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .tkt__column-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.5rem;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
 }
 
-/* Stack effect: cards overlap with slight offset */
-.tkt__column-body > .tkt__card {
-  margin-bottom: -28px;
-  position: relative;
-  z-index: 1;
-  transition: margin-bottom 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+.tkt__column-body::-webkit-scrollbar {
+  width: 6px;
 }
 
-.tkt__column-body > .tkt__card:last-child {
-  margin-bottom: 0;
-}
-
-/* Expand stack on column hover */
-.tkt__column-body:hover > .tkt__card {
-  margin-bottom: 4px;
-}
-
-/* Lift individual card on hover */
-.tkt__column-body > .tkt__card:hover {
-  z-index: 10;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+.tkt__column-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
 }
 
 .tkt__column-empty {
   text-align: center;
-  padding: 1.5rem 0.5rem;
+  padding: 2rem 0.75rem;
   color: #9ca3af;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+  border: 1px dashed #e5e7eb;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 /* ── Ticket Card ── */
 .tkt__card {
-  background: white;
-  border: 1px solid var(--ws-border, #e5e7eb);
-  border-radius: 8px;
-  padding: 0.65rem 0.75rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.65rem 0.7rem;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .tkt__card:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border-color: #cfd4dc;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
-.tkt__card-top {
+.tkt__card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
 }
 
-.tkt__card-number {
+.tkt__card-ids {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.tkt__card-id {
   font-size: 0.68rem;
   font-weight: 600;
-  color: var(--ws-text-secondary, #9ca3af);
+  color: #6b7280;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: -0.01em;
 }
 
-.tkt__card-priority { font-size: 0.72rem; }
+.tkt__card-id.tkt__linear-link {
+  font-size: 0.68rem;
+  color: #5e6ad2;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.tkt__card-id-secondary {
+  font-size: 0.62rem;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.tkt__card-priority {
+  font-size: 0.7rem;
+  line-height: 1;
+}
 
 .tkt__card-title {
   font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ws-text, #111827);
+  font-weight: 500;
+  color: #1f2328;
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.4;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.tkt__card-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
+}
+
+.tkt__card-footer-left,
+.tkt__card-footer-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.tkt__card-footer-right {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.tkt__card-type-icon {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.85;
 }
 
 .tkt__card-bottom {
@@ -27977,7 +28189,7 @@ body { background: #FAFAFA; }
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: #5e6ad2;
   color: white;
   font-size: 0.55rem;
   font-weight: 600;
@@ -27985,6 +28197,8 @@ body { background: #FAFAFA; }
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px #e5e7eb;
 }
 
 .tkt__card-assignee.unassigned {
@@ -30327,20 +30541,10 @@ body { background: #FAFAFA; }
    Ticket System V2 — New styles
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Board horizontal scroll fix */
-.tkt__board {
-  overflow-x: auto;
-}
-
-.tkt__column {
-  min-width: 220px;
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
+/* Board drag-and-drop */
 .tkt__drag-over {
-  background: rgba(99, 102, 241, 0.06) !important;
-  border-radius: 8px;
+  background: rgba(94, 106, 210, 0.06) !important;
+  border-color: #c7cff5 !important;
 }
 
 .tkt__card[draggable="true"] {
@@ -30370,13 +30574,20 @@ body { background: #FAFAFA; }
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  color: #6366f1;
-  background: #eef2ff;
+  color: #5e6ad2;
+  background: #eef0ff;
   padding: 1px 6px;
-  border-radius: 10px;
+  border-radius: 4px;
   white-space: nowrap;
+  border: 1px solid #e0e4ff;
+}
+
+.tkt__label-pill--card {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tkt__label-pill button {

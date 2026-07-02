@@ -36,9 +36,16 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
+import { Tooltip } from '@/components/Tooltip';
+import { useToast } from '@/components/Toast';
 import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 import { hasLinearLink, resolveLinearTicketUrl } from '@/lib/linear-issue-url';
+import {
+  formatLinearSyncToast,
+  linearSyncHadChanges,
+  type LinearSyncResponse,
+} from '@/lib/linear-sync-toast';
 
 const LINEAR_JSON_HEADERS: HeadersInit = {
   'Content-Type': 'application/json',
@@ -179,12 +186,21 @@ const TYPE_CONFIG: Record<TicketType, { label: string; icon: typeof Bug; color: 
   epic: { label: 'Epic', icon: Layers, color: '#f59e0b' },
 };
 
+const LINEAR_SYNC_HELP = (
+  <>
+    <p className="ui-tooltip__title">Sync with Linear</p>
+    <p><strong>Click</strong> — incremental sync: pulls recent updates from Linear.</p>
+    <p><strong>Shift+click</strong> — full sync: reconciles all issues and removes tickets deleted in Linear from the board (soft-archived as canceled in CRM).</p>
+  </>
+);
+
 // ═══════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
 
 export function TicketBoard() {
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const [tickets, setTickets] = useState<TicketData[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -290,7 +306,7 @@ export function TicketBoard() {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
-  const syncLinear = useCallback(async (fullSync = false) => {
+  const syncLinear = useCallback(async (fullSync = false, options?: { quiet?: boolean }) => {
     setLinearSyncing(true);
     setLinearError(null);
     try {
@@ -300,19 +316,31 @@ export function TicketBoard() {
         body: JSON.stringify({ incremental: !fullSync }),
       });
       if (!res.ok) throw new Error(await parseLinearApiError(res, 'Sync failed'));
-      const json = await res.json();
-      if (json.error) throw new Error(typeof json.error === 'string' ? json.error : json.error.message || 'Sync failed');
+      const json = (await res.json()) as LinearSyncResponse & { error?: string | { message?: string } };
+      if (json.error) {
+        throw new Error(typeof json.error === 'string' ? json.error : json.error.message || 'Sync failed');
+      }
       await fetchTickets();
+
+      const shouldNotify = !options?.quiet || linearSyncHadChanges(json);
+      if (shouldNotify) {
+        const toast = formatLinearSyncToast(json, fullSync);
+        showToast(toast.message, toast.type);
+      }
     } catch (err: unknown) {
-      setLinearError(err instanceof Error ? err.message : 'Sync failed');
+      const message = err instanceof Error ? err.message : 'Sync failed';
+      setLinearError(message);
+      if (!options?.quiet) {
+        showToast(message, 'error', 6000);
+      }
     } finally {
       setLinearSyncing(false);
     }
-  }, [fetchTickets]);
+  }, [fetchTickets, showToast]);
 
   // Light incremental pull every 5 minutes while the board is open
   useEffect(() => {
-    const interval = setInterval(() => syncLinear(false), 5 * 60 * 1000);
+    const interval = setInterval(() => syncLinear(false, { quiet: true }), 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [syncLinear]);
 
@@ -468,21 +496,24 @@ export function TicketBoard() {
               setLoading(true);
             }}
           >
-            {tab === 'all' ? 'All Projects' : tab}
+            {tab === 'all' ? 'All Tickets' : tab}
             <span className="tkt__project-tab-count">{projectTab === tab || tab === 'all' ? projectTabCounts[tab] : '—'}</span>
           </button>
         ))}
         <div className="tkt__linear-sync">
           {linearError && <span className="tkt__linear-error">{linearError}</span>}
-          <button
-            className="tkt__linear-sync-btn"
-            onClick={e => syncLinear(e.shiftKey)}
-            disabled={linearSyncing}
-            title="Sync with Linear (incremental). Hold Shift for full sync."
-          >
-            <RefreshCw size={14} className={linearSyncing ? 'tkt__spinner' : ''} />
-            {linearSyncing ? 'Syncing...' : 'Sync with Linear'}
-          </button>
+          <Tooltip content={LINEAR_SYNC_HELP} side="bottom" align="end">
+            <button
+              type="button"
+              className="tkt__linear-sync-btn"
+              onClick={e => syncLinear(e.shiftKey)}
+              disabled={linearSyncing}
+              aria-label="Sync with Linear. Shift+click for full sync."
+              aria-busy={linearSyncing}
+            >
+              <RefreshCw size={16} className={linearSyncing ? 'tkt__spinner' : ''} />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -694,50 +725,71 @@ function LinearTicketLink({
 function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onClick: () => void; onDragStart: () => void }) {
   const TypeIcon = TYPE_CONFIG[ticket.type]?.icon || AlertCircle;
   const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+  const typeCfg = TYPE_CONFIG[ticket.type];
+  const visibleLabels = ticket.labels?.slice(0, 2) ?? [];
+  const extraLabelCount = (ticket.labels?.length ?? 0) - visibleLabels.length;
 
   return (
     <div
       className="tkt__card"
       onClick={onClick}
       draggable
+      title={ticket.title}
       onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(); }}
     >
-      <div className="tkt__card-top">
-        <span className="tkt__card-number">#{ticket.number}</span>
-        {hasLinearLink(ticket) && <LinearTicketLink ticket={ticket} className="tkt__card-external-id tkt__linear-link" />}
-        <span className="tkt__card-priority" style={{ color: priorityCfg.color }}>{priorityCfg.icon}</span>
-      </div>
-      <h4 className="tkt__card-title">{ticket.title}</h4>
-      {ticket.project && (
-        <div className="tkt__card-project">
-          <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
-            {ticket.project === 'Mobile App' ? '📱' : '🌐'} {ticket.project}
-          </span>
+      <div className="tkt__card-header">
+        <div className="tkt__card-ids">
+          {hasLinearLink(ticket) ? (
+            <LinearTicketLink ticket={ticket} className="tkt__card-id tkt__linear-link" />
+          ) : (
+            <span className="tkt__card-id">#{ticket.number}</span>
+          )}
         </div>
-      )}
-      {(ticket.labels && ticket.labels.length > 0) && (
-        <div className="tkt__labels">
-          {ticket.labels.slice(0, 3).map(l => <span key={l} className="tkt__label-pill">{l}</span>)}
-          {ticket.labels.length > 3 && <span className="tkt__label-pill tkt__label-more">+{ticket.labels.length - 3}</span>}
-        </div>
-      )}
-      <div className="tkt__card-bottom">
-        <span className="tkt__card-type" style={{ color: TYPE_CONFIG[ticket.type]?.color }}>
-          <TypeIcon size={12} /> {TYPE_CONFIG[ticket.type]?.label}
-        </span>
-        {ticket.due_date && (
-          <span className="tkt__card-due" title={`Due: ${ticket.due_date}`}>
-            <CalendarDays size={11} />
-            {new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
-        )}
         {ticket.assignee ? (
           <div className="tkt__card-assignee" title={ticket.assignee.name}>
             {ticket.assignee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
           </div>
         ) : (
-          <div className="tkt__card-assignee unassigned"><User size={12} /></div>
+          <div className="tkt__card-assignee unassigned" title="Unassigned">
+            <User size={11} />
+          </div>
         )}
+      </div>
+
+      <h4 className="tkt__card-title">{ticket.title}</h4>
+
+      <div className="tkt__card-footer">
+        <div className="tkt__card-footer-left">
+          {ticket.project && (
+            <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
+              {ticket.project === 'Mobile App' ? 'Mobile' : 'Web'}
+            </span>
+          )}
+          {visibleLabels.map(label => (
+            <span key={label} className="tkt__label-pill tkt__label-pill--card">{label}</span>
+          ))}
+          {extraLabelCount > 0 && (
+            <span className="tkt__label-pill tkt__label-pill--card tkt__label-more">+{extraLabelCount}</span>
+          )}
+        </div>
+        <div className="tkt__card-footer-right">
+          {ticket.priority !== 'none' && (
+            <span className="tkt__card-priority" style={{ color: priorityCfg.color }} title={priorityCfg.label}>
+              {priorityCfg.icon}
+            </span>
+          )}
+          {typeCfg && (
+            <span className="tkt__card-type-icon" style={{ color: typeCfg.color }} title={typeCfg.label}>
+              <TypeIcon size={12} />
+            </span>
+          )}
+          {ticket.due_date && (
+            <span className="tkt__card-due" title={`Due: ${ticket.due_date}`}>
+              <CalendarDays size={11} />
+              {new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
