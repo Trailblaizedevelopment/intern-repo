@@ -29115,109 +29115,150 @@ body { background: #FAFAFA; }
 .tkt__comments {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
+}
+
+.tkt__comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 0.15rem;
 }
 
 .tkt__comments-empty {
-  text-align: center;
-  padding: 1.5rem;
+  margin: 0;
+  padding: 0.15rem 0;
   color: #9ca3af;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .tkt__comment {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
+  gap: 0.55rem;
+  align-items: flex-start;
 }
 
 .tkt__comment-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #3b82f6;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #6366f1;
   color: white;
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
-.tkt__comment-body { flex: 1; min-width: 0; }
+.tkt__comment-body {
+  flex: 1;
+  min-width: 0;
+}
 
 .tkt__comment-header {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.2rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.15rem;
 }
 
 .tkt__comment-author {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--ws-text, #111827);
 }
 
 .tkt__comment-time {
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   color: #9ca3af;
 }
 
 .tkt__comment-text {
-  font-size: 0.82rem;
-  color: var(--ws-text, #374151);
+  font-size: 0.8rem;
+  color: var(--ws-text-secondary, #4b5563);
   line-height: 1.45;
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.tkt__comment-input {
-  display: flex;
-  gap: 0.5rem;
-  align-items: flex-end;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--ws-border, #e5e7eb);
+.tkt__comment-composer {
+  position: relative;
+  width: 100%;
+  padding: 0.22rem 0.3rem 0.22rem 0.85rem;
+  background: var(--ws-bg-secondary, #f3f4f6);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.tkt__comment-input textarea {
-  flex: 1;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--ws-border, #e5e7eb);
-  border-radius: 7px;
+.tkt__comment-composer:focus-within {
+  background: #fff;
+  border-color: var(--ws-border, #e5e7eb);
+}
+
+.tkt__comment-composer input[type="text"] {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 2.35rem 0 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   font-size: 0.8rem;
   color: var(--ws-text, #111827);
-  resize: none;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s ease;
+  box-shadow: none;
 }
 
-.tkt__comment-input textarea:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+.tkt__comment-composer input[type="text"]:focus,
+.tkt__comment-composer input[type="text"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: none;
 }
 
-.tkt__comment-input textarea::placeholder { color: #9ca3af; }
+.tkt__comment-composer input[type="text"]::placeholder {
+  color: #9ca3af;
+}
+
+.tkt__comment-composer .tkt__send-btn {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
 
 .tkt__send-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   background: var(--ws-text, #111827);
   color: white;
   border: none;
-  border-radius: 7px;
+  border-radius: 999px;
   cursor: pointer;
   flex-shrink: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
 }
-.tkt__send-btn:hover { opacity: 0.85; }
-.tkt__send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.tkt__send-btn:hover:not(:disabled) { opacity: 0.88; }
+.tkt__send-btn:disabled {
+  background: #d1d5db;
+  opacity: 1;
+  cursor: not-allowed;
+}
 
 /* Activity */
 .tkt__activity {

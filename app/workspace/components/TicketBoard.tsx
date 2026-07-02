@@ -1910,38 +1910,47 @@ function TicketDetailPanel({
 
               {activeTab === 'comments' && (
                 <div className="tkt__comments">
-                  {comments.length === 0 ? (
-                    <p className="tkt__comments-empty">No comments yet. Start the conversation.</p>
-                  ) : (
-                    comments.map(c => (
-                      <div key={c.id} className="tkt__comment">
-                        <div className="tkt__comment-avatar">
-                          {c.author?.name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
-                        </div>
-                        <div className="tkt__comment-body">
-                          <div className="tkt__comment-header">
-                            <span className="tkt__comment-author">{c.author?.name || 'Unknown'}</span>
-                            <span className="tkt__comment-time">
-                              {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              {' '}{new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                            </span>
+                  <div className="tkt__comments-list">
+                    {comments.length === 0 ? (
+                      <p className="tkt__comments-empty">No comments yet.</p>
+                    ) : (
+                      comments.map(c => (
+                        <div key={c.id} className="tkt__comment">
+                          <div className="tkt__comment-avatar">
+                            {c.author?.name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
                           </div>
-                          <p className="tkt__comment-text">{c.content}</p>
+                          <div className="tkt__comment-body">
+                            <div className="tkt__comment-header">
+                              <span className="tkt__comment-author">{c.author?.name || 'Unknown'}</span>
+                              <span className="tkt__comment-time">
+                                {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                {' · '}
+                                {new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="tkt__comment-text">{c.content}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                  <div ref={commentsEndRef} />
-                  <div className="tkt__comment-input">
-                    <textarea
-                      placeholder="Write a comment... Use @name to mention"
+                      ))
+                    )}
+                    <div ref={commentsEndRef} />
+                  </div>
+                  <div className="tkt__comment-composer">
+                    <input
+                      type="text"
+                      placeholder="Leave a comment…"
                       value={commentText}
                       onChange={e => setCommentText(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleComment(); }}
-                      rows={2}
+                      onKeyDown={e => { if (e.key === 'Enter') handleComment(); }}
                     />
-                    <button className="tkt__send-btn" onClick={handleComment} disabled={!commentText.trim() || sending}>
-                      {sending ? <Loader2 size={14} className="tkt__spinner" /> : <Send size={14} />}
+                    <button
+                      type="button"
+                      className="tkt__send-btn"
+                      onClick={handleComment}
+                      disabled={!commentText.trim() || sending}
+                      aria-label="Send comment"
+                    >
+                      {sending ? <Loader2 size={13} className="tkt__spinner" /> : <Send size={13} />}
                     </button>
                   </div>
                 </div>
