@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
       labels,
       project,
       project_id,
+      linear_project_id,
       parent_ticket_id,
       milestone_id,
       sprint,
@@ -179,6 +180,7 @@ export async function POST(request: NextRequest) {
           assigneeEmail,
           dueDate: due_date || null,
           app: appTab,
+          linearProjectId: linear_project_id || null,
           parentLinearIssueId,
           labelNames: labels || [],
         });

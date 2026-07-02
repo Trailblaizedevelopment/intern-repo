@@ -21,8 +21,10 @@ export interface CreateLinearIssueInput {
   priority?: TicketPriority;
   assigneeEmail?: string | null;
   dueDate?: string | null;
-  /** CRM App tab: Web App | Mobile App — drives Linear project assignment. */
+  /** CRM App tab: Web App | Mobile App — drives default Linear project when linearProjectId is unset. */
   app?: string | null;
+  /** Explicit Linear project UUID (overrides app-based project resolution). */
+  linearProjectId?: string | null;
   parentLinearIssueId?: string | null;
   labelNames?: string[];
   teamId?: string;
@@ -188,7 +190,9 @@ export async function createLinearIssue(
     input.assigneeEmail
       ? resolveLinearUserIdByEmail(input.assigneeEmail)
       : Promise.resolve(null),
-    resolveLinearProjectId(supabase, linearProjectName),
+    input.linearProjectId
+      ? Promise.resolve(input.linearProjectId)
+      : resolveLinearProjectId(supabase, linearProjectName),
     resolveLinearLabelIds(supabase, labelNames),
   ]);
 

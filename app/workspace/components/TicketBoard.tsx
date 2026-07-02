@@ -44,6 +44,7 @@ import { useToast } from '@/components/Toast';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
+import { getLinearMobileProjectName, mapCrmAppToLinearProjectName } from '@/lib/linear-project-map';
 import { hasLinearLink, resolveLinearTicketUrl } from '@/lib/linear-issue-url';
 import {
   formatLinearSyncToast,
@@ -753,7 +754,6 @@ export function TicketBoard() {
         <CreateTicketModal
           employees={employees}
           currentEmployee={currentEmployee}
-          projects={projects}
           tickets={tickets}
           defaultProject={projectTab !== 'all' ? projectTab : 'Web App'}
           onClose={() => setShowCreateModal(false)}
@@ -1411,10 +1411,22 @@ function DashboardView({ tickets }: { tickets: TicketData[] }) {
 // CREATE TICKET MODAL
 // ═══════════════════════════════════════════
 
+interface LinearLabelOption {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+interface LinearProjectOption {
+  id: string;
+  name: string;
+  color: string | null;
+  state: string | null;
+}
+
 function CreateTicketModal({
   employees,
   currentEmployee,
-  projects,
   tickets,
   onClose,
   onCreated,
@@ -1422,7 +1434,6 @@ function CreateTicketModal({
 }: {
   employees: Employee[];
   currentEmployee: Employee | null;
-  projects: ProjectData[];
   tickets: TicketData[];
   onClose: () => void;
   onCreated: () => void;
@@ -1434,15 +1445,83 @@ function CreateTicketModal({
   const [priority, setPriority] = useState<TicketPriority>('medium');
   const [assigneeId, setAssigneeId] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [labelsInput, setLabelsInput] = useState('');
   const [labels, setLabels] = useState<string[]>([]);
+  const [labelPicker, setLabelPicker] = useState('');
+  const [linearLabels, setLinearLabels] = useState<LinearLabelOption[]>([]);
+  const [linearProjects, setLinearProjects] = useState<LinearProjectOption[]>([]);
+  const [linearMetaLoading, setLinearMetaLoading] = useState(true);
   const [projectApp, setProjectApp] = useState<string>(defaultProject && defaultProject !== 'all' ? defaultProject : 'Web App');
-  const [projectId, setProjectId] = useState('');
+  const [linearProjectId, setLinearProjectId] = useState('');
   const [parentTicketId, setParentTicketId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [descriptionKey, setDescriptionKey] = useState(0);
   const [aiDescription, setAiDescription] = useState('');
   const [generatingSpec, setGeneratingSpec] = useState(false);
+  const [aiExpanded, setAiExpanded] = useState(false);
+  const aiPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!aiExpanded) return;
+    requestAnimationFrame(() => {
+      aiPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }, [aiExpanded]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchLinearMeta = async () => {
+      setLinearMetaLoading(true);
+      try {
+        const headers = { Authorization: INTERNAL_AUTH_HEADER };
+        const [labelsRes, projectsRes] = await Promise.all([
+          fetch('/api/linear/labels', { headers }),
+          fetch('/api/linear/projects', { headers }),
+        ]);
+        const labelsJson = await labelsRes.json();
+        const projectsJson = await projectsRes.json();
+        if (cancelled) return;
+        if (labelsJson.data) setLinearLabels(labelsJson.data);
+        if (projectsJson.data) setLinearProjects(projectsJson.data);
+      } catch (err) {
+        console.error('Error fetching Linear metadata:', err);
+      } finally {
+        if (!cancelled) setLinearMetaLoading(false);
+      }
+    };
+    void fetchLinearMeta();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (linearProjects.length === 0) return;
+    const targetName = mapCrmAppToLinearProjectName(projectApp);
+    if (!targetName) {
+      setLinearProjectId('');
+      return;
+    }
+    const mobileName = getLinearMobileProjectName().toLowerCase();
+    const match = linearProjects.find(p =>
+      p.name.toLowerCase() === targetName.toLowerCase() ||
+      (projectApp === 'Mobile App' && p.name.toLowerCase() === mobileName)
+    );
+    setLinearProjectId(match?.id ?? '');
+  }, [projectApp, linearProjects]);
+
+  const availableLabels = useMemo(
+    () => linearLabels.filter(l => !labels.includes(l.name)),
+    [linearLabels, labels]
+  );
+
+  const addLabel = (labelName: string) => {
+    if (!labelName || labels.includes(labelName)) return;
+    setLabels(prev => [...prev, labelName]);
+    setLabelPicker('');
+  };
+
+  const removeLabel = (label: string) => {
+    setLabels(prev => prev.filter(l => l !== label));
+  };
 
   const generateSpec = async () => {
     if (!aiDescription.trim()) return;
@@ -1474,24 +1553,11 @@ function CreateTicketModal({
 
   const isDescriptionEmpty = !description || description === '<p></p>' || !description.replace(/<[^>]*>/g, '').trim();
 
-  const handleLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if ((e.key === 'Enter' || e.key === ',') && labelsInput.trim()) {
-      e.preventDefault();
-      const newLabel = labelsInput.trim().replace(/,/g, '');
-      if (newLabel && !labels.includes(newLabel)) {
-        setLabels([...labels, newLabel]);
-      }
-      setLabelsInput('');
-    }
-  };
-
-  const removeLabel = (label: string) => {
-    setLabels(labels.filter(l => l !== label));
-  };
-
-  const handleSubmit = async () => {
-    if (!title.trim()) return;
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!title.trim() || creating) return;
     setCreating(true);
+    setCreateError(null);
     try {
       const res = await fetch('/api/tickets', {
         method: 'POST',
@@ -1506,157 +1572,210 @@ function CreateTicketModal({
           due_date: dueDate || null,
           labels,
           project: projectApp || 'Web App',
-          project_id: projectId || null,
+          linear_project_id: linearProjectId || null,
           parent_ticket_id: parentTicketId || null,
           create_in_linear: true,
         }),
       });
       const result = await res.json();
       if (result.error) {
-        alert(result.error.message);
+        setCreateError(result.error.message || 'Failed to create ticket');
         return;
       }
       onCreated();
     } catch (err) {
       console.error('Error creating ticket:', err);
+      setCreateError(err instanceof Error ? err.message : 'Failed to create ticket');
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <ModalOverlay className="tkt__overlay" onClose={onClose}>
-      <div className="tkt__modal" onClick={e => e.stopPropagation()}>
+    <ModalOverlay className="tkt__overlay tkt__overlay--modal" onClose={onClose}>
+      <div className="tkt__modal tkt__modal--create" onClick={e => e.stopPropagation()}>
         <div className="tkt__modal-header">
           <h2>New Ticket</h2>
-          <button onClick={onClose}><X size={18} /></button>
+          <button type="button" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
-        <div className="tkt__modal-body">
-          {/* AI Spec Generation */}
-          <div className="tkt__field tkt__ai-spec-field">
-            <label>Describe in plain English <span style={{ color: '#8b5cf6', fontWeight: 400 }}>(optional)</span></label>
-            <textarea
-              placeholder="e.g. The login button doesn't work on mobile Safari when the keyboard is open..."
-              value={aiDescription}
-              onChange={e => setAiDescription(e.target.value)}
-              rows={2}
-              style={{ width: '100%', resize: 'vertical' }}
-            />
-            <button
-              type="button"
-              className="tkt__generate-spec-btn"
-              onClick={generateSpec}
-              disabled={!aiDescription.trim() || generatingSpec}
-            >
-              {generatingSpec ? <Loader2 size={13} className="tkt__spinner" /> : <Sparkles size={13} />}
-              {generatingSpec ? 'Generating...' : 'Generate Spec ✨'}
-            </button>
-          </div>
-          <div className="tkt__field">
-            <label>Title *</label>
-            <input type="text" placeholder="Brief summary..." value={title} onChange={e => setTitle(e.target.value)} autoFocus />
-          </div>
-          <div className="tkt__field">
-            <label>Description</label>
-            <RichTextEditor key={descriptionKey} content={description} onChange={setDescription} placeholder="Steps to reproduce, expected behavior..." />
-          </div>
-          <div className="tkt__field">
-            <label>App</label>
-            <div className="tkt__project-tab-select">
-              {(['Web App', 'Mobile App'] as const).map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  className={`tkt__project-tab-btn ${projectApp === p ? 'active' : ''}`}
-                  onClick={() => setProjectApp(p)}
-                >
-                  {p === 'Mobile App' ? '📱' : '🌐'} {p}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="tkt__field-row">
+        <form className="tkt__modal-form" onSubmit={handleSubmit}>
+          <div className="tkt__modal-body">
             <div className="tkt__field">
-              <label>Type</label>
-              <select value={type} onChange={e => setType(e.target.value as TicketType)}>
-                {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-              </select>
-            </div>
-            <div className="tkt__field">
-              <label>Priority</label>
-              <select value={priority} onChange={e => setPriority(e.target.value as TicketPriority)}>
-                <option value="none">None</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-            <div className="tkt__field">
-              <label>Assign to</label>
-              <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
-                <option value="">Unassigned</option>
-                {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="tkt__field-row">
-            <div className="tkt__field">
-              <label>Due Date</label>
-              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
-            </div>
-            <div className="tkt__field">
-              <label>Project</label>
-              <select value={projectId} onChange={e => setProjectId(e.target.value)}>
-                <option value="">None</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div className="tkt__field">
-              <label>Parent Ticket</label>
-              <select value={parentTicketId} onChange={e => setParentTicketId(e.target.value)}>
-                <option value="">None</option>
-                {tickets.filter(t => t.type === 'epic' || t.type === 'feature_request').map(t => (
-                  <option key={t.id} value={t.id}>#{t.number} {t.title.substring(0, 40)}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="tkt__field">
-            <label>Labels</label>
-            <div className="tkt__labels-input">
-              {labels.map(l => (
-                <span key={l} className="tkt__label-pill">
-                  {l}
-                  <button onClick={() => removeLabel(l)}><X size={10} /></button>
-                </span>
-              ))}
+              <label htmlFor="create-ticket-title">Title *</label>
               <input
+                id="create-ticket-title"
                 type="text"
-                placeholder="Type and press Enter..."
-                value={labelsInput}
-                onChange={e => setLabelsInput(e.target.value)}
-                onKeyDown={handleLabelKeyDown}
+                placeholder="Brief summary..."
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                autoFocus
               />
             </div>
+            <div className="tkt__field">
+              <label>App</label>
+              <div className="tkt__project-tab-select">
+                {(['Web App', 'Mobile App'] as const).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`tkt__project-tab-btn ${projectApp === p ? 'active' : ''}`}
+                    onClick={() => setProjectApp(p)}
+                  >
+                    {p === 'Mobile App' ? '📱' : '🌐'} {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="tkt__field-row tkt__field-row--compact">
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-type">Type</label>
+                <select id="create-ticket-type" value={type} onChange={e => setType(e.target.value as TicketType)}>
+                  {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-priority">Priority</label>
+                <select id="create-ticket-priority" value={priority} onChange={e => setPriority(e.target.value as TicketPriority)}>
+                  <option value="none">None</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-assignee">Assign to</label>
+                <select id="create-ticket-assignee" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
+                  <option value="">Unassigned</option>
+                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="tkt__field tkt__field--rte">
+              <label>Description</label>
+              <RichTextEditor key={descriptionKey} content={description} onChange={setDescription} placeholder="Steps to reproduce, expected behavior..." />
+            </div>
+            <div className="tkt__field-row tkt__field-row--compact">
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-due">Due Date</label>
+                <input id="create-ticket-due" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+              </div>
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-linear-project">Linear Project</label>
+                <select
+                  id="create-ticket-linear-project"
+                  value={linearProjectId}
+                  onChange={e => setLinearProjectId(e.target.value)}
+                  disabled={linearMetaLoading}
+                >
+                  <option value="">{linearMetaLoading ? 'Loading projects…' : 'None'}</option>
+                  {linearProjects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {!linearMetaLoading && linearProjects.length === 0 && (
+                  <span className="tkt__field-hint">No Linear projects synced. Run Sync with Linear first.</span>
+                )}
+              </div>
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-parent">Parent Ticket</label>
+                <select id="create-ticket-parent" value={parentTicketId} onChange={e => setParentTicketId(e.target.value)}>
+                  <option value="">None</option>
+                  {tickets.filter(t => t.type === 'epic' || t.type === 'feature_request').map(t => (
+                    <option key={t.id} value={t.id}>#{t.number} {t.title.substring(0, 40)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="tkt__field">
+              <label htmlFor="create-ticket-labels">Labels</label>
+              {linearMetaLoading ? (
+                <p className="tkt__props-labels-empty">Loading Linear labels…</p>
+              ) : linearLabels.length === 0 ? (
+                <p className="tkt__props-labels-empty">No Linear labels synced yet. Run Sync with Linear first.</p>
+              ) : (
+                <>
+                  <select
+                    id="create-ticket-labels"
+                    value={labelPicker}
+                    onChange={e => addLabel(e.target.value)}
+                    disabled={availableLabels.length === 0}
+                  >
+                    <option value="">
+                      {availableLabels.length === 0 ? 'All labels selected' : 'Add label…'}
+                    </option>
+                    {availableLabels.map(label => (
+                      <option key={label.id} value={label.name}>{label.name}</option>
+                    ))}
+                  </select>
+                  {labels.length > 0 && (
+                    <div className="tkt__create-labels-selected">
+                      {labels.map(name => {
+                        const meta = linearLabels.find(l => l.name === name);
+                        return (
+                          <span key={name} className="tkt__label-pill">
+                            <span
+                              className="tkt__props-label-dot"
+                              style={{ backgroundColor: meta?.color || '#9ca3af' }}
+                            />
+                            {name}
+                            <button type="button" onClick={() => removeLabel(name)} aria-label={`Remove label ${name}`}>
+                              <X size={10} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="tkt__ai-spec-panel" ref={aiPanelRef}>
+              <button
+                type="button"
+                className="tkt__ai-spec-toggle"
+                onClick={() => setAiExpanded(open => !open)}
+                aria-expanded={aiExpanded}
+              >
+                <Sparkles size={14} />
+                <span>Generate from plain English (optional)</span>
+                <ChevronDown size={16} className={aiExpanded ? 'tkt__ai-spec-chevron--open' : undefined} />
+              </button>
+              {aiExpanded && (
+                <div className="tkt__ai-spec-body">
+                  <textarea
+                    placeholder="e.g. The login button doesn't work on mobile Safari when the keyboard is open..."
+                    value={aiDescription}
+                    onChange={e => setAiDescription(e.target.value)}
+                    rows={2}
+                  />
+                  <button
+                    type="button"
+                    className="tkt__generate-spec-btn"
+                    onClick={generateSpec}
+                    disabled={!aiDescription.trim() || generatingSpec}
+                  >
+                    {generatingSpec ? <Loader2 size={13} className="tkt__spinner" /> : <Sparkles size={13} />}
+                    {generatingSpec ? 'Generating...' : 'Generate Spec'}
+                  </button>
+                </div>
+              )}
+            </div>
+            {createError && (
+              <p className="tkt__modal-error" role="alert">{createError}</p>
+            )}
           </div>
-        </div>
-        <div className="tkt__modal-footer">
-          <button className="tkt__btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="tkt__btn-primary" onClick={handleSubmit} disabled={!title.trim() || creating}>
-            {creating ? <Loader2 size={14} className="tkt__spinner" /> : <Plus size={14} />}
-            {creating ? 'Creating in Linear...' : 'Create Ticket'}
-          </button>
-        </div>
+          <div className="tkt__modal-footer">
+            <button type="button" className="tkt__btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="tkt__btn-primary" disabled={!title.trim() || creating}>
+              {creating ? <Loader2 size={14} className="tkt__spinner" /> : <Plus size={14} />}
+              {creating ? 'Creating in Linear...' : 'Create Ticket'}
+            </button>
+          </div>
+        </form>
       </div>
     </ModalOverlay>
   );
-}
-
-interface LinearLabelOption {
-  id: string;
-  name: string;
-  color: string | null;
 }
 
 // ═══════════════════════════════════════════
