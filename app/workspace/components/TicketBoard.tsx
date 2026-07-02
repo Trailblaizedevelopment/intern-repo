@@ -28,6 +28,9 @@ import {
   Trash2,
   SlidersHorizontal,
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
@@ -802,9 +805,11 @@ async function handleStatusChange(
 function LinearTicketLink({
   ticket,
   className = 'tkt__linear-link',
+  showIcon = true,
 }: {
   ticket: Pick<TicketData, 'linear_url' | 'linear_identifier' | 'external_id'>;
   className?: string;
+  showIcon?: boolean;
 }) {
   const url = resolveLinearTicketUrl(ticket);
   const label = ticket.linear_identifier;
@@ -820,7 +825,7 @@ function LinearTicketLink({
       onClick={e => e.stopPropagation()}
     >
       {label}
-      <ExternalLink size={10} />
+      {showIcon && <ExternalLink size={10} />}
     </a>
   );
 }
@@ -922,6 +927,46 @@ type SortDir = 'asc' | 'desc' | null;
 
 const PRIORITY_ORDER: Record<TicketPriority, number> = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
 
+function ListSortHeader({
+  field,
+  label,
+  sortField,
+  sortDir,
+  onSort,
+  className = '',
+}: {
+  field: SortField;
+  label: string;
+  sortField: SortField | null;
+  sortDir: SortDir;
+  onSort: (field: SortField) => void;
+  className?: string;
+}) {
+  const active = sortField === field;
+  const SortIcon = !active || !sortDir
+    ? ArrowUpDown
+    : sortDir === 'asc'
+      ? ArrowUp
+      : ArrowDown;
+
+  return (
+    <span
+      className={`tkt__list-col tkt__sort-header ${className} ${active ? 'tkt__sort-header--active' : ''}`.trim()}
+      onClick={() => onSort(field)}
+      role="columnheader"
+      aria-sort={active && sortDir ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      title={active && sortDir ? `Sorted ${sortDir === 'asc' ? 'ascending' : 'descending'}` : 'Sort column'}
+    >
+      <span>{label}</span>
+      <SortIcon
+        size={12}
+        className={`tkt__sort-icon ${active && sortDir ? 'tkt__sort-icon--active' : 'tkt__sort-icon--neutral'}`}
+        aria-hidden
+      />
+    </span>
+  );
+}
+
 function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
@@ -935,11 +980,6 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
       setSortField(field);
       setSortDir('asc');
     }
-  };
-
-  const sortIndicator = (field: SortField) => {
-    if (sortField !== field) return '';
-    return sortDir === 'asc' ? ' ▲' : sortDir === 'desc' ? ' ▼' : '';
   };
 
   const sorted = useMemo(() => {
@@ -969,15 +1009,15 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
   return (
     <div className="tkt__list">
       <div className="tkt__list-header-row">
-        <span className="tkt__list-col tkt__list-col--id tkt__sort-header" onClick={() => toggleSort('number')}>#{sortIndicator('number')}</span>
-        <span className="tkt__list-col tkt__list-col--title tkt__sort-header" onClick={() => toggleSort('title')}>Title{sortIndicator('title')}</span>
+        <ListSortHeader field="number" label="#" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--id" />
+        <ListSortHeader field="title" label="Title" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--title" />
         <span className="tkt__list-col tkt__list-col--project">Project</span>
-        <span className="tkt__list-col tkt__list-col--status tkt__sort-header" onClick={() => toggleSort('status')}>Status{sortIndicator('status')}</span>
-        <span className="tkt__list-col tkt__list-col--priority tkt__sort-header" onClick={() => toggleSort('priority')}>Priority{sortIndicator('priority')}</span>
-        <span className="tkt__list-col tkt__list-col--type tkt__sort-header" onClick={() => toggleSort('type')}>Type{sortIndicator('type')}</span>
-        <span className="tkt__list-col tkt__list-col--assignee tkt__sort-header" onClick={() => toggleSort('assignee')}>Assignee{sortIndicator('assignee')}</span>
-        <span className="tkt__list-col tkt__list-col--date tkt__sort-header" onClick={() => toggleSort('due_date')}>Due{sortIndicator('due_date')}</span>
-        <span className="tkt__list-col tkt__list-col--date tkt__sort-header" onClick={() => toggleSort('created_at')}>Created{sortIndicator('created_at')}</span>
+        <ListSortHeader field="status" label="Status" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--status" />
+        <ListSortHeader field="priority" label="Priority" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--priority" />
+        <ListSortHeader field="type" label="Type" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--type" />
+        <ListSortHeader field="assignee" label="Assignee" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--assignee" />
+        <ListSortHeader field="due_date" label="Due" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--date" />
+        <ListSortHeader field="created_at" label="Created" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--date" />
       </div>
       {sorted.length === 0 ? (
         <div className="tkt__list-empty">No tickets found</div>
@@ -987,12 +1027,18 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
           const typeCfg = TYPE_CONFIG[ticket.type];
           return (
             <div key={ticket.id} className="tkt__list-row" onClick={() => onTicketClick(ticket)}>
-              <span className="tkt__list-col tkt__list-col--id">
-                {ticket.number}
-                {hasLinearLink(ticket) && <LinearTicketLink ticket={ticket} className="tkt__external-id tkt__linear-link" />}
-              </span>
-              <span className="tkt__list-col tkt__list-col--title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {ticket.title}
+              <span className="tkt__list-col tkt__list-col--id">{ticket.number}</span>
+              <span className="tkt__list-col tkt__list-col--title">
+                <span className="tkt__list-title-cell">
+                  {hasLinearLink(ticket) && (
+                    <LinearTicketLink
+                      ticket={ticket}
+                      className="tkt__list-linear-key tkt__linear-link"
+                      showIcon={false}
+                    />
+                  )}
+                  <span className="tkt__list-title-text" title={ticket.title}>{ticket.title}</span>
+                </span>
               </span>
               <span className="tkt__list-col tkt__list-col--project">
                 {ticket.project && (
