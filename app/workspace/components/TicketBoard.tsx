@@ -26,6 +26,8 @@ import {
   RefreshCw,
   ExternalLink,
   Trash2,
+  SlidersHorizontal,
+  ArrowLeft,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
@@ -34,7 +36,8 @@ import { Dropdown } from '@/components/Dropdown';
 import { Tooltip } from '@/components/Tooltip';
 import { HorizontalScrollNav } from '@/components/HorizontalScrollNav';
 import { useToast } from '@/components/Toast';
-import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
+import { RichTextEditor } from '@/components/RichTextEditor';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
 import { hasLinearLink, resolveLinearTicketUrl } from '@/lib/linear-issue-url';
 import {
@@ -758,6 +761,7 @@ export function TicketBoard() {
           allTickets={tickets}
           onClose={() => setSelectedTicket(null)}
           onUpdate={() => { fetchTickets(); fetchNotifications(); }}
+          onTicketChange={setSelectedTicket}
         />
       )}
     </div>
@@ -1444,6 +1448,159 @@ function CreateTicketModal({
   );
 }
 
+interface LinearLabelOption {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+// ═══════════════════════════════════════════
+// TICKET PROPERTIES WIZARD
+// ═══════════════════════════════════════════
+
+interface TicketPropertiesWizardProps {
+  ticket: TicketData;
+  employees: Employee[];
+  projects: ProjectData[];
+  linearLabels: LinearLabelOption[];
+  labelsLoading: boolean;
+  editLabels: string[];
+  updating: boolean;
+  onFieldUpdate: (field: string, value: unknown) => void;
+  onToggleLabel: (label: string) => void;
+  onDone: () => void;
+}
+
+function TicketPropertiesWizard({
+  ticket,
+  employees,
+  projects,
+  linearLabels,
+  labelsLoading,
+  editLabels,
+  updating,
+  onFieldUpdate,
+  onToggleLabel,
+  onDone,
+}: TicketPropertiesWizardProps) {
+  const typeCfg = TYPE_CONFIG[ticket.type];
+  const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+
+  return (
+    <div className="tkt__props-wizard">
+      <div className="tkt__props-wizard-intro">
+        <h3>Ticket properties</h3>
+        <p>Update fields synced with your board. Labels come from Linear only.</p>
+      </div>
+
+      <div className="tkt__props-wizard-grid">
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-status">Status</label>
+          <select id="tkt-prop-status" value={ticket.status} onChange={e => onFieldUpdate('status', e.target.value)} disabled={updating}>
+            {STATUS_COLUMNS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-priority">Priority</label>
+          <select id="tkt-prop-priority" value={ticket.priority} onChange={e => onFieldUpdate('priority', e.target.value)} disabled={updating}>
+            <option value="none">None</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+          <span className="tkt__props-hint">
+            <span className="tkt__priority-dot" style={{ backgroundColor: priorityCfg.color }} />
+            {priorityCfg.label}
+          </span>
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-type">Type</label>
+          <select id="tkt-prop-type" value={ticket.type} onChange={e => onFieldUpdate('type', e.target.value)} disabled={updating}>
+            {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          {typeCfg && (
+            <span className="tkt__props-hint">
+              <span className="tkt__type-dot" style={{ backgroundColor: typeCfg.color }} />
+              {typeCfg.label}
+            </span>
+          )}
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-assignee">Assignee</label>
+          <select id="tkt-prop-assignee" value={ticket.assignee_id || ''} onChange={e => onFieldUpdate('assignee_id', e.target.value || null)} disabled={updating}>
+            <option value="">Unassigned</option>
+            {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+          </select>
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-reviewer">Reviewer</label>
+          <select id="tkt-prop-reviewer" value={ticket.reviewer_id || ''} onChange={e => onFieldUpdate('reviewer_id', e.target.value || null)} disabled={updating}>
+            <option value="">None</option>
+            {employees.filter(emp => emp.id !== ticket.assignee_id).map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+          </select>
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-due">Due date</label>
+          <input id="tkt-prop-due" type="date" value={ticket.due_date || ''} onChange={e => onFieldUpdate('due_date', e.target.value || null)} disabled={updating} />
+        </div>
+
+        <div className="tkt__props-field tkt__props-field--full">
+          <label htmlFor="tkt-prop-project">Project</label>
+          <select id="tkt-prop-project" value={ticket.project_id || ''} onChange={e => onFieldUpdate('project_id', e.target.value || null)} disabled={updating}>
+            <option value="">None</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+
+        <div className="tkt__props-field tkt__props-field--full">
+          <label>Labels</label>
+          {labelsLoading ? (
+            <p className="tkt__props-labels-empty">Loading Linear labels…</p>
+          ) : linearLabels.length === 0 ? (
+            <p className="tkt__props-labels-empty">No Linear labels synced yet. Run Sync with Linear first.</p>
+          ) : (
+            <div className="tkt__props-labels">
+              {linearLabels.map(label => {
+                const selected = editLabels.includes(label.name);
+                return (
+                  <button
+                    key={label.id}
+                    type="button"
+                    className={`tkt__props-label-btn ${selected ? 'selected' : ''}`}
+                    onClick={() => onToggleLabel(label.name)}
+                    disabled={updating}
+                  >
+                    <span className="tkt__props-label-dot" style={{ backgroundColor: label.color || '#9ca3af' }} />
+                    {label.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="tkt__props-readonly">
+        <div><span>Creator</span><strong>{ticket.creator?.name || 'Unknown'}</strong></div>
+        <div><span>Created</span><strong>{new Date(ticket.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>
+        {ticket.resolved_at && (
+          <div><span>Resolved</span><strong>{new Date(ticket.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>
+        )}
+      </div>
+
+      <div className="tkt__props-wizard-footer">
+        <button type="button" className="tkt__props-done-btn" onClick={onDone}>Done</button>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════
 // TICKET DETAIL PANEL
 // ═══════════════════════════════════════════
@@ -1456,6 +1613,7 @@ function TicketDetailPanel({
   allTickets,
   onClose,
   onUpdate,
+  onTicketChange,
 }: {
   ticket: TicketData;
   employees: Employee[];
@@ -1464,8 +1622,10 @@ function TicketDetailPanel({
   allTickets: TicketData[];
   onClose: () => void;
   onUpdate: () => void;
+  onTicketChange: (ticket: TicketData) => void;
 }) {
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
+  const [detailView, setDetailView] = useState<'content' | 'properties'>('content');
   const [comments, setComments] = useState<TicketComment[]>([]);
   const [activity, setActivity] = useState<TicketActivityEntry[]>([]);
   const [commentText, setCommentText] = useState('');
@@ -1474,9 +1634,9 @@ function TicketDetailPanel({
   const [deleting, setDeleting] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
-  // Labels editing
   const [editLabels, setEditLabels] = useState<string[]>(ticket.labels || []);
-  const [labelInput, setLabelInput] = useState('');
+  const [linearLabels, setLinearLabels] = useState<LinearLabelOption[]>([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
 
   const subTickets = allTickets.filter(t => t.parent_ticket_id === ticket.id);
   const parentTicket = ticket.parent_ticket_id ? allTickets.find(t => t.id === ticket.parent_ticket_id) : null;
@@ -1500,6 +1660,26 @@ function TicketDetailPanel({
   useEffect(() => { fetchComments(); fetchActivity(); }, [fetchComments, fetchActivity]);
   useEffect(() => { commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [comments]);
   useEffect(() => { setEditLabels(ticket.labels || []); }, [ticket.labels]);
+  useEffect(() => { setDetailView('content'); }, [ticket.id]);
+
+  const fetchLinearLabels = useCallback(async () => {
+    setLabelsLoading(true);
+    try {
+      const res = await fetch('/api/linear/labels', {
+        headers: { Authorization: INTERNAL_AUTH_HEADER },
+      });
+      const { data } = await res.json();
+      if (data) setLinearLabels(data);
+    } catch (err) {
+      console.error('Error fetching Linear labels:', err);
+    } finally {
+      setLabelsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (detailView === 'properties') void fetchLinearLabels();
+  }, [detailView, fetchLinearLabels]);
 
   const parseMentions = (text: string): string[] => {
     const mentioned: string[] = [];
@@ -1562,43 +1742,65 @@ function TicketDetailPanel({
       });
       const result = await res.json();
       if (result.error) alert(result.error.message);
-      else { onUpdate(); fetchActivity(); }
+      else {
+        if (result.data) onTicketChange(result.data);
+        onUpdate();
+        fetchActivity();
+      }
     } catch (err) { console.error('Error updating ticket:', err); }
     finally { setUpdating(false); }
   };
 
-  const handleLabelAdd = () => {
-    const val = labelInput.trim();
-    if (val && !editLabels.includes(val)) {
-      const newLabels = [...editLabels, val];
-      setEditLabels(newLabels);
-      setLabelInput('');
-      handleFieldUpdate('labels', newLabels);
-    }
-  };
-
-  const handleLabelRemove = (label: string) => {
-    const newLabels = editLabels.filter(l => l !== label);
+  const handleLabelToggle = (label: string) => {
+    const newLabels = editLabels.includes(label)
+      ? editLabels.filter(l => l !== label)
+      : [...editLabels, label];
     setEditLabels(newLabels);
     handleFieldUpdate('labels', newLabels);
   };
 
+  const handleDescriptionSave = async (description: string) => {
+    await handleFieldUpdate('description', description);
+  };
+
   const statusCol = STATUS_COLUMNS.find(s => s.key === ticket.status);
   const typeCfg = TYPE_CONFIG[ticket.type];
+  const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+  const assigneeName = ticket.assignee?.name || 'Unassigned';
 
   return (
     <ModalOverlay className="tkt__overlay" onClose={onClose}>
       <div className="tkt__detail" onClick={e => e.stopPropagation()}>
         <div className="tkt__detail-header">
           <div className="tkt__detail-header-left">
-            <span className="tkt__detail-number">#{ticket.number}</span>
-            {hasLinearLink(ticket) && (
-              <LinearTicketLink ticket={ticket} className="tkt__detail-external-id tkt__linear-link" />
+            {detailView === 'properties' ? (
+              <button type="button" className="tkt__detail-back" onClick={() => setDetailView('content')}>
+                <ArrowLeft size={16} />
+                Back
+              </button>
+            ) : (
+              <>
+                <span className="tkt__detail-number">#{ticket.number}</span>
+                {hasLinearLink(ticket) && (
+                  <LinearTicketLink ticket={ticket} className="tkt__detail-external-id tkt__linear-link" />
+                )}
+                <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
+              </>
             )}
-            <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {isCreatorOrAdmin && (
+            {detailView === 'content' && (
+              <button
+                type="button"
+                className="tkt__detail-props-btn"
+                onClick={() => setDetailView('properties')}
+                aria-label="Edit ticket properties"
+              >
+                <SlidersHorizontal size={15} />
+                Properties
+              </button>
+            )}
+            {isCreatorOrAdmin && detailView === 'content' && (
               <button
                 onClick={handleDelete}
                 disabled={deleting}
@@ -1613,199 +1815,160 @@ function TicketDetailPanel({
         </div>
 
         <div className="tkt__detail-body">
-          <h2 className="tkt__detail-title">{ticket.title}</h2>
-          {ticket.description && <div className="tkt__detail-desc"><RichTextDisplay content={ticket.description} /></div>}
+          {detailView === 'properties' ? (
+            <TicketPropertiesWizard
+              ticket={ticket}
+              employees={employees}
+              projects={projects}
+              linearLabels={linearLabels}
+              labelsLoading={labelsLoading}
+              editLabels={editLabels}
+              updating={updating}
+              onFieldUpdate={handleFieldUpdate}
+              onToggleLabel={handleLabelToggle}
+              onDone={() => setDetailView('content')}
+            />
+          ) : (
+            <>
+              <h2 className="tkt__detail-title">{ticket.title}</h2>
 
-          {/* Parent ticket link */}
-          {parentTicket && (
-            <div className="tkt__detail-parent">
-              <Link2 size={12} /> Parent: <strong>#{parentTicket.number}</strong> {parentTicket.title}
-            </div>
-          )}
-
-          <div className="tkt__detail-meta">
-            <div className="tkt__meta-row">
-              <label>Status</label>
-              <select value={ticket.status} onChange={e => handleFieldUpdate('status', e.target.value)} disabled={updating}>
-                {STATUS_COLUMNS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Priority</label>
-              <select value={ticket.priority} onChange={e => handleFieldUpdate('priority', e.target.value)} disabled={updating}>
-                <option value="none">None</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Type</label>
-              <span className="tkt__list-type">
-                {typeCfg && <span className="tkt__type-dot" style={{ backgroundColor: typeCfg.color }} />}
-                {typeCfg?.label || ticket.type}
-              </span>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Assignee</label>
-              <select value={ticket.assignee_id || ''} onChange={e => handleFieldUpdate('assignee_id', e.target.value || null)} disabled={updating}>
-                <option value="">Unassigned</option>
-                {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Reviewer</label>
-              <select value={ticket.reviewer_id || ''} onChange={e => handleFieldUpdate('reviewer_id', e.target.value || null)} disabled={updating}>
-                <option value="">None</option>
-                {employees.filter(emp => emp.id !== ticket.assignee_id).map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Due Date</label>
-              <input type="date" value={ticket.due_date || ''} onChange={e => handleFieldUpdate('due_date', e.target.value || null)} disabled={updating} />
-            </div>
-            <div className="tkt__meta-row">
-              <label>Project</label>
-              <select value={ticket.project_id || ''} onChange={e => handleFieldUpdate('project_id', e.target.value || null)} disabled={updating}>
-                <option value="">None</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Creator</label>
-              <span>{ticket.creator?.name || 'Unknown'}</span>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Created</label>
-              <span>{new Date(ticket.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-            </div>
-            {ticket.resolved_at && (
-              <div className="tkt__meta-row">
-                <label>Resolved</label>
-                <span>{new Date(ticket.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Labels */}
-          <div className="tkt__detail-section">
-            <label>Labels</label>
-            <div className="tkt__labels-input">
-              {editLabels.map(l => (
-                <span key={l} className="tkt__label-pill">
-                  {l}
-                  <button onClick={() => handleLabelRemove(l)}><X size={10} /></button>
+              <div className="tkt__detail-summary">
+                <span className="tkt__detail-summary-item">
+                  <span className="tkt__priority-dot" style={{ backgroundColor: priorityCfg.color }} />
+                  {priorityCfg.label}
                 </span>
-              ))}
-              <input
-                type="text"
-                placeholder="Add label..."
-                value={labelInput}
-                onChange={e => setLabelInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLabelAdd(); } }}
-              />
-            </div>
-          </div>
-
-          {/* Sub-tickets */}
-          {subTickets.length > 0 && (
-            <div className="tkt__detail-section">
-              <label>Sub-tickets ({subTickets.length})</label>
-              <div className="tkt__subtasks">
-                {subTickets.map(st => {
-                  const stStatus = STATUS_COLUMNS.find(s => s.key === st.status);
-                  return (
-                    <div key={st.id} className="tkt__subtask-item">
-                      <span className="tkt__subtask-num">#{st.number}</span>
-                      <span className="tkt__subtask-title">{st.title}</span>
-                      <span className="tkt__status-pill" style={{ color: stStatus?.color, background: `${stStatus?.color}15`, fontSize: '0.65rem' }}>{stStatus?.label}</span>
-                    </div>
-                  );
-                })}
+                {typeCfg && (
+                  <span className="tkt__detail-summary-item">
+                    <span className="tkt__type-dot" style={{ backgroundColor: typeCfg.color }} />
+                    {typeCfg.label}
+                  </span>
+                )}
+                <span className="tkt__detail-summary-item">{assigneeName}</span>
+                {ticket.project && (
+                  <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
+                    {ticket.project === 'Mobile App' ? 'Mobile' : 'Web'}
+                  </span>
+                )}
+                {editLabels.slice(0, 3).map(label => (
+                  <span key={label} className="tkt__label-pill tkt__label-pill--sm">{label}</span>
+                ))}
+                {editLabels.length > 3 && (
+                  <span className="tkt__label-pill tkt__label-pill--sm tkt__label-more">+{editLabels.length - 3}</span>
+                )}
               </div>
-            </div>
-          )}
 
-          {/* QA Gate */}
-          {ticket.status === 'testing' && (
-            <div className="tkt__qa-gate">
-              <AlertTriangle size={14} />
-              <span>QA Gate: A reviewer (different from assignee) must verify before marking Done.
-                {!ticket.reviewer_id && ' Assign a reviewer above.'}
-              </span>
-            </div>
-          )}
-
-          {/* Tabs */}
-          <div className="tkt__tabs">
-            <button className={activeTab === 'comments' ? 'active' : ''} onClick={() => setActiveTab('comments')}>
-              <MessageSquare size={14} /> Comments ({comments.length})
-            </button>
-            <button className={activeTab === 'activity' ? 'active' : ''} onClick={() => setActiveTab('activity')}>
-              <Activity size={14} /> Activity ({activity.length})
-            </button>
-          </div>
-
-          {activeTab === 'comments' && (
-            <div className="tkt__comments">
-              {comments.length === 0 ? (
-                <p className="tkt__comments-empty">No comments yet. Start the conversation.</p>
-              ) : (
-                comments.map(c => (
-                  <div key={c.id} className="tkt__comment">
-                    <div className="tkt__comment-avatar">
-                      {c.author?.name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
-                    </div>
-                    <div className="tkt__comment-body">
-                      <div className="tkt__comment-header">
-                        <span className="tkt__comment-author">{c.author?.name || 'Unknown'}</span>
-                        <span className="tkt__comment-time">
-                          {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          {' '}{new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <p className="tkt__comment-text">{c.content}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-              <div ref={commentsEndRef} />
-              <div className="tkt__comment-input">
-                <textarea
-                  placeholder="Write a comment... Use @name to mention"
-                  value={commentText}
-                  onChange={e => setCommentText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleComment(); }}
-                  rows={2}
+              <div className="tkt__detail-desc">
+                <label className="tkt__detail-section-label">Description</label>
+                <MarkdownEditor
+                  value={ticket.description || ''}
+                  onSave={handleDescriptionSave}
+                  placeholder="Add a description… Supports **markdown**, lists, and code blocks."
                 />
-                <button className="tkt__send-btn" onClick={handleComment} disabled={!commentText.trim() || sending}>
-                  {sending ? <Loader2 size={14} className="tkt__spinner" /> : <Send size={14} />}
+              </div>
+
+              {parentTicket && (
+                <div className="tkt__detail-parent">
+                  <Link2 size={12} /> Parent: <strong>#{parentTicket.number}</strong> {parentTicket.title}
+                </div>
+              )}
+
+              {subTickets.length > 0 && (
+                <div className="tkt__detail-section">
+                  <label>Sub-tickets ({subTickets.length})</label>
+                  <div className="tkt__subtasks">
+                    {subTickets.map(st => {
+                      const stStatus = STATUS_COLUMNS.find(s => s.key === st.status);
+                      return (
+                        <div key={st.id} className="tkt__subtask-item">
+                          <span className="tkt__subtask-num">#{st.number}</span>
+                          <span className="tkt__subtask-title">{st.title}</span>
+                          <span className="tkt__status-pill" style={{ color: stStatus?.color, background: `${stStatus?.color}15`, fontSize: '0.65rem' }}>{stStatus?.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {ticket.status === 'testing' && (
+                <div className="tkt__qa-gate">
+                  <AlertTriangle size={14} />
+                  <span>QA Gate: A reviewer (different from assignee) must verify before marking Done.
+                    {!ticket.reviewer_id && ' Assign a reviewer in Properties.'}
+                  </span>
+                </div>
+              )}
+
+              <div className="tkt__tabs">
+                <button className={activeTab === 'comments' ? 'active' : ''} onClick={() => setActiveTab('comments')}>
+                  <MessageSquare size={14} /> Comments ({comments.length})
+                </button>
+                <button className={activeTab === 'activity' ? 'active' : ''} onClick={() => setActiveTab('activity')}>
+                  <Activity size={14} /> Activity ({activity.length})
                 </button>
               </div>
-            </div>
-          )}
 
-          {activeTab === 'activity' && (
-            <div className="tkt__activity">
-              {activity.length === 0 ? (
-                <p className="tkt__activity-empty">No activity recorded yet.</p>
-              ) : (
-                activity.map(a => (
-                  <div key={a.id} className="tkt__activity-item">
-                    <div className="tkt__activity-dot" />
-                    <div className="tkt__activity-content">
-                      <span className="tkt__activity-actor">{a.actor?.name || 'System'}</span>{' '}
-                      <span className="tkt__activity-action">{formatActivityAction(a)}</span>
-                      <span className="tkt__activity-time">
-                        {new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        {' '}{new Date(a.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                      </span>
-                    </div>
+              {activeTab === 'comments' && (
+                <div className="tkt__comments">
+                  {comments.length === 0 ? (
+                    <p className="tkt__comments-empty">No comments yet. Start the conversation.</p>
+                  ) : (
+                    comments.map(c => (
+                      <div key={c.id} className="tkt__comment">
+                        <div className="tkt__comment-avatar">
+                          {c.author?.name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
+                        </div>
+                        <div className="tkt__comment-body">
+                          <div className="tkt__comment-header">
+                            <span className="tkt__comment-author">{c.author?.name || 'Unknown'}</span>
+                            <span className="tkt__comment-time">
+                              {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {' '}{new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="tkt__comment-text">{c.content}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={commentsEndRef} />
+                  <div className="tkt__comment-input">
+                    <textarea
+                      placeholder="Write a comment... Use @name to mention"
+                      value={commentText}
+                      onChange={e => setCommentText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleComment(); }}
+                      rows={2}
+                    />
+                    <button className="tkt__send-btn" onClick={handleComment} disabled={!commentText.trim() || sending}>
+                      {sending ? <Loader2 size={14} className="tkt__spinner" /> : <Send size={14} />}
+                    </button>
                   </div>
-                ))
+                </div>
               )}
-            </div>
+
+              {activeTab === 'activity' && (
+                <div className="tkt__activity">
+                  {activity.length === 0 ? (
+                    <p className="tkt__activity-empty">No activity recorded yet.</p>
+                  ) : (
+                    activity.map(a => (
+                      <div key={a.id} className="tkt__activity-item">
+                        <div className="tkt__activity-dot" />
+                        <div className="tkt__activity-content">
+                          <span className="tkt__activity-actor">{a.actor?.name || 'System'}</span>{' '}
+                          <span className="tkt__activity-action">{formatActivityAction(a)}</span>
+                          <span className="tkt__activity-time">
+                            {new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {' '}{new Date(a.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
