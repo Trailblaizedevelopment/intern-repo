@@ -7,6 +7,7 @@ import {
   pruneStaleLinearIssues,
   reconcileLinearIssuesToTickets,
 } from '@/lib/linear-reconcile';
+import { bridgeAllCachedLinearComments } from '@/lib/linear-comment-bridge';
 import { syncLinearWorkflowStates } from '@/lib/linear-workflow-states';
 
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
               team { id name key }
               project { id name }
               labels { nodes { id name color } }
+              comments { nodes { id body createdAt updatedAt user { id name avatarUrl } } }
               estimate dueDate url createdAt updatedAt completedAt canceledAt
             }
           }
@@ -193,6 +195,21 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        const commentNodes = issue.comments?.nodes ?? [];
+        for (const comment of commentNodes) {
+          await supabase.from('linear_comments').upsert({
+            id: comment.id,
+            issue_id: issue.id,
+            body: comment.body,
+            user_id: comment.user?.id ?? null,
+            user_name: comment.user?.name ?? null,
+            user_avatar_url: comment.user?.avatarUrl ?? null,
+            created_at: comment.createdAt,
+            updated_at: comment.updatedAt,
+            synced_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
+        }
+
         syncResults.issues++;
       }
 
@@ -216,6 +233,13 @@ export async function POST(request: NextRequest) {
     syncResults.ticketsUpdated = reconcileResult.updated;
     if (reconcileResult.errors.length > 0) {
       console.error('Linear reconcile errors:', reconcileResult.errors);
+    }
+
+    try {
+      const commentBridge = await bridgeAllCachedLinearComments(supabase);
+      syncResults.bridgedComments = commentBridge.bridged;
+    } catch (bridgeErr) {
+      console.warn('Linear comment bridge failed:', bridgeErr);
     }
 
     await supabase.from('linear_teams').update({

@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getLinearApiKeyHeader } from '@/lib/linear';
-import {
-  LINEAR_TEAM_ID,
-  resolveLinearStateIdForTicketStatus,
-} from '@/lib/linear-workflow-states';
-import { updateLinearIssueState } from '@/lib/linear-update-issue';
-import type { TicketStatus } from '@/lib/linear-ticket-map';
+import { pushTicketPatchToLinear } from '@/lib/linear-push-ticket';
+import { deleteLinearIssue } from '@/lib/linear-update-issue';
 
 const TICKET_SELECT = `
   *,
@@ -15,7 +11,6 @@ const TICKET_SELECT = `
   reviewer:employees!tickets_reviewer_id_fkey(id, name, email, role)
 `;
 
-// Status transition validation — any status can move to done or canceled freely
 function validateStatusTransition(
   currentStatus: string,
   newStatus: string,
@@ -26,14 +21,12 @@ function validateStatusTransition(
   if (!ALL_STATUSES.includes(newStatus)) {
     return { valid: false, message: `Unknown status: "${newStatus}"` };
   }
-  // Only block nonsensical same-status no-ops
   if (currentStatus === newStatus) {
     return { valid: false, message: `Ticket is already "${currentStatus}"` };
   }
   return { valid: true };
 }
 
-// GET - Fetch single ticket with comments and activity
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -64,7 +57,6 @@ export async function GET(
   }
 }
 
-// PATCH - Update ticket (with status transition validation)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -79,7 +71,6 @@ export async function PATCH(
     const body = await request.json();
     const actorId = body.actor_id;
 
-    // Fetch current ticket for transition validation
     const { data: current, error: fetchError } = await supabase
       .from('tickets')
       .select('*')
@@ -99,7 +90,6 @@ export async function PATCH(
       }
     }
 
-    // Validate status transition
     if (body.status && body.status !== current.status) {
       const reviewerId = body.reviewer_id ?? current.reviewer_id;
       const assigneeId = body.assignee_id ?? current.assignee_id;
@@ -112,54 +102,24 @@ export async function PATCH(
         );
       }
 
-      // Push status change to Linear when ticket is linked
-      if (current.external_id && getLinearApiKeyHeader()) {
-        const stateId = await resolveLinearStateIdForTicketStatus(
-          supabase,
-          LINEAR_TEAM_ID,
-          body.status as TicketStatus
-        );
-        if (!stateId) {
-          return NextResponse.json(
-            {
-              data: null,
-              error: {
-                message: `No Linear workflow state mapped for status "${body.status}". Run Sync with Linear first.`,
-                code: 'LINEAR_STATE_NOT_FOUND',
-              },
-            },
-            { status: 400 }
-          );
-        }
-
-        try {
-          const linearUpdate = await updateLinearIssueState(current.external_id, stateId);
-          await supabase
-            .from('linear_issues')
-            .update({
-              state_id: linearUpdate.state_id,
-              state_name: linearUpdate.state_name,
-              state_type: linearUpdate.state_type,
-              synced_at: new Date().toISOString(),
-            })
-            .eq('id', current.external_id);
-        } catch (linearErr) {
-          const message =
-            linearErr instanceof Error ? linearErr.message : 'Failed to update Linear issue';
-          console.error('Linear status update failed:', linearErr);
-          return NextResponse.json(
-            { data: null, error: { message: `Linear update failed: ${message}`, code: 'LINEAR_UPDATE_FAILED' } },
-            { status: 502 }
-          );
-        }
-      }
-
-      // Set resolved_at when moving to done
       if (body.status === 'done') {
         updateData.resolved_at = new Date().toISOString();
-      }
-      if (body.status !== 'done') {
+      } else {
         updateData.resolved_at = null;
+      }
+    }
+
+    if (current.external_id && getLinearApiKeyHeader()) {
+      try {
+        await pushTicketPatchToLinear(supabase, current, body);
+      } catch (linearErr) {
+        const message =
+          linearErr instanceof Error ? linearErr.message : 'Failed to update Linear issue';
+        console.error('Linear update failed:', linearErr);
+        return NextResponse.json(
+          { data: null, error: { message: `Linear update failed: ${message}`, code: 'LINEAR_UPDATE_FAILED' } },
+          { status: 502 }
+        );
       }
     }
 
@@ -175,7 +135,6 @@ export async function PATCH(
       return NextResponse.json({ data: null, error: { message: error.message, code: error.code } }, { status: 500 });
     }
 
-    // Log activity for significant changes
     const activityEntries: Array<{
       ticket_id: string;
       actor_id: string | null;
@@ -183,6 +142,26 @@ export async function PATCH(
       from_value: string | null;
       to_value: string | null;
     }> = [];
+
+    if (body.title !== undefined && body.title !== current.title) {
+      activityEntries.push({
+        ticket_id: id,
+        actor_id: actorId || null,
+        action: 'title_changed',
+        from_value: current.title,
+        to_value: body.title,
+      });
+    }
+
+    if (body.description !== undefined && body.description !== current.description) {
+      activityEntries.push({
+        ticket_id: id,
+        actor_id: actorId || null,
+        action: 'description_changed',
+        from_value: current.description ? current.description.substring(0, 100) : null,
+        to_value: body.description ? String(body.description).substring(0, 100) : null,
+      });
+    }
 
     if (body.status && body.status !== current.status) {
       activityEntries.push({
@@ -203,7 +182,6 @@ export async function PATCH(
         to_value: body.assignee_id,
       });
 
-      // Notify new assignee
       if (body.assignee_id && body.assignee_id !== actorId) {
         const actorName = updated.creator?.name || 'Someone';
         await supabase.from('ticket_notifications').insert([{
@@ -230,7 +208,6 @@ export async function PATCH(
       await supabase.from('ticket_activity').insert(activityEntries);
     }
 
-    // Notify ticket creator on status change
     if (body.status && body.status !== current.status && current.creator_id && current.creator_id !== actorId) {
       await supabase.from('ticket_notifications').insert([{
         recipient_id: current.creator_id,
@@ -248,7 +225,6 @@ export async function PATCH(
   }
 }
 
-// DELETE - Hard delete ticket (permanently removes from DB)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -261,7 +237,30 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Clean up related records first
+    const { data: ticket } = await supabase
+      .from('tickets')
+      .select('external_id, number')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (ticket?.external_id && getLinearApiKeyHeader()) {
+      try {
+        await deleteLinearIssue(ticket.external_id);
+      } catch (linearErr) {
+        const message =
+          linearErr instanceof Error ? linearErr.message : 'Failed to delete Linear issue';
+        console.error('Linear delete failed:', linearErr);
+        return NextResponse.json(
+          { data: null, error: { message: `Linear delete failed: ${message}`, code: 'LINEAR_DELETE_FAILED' } },
+          { status: 502 }
+        );
+      }
+
+      await supabase.from('linear_issue_labels').delete().eq('issue_id', ticket.external_id);
+      await supabase.from('linear_comments').delete().eq('issue_id', ticket.external_id);
+      await supabase.from('linear_issues').delete().eq('id', ticket.external_id);
+    }
+
     await supabase.from('ticket_activity').delete().eq('ticket_id', id);
     await supabase.from('ticket_comments').delete().eq('ticket_id', id);
     await supabase.from('ticket_notifications').delete().eq('ticket_id', id);

@@ -87,7 +87,7 @@ export function htmlToLinearDescription(html: string): string {
     .trim();
 }
 
-async function resolveLinearUserIdByEmail(email: string): Promise<string | null> {
+export async function resolveLinearUserIdByEmail(email: string): Promise<string | null> {
   const query = `
     query($filter: UserFilter) {
       users(filter: $filter, first: 1) {
@@ -125,7 +125,7 @@ async function resolveLinearProjectId(
   return data?.id ?? null;
 }
 
-async function resolveLinearLabelIds(
+export async function resolveLinearLabelIds(
   supabase: SupabaseClient,
   labelNames: string[]
 ): Promise<string[]> {

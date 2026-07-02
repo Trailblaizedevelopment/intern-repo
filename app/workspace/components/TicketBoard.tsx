@@ -113,9 +113,11 @@ interface TicketComment {
   id: string;
   ticket_id: string;
   author_id: string | null;
+  author_name?: string | null;
   content: string;
   mentions: string[];
   created_at: string;
+  source?: string;
   author?: { id: string; name: string; email: string; role: string } | null;
 }
 
@@ -127,6 +129,7 @@ interface TicketActivityEntry {
   from_value: string | null;
   to_value: string | null;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
   actor?: { id: string; name: string; email: string } | null;
 }
 
@@ -1755,7 +1758,10 @@ function TicketDetailPanel({
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete ticket #${ticket.number}? This cannot be easily undone.`)) return;
+    const linearNote = hasLinearLink(ticket)
+      ? ' This will also delete the linked Linear issue.'
+      : '';
+    if (!confirm(`Delete ticket #${ticket.number}?${linearNote} This cannot be easily undone.`)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/tickets/${ticket.id}`, { method: 'DELETE' });
@@ -1774,8 +1780,12 @@ function TicketDetailPanel({
     }
   };
 
-  const isCreatorOrAdmin = currentEmployee &&
-    (ticket.creator_id === currentEmployee.id || currentEmployee.role === 'founder' || currentEmployee.role === 'cofounder');
+  const isCreatorOrAdmin = currentEmployee && (
+    ticket.creator_id === currentEmployee.id
+    || currentEmployee.role === 'founder'
+    || currentEmployee.role === 'cofounder'
+    || currentEmployee.email?.toLowerCase() === 'devin@trailblaize.net'
+  );
 
   const handleFieldUpdate = async (field: string, value: unknown) => {
     setUpdating(true);
@@ -1963,11 +1973,13 @@ function TicketDetailPanel({
                       comments.map(c => (
                         <div key={c.id} className="tkt__comment">
                           <div className="tkt__comment-avatar">
-                            {c.author?.name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
+                            {(c.author?.name || c.author_name || '?').split(' ').map(n => n[0]).join('').substring(0, 2)}
                           </div>
                           <div className="tkt__comment-body">
                             <div className="tkt__comment-header">
-                              <span className="tkt__comment-author">{c.author?.name || 'Unknown'}</span>
+                              <span className="tkt__comment-author">
+                                {c.author?.name || c.author_name || 'Unknown'}
+                              </span>
                               <span className="tkt__comment-time">
                                 {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 {' · '}
@@ -2011,7 +2023,9 @@ function TicketDetailPanel({
                       <div key={a.id} className="tkt__activity-item">
                         <div className="tkt__activity-dot" />
                         <div className="tkt__activity-content">
-                          <span className="tkt__activity-actor">{a.actor?.name || 'System'}</span>{' '}
+                          <span className="tkt__activity-actor">
+                            {a.actor?.name || (a.metadata?.author_name as string | undefined) || (a.metadata?.source === 'linear' ? 'Linear' : 'System')}
+                          </span>{' '}
                           <span className="tkt__activity-action">{formatActivityAction(a)}</span>
                           <span className="tkt__activity-time">
                             {new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -2034,11 +2048,13 @@ function TicketDetailPanel({
 function formatActivityAction(a: TicketActivityEntry): string {
   switch (a.action) {
     case 'created': return 'created this ticket';
-    case 'status_changed': return `changed status from ${a.from_value?.replace('_', ' ')} to ${a.to_value?.replace('_', ' ')}`;
+    case 'status_changed': return `changed status from ${a.from_value?.replace(/_/g, ' ')} to ${a.to_value?.replace(/_/g, ' ')}`;
     case 'assigned': return a.to_value ? 'assigned this ticket' : 'unassigned this ticket';
     case 'priority_changed': return `changed priority from ${a.from_value} to ${a.to_value}`;
+    case 'title_changed': return 'updated the title';
+    case 'description_changed': return 'updated the description';
     case 'commented': return 'added a comment';
-    default: return a.action.replace('_', ' ');
+    default: return a.action.replace(/_/g, ' ');
   }
 }
 

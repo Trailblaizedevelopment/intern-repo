@@ -9,6 +9,8 @@ import {
   LinearWebhookAction
 } from '@/lib/linear';
 import { reconcileLinearIssueById, archiveTicketByExternalId } from '@/lib/linear-reconcile';
+import { bridgeLinearCommentToTicket, removeBridgedLinearComment } from '@/lib/linear-comment-bridge';
+import { logLinearIssueUpdateActivity } from '@/lib/linear-activity-bridge';
 
 /**
  * POST /api/linear/webhooks
@@ -159,6 +161,20 @@ async function handleIssueEvent(
     return;
   }
 
+  const { data: ticketBefore } = await supabase
+    .from('tickets')
+    .select('id, title, description, priority, status, assignee_id')
+    .eq('external_id', issueData.id)
+    .maybeSingle();
+
+  if (action === 'update' && ticketBefore) {
+    try {
+      await logLinearIssueUpdateActivity(supabase, ticketBefore, issueData);
+    } catch (err) {
+      console.warn(`Failed to log Linear activity for ${issueData.id}:`, err);
+    }
+  }
+
   // Ensure team exists
   if (issueData.team) {
     await supabase.from('linear_teams').upsert({
@@ -261,6 +277,11 @@ async function handleCommentEvent(
       .from('linear_comments')
       .delete()
       .eq('id', commentData.id);
+    try {
+      await removeBridgedLinearComment(supabase, commentData.id);
+    } catch (err) {
+      console.warn(`Failed to remove bridged comment ${commentData.id}:`, err);
+    }
     return;
   }
 
@@ -275,6 +296,12 @@ async function handleCommentEvent(
     updated_at: commentData.updatedAt,
     synced_at: new Date().toISOString(),
   }, { onConflict: 'id' });
+
+  try {
+    await bridgeLinearCommentToTicket(supabase, commentData);
+  } catch (err) {
+    console.warn(`Failed to bridge Linear comment ${commentData.id}:`, err);
+  }
 }
 
 // Handle Project events
