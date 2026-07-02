@@ -31,6 +31,8 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  GitMerge,
+  HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
@@ -48,6 +50,7 @@ import {
   linearSyncHadChanges,
   type LinearSyncResponse,
 } from '@/lib/linear-sync-toast';
+import { buildWeeklyCompletionBuckets, type GitHubMergesSummary } from '@/lib/github-merges';
 
 const LINEAR_JSON_HEADERS: HeadersInit = {
   'Content-Type': 'application/json',
@@ -626,7 +629,7 @@ export function TicketBoard() {
             <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="Timeline">
               <GanttChart size={16} />
             </button>
-            <button className={viewMode === 'dashboard' ? 'active' : ''} onClick={() => setViewMode('dashboard')} title="Dashboard">
+            <button className={viewMode === 'dashboard' ? 'active' : ''} onClick={() => setViewMode('dashboard')} title="Analytics">
               <BarChart3 size={16} />
             </button>
           </div>
@@ -743,7 +746,7 @@ export function TicketBoard() {
       ) : viewMode === 'timeline' ? (
         <TimelineView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : (
-        <DashboardView tickets={tickets} projects={projects} />
+        <DashboardView tickets={tickets} />
       )}
 
       {showCreateModal && (
@@ -1161,91 +1164,244 @@ function TimelineView({ tickets, onTicketClick }: { tickets: TicketData[]; onTic
 }
 
 // ═══════════════════════════════════════════
-// DASHBOARD VIEW
+// ANALYTICS VIEW
 // ═══════════════════════════════════════════
 
-function DashboardView({ tickets, projects }: { tickets: TicketData[]; projects: ProjectData[] }) {
-  // Sprint stats
-  const activeTickets = tickets.filter(t => !['done', 'canceled'].includes(t.status));
-  const doneTickets = tickets.filter(t => t.status === 'done');
-  const blockedCount = tickets.filter(t => t.priority === 'critical' && !['done', 'canceled'].includes(t.status)).length;
-  const total = tickets.length;
-  const completionPct = total > 0 ? Math.round((doneTickets.length / total) * 100) : 0;
+function formatMergeDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
-  // Recent activity: use updated_at to approximate
-  const recentTickets = [...tickets].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 10);
+const DASH_KPI_TIPS = {
+  doneThisWeek: 'Tickets marked Done since Monday. Uses resolved date, or last update if none. Counts match the current board filters.',
+  priorAvg: 'Average Done tickets per week over the three calendar weeks before this one (Mon–Sun).',
+  prodMerges: 'Merged pull requests into main (production) on Trailblaize-Web this calendar week.',
+  active: 'Tickets still open (excluding Done and Canceled). Critical is the urgent-priority subset.',
+} as const;
+
+const DASH_SECTION_TIPS = {
+  weekly: (
+    <>
+      <p className="ui-tooltip__title">Weekly completions</p>
+      <p>Done tickets grouped by calendar week (Monday start). The purple bar is this week; gray bars are prior weeks.</p>
+    </>
+  ),
+  github: (
+    <>
+      <p className="ui-tooltip__title">GitHub merges</p>
+      <p>Recent merged PRs from Trailblaize-Web. Develop is the integration branch; Production is main. Generic branch-sync PRs titled &quot;Develop&quot; are hidden.</p>
+    </>
+  ),
+} as const;
+
+function DashKpiCard({
+  tip,
+  children,
+}: {
+  tip: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip content={tip} side="top" align="center" delayMs={200} compact>
+      <div className="tkt__dash-kpi tkt__dash-kpi--tip" tabIndex={0}>
+        {children}
+      </div>
+    </Tooltip>
+  );
+}
+
+function DashSectionTip({ content, label }: { content: React.ReactNode; label: string }) {
+  return (
+    <Tooltip content={content} side="top" align="start" delayMs={150}>
+      <button type="button" className="tkt__dash-info-btn" aria-label={`About ${label}`}>
+        <HelpCircle size={13} />
+      </button>
+    </Tooltip>
+  );
+}
+
+function DashboardView({ tickets }: { tickets: TicketData[] }) {
+  const [github, setGithub] = useState<GitHubMergesSummary | null>(null);
+  const [githubLoading, setGithubLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/github/merges');
+        const json = await res.json();
+        if (!cancelled && json.data) setGithub(json.data);
+      } catch (err) {
+        console.error('Failed to load GitHub merges:', err);
+      } finally {
+        if (!cancelled) setGithubLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const weeklyBuckets = useMemo(() => buildWeeklyCompletionBuckets(tickets, 4), [tickets]);
+  const maxWeekly = Math.max(1, ...weeklyBuckets.map(b => b.count));
+  const thisWeekDone = weeklyBuckets[weeklyBuckets.length - 1]?.count ?? 0;
+  const priorWeeks = weeklyBuckets.slice(0, -1);
+  const priorAvg = priorWeeks.length
+    ? Math.round(priorWeeks.reduce((sum, b) => sum + b.count, 0) / priorWeeks.length)
+    : 0;
+
+  const activeTickets = tickets.filter(t => !['done', 'canceled'].includes(t.status));
+  const criticalCount = tickets.filter(t => t.priority === 'critical' && !['done', 'canceled'].includes(t.status)).length;
+
+  const weekStart = useMemo(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const completedThisWeek = useMemo(() => (
+    tickets
+      .filter(t => {
+        if (t.status !== 'done') return false;
+        const resolved = new Date(t.resolved_at || t.updated_at);
+        return resolved >= weekStart;
+      })
+      .sort((a, b) => new Date(b.resolved_at || b.updated_at).getTime() - new Date(a.resolved_at || a.updated_at).getTime())
+      .slice(0, 5)
+  ), [tickets, weekStart]);
+
+  const renderMergeList = (items: GitHubMergesSummary['develop'], emptyLabel: string) => {
+    if (githubLoading) {
+      return <p className="tkt__dash-muted"><Loader2 size={14} className="tkt__spinner" /> Loading merges…</p>;
+    }
+    if (!github?.configured) {
+      return <p className="tkt__dash-muted">Add GITHUB_TOKEN to show merge activity.</p>;
+    }
+    if (github.error) {
+      return <p className="tkt__dash-muted">{github.error}</p>;
+    }
+    if (items.length === 0) {
+      return <p className="tkt__dash-muted">{emptyLabel}</p>;
+    }
+    return (
+      <ul className="tkt__dash-merge-list">
+        {items.map(item => (
+          <li key={`${item.base}-${item.number}`}>
+            <a href={item.url} target="_blank" rel="noopener noreferrer" className="tkt__dash-merge-link">
+              <span className="tkt__dash-merge-title">#{item.number} {item.title}</span>
+              <span className="tkt__dash-merge-meta">
+                {formatMergeDate(item.merged_at)}
+                {item.author ? ` · ${item.author}` : ''}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    );
+  };
 
   return (
-    <div className="tkt__dashboard">
-      {/* Sprint Section */}
-      <div className="tkt__dash-section">
-        <h3 className="tkt__dash-title">Current Sprint</h3>
-        <div className="tkt__dash-cards">
-          <div className="tkt__dash-card">
-            <div className="tkt__dash-card-value">{completionPct}%</div>
-            <div className="tkt__dash-card-label">Completion</div>
-            <div className="tkt__dash-progress">
-              <div className="tkt__dash-progress-bar" style={{ width: `${completionPct}%` }} />
-            </div>
-          </div>
-          <div className="tkt__dash-card">
-            <div className="tkt__dash-card-value">{doneTickets.length}/{total}</div>
-            <div className="tkt__dash-card-label">Tickets Done</div>
-          </div>
-          <div className="tkt__dash-card">
-            <div className="tkt__dash-card-value">{activeTickets.length}</div>
-            <div className="tkt__dash-card-label">Active</div>
-          </div>
-          <div className="tkt__dash-card">
-            <div className="tkt__dash-card-value" style={{ color: blockedCount > 0 ? '#ef4444' : undefined }}>{blockedCount}</div>
-            <div className="tkt__dash-card-label">Critical / Blocked</div>
-          </div>
-        </div>
+    <div className="tkt__dashboard tkt__dashboard--analytics">
+      <div className="tkt__dash-kpi-row">
+        <DashKpiCard tip={DASH_KPI_TIPS.doneThisWeek}>
+          <span className="tkt__dash-kpi-value">{thisWeekDone}</span>
+          <span className="tkt__dash-kpi-label">Done this week</span>
+        </DashKpiCard>
+        <DashKpiCard tip={DASH_KPI_TIPS.priorAvg}>
+          <span className="tkt__dash-kpi-value">{priorAvg}</span>
+          <span className="tkt__dash-kpi-label">Prior 3-wk avg</span>
+        </DashKpiCard>
+        <DashKpiCard tip={DASH_KPI_TIPS.prodMerges}>
+          <span className="tkt__dash-kpi-value">{github?.production_this_week ?? '—'}</span>
+          <span className="tkt__dash-kpi-label">Prod merges (wk)</span>
+        </DashKpiCard>
+        <DashKpiCard tip={DASH_KPI_TIPS.active}>
+          <span className="tkt__dash-kpi-value" style={{ color: criticalCount > 0 ? '#ef4444' : undefined }}>
+            {activeTickets.length}
+          </span>
+          <span className="tkt__dash-kpi-label">Active · {criticalCount} critical</span>
+        </DashKpiCard>
       </div>
 
-      {/* Projects Section */}
-      {projects.length > 0 && (
-        <div className="tkt__dash-section">
-          <h3 className="tkt__dash-title">Project Overview</h3>
-          <div className="tkt__dash-cards">
-            {projects.map(p => {
-              const pct = p.ticket_count > 0 ? Math.round((p.tickets_done / p.ticket_count) * 100) : 0;
-              return (
-                <div key={p.id} className="tkt__dash-card">
-                  <div className="tkt__dash-card-name">{p.name}</div>
-                  <div className="tkt__dash-card-label">{p.ticket_count} tickets · {pct}% done</div>
-                  <div className="tkt__dash-progress">
-                    <div className="tkt__dash-progress-bar" style={{ width: `${pct}%` }} />
-                  </div>
-                  {p.target_date && <div className="tkt__dash-card-label">Target: {new Date(p.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>}
-                </div>
-              );
-            })}
+      <div className="tkt__dash-grid">
+        <section className="tkt__dash-panel">
+          <div className="tkt__dash-panel-head">
+            <h3 className="tkt__dash-title">
+              Weekly completions
+              <DashSectionTip content={DASH_SECTION_TIPS.weekly} label="weekly completions" />
+            </h3>
+            <span className="tkt__dash-subtitle">Tickets marked done</span>
           </div>
-        </div>
-      )}
+          <div className="tkt__dash-week-bars">
+            {weeklyBuckets.map(bucket => (
+              <div key={bucket.label} className="tkt__dash-week-bar">
+                <span className="tkt__dash-week-count">{bucket.count}</span>
+                <div
+                  className={`tkt__dash-week-bar-fill ${bucket.isCurrent ? 'tkt__dash-week-bar-fill--current' : ''}`}
+                  style={{ height: `${Math.max(8, (bucket.count / maxWeekly) * 100)}%` }}
+                />
+                <span className="tkt__dash-week-label">{bucket.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      {/* Recent Activity */}
-      <div className="tkt__dash-section">
-        <h3 className="tkt__dash-title">Recent Activity</h3>
-        <div className="tkt__dash-activity">
-          {recentTickets.map(t => (
-            <div key={t.id} className="tkt__dash-activity-item">
-              <span className="tkt__dash-activity-num">#{t.number}</span>
-              <span className="tkt__dash-activity-title">{t.title}</span>
-              <span className="tkt__status-pill" style={{
-                color: STATUS_COLUMNS.find(s => s.key === t.status)?.color,
-                background: `${STATUS_COLUMNS.find(s => s.key === t.status)?.color}15`,
-              }}>
-                {STATUS_COLUMNS.find(s => s.key === t.status)?.label}
-              </span>
-              <span className="tkt__dash-activity-time">
-                {new Date(t.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
+        <section className="tkt__dash-panel">
+          <div className="tkt__dash-panel-head">
+            <h3 className="tkt__dash-title">
+              <GitMerge size={15} />
+              GitHub · Trailblaize-Web
+              <DashSectionTip content={DASH_SECTION_TIPS.github} label="GitHub merges" />
+            </h3>
+            <a
+              href="https://github.com/Trailblaizedevelopment/Trailblaize-Web"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tkt__dash-repo-link"
+            >
+              Open repo <ExternalLink size={11} />
+            </a>
+          </div>
+          <div className="tkt__dash-merge-columns">
+            <div className="tkt__dash-merge-col">
+              <div className="tkt__dash-merge-col-head">
+                <span className="tkt__dash-merge-branch tkt__dash-merge-branch--develop">develop</span>
+                <span className="tkt__dash-merge-count">{github?.develop_this_week ?? 0} this wk</span>
+              </div>
+              {renderMergeList(github?.develop ?? [], 'No recent develop merges')}
             </div>
-          ))}
-        </div>
+            <div className="tkt__dash-merge-col">
+              <div className="tkt__dash-merge-col-head">
+                <span className="tkt__dash-merge-branch tkt__dash-merge-branch--prod">production</span>
+                <span className="tkt__dash-merge-count">{github?.production_this_week ?? 0} this wk</span>
+              </div>
+              {renderMergeList(github?.production ?? [], 'No recent production merges')}
+            </div>
+          </div>
+        </section>
       </div>
+
+      <section className="tkt__dash-panel tkt__dash-panel--compact">
+        <div className="tkt__dash-panel-head">
+          <h3 className="tkt__dash-title">Completed this week</h3>
+          <span className="tkt__dash-subtitle">Latest done tickets for sales / eng sync</span>
+        </div>
+        {completedThisWeek.length === 0 ? (
+          <p className="tkt__dash-muted">No tickets completed yet this week.</p>
+        ) : (
+          <div className="tkt__dash-done-list">
+            {completedThisWeek.map(t => (
+              <div key={t.id} className="tkt__dash-done-item">
+                <span className="tkt__dash-done-id">{t.linear_identifier || `#${t.number}`}</span>
+                <span className="tkt__dash-done-title" title={t.title}>{t.title}</span>
+                <span className="tkt__dash-done-date">
+                  {formatMergeDate(t.resolved_at || t.updated_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
