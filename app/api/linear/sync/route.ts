@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { assertLinearApiKeyConfigured, linearGQLWithApiKey } from '@/lib/linear';
+import { reconcileLinearIssuesToTickets } from '@/lib/linear-reconcile';
 
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
 
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     const teamId = body.teamId || LINEAR_TEAM_ID;
 
     const supabase = getSupabaseAdmin();
-    const syncResults = { teams: 0, projects: 0, issues: 0, labels: 0 };
+    const syncResults = { teams: 0, projects: 0, issues: 0, labels: 0, tickets: 0 };
 
     // Sync teams
     const teamsData = await linearGQLWithApiKey(`
@@ -163,10 +164,17 @@ export async function POST(request: NextRequest) {
       if (!cursor) hasNextPage = false;
     }
 
+    const reconcileResult = await reconcileLinearIssuesToTickets(supabase, teamId);
+    syncResults.tickets = reconcileResult.reconciled;
+    if (reconcileResult.errors.length > 0) {
+      console.error('Linear reconcile errors:', reconcileResult.errors);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Sync completed successfully',
       synced: syncResults,
+      reconcileErrors: reconcileResult.errors.length > 0 ? reconcileResult.errors : undefined,
     });
   } catch (error) {
     console.error('Error syncing Linear data:', error);

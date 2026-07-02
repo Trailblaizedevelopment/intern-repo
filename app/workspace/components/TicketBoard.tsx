@@ -78,6 +78,7 @@ interface TicketData {
   assignee_id: string | null;
   reviewer_id: string | null;
   external_id: string | null;
+  linear_identifier: string | null;
   labels: string[];
   project: string | null;
   project_id: string | null;
@@ -329,6 +330,7 @@ export function TicketBoard() {
       const json = await res.json();
       if (json.error) throw new Error(typeof json.error === 'string' ? json.error : json.error.message || 'Sync failed');
       await fetchLinearIssues();
+      await fetchTickets();
     } catch (err: unknown) {
       setLinearError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
@@ -424,7 +426,7 @@ export function TicketBoard() {
             <Search size={14} />
             <input
               type="text"
-              placeholder="Search tickets... (#238 or TRA-238)"
+              placeholder="Search tickets... (#238 or TRA-123)"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
