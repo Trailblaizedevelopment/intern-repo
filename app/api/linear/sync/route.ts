@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { assertLinearApiKeyConfigured, linearGQLWithApiKey } from '@/lib/linear';
 import { reconcileLinearIssuesToTickets } from '@/lib/linear-reconcile';
+import { syncLinearWorkflowStates } from '@/lib/linear-workflow-states';
 
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
 
@@ -21,9 +22,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const teamId = body.teamId || LINEAR_TEAM_ID;
+    const incremental = body.incremental === true;
 
     const supabase = getSupabaseAdmin();
-    const syncResults = { teams: 0, projects: 0, issues: 0, labels: 0, tickets: 0 };
+    const syncResults = { teams: 0, projects: 0, issues: 0, labels: 0, tickets: 0, workflowStates: 0 };
+
+    let lastSyncAt: string | null = null;
+    if (incremental) {
+      const { data: teamRow } = await supabase
+        .from('linear_teams')
+        .select('synced_at')
+        .eq('id', teamId)
+        .maybeSingle();
+      lastSyncAt = teamRow?.synced_at ?? null;
+    }
 
     // Sync teams
     const teamsData = await linearGQLWithApiKey(`
@@ -85,7 +97,14 @@ export async function POST(request: NextRequest) {
       syncResults.labels++;
     }
 
-    // Sync issues — paginate through all
+    syncResults.workflowStates = await syncLinearWorkflowStates(supabase, teamId);
+
+    const issueFilter: Record<string, unknown> = { team: { id: { eq: teamId } } };
+    if (incremental && lastSyncAt) {
+      issueFilter.updatedAt = { gt: lastSyncAt };
+    }
+
+    // Sync issues — paginate through all (or incremental delta)
     let hasNextPage = true;
     let cursor: string | null = null;
 
@@ -107,7 +126,7 @@ export async function POST(request: NextRequest) {
           }
         }
       `, {
-        filter: { team: { id: { eq: teamId } } },
+        filter: issueFilter,
         first: 100,
         after: cursor,
       });
@@ -170,9 +189,14 @@ export async function POST(request: NextRequest) {
       console.error('Linear reconcile errors:', reconcileResult.errors);
     }
 
+    await supabase.from('linear_teams').update({
+      synced_at: new Date().toISOString(),
+    }).eq('id', teamId);
+
     return NextResponse.json({
       success: true,
-      message: 'Sync completed successfully',
+      message: incremental ? 'Incremental sync completed' : 'Sync completed successfully',
+      mode: incremental ? 'incremental' : 'full',
       synced: syncResults,
       reconcileErrors: reconcileResult.errors.length > 0 ? reconcileResult.errors : undefined,
     });

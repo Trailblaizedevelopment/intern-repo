@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { getLinearApiKeyHeader } from '@/lib/linear';
+import {
+  LINEAR_TEAM_ID,
+  resolveLinearStateIdForTicketStatus,
+} from '@/lib/linear-workflow-states';
+import { updateLinearIssueState } from '@/lib/linear-update-issue';
+import type { TicketStatus } from '@/lib/linear-ticket-map';
 
 const TICKET_SELECT = `
   *,
@@ -103,6 +110,48 @@ export async function PATCH(
           { data: null, error: { message: validation.message, code: 'INVALID_TRANSITION' } },
           { status: 400 }
         );
+      }
+
+      // Push status change to Linear when ticket is linked
+      if (current.external_id && getLinearApiKeyHeader()) {
+        const stateId = await resolveLinearStateIdForTicketStatus(
+          supabase,
+          LINEAR_TEAM_ID,
+          body.status as TicketStatus
+        );
+        if (!stateId) {
+          return NextResponse.json(
+            {
+              data: null,
+              error: {
+                message: `No Linear workflow state mapped for status "${body.status}". Run Sync with Linear first.`,
+                code: 'LINEAR_STATE_NOT_FOUND',
+              },
+            },
+            { status: 400 }
+          );
+        }
+
+        try {
+          const linearUpdate = await updateLinearIssueState(current.external_id, stateId);
+          await supabase
+            .from('linear_issues')
+            .update({
+              state_id: linearUpdate.state_id,
+              state_name: linearUpdate.state_name,
+              state_type: linearUpdate.state_type,
+              synced_at: new Date().toISOString(),
+            })
+            .eq('id', current.external_id);
+        } catch (linearErr) {
+          const message =
+            linearErr instanceof Error ? linearErr.message : 'Failed to update Linear issue';
+          console.error('Linear status update failed:', linearErr);
+          return NextResponse.json(
+            { data: null, error: { message: `Linear update failed: ${message}`, code: 'LINEAR_UPDATE_FAILED' } },
+            { status: 502 }
+          );
+        }
       }
 
       // Set resolved_at when moving to done

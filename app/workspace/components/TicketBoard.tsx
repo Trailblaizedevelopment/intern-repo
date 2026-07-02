@@ -200,24 +200,12 @@ export function TicketBoard() {
   const [filterPriority, setFilterPriority] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterProject, setFilterProject] = useState('');
+  const [filterLinearOnly, setFilterLinearOnly] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);
   const [notifications, setNotifications] = useState<TicketNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // ── Linear state ──
-  interface LinearIssue {
-    id: string;
-    identifier: string;
-    title: string;
-    status: { name: string; color: string } | null;
-    priority: number;
-    url: string;
-    team?: { name: string } | null;
-    project?: { name: string } | null;
-  }
-  const [linearIssues, setLinearIssues] = useState<LinearIssue[]>([]);
-  const [linearLoading, setLinearLoading] = useState(false);
   const [linearSyncing, setLinearSyncing] = useState(false);
   const [linearError, setLinearError] = useState<string | null>(null);
 
@@ -264,6 +252,7 @@ export function TicketBoard() {
       if (projectTab !== 'all') params.set('project', projectTab);
       else if (filterProject) params.set('project', filterProject);
       if (filterStatus) params.set('status', filterStatus);
+      if (filterLinearOnly) params.set('linked_linear', 'true');
       if (searchQuery) params.set('search', searchQuery);
 
       const res = await fetch(`/api/tickets?${params}`);
@@ -274,7 +263,7 @@ export function TicketBoard() {
     } finally {
       setLoading(false);
     }
-  }, [filterAssignee, filterPriority, filterType, filterProject, filterStatus, searchQuery, projectTab]);
+  }, [filterAssignee, filterPriority, filterType, filterProject, filterStatus, filterLinearOnly, searchQuery, projectTab]);
 
   const fetchNotifications = useCallback(async () => {
     if (!currentEmployee) return;
@@ -301,46 +290,31 @@ export function TicketBoard() {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
-  const fetchLinearIssues = useCallback(async () => {
-    setLinearLoading(true);
-    setLinearError(null);
-    try {
-      const res = await fetch('/api/linear/issues?source=cache', {
-        headers: LINEAR_JSON_HEADERS,
-      });
-      if (!res.ok) throw new Error(await parseLinearApiError(res, 'Failed to load Linear issues'));
-      const json = await res.json();
-      if (json.error) throw new Error(json.error.message || String(json.error));
-      setLinearIssues(json.data || json.issues || []);
-    } catch (err: unknown) {
-      setLinearError(err instanceof Error ? err.message : 'Failed to load Linear issues');
-    } finally {
-      setLinearLoading(false);
-    }
-  }, []);
-
-  const syncLinear = async () => {
+  const syncLinear = useCallback(async (fullSync = false) => {
     setLinearSyncing(true);
     setLinearError(null);
     try {
       const res = await fetch('/api/linear/sync', {
         method: 'POST',
         headers: LINEAR_JSON_HEADERS,
-        body: JSON.stringify({}),
+        body: JSON.stringify({ incremental: !fullSync }),
       });
       if (!res.ok) throw new Error(await parseLinearApiError(res, 'Sync failed'));
       const json = await res.json();
       if (json.error) throw new Error(typeof json.error === 'string' ? json.error : json.error.message || 'Sync failed');
-      await fetchLinearIssues();
       await fetchTickets();
     } catch (err: unknown) {
       setLinearError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
       setLinearSyncing(false);
     }
-  };
+  }, [fetchTickets]);
 
-  useEffect(() => { fetchLinearIssues(); }, [fetchLinearIssues]);
+  // Light incremental pull every 5 minutes while the board is open
+  useEffect(() => {
+    const interval = setInterval(() => syncLinear(false), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [syncLinear]);
 
   // ── Grouped tickets for Kanban ──
 
@@ -387,7 +361,7 @@ export function TicketBoard() {
     };
   }, [tickets]);
 
-  const activeFilterCount = [filterStatus, filterAssignee, filterPriority, filterType, filterProject].filter(Boolean).length;
+  const activeFilterCount = [filterStatus, filterAssignee, filterPriority, filterType, filterProject, filterLinearOnly].filter(Boolean).length;
 
   // ── Drag & Drop ──
   const [dragTicketId, setDragTicketId] = useState<string | null>(null);
@@ -492,7 +466,6 @@ export function TicketBoard() {
             onClick={() => {
               setProjectTab(tab);
               setLoading(true);
-              if (tab === 'Web App' || tab === 'all') fetchLinearIssues();
             }}
           >
             {tab === 'all' ? 'All Projects' : tab}
@@ -500,11 +473,12 @@ export function TicketBoard() {
           </button>
         ))}
         <div className="tkt__linear-sync">
+          {linearError && <span className="tkt__linear-error">{linearError}</span>}
           <button
             className="tkt__linear-sync-btn"
-            onClick={syncLinear}
+            onClick={e => syncLinear(e.shiftKey)}
             disabled={linearSyncing}
-            title="Sync issues from Linear"
+            title="Sync with Linear (incremental). Hold Shift for full sync."
           >
             <RefreshCw size={14} className={linearSyncing ? 'tkt__spinner' : ''} />
             {linearSyncing ? 'Syncing...' : 'Sync with Linear'}
@@ -558,8 +532,25 @@ export function TicketBoard() {
               </select>
             </div>
           )}
+          <div className="tkt__filter-group tkt__filter-group--checkbox">
+            <label className="tkt__filter-checkbox">
+              <input
+                type="checkbox"
+                checked={filterLinearOnly}
+                onChange={e => setFilterLinearOnly(e.target.checked)}
+              />
+              Linear-linked only
+            </label>
+          </div>
           {activeFilterCount > 0 && (
-            <button className="tkt__clear-filters" onClick={() => { setFilterStatus(''); setFilterAssignee(''); setFilterPriority(''); setFilterType(''); setFilterProject(''); }}>
+            <button className="tkt__clear-filters" onClick={() => {
+              setFilterStatus('');
+              setFilterAssignee('');
+              setFilterPriority('');
+              setFilterType('');
+              setFilterProject('');
+              setFilterLinearOnly(false);
+            }}>
               Clear all
             </button>
           )}
@@ -611,15 +602,6 @@ export function TicketBoard() {
       ) : (
         <DashboardView tickets={tickets} projects={projects} />
       )}
-
-      {/* ── Linear Issues ── */}
-      <LinearIssuesSection
-        issues={linearIssues}
-        loading={linearLoading}
-        error={linearError}
-        onSync={syncLinear}
-        syncing={linearSyncing}
-      />
 
       {showCreateModal && (
         <CreateTicketModal
@@ -1048,132 +1030,6 @@ function DashboardView({ tickets, projects }: { tickets: TicketData[]; projects:
   );
 }
 
-
-// ═══════════════════════════════════════════
-// LINEAR ISSUES SECTION
-// ═══════════════════════════════════════════
-
-const LINEAR_PRIORITY_DOT: Record<number, string> = {
-  0: '#9ca3af',
-  1: '#ef4444',
-  2: '#f59e0b',
-  3: '#3b82f6',
-  4: '#6b7280',
-};
-
-const LINEAR_PRIORITY_LABEL: Record<number, string> = {
-  0: 'No priority',
-  1: 'Urgent',
-  2: 'High',
-  3: 'Medium',
-  4: 'Low',
-};
-
-interface LinearIssue {
-  id: string;
-  identifier: string;
-  title: string;
-  status: { name: string; color: string } | null;
-  priority: number;
-  url: string;
-  team?: { name: string } | null;
-  project?: { name: string } | null;
-}
-
-function LinearIssuesSection({
-  issues,
-  loading,
-  error,
-  onSync,
-  syncing,
-}: {
-  issues: LinearIssue[];
-  loading: boolean;
-  error: string | null;
-  onSync: () => void;
-  syncing: boolean;
-}) {
-  const grouped = useMemo(() => {
-    const g: Record<string, LinearIssue[]> = {};
-    issues.forEach(issue => {
-      const key = issue.project?.name || issue.team?.name || 'General';
-      if (!g[key]) g[key] = [];
-      g[key].push(issue);
-    });
-    return g;
-  }, [issues]);
-
-  return (
-    <div className="tkt__linear-section">
-      <div className="tkt__linear-header">
-        <h3 className="tkt__linear-title">
-          <Zap size={16} style={{ color: '#5e6ad2' }} />
-          Linear Issues
-          {issues.length > 0 && <span className="tkt__column-count">{issues.length}</span>}
-        </h3>
-        <div className="tkt__linear-header-actions">
-          {error && <span className="tkt__linear-error">{error}</span>}
-          <button
-            type="button"
-            className="tkt__linear-sync-btn"
-            onClick={onSync}
-            disabled={syncing}
-            title="Sync issues from Linear"
-          >
-            <RefreshCw size={14} className={syncing ? 'tkt__spinner' : ''} />
-            {syncing ? 'Syncing...' : 'Sync'}
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="tkt__loading" style={{ padding: '1rem' }}>
-          <Loader2 size={18} className="tkt__spinner" />
-          <span>Loading Linear issues...</span>
-        </div>
-      ) : Object.keys(grouped).length === 0 ? (
-        <p className="tkt__list-empty">No Linear issues synced. Click &quot;Sync with Linear&quot; to pull issues.</p>
-      ) : (
-        Object.entries(grouped).map(([projectName, projectIssues]) => (
-          <div key={projectName} className="tkt__linear-group">
-            <div className="tkt__linear-group-label">{projectName}</div>
-            <div className="tkt__linear-rows">
-              {projectIssues.map(issue => (
-                <div key={issue.id} className="tkt__linear-row">
-                  <span
-                    className="tkt__linear-priority-dot"
-                    style={{ background: LINEAR_PRIORITY_DOT[issue.priority] ?? '#9ca3af' }}
-                    title={LINEAR_PRIORITY_LABEL[issue.priority] ?? 'Unknown priority'}
-                  />
-                  <span className="tkt__linear-identifier">{issue.identifier}</span>
-                  <span className="tkt__linear-issue-title">{issue.title}</span>
-                  {issue.status && (
-                    <span
-                      className="tkt__status-pill"
-                      style={{ color: issue.status.color || '#6b7280', background: `${issue.status.color || '#6b7280'}18` }}
-                    >
-                      {issue.status.name}
-                    </span>
-                  )}
-                  <a
-                    href={issue.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="tkt__linear-ext-link"
-                    onClick={e => e.stopPropagation()}
-                    title="Open in Linear"
-                  >
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════
 // CREATE TICKET MODAL

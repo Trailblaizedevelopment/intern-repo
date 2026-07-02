@@ -8,6 +8,7 @@ import {
   LinearWebhookPayload,
   LinearWebhookAction
 } from '@/lib/linear';
+import { reconcileLinearIssueById } from '@/lib/linear-reconcile';
 
 /**
  * POST /api/linear/webhooks
@@ -230,6 +231,11 @@ async function handleIssueEvent(
         label_id: label.id,
       }))
     );
+  }
+
+  const reconcile = await reconcileLinearIssueById(supabase, issueData.id);
+  if (!reconcile.ok) {
+    console.warn(`Linear webhook reconcile failed for ${issueData.id}:`, reconcile.error);
   }
 }
 

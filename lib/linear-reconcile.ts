@@ -143,3 +143,85 @@ export async function reconcileLinearIssuesToTickets(
 
   return { reconciled, errors };
 }
+
+/**
+ * Reconcile a single cached Linear issue into CRM `tickets` by issue UUID.
+ */
+export async function reconcileLinearIssueById(
+  supabase: SupabaseClient,
+  issueId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { data: row, error: issuesError } = await supabase
+    .from('linear_issues')
+    .select(`
+      id, identifier, title, description, priority, priority_label,
+      state_type, state_name, assignee_email, team_id,
+      estimate, due_date, created_at, updated_at, completed_at, canceled_at, url,
+      linear_projects ( name )
+    `)
+    .eq('id', issueId)
+    .maybeSingle();
+
+  if (issuesError) {
+    return { ok: false, error: issuesError.message };
+  }
+  if (!row) {
+    return { ok: false, error: 'Issue not found in cache' };
+  }
+
+  const cached = row as CachedLinearIssueRow & { team_id?: string };
+
+  const { data: labelLinks } = await supabase
+    .from('linear_issue_labels')
+    .select('issue_id, linear_labels ( name )')
+    .eq('issue_id', issueId);
+
+  const label_names: string[] = [];
+  for (const link of labelLinks ?? []) {
+    const labelRel = link.linear_labels as { name: string } | { name: string }[] | null;
+    const name = Array.isArray(labelRel) ? labelRel[0]?.name : labelRel?.name;
+    if (name) label_names.push(name);
+  }
+
+  const { data: employees } = await supabase.from('employees').select('id, email');
+  const employeeByEmail: Record<string, string> = {};
+  for (const emp of employees ?? []) {
+    if (emp.email) employeeByEmail[emp.email.toLowerCase()] = emp.id;
+  }
+
+  const assigneeEmail = cached.assignee_email?.toLowerCase() ?? '';
+  const linearIssue: LinearIssueForTicket = {
+    id: cached.id,
+    identifier: cached.identifier,
+    title: cached.title,
+    description: cached.description,
+    priority: cached.priority,
+    priority_label: cached.priority_label,
+    state_type: cached.state_type,
+    state_name: cached.state_name,
+    assignee_email: cached.assignee_email,
+    project_name: projectName(cached.linear_projects),
+    estimate: cached.estimate,
+    due_date: cached.due_date,
+    url: cached.url,
+    created_at: cached.created_at,
+    updated_at: cached.updated_at,
+    completed_at: cached.completed_at,
+    canceled_at: cached.canceled_at,
+    label_names,
+  };
+
+  const ticketRow = buildTicketRowFromLinearIssue(linearIssue, {
+    assignee_id: assigneeEmail ? employeeByEmail[assigneeEmail] ?? null : null,
+    project: projectName(cached.linear_projects),
+  });
+
+  const { error } = await supabase
+    .from('tickets')
+    .upsert(ticketRow, { onConflict: 'external_id' });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}

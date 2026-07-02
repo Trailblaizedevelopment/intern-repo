@@ -27781,6 +27781,25 @@ body { background: #FAFAFA; }
   cursor: pointer;
 }
 
+.tkt__filter-group--checkbox {
+  align-self: center;
+}
+
+.tkt__filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  color: var(--ws-text, #111827) !important;
+  cursor: pointer;
+}
+
+.tkt__filter-checkbox input {
+  cursor: pointer;
+}
+
 .tkt__clear-filters {
   font-size: 0.72rem;
   color: var(--ws-text-secondary, #6b7280);

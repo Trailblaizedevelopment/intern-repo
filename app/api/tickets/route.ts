@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const project = searchParams.get('project');
     const search = searchParams.get('search');
+    const linkedLinear = searchParams.get('linked_linear');
 
     let query = supabase
       .from('tickets')
@@ -57,6 +58,9 @@ export async function GET(request: NextRequest) {
     if (priority) query = query.eq('priority', priority);
     if (type) query = query.eq('type', type);
     if (project) query = query.eq('project', project);
+    if (linkedLinear === 'true') {
+      query = query.not('external_id', 'is', null);
+    }
     if (search) {
       const linearIdentifier = parseLinearIdentifierSearch(search);
       if (linearIdentifier) {
