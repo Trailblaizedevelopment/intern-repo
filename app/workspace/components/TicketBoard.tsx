@@ -11,9 +11,7 @@ import {
   ChevronDown,
   Clock,
   AlertTriangle,
-  Bug,
   Sparkles,
-  AlertCircle,
   User,
   MessageSquare,
   Activity,
@@ -21,10 +19,6 @@ import {
   Bell,
   BellOff,
   Loader2,
-  Ticket,
-  Zap,
-  Target,
-  Layers,
   CalendarDays,
   BarChart3,
   GanttChart,
@@ -32,12 +26,52 @@ import {
   RefreshCw,
   ExternalLink,
   Trash2,
+  SlidersHorizontal,
+  ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  GitMerge,
+  HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Employee } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
-import { RichTextEditor, RichTextDisplay } from '@/components/RichTextEditor';
+import { Dropdown } from '@/components/Dropdown';
+import { Tooltip } from '@/components/Tooltip';
+import { HorizontalScrollNav } from '@/components/HorizontalScrollNav';
+import { useToast } from '@/components/Toast';
+import { RichTextEditor } from '@/components/RichTextEditor';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
+import { getLinearMobileProjectName, mapCrmAppToLinearProjectName } from '@/lib/linear-project-map';
+import { hasLinearLink, resolveLinearTicketUrl } from '@/lib/linear-issue-url';
+import {
+  formatLinearSyncToast,
+  linearSyncHadChanges,
+  type LinearSyncResponse,
+} from '@/lib/linear-sync-toast';
+import { buildWeeklyCompletionBuckets, type GitHubMergesSummary } from '@/lib/github-merges';
+
+const LINEAR_JSON_HEADERS: HeadersInit = {
+  'Content-Type': 'application/json',
+  Authorization: INTERNAL_AUTH_HEADER,
+};
+
+const LINEAR_AUTO_SYNC_MS = 24 * 60 * 60 * 1000;
+const LINEAR_AUTO_SYNC_STORAGE_KEY = 'linear-last-auto-sync';
+
+async function parseLinearApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const json = await res.json();
+    if (typeof json.error === 'string') return json.error;
+    if (json.error?.message) return json.error.message;
+    if (json.details) return `${fallback}: ${json.details}`;
+  } catch {
+    // ignore JSON parse errors
+  }
+  return `${fallback} (HTTP ${res.status})`;
+}
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -61,6 +95,8 @@ interface TicketData {
   assignee_id: string | null;
   reviewer_id: string | null;
   external_id: string | null;
+  linear_identifier: string | null;
+  linear_url: string | null;
   labels: string[];
   project: string | null;
   project_id: string | null;
@@ -81,9 +117,11 @@ interface TicketComment {
   id: string;
   ticket_id: string;
   author_id: string | null;
+  author_name?: string | null;
   content: string;
   mentions: string[];
   created_at: string;
+  source?: string;
   author?: { id: string; name: string; email: string; role: string } | null;
 }
 
@@ -95,6 +133,7 @@ interface TicketActivityEntry {
   from_value: string | null;
   to_value: string | null;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
   actor?: { id: string; name: string; email: string } | null;
 }
 
@@ -134,12 +173,12 @@ const STATUS_COLUMNS: { key: TicketStatus; label: string; color: string }[] = [
   { key: 'canceled', label: 'Canceled', color: '#ef4444' },
 ];
 
-const PRIORITY_CONFIG: Record<TicketPriority, { label: string; color: string; icon: string }> = {
-  none: { label: 'None', color: '#d1d5db', icon: '—' },
-  low: { label: 'Low', color: '#6b7280', icon: '▽' },
-  medium: { label: 'Medium', color: '#3b82f6', icon: '■' },
-  high: { label: 'High', color: '#f59e0b', icon: '▲' },
-  critical: { label: 'Critical', color: '#ef4444', icon: '⚡' },
+const PRIORITY_CONFIG: Record<TicketPriority, { label: string; color: string }> = {
+  none: { label: 'None', color: '#d1d5db' },
+  low: { label: 'Low', color: '#6b7280' },
+  medium: { label: 'Medium', color: '#3b82f6' },
+  high: { label: 'High', color: '#f59e0b' },
+  critical: { label: 'Critical', color: '#ef4444' },
 };
 
 const PRIORITY_BAR_COLORS: Record<TicketPriority, string> = {
@@ -150,14 +189,145 @@ const PRIORITY_BAR_COLORS: Record<TicketPriority, string> = {
   critical: '#ef4444',
 };
 
-const TYPE_CONFIG: Record<TicketType, { label: string; icon: typeof Bug; color: string }> = {
-  bug: { label: 'Bug', icon: Bug, color: '#ef4444' },
-  feature_request: { label: 'Feature', icon: Sparkles, color: '#8b5cf6' },
-  issue: { label: 'Issue', icon: AlertCircle, color: '#f59e0b' },
-  improvement: { label: 'Improvement', icon: Zap, color: '#10b981' },
-  task: { label: 'Task', icon: Target, color: '#3b82f6' },
-  epic: { label: 'Epic', icon: Layers, color: '#f59e0b' },
+const TYPE_CONFIG: Record<TicketType, { label: string; color: string }> = {
+  bug: { label: 'Bug', color: '#db2777' },
+  feature_request: { label: 'Feature', color: '#7c3aed' },
+  issue: { label: 'Issue', color: '#ca8a04' },
+  improvement: { label: 'Improvement', color: '#059669' },
+  task: { label: 'Task', color: '#6366f1' },
+  epic: { label: 'Epic', color: '#0d9488' },
 };
+
+const LINEAR_SYNC_HELP = (
+  <>
+    <p className="ui-tooltip__title">Sync with Linear</p>
+    <p><strong>Click</strong> — incremental sync: pulls recent updates from Linear.</p>
+    <p><strong>Shift+click</strong> — full sync: reconciles all issues and removes tickets deleted in Linear from the board (soft-archived as canceled in CRM).</p>
+  </>
+);
+
+interface TicketFiltersDropdownProps {
+  filterStatus: string;
+  filterAssignee: string;
+  filterPriority: string;
+  filterType: string;
+  filterProject: string;
+  filterLinearOnly: boolean;
+  activeFilterCount: number;
+  employees: Employee[];
+  currentEmployee: Employee | null;
+  uniqueProjects: string[];
+  onStatusChange: (value: string) => void;
+  onAssigneeChange: (value: string) => void;
+  onPriorityChange: (value: string) => void;
+  onTypeChange: (value: string) => void;
+  onProjectChange: (value: string) => void;
+  onLinearOnlyChange: (value: boolean) => void;
+  onClear: () => void;
+}
+
+function TicketFiltersDropdown({
+  filterStatus,
+  filterAssignee,
+  filterPriority,
+  filterType,
+  filterProject,
+  filterLinearOnly,
+  activeFilterCount,
+  employees,
+  currentEmployee,
+  uniqueProjects,
+  onStatusChange,
+  onAssigneeChange,
+  onPriorityChange,
+  onTypeChange,
+  onProjectChange,
+  onLinearOnlyChange,
+  onClear,
+}: TicketFiltersDropdownProps) {
+  return (
+    <Dropdown
+      align="end"
+      panelClassName="tkt__filter-dropdown"
+      trigger={
+        <button
+          type="button"
+          className={`tkt__icon-btn ${activeFilterCount > 0 ? 'active' : ''}`}
+          title="Filters"
+          aria-label="Filter tickets"
+        >
+          <Filter size={16} />
+          {activeFilterCount > 0 && <span className="tkt__filter-count">{activeFilterCount}</span>}
+        </button>
+      }
+    >
+      <div className="tkt__filter-dropdown-header">
+        <span>Filters</span>
+        {activeFilterCount > 0 && (
+          <button type="button" className="tkt__clear-filters" onClick={onClear}>
+            Clear all
+          </button>
+        )}
+      </div>
+      <div className="tkt__filter-group">
+        <label htmlFor="tkt-filter-status">Status</label>
+        <select id="tkt-filter-status" value={filterStatus} onChange={e => onStatusChange(e.target.value)}>
+          <option value="">All</option>
+          <option value="active">Active</option>
+          {STATUS_COLUMNS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </select>
+      </div>
+      <div className="tkt__filter-group">
+        <label htmlFor="tkt-filter-assignee">Assignee</label>
+        <select id="tkt-filter-assignee" value={filterAssignee} onChange={e => onAssigneeChange(e.target.value)}>
+          <option value="">Anyone</option>
+          {currentEmployee && <option value={currentEmployee.id}>Me</option>}
+          {employees.filter(e => e.id !== currentEmployee?.id).map(e => (
+            <option key={e.id} value={e.id}>{e.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="tkt__filter-group">
+        <label htmlFor="tkt-filter-priority">Priority</label>
+        <select id="tkt-filter-priority" value={filterPriority} onChange={e => onPriorityChange(e.target.value)}>
+          <option value="">Any</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div className="tkt__filter-group">
+        <label htmlFor="tkt-filter-type">Type</label>
+        <select id="tkt-filter-type" value={filterType} onChange={e => onTypeChange(e.target.value)}>
+          <option value="">Any</option>
+          {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+      </div>
+      {uniqueProjects.length > 0 && (
+        <div className="tkt__filter-group">
+          <label htmlFor="tkt-filter-project">Project</label>
+          <select id="tkt-filter-project" value={filterProject} onChange={e => onProjectChange(e.target.value)}>
+            <option value="">Any</option>
+            {uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="tkt__filter-group tkt__filter-group--checkbox">
+        <label className="tkt__filter-checkbox" htmlFor="tkt-filter-linear">
+          <input
+            id="tkt-filter-linear"
+            type="checkbox"
+            checked={filterLinearOnly}
+            onChange={e => onLinearOnlyChange(e.target.checked)}
+          />
+          Linear-linked only
+        </label>
+      </div>
+    </Dropdown>
+  );
+}
 
 // ═══════════════════════════════════════════
 // MAIN COMPONENT
@@ -165,6 +335,7 @@ const TYPE_CONFIG: Record<TicketType, { label: string; icon: typeof Bug; color: 
 
 export function TicketBoard() {
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const [tickets, setTickets] = useState<TicketData[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -174,30 +345,17 @@ export function TicketBoard() {
   const [viewMode, setViewMode] = useState<ViewMode>('board');
   const [projectTab, setProjectTab] = useState<ProjectTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterProject, setFilterProject] = useState('');
+  const [filterLinearOnly, setFilterLinearOnly] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);
   const [notifications, setNotifications] = useState<TicketNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // ── Linear state ──
-  interface LinearIssue {
-    id: string;
-    identifier: string;
-    title: string;
-    status: { name: string; color: string } | null;
-    priority: number;
-    url: string;
-    team?: { name: string } | null;
-    project?: { name: string } | null;
-  }
-  const [linearIssues, setLinearIssues] = useState<LinearIssue[]>([]);
-  const [linearLoading, setLinearLoading] = useState(false);
   const [linearSyncing, setLinearSyncing] = useState(false);
   const [linearError, setLinearError] = useState<string | null>(null);
 
@@ -244,6 +402,7 @@ export function TicketBoard() {
       if (projectTab !== 'all') params.set('project', projectTab);
       else if (filterProject) params.set('project', filterProject);
       if (filterStatus) params.set('status', filterStatus);
+      if (filterLinearOnly) params.set('linked_linear', 'true');
       if (searchQuery) params.set('search', searchQuery);
 
       const res = await fetch(`/api/tickets?${params}`);
@@ -254,7 +413,7 @@ export function TicketBoard() {
     } finally {
       setLoading(false);
     }
-  }, [filterAssignee, filterPriority, filterType, filterProject, filterStatus, searchQuery, projectTab]);
+  }, [filterAssignee, filterPriority, filterType, filterProject, filterStatus, filterLinearOnly, searchQuery, projectTab]);
 
   const fetchNotifications = useCallback(async () => {
     if (!currentEmployee) return;
@@ -281,33 +440,65 @@ export function TicketBoard() {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
-  const fetchLinearIssues = useCallback(async () => {
-    setLinearLoading(true);
-    setLinearError(null);
-    try {
-      const res = await fetch('/api/linear/issues?source=cache');
-      const json = await res.json();
-      if (json.error) throw new Error(json.error.message || String(json.error));
-      setLinearIssues(json.data || json.issues || []);
-    } catch (err: unknown) {
-      setLinearError(err instanceof Error ? err.message : 'Failed to load Linear issues');
-    } finally {
-      setLinearLoading(false);
-    }
-  }, []);
-
-  const syncLinear = async () => {
+  const syncLinear = useCallback(async (fullSync = false, options?: { quiet?: boolean }): Promise<boolean> => {
     setLinearSyncing(true);
     setLinearError(null);
     try {
-      await fetch('/api/linear/sync', { method: 'POST' });
-      await fetchLinearIssues();
+      const res = await fetch('/api/linear/sync', {
+        method: 'POST',
+        headers: LINEAR_JSON_HEADERS,
+        body: JSON.stringify({ incremental: !fullSync }),
+      });
+      if (!res.ok) throw new Error(await parseLinearApiError(res, 'Sync failed'));
+      const json = (await res.json()) as LinearSyncResponse & { error?: string | { message?: string } };
+      if (json.error) {
+        throw new Error(typeof json.error === 'string' ? json.error : json.error.message || 'Sync failed');
+      }
+      await fetchTickets();
+
+      const shouldNotify = !options?.quiet || linearSyncHadChanges(json);
+      if (shouldNotify) {
+        const toast = formatLinearSyncToast(json, fullSync);
+        showToast(toast.message, toast.type);
+      }
+      return true;
     } catch (err: unknown) {
-      setLinearError(err instanceof Error ? err.message : 'Sync failed');
+      const message = err instanceof Error ? err.message : 'Sync failed';
+      setLinearError(message);
+      if (!options?.quiet) {
+        showToast(message, 'error', 6000);
+      }
+      return false;
     } finally {
       setLinearSyncing(false);
     }
-  };
+  }, [fetchTickets, showToast]);
+
+  // Incremental pull at most once per day (persists across visits via localStorage)
+  useEffect(() => {
+    const runAutoSyncIfDue = async () => {
+      try {
+        const last = localStorage.getItem(LINEAR_AUTO_SYNC_STORAGE_KEY);
+        const lastMs = last ? Number(last) : 0;
+        if (Number.isFinite(lastMs) && Date.now() - lastMs < LINEAR_AUTO_SYNC_MS) return;
+      } catch {
+        // localStorage unavailable — still attempt sync
+      }
+
+      const ok = await syncLinear(false, { quiet: true });
+      if (!ok) return;
+
+      try {
+        localStorage.setItem(LINEAR_AUTO_SYNC_STORAGE_KEY, String(Date.now()));
+      } catch {
+        // ignore
+      }
+    };
+
+    void runAutoSyncIfDue();
+    const interval = setInterval(() => void runAutoSyncIfDue(), LINEAR_AUTO_SYNC_MS);
+    return () => clearInterval(interval);
+  }, [syncLinear]);
 
   // ── Grouped tickets for Kanban ──
 
@@ -354,7 +545,7 @@ export function TicketBoard() {
     };
   }, [tickets]);
 
-  const activeFilterCount = [filterStatus, filterAssignee, filterPriority, filterType, filterProject].filter(Boolean).length;
+  const activeFilterCount = [filterStatus, filterAssignee, filterPriority, filterType, filterProject, filterLinearOnly].filter(Boolean).length;
 
   // ── Drag & Drop ──
   const [dragTicketId, setDragTicketId] = useState<string | null>(null);
@@ -373,6 +564,15 @@ export function TicketBoard() {
     setDragOverStatus(null);
   };
 
+  const clearFilters = () => {
+    setFilterStatus('');
+    setFilterAssignee('');
+    setFilterPriority('');
+    setFilterType('');
+    setFilterProject('');
+    setFilterLinearOnly(false);
+  };
+
   const handleDrop = async (newStatus: TicketStatus) => {
     setDragOverStatus(null);
     if (!dragTicketId) return;
@@ -387,7 +587,6 @@ export function TicketBoard() {
       {/* ── Header ── */}
       <header className="tkt__header">
         <div className="tkt__header-left">
-          <Ticket size={22} />
           <h1>Tickets</h1>
         </div>
         <div className="tkt__header-right">
@@ -395,20 +594,31 @@ export function TicketBoard() {
             <Search size={14} />
             <input
               type="text"
-              placeholder="Search tickets... (#238 or TRA-238)"
+              placeholder="Search tickets... (#238 or TRA-123)"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <button
-            className={`tkt__icon-btn ${showFilters ? 'active' : ''}`}
-            onClick={() => setShowFilters(!showFilters)}
-            title="Filters"
-          >
-            <Filter size={16} />
-            {activeFilterCount > 0 && <span className="tkt__filter-count">{activeFilterCount}</span>}
-          </button>
+          <TicketFiltersDropdown
+            filterStatus={filterStatus}
+            filterAssignee={filterAssignee}
+            filterPriority={filterPriority}
+            filterType={filterType}
+            filterProject={filterProject}
+            filterLinearOnly={filterLinearOnly}
+            activeFilterCount={activeFilterCount}
+            employees={employees}
+            currentEmployee={currentEmployee}
+            uniqueProjects={uniqueProjects}
+            onStatusChange={setFilterStatus}
+            onAssigneeChange={setFilterAssignee}
+            onPriorityChange={setFilterPriority}
+            onTypeChange={setFilterType}
+            onProjectChange={setFilterProject}
+            onLinearOnlyChange={setFilterLinearOnly}
+            onClear={clearFilters}
+          />
 
           <div className="tkt__view-toggle">
             <button className={viewMode === 'board' ? 'active' : ''} onClick={() => setViewMode('board')} title="Board">
@@ -420,7 +630,7 @@ export function TicketBoard() {
             <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="Timeline">
               <GanttChart size={16} />
             </button>
-            <button className={viewMode === 'dashboard' ? 'active' : ''} onClick={() => setViewMode('dashboard')} title="Dashboard">
+            <button className={viewMode === 'dashboard' ? 'active' : ''} onClick={() => setViewMode('dashboard')} title="Analytics">
               <BarChart3 size={16} />
             </button>
           </div>
@@ -443,10 +653,6 @@ export function TicketBoard() {
               />
             )}
           </div>
-
-          <button className="tkt__create-btn" onClick={() => setShowCreateModal(true)}>
-            <Plus size={16} /> New Ticket
-          </button>
         </div>
       </header>
 
@@ -459,79 +665,38 @@ export function TicketBoard() {
             onClick={() => {
               setProjectTab(tab);
               setLoading(true);
-              if (tab === 'Web App' || tab === 'all') fetchLinearIssues();
             }}
           >
-            {tab === 'all' ? 'All Projects' : tab}
+            {tab === 'all' ? 'All Tickets' : tab}
             <span className="tkt__project-tab-count">{projectTab === tab || tab === 'all' ? projectTabCounts[tab] : '—'}</span>
           </button>
         ))}
-        <div className="tkt__linear-sync">
-          <button
-            className="tkt__linear-sync-btn"
-            onClick={syncLinear}
-            disabled={linearSyncing}
-            title="Sync issues from Linear"
-          >
-            <RefreshCw size={14} className={linearSyncing ? 'tkt__spinner' : ''} />
-            {linearSyncing ? 'Syncing...' : 'Sync with Linear'}
-          </button>
+        <div className="tkt__tab-actions">
+          {linearError && <span className="tkt__linear-error">{linearError}</span>}
+          <Tooltip content="New ticket" side="bottom" align="end" compact>
+            <button
+              type="button"
+              className="tkt__round-btn tkt__round-btn--create"
+              onClick={() => setShowCreateModal(true)}
+              aria-label="New ticket"
+            >
+              <Plus size={16} />
+            </button>
+          </Tooltip>
+          <Tooltip content={LINEAR_SYNC_HELP} side="bottom" align="end">
+            <button
+              type="button"
+              className="tkt__round-btn tkt__round-btn--sync"
+              onClick={e => syncLinear(e.shiftKey)}
+              disabled={linearSyncing}
+              aria-label="Sync with Linear. Shift+click for full sync."
+              aria-busy={linearSyncing}
+            >
+              <RefreshCw size={16} className={linearSyncing ? 'tkt__spinner' : ''} />
+            </button>
+          </Tooltip>
         </div>
       </div>
-
-      {/* ── Filters ── */}
-      {showFilters && (
-        <div className="tkt__filters">
-          <div className="tkt__filter-group">
-            <label>Status</label>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="">All</option>
-              <option value="active">Active</option>
-              {STATUS_COLUMNS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-          </div>
-          <div className="tkt__filter-group">
-            <label>Assignee</label>
-            <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
-              <option value="">Anyone</option>
-              {currentEmployee && <option value={currentEmployee.id}>Me</option>}
-              {employees.filter(e => e.id !== currentEmployee?.id).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
-          </div>
-          <div className="tkt__filter-group">
-            <label>Priority</label>
-            <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-              <option value="">Any</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-              <option value="none">None</option>
-            </select>
-          </div>
-          <div className="tkt__filter-group">
-            <label>Type</label>
-            <select value={filterType} onChange={e => setFilterType(e.target.value)}>
-              <option value="">Any</option>
-              {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-          </div>
-          {uniqueProjects.length > 0 && (
-            <div className="tkt__filter-group">
-              <label>Project</label>
-              <select value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-                <option value="">Any</option>
-                {uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-          )}
-          {activeFilterCount > 0 && (
-            <button className="tkt__clear-filters" onClick={() => { setFilterStatus(''); setFilterAssignee(''); setFilterPriority(''); setFilterType(''); setFilterProject(''); }}>
-              Clear all
-            </button>
-          )}
-        </div>
-      )}
 
       {/* ── Content ── */}
       {loading ? (
@@ -540,7 +705,13 @@ export function TicketBoard() {
           <p>Loading tickets...</p>
         </div>
       ) : viewMode === 'board' ? (
-        <div className="tkt__board">
+        <HorizontalScrollNav
+          className="tkt__board-shell"
+          viewportClassName="tkt__board"
+          controlsClassName="tkt__board-nav"
+          itemSelector=".tkt__column"
+          ariaLabel="Ticket board columns"
+        >
           {STATUS_COLUMNS.map(col => (
             <div
               key={col.key}
@@ -570,31 +741,19 @@ export function TicketBoard() {
               </div>
             </div>
           ))}
-        </div>
+        </HorizontalScrollNav>
       ) : viewMode === 'list' ? (
         <TicketListView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : viewMode === 'timeline' ? (
         <TimelineView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : (
-        <DashboardView tickets={tickets} projects={projects} />
-      )}
-
-      {/* ── Linear Issues ── */}
-      {(linearIssues.length > 0 || linearLoading || linearError) && (
-        <LinearIssuesSection
-          issues={linearIssues}
-          loading={linearLoading}
-          error={linearError}
-          onSync={syncLinear}
-          syncing={linearSyncing}
-        />
+        <DashboardView tickets={tickets} />
       )}
 
       {showCreateModal && (
         <CreateTicketModal
           employees={employees}
           currentEmployee={currentEmployee}
-          projects={projects}
           tickets={tickets}
           defaultProject={projectTab !== 'all' ? projectTab : 'Web App'}
           onClose={() => setShowCreateModal(false)}
@@ -611,6 +770,7 @@ export function TicketBoard() {
           allTickets={tickets}
           onClose={() => setSelectedTicket(null)}
           onUpdate={() => { fetchTickets(); fetchNotifications(); }}
+          onTicketChange={setSelectedTicket}
         />
       )}
     </div>
@@ -645,12 +805,50 @@ async function handleStatusChange(
 }
 
 // ═══════════════════════════════════════════
+// LINEAR LINK
+// ═══════════════════════════════════════════
+
+function LinearTicketLink({
+  ticket,
+  className = 'tkt__linear-link',
+  showIcon = true,
+}: {
+  ticket: Pick<TicketData, 'linear_url' | 'linear_identifier' | 'external_id'>;
+  className?: string;
+  showIcon?: boolean;
+}) {
+  const url = resolveLinearTicketUrl(ticket);
+  const label = ticket.linear_identifier;
+  if (!url || !label) return null;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      title="Open in Linear"
+      onClick={e => e.stopPropagation()}
+    >
+      {label}
+      {showIcon && <ExternalLink size={10} />}
+    </a>
+  );
+}
+
+// ═══════════════════════════════════════════
 // TICKET CARD (Kanban)
 // ═══════════════════════════════════════════
 
 function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onClick: () => void; onDragStart: () => void }) {
-  const TypeIcon = TYPE_CONFIG[ticket.type]?.icon || AlertCircle;
   const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+  const typeCfg = TYPE_CONFIG[ticket.type];
+  const platformBadge =
+    ticket.project === 'Mobile App'
+      ? { key: 'mobile' as const, label: 'Mobile' }
+      : ticket.project
+        ? { key: 'web' as const, label: 'Web' }
+        : null;
 
   return (
     <div
@@ -659,42 +857,68 @@ function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onCl
       draggable
       onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(); }}
     >
-      <div className="tkt__card-top">
-        <span className="tkt__card-number">#{ticket.number}</span>
-        {ticket.external_id && <span className="tkt__card-external-id">{ticket.external_id}</span>}
-        <span className="tkt__card-priority" style={{ color: priorityCfg.color }}>{priorityCfg.icon}</span>
-      </div>
-      <h4 className="tkt__card-title">{ticket.title}</h4>
-      {ticket.project && (
-        <div className="tkt__card-project">
-          <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
-            {ticket.project === 'Mobile App' ? '📱' : '🌐'} {ticket.project}
-          </span>
+      <div className="tkt__card-header">
+        <div className="tkt__card-ids">
+          {hasLinearLink(ticket) ? (
+            <LinearTicketLink ticket={ticket} className="tkt__card-id tkt__linear-link" />
+          ) : (
+            <span className="tkt__card-id">#{ticket.number}</span>
+          )}
         </div>
-      )}
-      {(ticket.labels && ticket.labels.length > 0) && (
-        <div className="tkt__labels">
-          {ticket.labels.slice(0, 3).map(l => <span key={l} className="tkt__label-pill">{l}</span>)}
-          {ticket.labels.length > 3 && <span className="tkt__label-pill tkt__label-more">+{ticket.labels.length - 3}</span>}
-        </div>
-      )}
-      <div className="tkt__card-bottom">
-        <span className="tkt__card-type" style={{ color: TYPE_CONFIG[ticket.type]?.color }}>
-          <TypeIcon size={12} /> {TYPE_CONFIG[ticket.type]?.label}
-        </span>
-        {ticket.due_date && (
-          <span className="tkt__card-due" title={`Due: ${ticket.due_date}`}>
-            <CalendarDays size={11} />
-            {new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
-        )}
         {ticket.assignee ? (
           <div className="tkt__card-assignee" title={ticket.assignee.name}>
             {ticket.assignee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
           </div>
         ) : (
-          <div className="tkt__card-assignee unassigned"><User size={12} /></div>
+          <div className="tkt__card-assignee unassigned" title="Unassigned">
+            <User size={11} />
+          </div>
         )}
+      </div>
+
+      <h4 className="tkt__card-title" title={ticket.title}>{ticket.title}</h4>
+
+      <div className="tkt__card-footer">
+        <div className="tkt__card-footer-left">
+          {platformBadge && (
+            <span className={`tkt__project-badge tkt__project-badge--${platformBadge.key}`}>
+              {platformBadge.label}
+            </span>
+          )}
+        </div>
+        <div
+          className="tkt__card-footer-right"
+          onMouseEnter={e => e.stopPropagation()}
+        >
+          {ticket.priority !== 'none' && (
+            <Tooltip content={`Priority: ${priorityCfg.label}`} side="top" align="end" delayMs={250} compact>
+              <span
+                className="tkt__priority-dot"
+                style={{ backgroundColor: priorityCfg.color }}
+                role="img"
+                aria-label={`Priority: ${priorityCfg.label}`}
+              />
+            </Tooltip>
+          )}
+          {typeCfg && (
+            <Tooltip content={`Type: ${typeCfg.label}`} side="top" align="end" delayMs={250} compact>
+              <span
+                className="tkt__type-dot"
+                style={{ backgroundColor: typeCfg.color }}
+                role="img"
+                aria-label={`Type: ${typeCfg.label}`}
+              />
+            </Tooltip>
+          )}
+          {ticket.due_date && (
+            <Tooltip content={`Due ${new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`} side="top" align="end" delayMs={250} compact>
+              <span className="tkt__card-due">
+                <CalendarDays size={11} />
+                {new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            </Tooltip>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -709,6 +933,46 @@ type SortDir = 'asc' | 'desc' | null;
 
 const PRIORITY_ORDER: Record<TicketPriority, number> = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
 
+function ListSortHeader({
+  field,
+  label,
+  sortField,
+  sortDir,
+  onSort,
+  className = '',
+}: {
+  field: SortField;
+  label: string;
+  sortField: SortField | null;
+  sortDir: SortDir;
+  onSort: (field: SortField) => void;
+  className?: string;
+}) {
+  const active = sortField === field;
+  const SortIcon = !active || !sortDir
+    ? ArrowUpDown
+    : sortDir === 'asc'
+      ? ArrowUp
+      : ArrowDown;
+
+  return (
+    <span
+      className={`tkt__list-col tkt__sort-header ${className} ${active ? 'tkt__sort-header--active' : ''}`.trim()}
+      onClick={() => onSort(field)}
+      role="columnheader"
+      aria-sort={active && sortDir ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      title={active && sortDir ? `Sorted ${sortDir === 'asc' ? 'ascending' : 'descending'}` : 'Sort column'}
+    >
+      <span>{label}</span>
+      <SortIcon
+        size={12}
+        className={`tkt__sort-icon ${active && sortDir ? 'tkt__sort-icon--active' : 'tkt__sort-icon--neutral'}`}
+        aria-hidden
+      />
+    </span>
+  );
+}
+
 function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
@@ -722,11 +986,6 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
       setSortField(field);
       setSortDir('asc');
     }
-  };
-
-  const sortIndicator = (field: SortField) => {
-    if (sortField !== field) return '';
-    return sortDir === 'asc' ? ' ▲' : sortDir === 'desc' ? ' ▼' : '';
   };
 
   const sorted = useMemo(() => {
@@ -756,40 +1015,41 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
   return (
     <div className="tkt__list">
       <div className="tkt__list-header-row">
-        <span className="tkt__list-col tkt__list-col--id tkt__sort-header" onClick={() => toggleSort('number')}>#{sortIndicator('number')}</span>
-        <span className="tkt__list-col tkt__list-col--title tkt__sort-header" onClick={() => toggleSort('title')}>Title{sortIndicator('title')}</span>
+        <ListSortHeader field="number" label="#" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--id" />
+        <ListSortHeader field="title" label="Title" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--title" />
         <span className="tkt__list-col tkt__list-col--project">Project</span>
-        <span className="tkt__list-col tkt__list-col--status tkt__sort-header" onClick={() => toggleSort('status')}>Status{sortIndicator('status')}</span>
-        <span className="tkt__list-col tkt__list-col--priority tkt__sort-header" onClick={() => toggleSort('priority')}>Priority{sortIndicator('priority')}</span>
-        <span className="tkt__list-col tkt__list-col--type tkt__sort-header" onClick={() => toggleSort('type')}>Type{sortIndicator('type')}</span>
-        <span className="tkt__list-col tkt__list-col--assignee tkt__sort-header" onClick={() => toggleSort('assignee')}>Assignee{sortIndicator('assignee')}</span>
-        <span className="tkt__list-col tkt__list-col--date tkt__sort-header" onClick={() => toggleSort('due_date')}>Due{sortIndicator('due_date')}</span>
-        <span className="tkt__list-col tkt__list-col--date tkt__sort-header" onClick={() => toggleSort('created_at')}>Created{sortIndicator('created_at')}</span>
+        <ListSortHeader field="status" label="Status" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--status" />
+        <ListSortHeader field="priority" label="Priority" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--priority" />
+        <ListSortHeader field="type" label="Type" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--type" />
+        <ListSortHeader field="assignee" label="Assignee" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--assignee" />
+        <ListSortHeader field="due_date" label="Due" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--date" />
+        <ListSortHeader field="created_at" label="Created" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="tkt__list-col--date" />
       </div>
       {sorted.length === 0 ? (
         <div className="tkt__list-empty">No tickets found</div>
       ) : (
         sorted.map(ticket => {
           const statusCol = STATUS_COLUMNS.find(s => s.key === ticket.status);
-          const TypeIcon = TYPE_CONFIG[ticket.type]?.icon || AlertCircle;
+          const typeCfg = TYPE_CONFIG[ticket.type];
           return (
             <div key={ticket.id} className="tkt__list-row" onClick={() => onTicketClick(ticket)}>
-              <span className="tkt__list-col tkt__list-col--id">
-                {ticket.number}
-                {ticket.external_id && <span className="tkt__external-id">{ticket.external_id}</span>}
-              </span>
-              <span className="tkt__list-col tkt__list-col--title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {ticket.title}
-                {ticket.labels && ticket.labels.length > 0 && (
-                  <span className="tkt__labels tkt__labels--inline">
-                    {ticket.labels.slice(0, 2).map(l => <span key={l} className="tkt__label-pill tkt__label-pill--sm">{l}</span>)}
-                  </span>
-                )}
+              <span className="tkt__list-col tkt__list-col--id">{ticket.number}</span>
+              <span className="tkt__list-col tkt__list-col--title">
+                <span className="tkt__list-title-cell">
+                  {hasLinearLink(ticket) && (
+                    <LinearTicketLink
+                      ticket={ticket}
+                      className="tkt__list-linear-key tkt__linear-link"
+                      showIcon={false}
+                    />
+                  )}
+                  <span className="tkt__list-title-text" title={ticket.title}>{ticket.title}</span>
+                </span>
               </span>
               <span className="tkt__list-col tkt__list-col--project">
                 {ticket.project && (
                   <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
-                    {ticket.project === 'Mobile App' ? '📱' : '🌐'} {ticket.project}
+                    {ticket.project === 'Mobile App' ? 'Mobile' : 'Web'}
                   </span>
                 )}
               </span>
@@ -797,12 +1057,18 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
                 <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
               </span>
               <span className="tkt__list-col tkt__list-col--priority" style={{ flexShrink: 0 }}>
-                <span style={{ color: PRIORITY_CONFIG[ticket.priority].color }}>
-                  {PRIORITY_CONFIG[ticket.priority].icon} {PRIORITY_CONFIG[ticket.priority].label}
+                <span className="tkt__list-priority">
+                  <span className="tkt__priority-dot" style={{ backgroundColor: PRIORITY_CONFIG[ticket.priority].color }} />
+                  {PRIORITY_CONFIG[ticket.priority].label}
                 </span>
               </span>
               <span className="tkt__list-col tkt__list-col--type">
-                <TypeIcon size={12} style={{ color: TYPE_CONFIG[ticket.type]?.color }} /> {TYPE_CONFIG[ticket.type]?.label}
+                {typeCfg && (
+                  <span className="tkt__list-type">
+                    <span className="tkt__type-dot" style={{ backgroundColor: typeCfg.color }} />
+                    {typeCfg.label}
+                  </span>
+                )}
               </span>
               <span className="tkt__list-col tkt__list-col--assignee">{ticket.assignee?.name || 'Unassigned'}</span>
               <span className="tkt__list-col tkt__list-col--date">
@@ -898,216 +1164,269 @@ function TimelineView({ tickets, onTicketClick }: { tickets: TicketData[]; onTic
 }
 
 // ═══════════════════════════════════════════
-// DASHBOARD VIEW
+// ANALYTICS VIEW
 // ═══════════════════════════════════════════
 
-function DashboardView({ tickets, projects }: { tickets: TicketData[]; projects: ProjectData[] }) {
-  // Sprint stats
-  const activeTickets = tickets.filter(t => !['done', 'canceled'].includes(t.status));
-  const doneTickets = tickets.filter(t => t.status === 'done');
-  const blockedCount = tickets.filter(t => t.priority === 'critical' && !['done', 'canceled'].includes(t.status)).length;
-  const total = tickets.length;
-  const completionPct = total > 0 ? Math.round((doneTickets.length / total) * 100) : 0;
-
-  // Recent activity: use updated_at to approximate
-  const recentTickets = [...tickets].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 10);
-
-  return (
-    <div className="tkt__dashboard">
-      {/* Sprint Section */}
-      <div className="tkt__dash-section">
-        <h3 className="tkt__dash-title">Current Sprint</h3>
-        <div className="tkt__dash-cards">
-          <div className="tkt__dash-card">
-            <div className="tkt__dash-card-value">{completionPct}%</div>
-            <div className="tkt__dash-card-label">Completion</div>
-            <div className="tkt__dash-progress">
-              <div className="tkt__dash-progress-bar" style={{ width: `${completionPct}%` }} />
-            </div>
-          </div>
-          <div className="tkt__dash-card">
-            <div className="tkt__dash-card-value">{doneTickets.length}/{total}</div>
-            <div className="tkt__dash-card-label">Tickets Done</div>
-          </div>
-          <div className="tkt__dash-card">
-            <div className="tkt__dash-card-value">{activeTickets.length}</div>
-            <div className="tkt__dash-card-label">Active</div>
-          </div>
-          <div className="tkt__dash-card">
-            <div className="tkt__dash-card-value" style={{ color: blockedCount > 0 ? '#ef4444' : undefined }}>{blockedCount}</div>
-            <div className="tkt__dash-card-label">Critical / Blocked</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Projects Section */}
-      {projects.length > 0 && (
-        <div className="tkt__dash-section">
-          <h3 className="tkt__dash-title">Project Overview</h3>
-          <div className="tkt__dash-cards">
-            {projects.map(p => {
-              const pct = p.ticket_count > 0 ? Math.round((p.tickets_done / p.ticket_count) * 100) : 0;
-              return (
-                <div key={p.id} className="tkt__dash-card">
-                  <div className="tkt__dash-card-name">{p.name}</div>
-                  <div className="tkt__dash-card-label">{p.ticket_count} tickets · {pct}% done</div>
-                  <div className="tkt__dash-progress">
-                    <div className="tkt__dash-progress-bar" style={{ width: `${pct}%` }} />
-                  </div>
-                  {p.target_date && <div className="tkt__dash-card-label">Target: {new Date(p.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Activity */}
-      <div className="tkt__dash-section">
-        <h3 className="tkt__dash-title">Recent Activity</h3>
-        <div className="tkt__dash-activity">
-          {recentTickets.map(t => (
-            <div key={t.id} className="tkt__dash-activity-item">
-              <span className="tkt__dash-activity-num">#{t.number}</span>
-              <span className="tkt__dash-activity-title">{t.title}</span>
-              <span className="tkt__status-pill" style={{
-                color: STATUS_COLUMNS.find(s => s.key === t.status)?.color,
-                background: `${STATUS_COLUMNS.find(s => s.key === t.status)?.color}15`,
-              }}>
-                {STATUS_COLUMNS.find(s => s.key === t.status)?.label}
-              </span>
-              <span className="tkt__dash-activity-time">
-                {new Date(t.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+function formatMergeDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+const DASH_KPI_TIPS = {
+  doneThisWeek: 'Tickets marked Done since Monday. Uses resolved date, or last update if none. Counts match the current board filters.',
+  priorAvg: 'Average Done tickets per week over the three calendar weeks before this one (Mon–Sun).',
+  prodMerges: 'Merged pull requests into main (production) on Trailblaize-Web this calendar week.',
+  active: 'Tickets still open (excluding Done and Canceled). Critical is the urgent-priority subset.',
+} as const;
 
-// ═══════════════════════════════════════════
-// LINEAR ISSUES SECTION
-// ═══════════════════════════════════════════
+const DASH_SECTION_TIPS = {
+  weekly: (
+    <>
+      <p className="ui-tooltip__title">Weekly completions</p>
+      <p>Done tickets grouped by calendar week (Monday start). The purple bar is this week; gray bars are prior weeks.</p>
+    </>
+  ),
+  github: (
+    <>
+      <p className="ui-tooltip__title">GitHub merges</p>
+      <p>Recent merged PRs from Trailblaize-Web. Develop is the integration branch; Production is main. Generic branch-sync PRs titled &quot;Develop&quot; are hidden.</p>
+    </>
+  ),
+} as const;
 
-const LINEAR_PRIORITY_DOT: Record<number, string> = {
-  0: '#9ca3af',
-  1: '#ef4444',
-  2: '#f59e0b',
-  3: '#3b82f6',
-  4: '#6b7280',
-};
-
-const LINEAR_PRIORITY_LABEL: Record<number, string> = {
-  0: 'No priority',
-  1: 'Urgent',
-  2: 'High',
-  3: 'Medium',
-  4: 'Low',
-};
-
-interface LinearIssue {
-  id: string;
-  identifier: string;
-  title: string;
-  status: { name: string; color: string } | null;
-  priority: number;
-  url: string;
-  team?: { name: string } | null;
-  project?: { name: string } | null;
-}
-
-function LinearIssuesSection({
-  issues,
-  loading,
-  error,
+function DashKpiCard({
+  tip,
+  children,
 }: {
-  issues: LinearIssue[];
-  loading: boolean;
-  error: string | null;
-  onSync: () => void;
-  syncing: boolean;
+  tip: string;
+  children: React.ReactNode;
 }) {
-  const grouped = useMemo(() => {
-    const g: Record<string, LinearIssue[]> = {};
-    issues.forEach(issue => {
-      const key = issue.project?.name || issue.team?.name || 'General';
-      if (!g[key]) g[key] = [];
-      g[key].push(issue);
-    });
-    return g;
-  }, [issues]);
+  return (
+    <Tooltip content={tip} side="top" align="center" delayMs={200} compact>
+      <div className="tkt__dash-kpi tkt__dash-kpi--tip" tabIndex={0}>
+        {children}
+      </div>
+    </Tooltip>
+  );
+}
+
+function DashSectionTip({ content, label }: { content: React.ReactNode; label: string }) {
+  return (
+    <Tooltip content={content} side="top" align="start" delayMs={150}>
+      <button type="button" className="tkt__dash-info-btn" aria-label={`About ${label}`}>
+        <HelpCircle size={13} />
+      </button>
+    </Tooltip>
+  );
+}
+
+function DashboardView({ tickets }: { tickets: TicketData[] }) {
+  const [github, setGithub] = useState<GitHubMergesSummary | null>(null);
+  const [githubLoading, setGithubLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/github/merges');
+        const json = await res.json();
+        if (!cancelled && json.data) setGithub(json.data);
+      } catch (err) {
+        console.error('Failed to load GitHub merges:', err);
+      } finally {
+        if (!cancelled) setGithubLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const weeklyBuckets = useMemo(() => buildWeeklyCompletionBuckets(tickets, 4), [tickets]);
+  const maxWeekly = Math.max(1, ...weeklyBuckets.map(b => b.count));
+  const thisWeekDone = weeklyBuckets[weeklyBuckets.length - 1]?.count ?? 0;
+  const priorWeeks = weeklyBuckets.slice(0, -1);
+  const priorAvg = priorWeeks.length
+    ? Math.round(priorWeeks.reduce((sum, b) => sum + b.count, 0) / priorWeeks.length)
+    : 0;
+
+  const activeTickets = tickets.filter(t => !['done', 'canceled'].includes(t.status));
+  const criticalCount = tickets.filter(t => t.priority === 'critical' && !['done', 'canceled'].includes(t.status)).length;
+
+  const weekStart = useMemo(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const completedThisWeek = useMemo(() => (
+    tickets
+      .filter(t => {
+        if (t.status !== 'done') return false;
+        const resolved = new Date(t.resolved_at || t.updated_at);
+        return resolved >= weekStart;
+      })
+      .sort((a, b) => new Date(b.resolved_at || b.updated_at).getTime() - new Date(a.resolved_at || a.updated_at).getTime())
+      .slice(0, 5)
+  ), [tickets, weekStart]);
+
+  const renderMergeList = (items: GitHubMergesSummary['develop'], emptyLabel: string) => {
+    if (githubLoading) {
+      return <p className="tkt__dash-muted"><Loader2 size={14} className="tkt__spinner" /> Loading merges…</p>;
+    }
+    if (!github?.configured) {
+      return <p className="tkt__dash-muted">Add GITHUB_TOKEN to show merge activity.</p>;
+    }
+    if (github.error) {
+      return <p className="tkt__dash-muted">{github.error}</p>;
+    }
+    if (items.length === 0) {
+      return <p className="tkt__dash-muted">{emptyLabel}</p>;
+    }
+    return (
+      <ul className="tkt__dash-merge-list">
+        {items.map(item => (
+          <li key={`${item.base}-${item.number}`}>
+            <a href={item.url} target="_blank" rel="noopener noreferrer" className="tkt__dash-merge-link">
+              <span className="tkt__dash-merge-title">#{item.number} {item.title}</span>
+              <span className="tkt__dash-merge-meta">
+                {formatMergeDate(item.merged_at)}
+                {item.author ? ` · ${item.author}` : ''}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    );
+  };
 
   return (
-    <div className="tkt__linear-section">
-      <div className="tkt__linear-header">
-        <h3 className="tkt__linear-title">
-          <Zap size={16} style={{ color: '#5e6ad2' }} />
-          Linear Issues
-          {issues.length > 0 && <span className="tkt__column-count">{issues.length}</span>}
-        </h3>
-        {error && <span className="tkt__linear-error">{error}</span>}
+    <div className="tkt__dashboard tkt__dashboard--analytics">
+      <div className="tkt__dash-kpi-row">
+        <DashKpiCard tip={DASH_KPI_TIPS.doneThisWeek}>
+          <span className="tkt__dash-kpi-value">{thisWeekDone}</span>
+          <span className="tkt__dash-kpi-label">Done this week</span>
+        </DashKpiCard>
+        <DashKpiCard tip={DASH_KPI_TIPS.priorAvg}>
+          <span className="tkt__dash-kpi-value">{priorAvg}</span>
+          <span className="tkt__dash-kpi-label">Prior 3-wk avg</span>
+        </DashKpiCard>
+        <DashKpiCard tip={DASH_KPI_TIPS.prodMerges}>
+          <span className="tkt__dash-kpi-value">{github?.production_this_week ?? '—'}</span>
+          <span className="tkt__dash-kpi-label">Prod merges (wk)</span>
+        </DashKpiCard>
+        <DashKpiCard tip={DASH_KPI_TIPS.active}>
+          <span className="tkt__dash-kpi-value" style={{ color: criticalCount > 0 ? '#ef4444' : undefined }}>
+            {activeTickets.length}
+          </span>
+          <span className="tkt__dash-kpi-label">Active · {criticalCount} critical</span>
+        </DashKpiCard>
       </div>
 
-      {loading ? (
-        <div className="tkt__loading" style={{ padding: '1rem' }}>
-          <Loader2 size={18} className="tkt__spinner" />
-          <span>Loading Linear issues...</span>
-        </div>
-      ) : Object.keys(grouped).length === 0 ? (
-        <p className="tkt__list-empty">No Linear issues synced. Click &quot;Sync with Linear&quot; to pull issues.</p>
-      ) : (
-        Object.entries(grouped).map(([projectName, projectIssues]) => (
-          <div key={projectName} className="tkt__linear-group">
-            <div className="tkt__linear-group-label">{projectName}</div>
-            <div className="tkt__linear-rows">
-              {projectIssues.map(issue => (
-                <div key={issue.id} className="tkt__linear-row">
-                  <span
-                    className="tkt__linear-priority-dot"
-                    style={{ background: LINEAR_PRIORITY_DOT[issue.priority] ?? '#9ca3af' }}
-                    title={LINEAR_PRIORITY_LABEL[issue.priority] ?? 'Unknown priority'}
-                  />
-                  <span className="tkt__linear-identifier">{issue.identifier}</span>
-                  <span className="tkt__linear-issue-title">{issue.title}</span>
-                  {issue.status && (
-                    <span
-                      className="tkt__status-pill"
-                      style={{ color: issue.status.color || '#6b7280', background: `${issue.status.color || '#6b7280'}18` }}
-                    >
-                      {issue.status.name}
-                    </span>
-                  )}
-                  <a
-                    href={issue.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="tkt__linear-ext-link"
-                    onClick={e => e.stopPropagation()}
-                    title="Open in Linear"
-                  >
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
-              ))}
+      <div className="tkt__dash-grid">
+        <section className="tkt__dash-panel">
+          <div className="tkt__dash-panel-head">
+            <h3 className="tkt__dash-title">
+              Weekly completions
+              <DashSectionTip content={DASH_SECTION_TIPS.weekly} label="weekly completions" />
+            </h3>
+            <span className="tkt__dash-subtitle">Tickets marked done</span>
+          </div>
+          <div className="tkt__dash-week-bars">
+            {weeklyBuckets.map(bucket => (
+              <div key={bucket.label} className="tkt__dash-week-bar">
+                <span className="tkt__dash-week-count">{bucket.count}</span>
+                <div
+                  className={`tkt__dash-week-bar-fill ${bucket.isCurrent ? 'tkt__dash-week-bar-fill--current' : ''}`}
+                  style={{ height: `${Math.max(8, (bucket.count / maxWeekly) * 100)}%` }}
+                />
+                <span className="tkt__dash-week-label">{bucket.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="tkt__dash-panel">
+          <div className="tkt__dash-panel-head">
+            <h3 className="tkt__dash-title">
+              <GitMerge size={15} />
+              GitHub · Trailblaize-Web
+              <DashSectionTip content={DASH_SECTION_TIPS.github} label="GitHub merges" />
+            </h3>
+            <a
+              href="https://github.com/Trailblaizedevelopment/Trailblaize-Web"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tkt__dash-repo-link"
+            >
+              Open repo <ExternalLink size={11} />
+            </a>
+          </div>
+          <div className="tkt__dash-merge-columns">
+            <div className="tkt__dash-merge-col">
+              <div className="tkt__dash-merge-col-head">
+                <span className="tkt__dash-merge-branch tkt__dash-merge-branch--develop">develop</span>
+                <span className="tkt__dash-merge-count">{github?.develop_this_week ?? 0} this wk</span>
+              </div>
+              {renderMergeList(github?.develop ?? [], 'No recent develop merges')}
+            </div>
+            <div className="tkt__dash-merge-col">
+              <div className="tkt__dash-merge-col-head">
+                <span className="tkt__dash-merge-branch tkt__dash-merge-branch--prod">production</span>
+                <span className="tkt__dash-merge-count">{github?.production_this_week ?? 0} this wk</span>
+              </div>
+              {renderMergeList(github?.production ?? [], 'No recent production merges')}
             </div>
           </div>
-        ))
-      )}
+        </section>
+      </div>
+
+      <section className="tkt__dash-panel tkt__dash-panel--compact">
+        <div className="tkt__dash-panel-head">
+          <h3 className="tkt__dash-title">Completed this week</h3>
+          <span className="tkt__dash-subtitle">Latest done tickets for sales / eng sync</span>
+        </div>
+        {completedThisWeek.length === 0 ? (
+          <p className="tkt__dash-muted">No tickets completed yet this week.</p>
+        ) : (
+          <div className="tkt__dash-done-list">
+            {completedThisWeek.map(t => (
+              <div key={t.id} className="tkt__dash-done-item">
+                <span className="tkt__dash-done-id">{t.linear_identifier || `#${t.number}`}</span>
+                <span className="tkt__dash-done-title" title={t.title}>{t.title}</span>
+                <span className="tkt__dash-done-date">
+                  {formatMergeDate(t.resolved_at || t.updated_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
+
 
 // ═══════════════════════════════════════════
 // CREATE TICKET MODAL
 // ═══════════════════════════════════════════
 
+interface LinearLabelOption {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+interface LinearProjectOption {
+  id: string;
+  name: string;
+  color: string | null;
+  state: string | null;
+}
+
 function CreateTicketModal({
   employees,
   currentEmployee,
-  projects,
   tickets,
   onClose,
   onCreated,
@@ -1115,7 +1434,6 @@ function CreateTicketModal({
 }: {
   employees: Employee[];
   currentEmployee: Employee | null;
-  projects: ProjectData[];
   tickets: TicketData[];
   onClose: () => void;
   onCreated: () => void;
@@ -1127,15 +1445,83 @@ function CreateTicketModal({
   const [priority, setPriority] = useState<TicketPriority>('medium');
   const [assigneeId, setAssigneeId] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [labelsInput, setLabelsInput] = useState('');
   const [labels, setLabels] = useState<string[]>([]);
+  const [labelPicker, setLabelPicker] = useState('');
+  const [linearLabels, setLinearLabels] = useState<LinearLabelOption[]>([]);
+  const [linearProjects, setLinearProjects] = useState<LinearProjectOption[]>([]);
+  const [linearMetaLoading, setLinearMetaLoading] = useState(true);
   const [projectApp, setProjectApp] = useState<string>(defaultProject && defaultProject !== 'all' ? defaultProject : 'Web App');
-  const [projectId, setProjectId] = useState('');
+  const [linearProjectId, setLinearProjectId] = useState('');
   const [parentTicketId, setParentTicketId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [descriptionKey, setDescriptionKey] = useState(0);
   const [aiDescription, setAiDescription] = useState('');
   const [generatingSpec, setGeneratingSpec] = useState(false);
+  const [aiExpanded, setAiExpanded] = useState(false);
+  const aiPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!aiExpanded) return;
+    requestAnimationFrame(() => {
+      aiPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }, [aiExpanded]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchLinearMeta = async () => {
+      setLinearMetaLoading(true);
+      try {
+        const headers = { Authorization: INTERNAL_AUTH_HEADER };
+        const [labelsRes, projectsRes] = await Promise.all([
+          fetch('/api/linear/labels', { headers }),
+          fetch('/api/linear/projects', { headers }),
+        ]);
+        const labelsJson = await labelsRes.json();
+        const projectsJson = await projectsRes.json();
+        if (cancelled) return;
+        if (labelsJson.data) setLinearLabels(labelsJson.data);
+        if (projectsJson.data) setLinearProjects(projectsJson.data);
+      } catch (err) {
+        console.error('Error fetching Linear metadata:', err);
+      } finally {
+        if (!cancelled) setLinearMetaLoading(false);
+      }
+    };
+    void fetchLinearMeta();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (linearProjects.length === 0) return;
+    const targetName = mapCrmAppToLinearProjectName(projectApp);
+    if (!targetName) {
+      setLinearProjectId('');
+      return;
+    }
+    const mobileName = getLinearMobileProjectName().toLowerCase();
+    const match = linearProjects.find(p =>
+      p.name.toLowerCase() === targetName.toLowerCase() ||
+      (projectApp === 'Mobile App' && p.name.toLowerCase() === mobileName)
+    );
+    setLinearProjectId(match?.id ?? '');
+  }, [projectApp, linearProjects]);
+
+  const availableLabels = useMemo(
+    () => linearLabels.filter(l => !labels.includes(l.name)),
+    [linearLabels, labels]
+  );
+
+  const addLabel = (labelName: string) => {
+    if (!labelName || labels.includes(labelName)) return;
+    setLabels(prev => [...prev, labelName]);
+    setLabelPicker('');
+  };
+
+  const removeLabel = (label: string) => {
+    setLabels(prev => prev.filter(l => l !== label));
+  };
 
   const generateSpec = async () => {
     if (!aiDescription.trim()) return;
@@ -1167,24 +1553,11 @@ function CreateTicketModal({
 
   const isDescriptionEmpty = !description || description === '<p></p>' || !description.replace(/<[^>]*>/g, '').trim();
 
-  const handleLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if ((e.key === 'Enter' || e.key === ',') && labelsInput.trim()) {
-      e.preventDefault();
-      const newLabel = labelsInput.trim().replace(/,/g, '');
-      if (newLabel && !labels.includes(newLabel)) {
-        setLabels([...labels, newLabel]);
-      }
-      setLabelsInput('');
-    }
-  };
-
-  const removeLabel = (label: string) => {
-    setLabels(labels.filter(l => l !== label));
-  };
-
-  const handleSubmit = async () => {
-    if (!title.trim()) return;
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!title.trim() || creating) return;
     setCreating(true);
+    setCreateError(null);
     try {
       const res = await fetch('/api/tickets', {
         method: 'POST',
@@ -1199,146 +1572,356 @@ function CreateTicketModal({
           due_date: dueDate || null,
           labels,
           project: projectApp || 'Web App',
-          project_id: projectId || null,
+          linear_project_id: linearProjectId || null,
           parent_ticket_id: parentTicketId || null,
+          create_in_linear: true,
         }),
       });
       const result = await res.json();
-      if (result.error) alert(result.error.message);
-      else onCreated();
+      if (result.error) {
+        setCreateError(result.error.message || 'Failed to create ticket');
+        return;
+      }
+      onCreated();
     } catch (err) {
       console.error('Error creating ticket:', err);
+      setCreateError(err instanceof Error ? err.message : 'Failed to create ticket');
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <ModalOverlay className="tkt__overlay" onClose={onClose}>
-      <div className="tkt__modal" onClick={e => e.stopPropagation()}>
+    <ModalOverlay className="tkt__overlay tkt__overlay--modal" onClose={onClose}>
+      <div className="tkt__modal tkt__modal--create" onClick={e => e.stopPropagation()}>
         <div className="tkt__modal-header">
           <h2>New Ticket</h2>
-          <button onClick={onClose}><X size={18} /></button>
+          <button type="button" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
-        <div className="tkt__modal-body">
-          {/* AI Spec Generation */}
-          <div className="tkt__field tkt__ai-spec-field">
-            <label>Describe in plain English <span style={{ color: '#8b5cf6', fontWeight: 400 }}>(optional)</span></label>
-            <textarea
-              placeholder="e.g. The login button doesn't work on mobile Safari when the keyboard is open..."
-              value={aiDescription}
-              onChange={e => setAiDescription(e.target.value)}
-              rows={2}
-              style={{ width: '100%', resize: 'vertical' }}
-            />
-            <button
-              type="button"
-              className="tkt__generate-spec-btn"
-              onClick={generateSpec}
-              disabled={!aiDescription.trim() || generatingSpec}
-            >
-              {generatingSpec ? <Loader2 size={13} className="tkt__spinner" /> : <Sparkles size={13} />}
-              {generatingSpec ? 'Generating...' : 'Generate Spec ✨'}
-            </button>
-          </div>
-          <div className="tkt__field">
-            <label>Title *</label>
-            <input type="text" placeholder="Brief summary..." value={title} onChange={e => setTitle(e.target.value)} autoFocus />
-          </div>
-          <div className="tkt__field">
-            <label>Description</label>
-            <RichTextEditor key={descriptionKey} content={description} onChange={setDescription} placeholder="Steps to reproduce, expected behavior..." />
-          </div>
-          <div className="tkt__field">
-            <label>App</label>
-            <div className="tkt__project-tab-select">
-              {(['Web App', 'Mobile App'] as const).map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  className={`tkt__project-tab-btn ${projectApp === p ? 'active' : ''}`}
-                  onClick={() => setProjectApp(p)}
-                >
-                  {p === 'Mobile App' ? '📱' : '🌐'} {p}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="tkt__field-row">
+        <form className="tkt__modal-form" onSubmit={handleSubmit}>
+          <div className="tkt__modal-body">
             <div className="tkt__field">
-              <label>Type</label>
-              <select value={type} onChange={e => setType(e.target.value as TicketType)}>
-                {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-              </select>
-            </div>
-            <div className="tkt__field">
-              <label>Priority</label>
-              <select value={priority} onChange={e => setPriority(e.target.value as TicketPriority)}>
-                <option value="none">None</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-            <div className="tkt__field">
-              <label>Assign to</label>
-              <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
-                <option value="">Unassigned</option>
-                {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="tkt__field-row">
-            <div className="tkt__field">
-              <label>Due Date</label>
-              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
-            </div>
-            <div className="tkt__field">
-              <label>Project</label>
-              <select value={projectId} onChange={e => setProjectId(e.target.value)}>
-                <option value="">None</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div className="tkt__field">
-              <label>Parent Ticket</label>
-              <select value={parentTicketId} onChange={e => setParentTicketId(e.target.value)}>
-                <option value="">None</option>
-                {tickets.filter(t => t.type === 'epic' || t.type === 'feature_request').map(t => (
-                  <option key={t.id} value={t.id}>#{t.number} {t.title.substring(0, 40)}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="tkt__field">
-            <label>Labels</label>
-            <div className="tkt__labels-input">
-              {labels.map(l => (
-                <span key={l} className="tkt__label-pill">
-                  {l}
-                  <button onClick={() => removeLabel(l)}><X size={10} /></button>
-                </span>
-              ))}
+              <label htmlFor="create-ticket-title">Title *</label>
               <input
+                id="create-ticket-title"
                 type="text"
-                placeholder="Type and press Enter..."
-                value={labelsInput}
-                onChange={e => setLabelsInput(e.target.value)}
-                onKeyDown={handleLabelKeyDown}
+                placeholder="Brief summary..."
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                autoFocus
               />
             </div>
+            <div className="tkt__field">
+              <label>App</label>
+              <div className="tkt__project-tab-select">
+                {(['Web App', 'Mobile App'] as const).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`tkt__project-tab-btn ${projectApp === p ? 'active' : ''}`}
+                    onClick={() => setProjectApp(p)}
+                  >
+                    {p === 'Mobile App' ? '📱' : '🌐'} {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="tkt__field-row tkt__field-row--compact">
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-type">Type</label>
+                <select id="create-ticket-type" value={type} onChange={e => setType(e.target.value as TicketType)}>
+                  {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-priority">Priority</label>
+                <select id="create-ticket-priority" value={priority} onChange={e => setPriority(e.target.value as TicketPriority)}>
+                  <option value="none">None</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-assignee">Assign to</label>
+                <select id="create-ticket-assignee" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
+                  <option value="">Unassigned</option>
+                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="tkt__field tkt__field--rte">
+              <label>Description</label>
+              <RichTextEditor key={descriptionKey} content={description} onChange={setDescription} placeholder="Steps to reproduce, expected behavior..." />
+            </div>
+            <div className="tkt__field-row tkt__field-row--compact">
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-due">Due Date</label>
+                <input id="create-ticket-due" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+              </div>
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-linear-project">Linear Project</label>
+                <select
+                  id="create-ticket-linear-project"
+                  value={linearProjectId}
+                  onChange={e => setLinearProjectId(e.target.value)}
+                  disabled={linearMetaLoading}
+                >
+                  <option value="">{linearMetaLoading ? 'Loading projects…' : 'None'}</option>
+                  {linearProjects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {!linearMetaLoading && linearProjects.length === 0 && (
+                  <span className="tkt__field-hint">No Linear projects synced. Run Sync with Linear first.</span>
+                )}
+              </div>
+              <div className="tkt__field">
+                <label htmlFor="create-ticket-parent">Parent Ticket</label>
+                <select id="create-ticket-parent" value={parentTicketId} onChange={e => setParentTicketId(e.target.value)}>
+                  <option value="">None</option>
+                  {tickets.filter(t => t.type === 'epic' || t.type === 'feature_request').map(t => (
+                    <option key={t.id} value={t.id}>#{t.number} {t.title.substring(0, 40)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="tkt__field">
+              <label htmlFor="create-ticket-labels">Labels</label>
+              {linearMetaLoading ? (
+                <p className="tkt__props-labels-empty">Loading Linear labels…</p>
+              ) : linearLabels.length === 0 ? (
+                <p className="tkt__props-labels-empty">No Linear labels synced yet. Run Sync with Linear first.</p>
+              ) : (
+                <>
+                  <select
+                    id="create-ticket-labels"
+                    value={labelPicker}
+                    onChange={e => addLabel(e.target.value)}
+                    disabled={availableLabels.length === 0}
+                  >
+                    <option value="">
+                      {availableLabels.length === 0 ? 'All labels selected' : 'Add label…'}
+                    </option>
+                    {availableLabels.map(label => (
+                      <option key={label.id} value={label.name}>{label.name}</option>
+                    ))}
+                  </select>
+                  {labels.length > 0 && (
+                    <div className="tkt__create-labels-selected">
+                      {labels.map(name => {
+                        const meta = linearLabels.find(l => l.name === name);
+                        return (
+                          <span key={name} className="tkt__label-pill">
+                            <span
+                              className="tkt__props-label-dot"
+                              style={{ backgroundColor: meta?.color || '#9ca3af' }}
+                            />
+                            {name}
+                            <button type="button" onClick={() => removeLabel(name)} aria-label={`Remove label ${name}`}>
+                              <X size={10} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="tkt__ai-spec-panel" ref={aiPanelRef}>
+              <button
+                type="button"
+                className="tkt__ai-spec-toggle"
+                onClick={() => setAiExpanded(open => !open)}
+                aria-expanded={aiExpanded}
+              >
+                <Sparkles size={14} />
+                <span>Generate from plain English (optional)</span>
+                <ChevronDown size={16} className={aiExpanded ? 'tkt__ai-spec-chevron--open' : undefined} />
+              </button>
+              {aiExpanded && (
+                <div className="tkt__ai-spec-body">
+                  <textarea
+                    placeholder="e.g. The login button doesn't work on mobile Safari when the keyboard is open..."
+                    value={aiDescription}
+                    onChange={e => setAiDescription(e.target.value)}
+                    rows={2}
+                  />
+                  <button
+                    type="button"
+                    className="tkt__generate-spec-btn"
+                    onClick={generateSpec}
+                    disabled={!aiDescription.trim() || generatingSpec}
+                  >
+                    {generatingSpec ? <Loader2 size={13} className="tkt__spinner" /> : <Sparkles size={13} />}
+                    {generatingSpec ? 'Generating...' : 'Generate Spec'}
+                  </button>
+                </div>
+              )}
+            </div>
+            {createError && (
+              <p className="tkt__modal-error" role="alert">{createError}</p>
+            )}
           </div>
-        </div>
-        <div className="tkt__modal-footer">
-          <button className="tkt__btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="tkt__btn-primary" onClick={handleSubmit} disabled={!title.trim() || creating}>
-            {creating ? <Loader2 size={14} className="tkt__spinner" /> : <Plus size={14} />}
-            {creating ? 'Creating...' : 'Create Ticket'}
-          </button>
-        </div>
+          <div className="tkt__modal-footer">
+            <button type="button" className="tkt__btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="tkt__btn-primary" disabled={!title.trim() || creating}>
+              {creating ? <Loader2 size={14} className="tkt__spinner" /> : <Plus size={14} />}
+              {creating ? 'Creating in Linear...' : 'Create Ticket'}
+            </button>
+          </div>
+        </form>
       </div>
     </ModalOverlay>
+  );
+}
+
+// ═══════════════════════════════════════════
+// TICKET PROPERTIES WIZARD
+// ═══════════════════════════════════════════
+
+interface TicketPropertiesWizardProps {
+  ticket: TicketData;
+  employees: Employee[];
+  projects: ProjectData[];
+  linearLabels: LinearLabelOption[];
+  labelsLoading: boolean;
+  editLabels: string[];
+  updating: boolean;
+  onFieldUpdate: (field: string, value: unknown) => void;
+  onToggleLabel: (label: string) => void;
+  onDone: () => void;
+}
+
+function TicketPropertiesWizard({
+  ticket,
+  employees,
+  projects,
+  linearLabels,
+  labelsLoading,
+  editLabels,
+  updating,
+  onFieldUpdate,
+  onToggleLabel,
+  onDone,
+}: TicketPropertiesWizardProps) {
+  const typeCfg = TYPE_CONFIG[ticket.type];
+  const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+
+  return (
+    <div className="tkt__props-wizard">
+      <div className="tkt__props-wizard-intro">
+        <h3>Ticket properties</h3>
+        <p>Update fields synced with your board. Labels come from Linear only.</p>
+      </div>
+
+      <div className="tkt__props-wizard-grid">
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-status">Status</label>
+          <select id="tkt-prop-status" value={ticket.status} onChange={e => onFieldUpdate('status', e.target.value)} disabled={updating}>
+            {STATUS_COLUMNS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-priority">Priority</label>
+          <select id="tkt-prop-priority" value={ticket.priority} onChange={e => onFieldUpdate('priority', e.target.value)} disabled={updating}>
+            <option value="none">None</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+          <span className="tkt__props-hint">
+            <span className="tkt__priority-dot" style={{ backgroundColor: priorityCfg.color }} />
+            {priorityCfg.label}
+          </span>
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-type">Type</label>
+          <select id="tkt-prop-type" value={ticket.type} onChange={e => onFieldUpdate('type', e.target.value)} disabled={updating}>
+            {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          {typeCfg && (
+            <span className="tkt__props-hint">
+              <span className="tkt__type-dot" style={{ backgroundColor: typeCfg.color }} />
+              {typeCfg.label}
+            </span>
+          )}
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-assignee">Assignee</label>
+          <select id="tkt-prop-assignee" value={ticket.assignee_id || ''} onChange={e => onFieldUpdate('assignee_id', e.target.value || null)} disabled={updating}>
+            <option value="">Unassigned</option>
+            {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+          </select>
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-reviewer">Reviewer</label>
+          <select id="tkt-prop-reviewer" value={ticket.reviewer_id || ''} onChange={e => onFieldUpdate('reviewer_id', e.target.value || null)} disabled={updating}>
+            <option value="">None</option>
+            {employees.filter(emp => emp.id !== ticket.assignee_id).map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+          </select>
+        </div>
+
+        <div className="tkt__props-field">
+          <label htmlFor="tkt-prop-due">Due date</label>
+          <input id="tkt-prop-due" type="date" value={ticket.due_date || ''} onChange={e => onFieldUpdate('due_date', e.target.value || null)} disabled={updating} />
+        </div>
+
+        <div className="tkt__props-field tkt__props-field--full">
+          <label htmlFor="tkt-prop-project">Project</label>
+          <select id="tkt-prop-project" value={ticket.project_id || ''} onChange={e => onFieldUpdate('project_id', e.target.value || null)} disabled={updating}>
+            <option value="">None</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+
+        <div className="tkt__props-field tkt__props-field--full">
+          <label>Labels</label>
+          {labelsLoading ? (
+            <p className="tkt__props-labels-empty">Loading Linear labels…</p>
+          ) : linearLabels.length === 0 ? (
+            <p className="tkt__props-labels-empty">No Linear labels synced yet. Run Sync with Linear first.</p>
+          ) : (
+            <div className="tkt__props-labels">
+              {linearLabels.map(label => {
+                const selected = editLabels.includes(label.name);
+                return (
+                  <button
+                    key={label.id}
+                    type="button"
+                    className={`tkt__props-label-btn ${selected ? 'selected' : ''}`}
+                    onClick={() => onToggleLabel(label.name)}
+                    disabled={updating}
+                  >
+                    <span className="tkt__props-label-dot" style={{ backgroundColor: label.color || '#9ca3af' }} />
+                    {label.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="tkt__props-readonly">
+        <div><span>Creator</span><strong>{ticket.creator?.name || 'Unknown'}</strong></div>
+        <div><span>Created</span><strong>{new Date(ticket.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>
+        {ticket.resolved_at && (
+          <div><span>Resolved</span><strong>{new Date(ticket.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>
+        )}
+      </div>
+
+      <div className="tkt__props-wizard-footer">
+        <button type="button" className="tkt__props-done-btn" onClick={onDone}>Done</button>
+      </div>
+    </div>
   );
 }
 
@@ -1354,6 +1937,7 @@ function TicketDetailPanel({
   allTickets,
   onClose,
   onUpdate,
+  onTicketChange,
 }: {
   ticket: TicketData;
   employees: Employee[];
@@ -1362,8 +1946,10 @@ function TicketDetailPanel({
   allTickets: TicketData[];
   onClose: () => void;
   onUpdate: () => void;
+  onTicketChange: (ticket: TicketData) => void;
 }) {
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
+  const [detailView, setDetailView] = useState<'content' | 'properties'>('content');
   const [comments, setComments] = useState<TicketComment[]>([]);
   const [activity, setActivity] = useState<TicketActivityEntry[]>([]);
   const [commentText, setCommentText] = useState('');
@@ -1372,9 +1958,9 @@ function TicketDetailPanel({
   const [deleting, setDeleting] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
-  // Labels editing
   const [editLabels, setEditLabels] = useState<string[]>(ticket.labels || []);
-  const [labelInput, setLabelInput] = useState('');
+  const [linearLabels, setLinearLabels] = useState<LinearLabelOption[]>([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
 
   const subTickets = allTickets.filter(t => t.parent_ticket_id === ticket.id);
   const parentTicket = ticket.parent_ticket_id ? allTickets.find(t => t.id === ticket.parent_ticket_id) : null;
@@ -1398,6 +1984,26 @@ function TicketDetailPanel({
   useEffect(() => { fetchComments(); fetchActivity(); }, [fetchComments, fetchActivity]);
   useEffect(() => { commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [comments]);
   useEffect(() => { setEditLabels(ticket.labels || []); }, [ticket.labels]);
+  useEffect(() => { setDetailView('content'); }, [ticket.id]);
+
+  const fetchLinearLabels = useCallback(async () => {
+    setLabelsLoading(true);
+    try {
+      const res = await fetch('/api/linear/labels', {
+        headers: { Authorization: INTERNAL_AUTH_HEADER },
+      });
+      const { data } = await res.json();
+      if (data) setLinearLabels(data);
+    } catch (err) {
+      console.error('Error fetching Linear labels:', err);
+    } finally {
+      setLabelsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (detailView === 'properties') void fetchLinearLabels();
+  }, [detailView, fetchLinearLabels]);
 
   const parseMentions = (text: string): string[] => {
     const mentioned: string[] = [];
@@ -1427,7 +2033,10 @@ function TicketDetailPanel({
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete ticket #${ticket.number}? This cannot be easily undone.`)) return;
+    const linearNote = hasLinearLink(ticket)
+      ? ' This will also delete the linked Linear issue.'
+      : '';
+    if (!confirm(`Delete ticket #${ticket.number}?${linearNote} This cannot be easily undone.`)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/tickets/${ticket.id}`, { method: 'DELETE' });
@@ -1446,8 +2055,12 @@ function TicketDetailPanel({
     }
   };
 
-  const isCreatorOrAdmin = currentEmployee &&
-    (ticket.creator_id === currentEmployee.id || currentEmployee.role === 'founder' || currentEmployee.role === 'cofounder');
+  const isCreatorOrAdmin = currentEmployee && (
+    ticket.creator_id === currentEmployee.id
+    || currentEmployee.role === 'founder'
+    || currentEmployee.role === 'cofounder'
+    || currentEmployee.email?.toLowerCase() === 'devin@trailblaize.net'
+  );
 
   const handleFieldUpdate = async (field: string, value: unknown) => {
     setUpdating(true);
@@ -1460,41 +2073,65 @@ function TicketDetailPanel({
       });
       const result = await res.json();
       if (result.error) alert(result.error.message);
-      else { onUpdate(); fetchActivity(); }
+      else {
+        if (result.data) onTicketChange(result.data);
+        onUpdate();
+        fetchActivity();
+      }
     } catch (err) { console.error('Error updating ticket:', err); }
     finally { setUpdating(false); }
   };
 
-  const handleLabelAdd = () => {
-    const val = labelInput.trim();
-    if (val && !editLabels.includes(val)) {
-      const newLabels = [...editLabels, val];
-      setEditLabels(newLabels);
-      setLabelInput('');
-      handleFieldUpdate('labels', newLabels);
-    }
-  };
-
-  const handleLabelRemove = (label: string) => {
-    const newLabels = editLabels.filter(l => l !== label);
+  const handleLabelToggle = (label: string) => {
+    const newLabels = editLabels.includes(label)
+      ? editLabels.filter(l => l !== label)
+      : [...editLabels, label];
     setEditLabels(newLabels);
     handleFieldUpdate('labels', newLabels);
   };
 
+  const handleDescriptionSave = async (description: string) => {
+    await handleFieldUpdate('description', description);
+  };
+
   const statusCol = STATUS_COLUMNS.find(s => s.key === ticket.status);
-  const TypeIcon = TYPE_CONFIG[ticket.type]?.icon || AlertCircle;
+  const typeCfg = TYPE_CONFIG[ticket.type];
+  const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+  const assigneeName = ticket.assignee?.name || 'Unassigned';
 
   return (
     <ModalOverlay className="tkt__overlay" onClose={onClose}>
       <div className="tkt__detail" onClick={e => e.stopPropagation()}>
         <div className="tkt__detail-header">
           <div className="tkt__detail-header-left">
-            <span className="tkt__detail-number">#{ticket.number}</span>
-            {ticket.external_id && <span className="tkt__detail-external-id">{ticket.external_id}</span>}
-            <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
+            {detailView === 'properties' ? (
+              <button type="button" className="tkt__detail-back" onClick={() => setDetailView('content')}>
+                <ArrowLeft size={16} />
+                Back
+              </button>
+            ) : (
+              <>
+                <span className="tkt__detail-number">#{ticket.number}</span>
+                {hasLinearLink(ticket) && (
+                  <LinearTicketLink ticket={ticket} className="tkt__detail-external-id tkt__linear-link" />
+                )}
+                <span className="tkt__status-pill" style={{ color: statusCol?.color, background: `${statusCol?.color}15` }}>{statusCol?.label}</span>
+              </>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {isCreatorOrAdmin && (
+            {detailView === 'content' && (
+              <button
+                type="button"
+                className="tkt__detail-props-btn"
+                onClick={() => setDetailView('properties')}
+                aria-label="Edit ticket properties"
+              >
+                <SlidersHorizontal size={15} />
+                Properties
+              </button>
+            )}
+            {isCreatorOrAdmin && detailView === 'content' && (
               <button
                 onClick={handleDelete}
                 disabled={deleting}
@@ -1509,198 +2146,173 @@ function TicketDetailPanel({
         </div>
 
         <div className="tkt__detail-body">
-          <h2 className="tkt__detail-title">{ticket.title}</h2>
-          {ticket.description && <div className="tkt__detail-desc"><RichTextDisplay content={ticket.description} /></div>}
+          {detailView === 'properties' ? (
+            <TicketPropertiesWizard
+              ticket={ticket}
+              employees={employees}
+              projects={projects}
+              linearLabels={linearLabels}
+              labelsLoading={labelsLoading}
+              editLabels={editLabels}
+              updating={updating}
+              onFieldUpdate={handleFieldUpdate}
+              onToggleLabel={handleLabelToggle}
+              onDone={() => setDetailView('content')}
+            />
+          ) : (
+            <>
+              <h2 className="tkt__detail-title">{ticket.title}</h2>
 
-          {/* Parent ticket link */}
-          {parentTicket && (
-            <div className="tkt__detail-parent">
-              <Link2 size={12} /> Parent: <strong>#{parentTicket.number}</strong> {parentTicket.title}
-            </div>
-          )}
-
-          <div className="tkt__detail-meta">
-            <div className="tkt__meta-row">
-              <label>Status</label>
-              <select value={ticket.status} onChange={e => handleFieldUpdate('status', e.target.value)} disabled={updating}>
-                {STATUS_COLUMNS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Priority</label>
-              <select value={ticket.priority} onChange={e => handleFieldUpdate('priority', e.target.value)} disabled={updating}>
-                <option value="none">None</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Type</label>
-              <span style={{ color: TYPE_CONFIG[ticket.type]?.color || '#6b7280', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <TypeIcon size={14} /> {TYPE_CONFIG[ticket.type]?.label || ticket.type}
-              </span>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Assignee</label>
-              <select value={ticket.assignee_id || ''} onChange={e => handleFieldUpdate('assignee_id', e.target.value || null)} disabled={updating}>
-                <option value="">Unassigned</option>
-                {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Reviewer</label>
-              <select value={ticket.reviewer_id || ''} onChange={e => handleFieldUpdate('reviewer_id', e.target.value || null)} disabled={updating}>
-                <option value="">None</option>
-                {employees.filter(emp => emp.id !== ticket.assignee_id).map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Due Date</label>
-              <input type="date" value={ticket.due_date || ''} onChange={e => handleFieldUpdate('due_date', e.target.value || null)} disabled={updating} />
-            </div>
-            <div className="tkt__meta-row">
-              <label>Project</label>
-              <select value={ticket.project_id || ''} onChange={e => handleFieldUpdate('project_id', e.target.value || null)} disabled={updating}>
-                <option value="">None</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Creator</label>
-              <span>{ticket.creator?.name || 'Unknown'}</span>
-            </div>
-            <div className="tkt__meta-row">
-              <label>Created</label>
-              <span>{new Date(ticket.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-            </div>
-            {ticket.resolved_at && (
-              <div className="tkt__meta-row">
-                <label>Resolved</label>
-                <span>{new Date(ticket.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Labels */}
-          <div className="tkt__detail-section">
-            <label>Labels</label>
-            <div className="tkt__labels-input">
-              {editLabels.map(l => (
-                <span key={l} className="tkt__label-pill">
-                  {l}
-                  <button onClick={() => handleLabelRemove(l)}><X size={10} /></button>
+              <div className="tkt__detail-summary">
+                <span className="tkt__detail-summary-item">
+                  <span className="tkt__priority-dot" style={{ backgroundColor: priorityCfg.color }} />
+                  {priorityCfg.label}
                 </span>
-              ))}
-              <input
-                type="text"
-                placeholder="Add label..."
-                value={labelInput}
-                onChange={e => setLabelInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLabelAdd(); } }}
-              />
-            </div>
-          </div>
-
-          {/* Sub-tickets */}
-          {subTickets.length > 0 && (
-            <div className="tkt__detail-section">
-              <label>Sub-tickets ({subTickets.length})</label>
-              <div className="tkt__subtasks">
-                {subTickets.map(st => {
-                  const stStatus = STATUS_COLUMNS.find(s => s.key === st.status);
-                  return (
-                    <div key={st.id} className="tkt__subtask-item">
-                      <span className="tkt__subtask-num">#{st.number}</span>
-                      <span className="tkt__subtask-title">{st.title}</span>
-                      <span className="tkt__status-pill" style={{ color: stStatus?.color, background: `${stStatus?.color}15`, fontSize: '0.65rem' }}>{stStatus?.label}</span>
-                    </div>
-                  );
-                })}
+                {typeCfg && (
+                  <span className="tkt__detail-summary-item">
+                    <span className="tkt__type-dot" style={{ backgroundColor: typeCfg.color }} />
+                    {typeCfg.label}
+                  </span>
+                )}
+                <span className="tkt__detail-summary-item">{assigneeName}</span>
+                {ticket.project && (
+                  <span className={`tkt__project-badge tkt__project-badge--${ticket.project === 'Mobile App' ? 'mobile' : 'web'}`}>
+                    {ticket.project === 'Mobile App' ? 'Mobile' : 'Web'}
+                  </span>
+                )}
+                {editLabels.slice(0, 3).map(label => (
+                  <span key={label} className="tkt__label-pill tkt__label-pill--sm">{label}</span>
+                ))}
+                {editLabels.length > 3 && (
+                  <span className="tkt__label-pill tkt__label-pill--sm tkt__label-more">+{editLabels.length - 3}</span>
+                )}
               </div>
-            </div>
-          )}
 
-          {/* QA Gate */}
-          {ticket.status === 'testing' && (
-            <div className="tkt__qa-gate">
-              <AlertTriangle size={14} />
-              <span>QA Gate: A reviewer (different from assignee) must verify before marking Done.
-                {!ticket.reviewer_id && ' Assign a reviewer above.'}
-              </span>
-            </div>
-          )}
-
-          {/* Tabs */}
-          <div className="tkt__tabs">
-            <button className={activeTab === 'comments' ? 'active' : ''} onClick={() => setActiveTab('comments')}>
-              <MessageSquare size={14} /> Comments ({comments.length})
-            </button>
-            <button className={activeTab === 'activity' ? 'active' : ''} onClick={() => setActiveTab('activity')}>
-              <Activity size={14} /> Activity ({activity.length})
-            </button>
-          </div>
-
-          {activeTab === 'comments' && (
-            <div className="tkt__comments">
-              {comments.length === 0 ? (
-                <p className="tkt__comments-empty">No comments yet. Start the conversation.</p>
-              ) : (
-                comments.map(c => (
-                  <div key={c.id} className="tkt__comment">
-                    <div className="tkt__comment-avatar">
-                      {c.author?.name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
-                    </div>
-                    <div className="tkt__comment-body">
-                      <div className="tkt__comment-header">
-                        <span className="tkt__comment-author">{c.author?.name || 'Unknown'}</span>
-                        <span className="tkt__comment-time">
-                          {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          {' '}{new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <p className="tkt__comment-text">{c.content}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-              <div ref={commentsEndRef} />
-              <div className="tkt__comment-input">
-                <textarea
-                  placeholder="Write a comment... Use @name to mention"
-                  value={commentText}
-                  onChange={e => setCommentText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleComment(); }}
-                  rows={2}
+              <div className="tkt__detail-desc">
+                <label className="tkt__detail-section-label">Description</label>
+                <MarkdownEditor
+                  value={ticket.description || ''}
+                  onSave={handleDescriptionSave}
+                  placeholder="Add a description… Supports **markdown**, lists, and code blocks."
                 />
-                <button className="tkt__send-btn" onClick={handleComment} disabled={!commentText.trim() || sending}>
-                  {sending ? <Loader2 size={14} className="tkt__spinner" /> : <Send size={14} />}
+              </div>
+
+              {parentTicket && (
+                <div className="tkt__detail-parent">
+                  <Link2 size={12} /> Parent: <strong>#{parentTicket.number}</strong> {parentTicket.title}
+                </div>
+              )}
+
+              {subTickets.length > 0 && (
+                <div className="tkt__detail-section">
+                  <label>Sub-tickets ({subTickets.length})</label>
+                  <div className="tkt__subtasks">
+                    {subTickets.map(st => {
+                      const stStatus = STATUS_COLUMNS.find(s => s.key === st.status);
+                      return (
+                        <div key={st.id} className="tkt__subtask-item">
+                          <span className="tkt__subtask-num">#{st.number}</span>
+                          <span className="tkt__subtask-title">{st.title}</span>
+                          <span className="tkt__status-pill" style={{ color: stStatus?.color, background: `${stStatus?.color}15`, fontSize: '0.65rem' }}>{stStatus?.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {ticket.status === 'testing' && (
+                <div className="tkt__qa-gate">
+                  <AlertTriangle size={14} />
+                  <span>QA Gate: A reviewer (different from assignee) must verify before marking Done.
+                    {!ticket.reviewer_id && ' Assign a reviewer in Properties.'}
+                  </span>
+                </div>
+              )}
+
+              <div className="tkt__tabs">
+                <button className={activeTab === 'comments' ? 'active' : ''} onClick={() => setActiveTab('comments')}>
+                  <MessageSquare size={14} /> Comments ({comments.length})
+                </button>
+                <button className={activeTab === 'activity' ? 'active' : ''} onClick={() => setActiveTab('activity')}>
+                  <Activity size={14} /> Activity ({activity.length})
                 </button>
               </div>
-            </div>
-          )}
 
-          {activeTab === 'activity' && (
-            <div className="tkt__activity">
-              {activity.length === 0 ? (
-                <p className="tkt__activity-empty">No activity recorded yet.</p>
-              ) : (
-                activity.map(a => (
-                  <div key={a.id} className="tkt__activity-item">
-                    <div className="tkt__activity-dot" />
-                    <div className="tkt__activity-content">
-                      <span className="tkt__activity-actor">{a.actor?.name || 'System'}</span>{' '}
-                      <span className="tkt__activity-action">{formatActivityAction(a)}</span>
-                      <span className="tkt__activity-time">
-                        {new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        {' '}{new Date(a.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                      </span>
-                    </div>
+              {activeTab === 'comments' && (
+                <div className="tkt__comments">
+                  <div className="tkt__comments-list">
+                    {comments.length === 0 ? (
+                      <p className="tkt__comments-empty">No comments yet.</p>
+                    ) : (
+                      comments.map(c => (
+                        <div key={c.id} className="tkt__comment">
+                          <div className="tkt__comment-avatar">
+                            {(c.author?.name || c.author_name || '?').split(' ').map(n => n[0]).join('').substring(0, 2)}
+                          </div>
+                          <div className="tkt__comment-body">
+                            <div className="tkt__comment-header">
+                              <span className="tkt__comment-author">
+                                {c.author?.name || c.author_name || 'Unknown'}
+                              </span>
+                              <span className="tkt__comment-time">
+                                {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                {' · '}
+                                {new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="tkt__comment-text">{c.content}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <div ref={commentsEndRef} />
                   </div>
-                ))
+                  <div className="tkt__comment-composer">
+                    <input
+                      type="text"
+                      placeholder="Leave a comment…"
+                      value={commentText}
+                      onChange={e => setCommentText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleComment(); }}
+                    />
+                    <button
+                      type="button"
+                      className="tkt__send-btn"
+                      onClick={handleComment}
+                      disabled={!commentText.trim() || sending}
+                      aria-label="Send comment"
+                    >
+                      {sending ? <Loader2 size={13} className="tkt__spinner" /> : <Send size={13} />}
+                    </button>
+                  </div>
+                </div>
               )}
-            </div>
+
+              {activeTab === 'activity' && (
+                <div className="tkt__activity">
+                  {activity.length === 0 ? (
+                    <p className="tkt__activity-empty">No activity recorded yet.</p>
+                  ) : (
+                    activity.map(a => (
+                      <div key={a.id} className="tkt__activity-item">
+                        <div className="tkt__activity-dot" />
+                        <div className="tkt__activity-content">
+                          <span className="tkt__activity-actor">
+                            {a.actor?.name || (a.metadata?.author_name as string | undefined) || (a.metadata?.source === 'linear' ? 'Linear' : 'System')}
+                          </span>{' '}
+                          <span className="tkt__activity-action">{formatActivityAction(a)}</span>
+                          <span className="tkt__activity-time">
+                            {new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {' '}{new Date(a.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1711,11 +2323,13 @@ function TicketDetailPanel({
 function formatActivityAction(a: TicketActivityEntry): string {
   switch (a.action) {
     case 'created': return 'created this ticket';
-    case 'status_changed': return `changed status from ${a.from_value?.replace('_', ' ')} to ${a.to_value?.replace('_', ' ')}`;
+    case 'status_changed': return `changed status from ${a.from_value?.replace(/_/g, ' ')} to ${a.to_value?.replace(/_/g, ' ')}`;
     case 'assigned': return a.to_value ? 'assigned this ticket' : 'unassigned this ticket';
     case 'priority_changed': return `changed priority from ${a.from_value} to ${a.to_value}`;
+    case 'title_changed': return 'updated the title';
+    case 'description_changed': return 'updated the description';
     case 'commented': return 'added a comment';
-    default: return a.action.replace('_', ' ');
+    default: return a.action.replace(/_/g, ' ');
   }
 }
 

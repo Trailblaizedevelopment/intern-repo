@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 // Routes that never need an API key (webhooks, public onboarding, avatar proxy)
 const PUBLIC_API_PREFIXES = [
   '/api/webhooks/',
+  '/api/linear/webhooks',
   '/api/onboarding/',
   '/api/avatar-proxy',
   '/api/auth/docusign',

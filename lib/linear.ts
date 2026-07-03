@@ -16,6 +16,63 @@ export const LINEAR_CONFIG = {
 const LINEAR_API_URL = 'https://api.linear.app';
 const LINEAR_OAUTH_URL = 'https://linear.app/oauth';
 
+/** Personal API key Authorization header (raw key or Bearer-prefixed). */
+export function getLinearApiKeyHeader(): string {
+  const key = (process.env.LINEAR_API_KEY || '').trim();
+  if (!key) return '';
+  return key.startsWith('Bearer ') ? key : key;
+}
+
+export function assertLinearApiKeyConfigured(): void {
+  if (!getLinearApiKeyHeader()) {
+    throw new Error('LINEAR_API_KEY is not configured');
+  }
+}
+
+/** GraphQL request using the org personal API key (server-side sync routes). */
+export async function linearGQLWithApiKey<T = Record<string, unknown>>(
+  query: string,
+  variables?: Record<string, unknown>
+): Promise<T> {
+  assertLinearApiKeyConfigured();
+  const response = await fetch(`${LINEAR_API_URL}/graphql`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: getLinearApiKeyHeader(),
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  const raw = await response.text();
+  let parsed: { data?: T; errors?: { message: string }[] } | null = null;
+  try {
+    parsed = JSON.parse(raw) as { data?: T; errors?: { message: string }[] };
+  } catch {
+    // Linear may return non-JSON bodies on hard failures
+  }
+
+  if (!response.ok) {
+    const gqlMsg = parsed?.errors?.[0]?.message;
+    console.error('[Linear] GraphQL HTTP error', {
+      status: response.status,
+      message: gqlMsg,
+      body: raw.slice(0, 500),
+    });
+    throw new Error(
+      gqlMsg
+        ? `Linear API error: ${response.status} — ${gqlMsg}`
+        : `Linear API error: ${response.status}`
+    );
+  }
+
+  if (parsed?.errors?.length) {
+    throw new Error(parsed.errors[0].message || 'GraphQL error');
+  }
+
+  return parsed?.data as T;
+}
+
 // Generate OAuth URL for user authorization
 export function getLinearAuthUrl(state?: string): string {
   const params = new URLSearchParams({
@@ -277,8 +334,8 @@ export async function getLinearTeams(accessToken: string): Promise<LinearTeam[]>
 // Fetch projects
 export async function getLinearProjects(accessToken: string, teamId?: string): Promise<LinearProject[]> {
   const query = `
-    query($teamId: String) {
-      projects(filter: { team: { id: { eq: $teamId } } }) {
+    query($teamId: ID) {
+      projects(filter: { accessibleTeams: { id: { eq: $teamId } } }) {
         nodes {
           id
           name

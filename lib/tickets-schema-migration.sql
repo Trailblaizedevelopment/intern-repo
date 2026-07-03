@@ -6,8 +6,11 @@
 -- 1. ADD NEW COLUMNS (IF NOT EXISTS)
 -- ============================================
 
--- External ID for Linear cross-reference (e.g., "TRA-123")
+-- Linear issue UUID (canonical link for sync upsert)
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS external_id TEXT;
+
+-- Linear human-readable identifier (e.g., TRA-123)
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS linear_identifier TEXT;
 
 -- Labels/tags array
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS labels TEXT[] DEFAULT '{}';
@@ -55,6 +58,14 @@ ALTER TABLE tickets ADD CONSTRAINT tickets_type_check
 -- 5. INDEXES FOR NEW COLUMNS
 -- ============================================
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_external_id ON tickets(external_id) WHERE external_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_linear_identifier ON tickets(linear_identifier) WHERE linear_identifier IS NOT NULL;
+
+-- PostgREST upsert requires a non-partial UNIQUE constraint on external_id
+DO $$ BEGIN
+  ALTER TABLE tickets ADD CONSTRAINT tickets_external_id_key UNIQUE (external_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_tickets_project ON tickets(project) WHERE project IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_tickets_labels ON tickets USING GIN(labels) WHERE labels != '{}';
 CREATE INDEX IF NOT EXISTS idx_tickets_due_date ON tickets(due_date) WHERE due_date IS NOT NULL;

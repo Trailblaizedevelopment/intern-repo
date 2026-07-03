@@ -1,25 +1,16 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { assertLinearApiKeyConfigured, linearGQLWithApiKey } from '@/lib/linear';
+import {
+  archiveTicketsRemovedFromLinear,
+  pruneStaleLinearIssues,
+  reconcileLinearIssuesToTickets,
+} from '@/lib/linear-reconcile';
+import { bridgeAllCachedLinearComments } from '@/lib/linear-comment-bridge';
+import { syncLinearWorkflowStates } from '@/lib/linear-workflow-states';
 
-const LINEAR_API_KEY = process.env.LINEAR_API_KEY || '';
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
-const LINEAR_GRAPHQL = 'https://api.linear.app/graphql';
-
-async function linearGQL(query: string, variables?: Record<string, unknown>) {
-  const response = await fetch(LINEAR_GRAPHQL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: LINEAR_API_KEY,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  if (!response.ok) throw new Error(`Linear API error: ${response.status}`);
-  const result = await response.json();
-  if (result.errors) throw new Error(result.errors[0]?.message || 'GraphQL error');
-  return result.data;
-}
 
 /**
  * POST /api/linear/sync
@@ -32,14 +23,38 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    assertLinearApiKeyConfigured();
+
     const body = await request.json().catch(() => ({}));
     const teamId = body.teamId || LINEAR_TEAM_ID;
+    const incremental = body.incremental === true;
 
     const supabase = getSupabaseAdmin();
-    const syncResults = { teams: 0, projects: 0, issues: 0, labels: 0 };
+    const syncResults = {
+      teams: 0,
+      projects: 0,
+      issues: 0,
+      labels: 0,
+      tickets: 0,
+      ticketsCreated: 0,
+      ticketsUpdated: 0,
+      workflowStates: 0,
+      prunedIssues: 0,
+      archivedTickets: 0,
+    };
+
+    let lastSyncAt: string | null = null;
+    if (incremental) {
+      const { data: teamRow } = await supabase
+        .from('linear_teams')
+        .select('synced_at')
+        .eq('id', teamId)
+        .maybeSingle();
+      lastSyncAt = teamRow?.synced_at ?? null;
+    }
 
     // Sync teams
-    const teamsData = await linearGQL(`
+    const teamsData = await linearGQLWithApiKey(`
       query { teams { nodes { id name key description } } }
     `);
     const teams = teamsData?.teams?.nodes ?? [];
@@ -54,10 +69,10 @@ export async function POST(request: NextRequest) {
       syncResults.teams++;
     }
 
-    // Sync projects for team
-    const projectsData = await linearGQL(`
-      query($teamId: String) {
-        projects(filter: { team: { id: { eq: $teamId } } }) {
+    // Sync projects for team (ProjectFilter uses accessibleTeams, not team)
+    const projectsData = await linearGQLWithApiKey(`
+      query($teamId: ID!) {
+        projects(filter: { accessibleTeams: { id: { eq: $teamId } } }) {
           nodes { id name description icon color state startDate targetDate progress }
         }
       }
@@ -80,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Sync labels
-    const labelsData = await linearGQL(`
+    const labelsData = await linearGQLWithApiKey(`
       query($teamId: String!) {
         team(id: $teamId) { labels { nodes { id name color description } } }
       }
@@ -98,12 +113,20 @@ export async function POST(request: NextRequest) {
       syncResults.labels++;
     }
 
-    // Sync issues — paginate through all
+    syncResults.workflowStates = await syncLinearWorkflowStates(supabase, teamId);
+
+    const issueFilter: Record<string, unknown> = { team: { id: { eq: teamId } } };
+    if (incremental && lastSyncAt) {
+      issueFilter.updatedAt = { gt: lastSyncAt };
+    }
+
+    // Sync issues — paginate through all (or incremental delta)
     let hasNextPage = true;
     let cursor: string | null = null;
+    const syncedIssueIds = new Set<string>();
 
     while (hasNextPage) {
-      const issuesData = await linearGQL(`
+      const issuesData = await linearGQLWithApiKey(`
         query($filter: IssueFilter, $first: Int, $after: String) {
           issues(filter: $filter, first: $first, after: $after, orderBy: updatedAt) {
             pageInfo { hasNextPage endCursor }
@@ -115,12 +138,13 @@ export async function POST(request: NextRequest) {
               team { id name key }
               project { id name }
               labels { nodes { id name color } }
+              comments { nodes { id body createdAt updatedAt user { id name avatarUrl } } }
               estimate dueDate url createdAt updatedAt completedAt canceledAt
             }
           }
         }
       `, {
-        filter: { team: { id: { eq: teamId } } },
+        filter: issueFilter,
         first: 100,
         after: cursor,
       });
@@ -131,6 +155,7 @@ export async function POST(request: NextRequest) {
       cursor = issuesPage?.pageInfo?.endCursor ?? null;
 
       for (const issue of issueNodes) {
+        syncedIssueIds.add(issue.id);
         await supabase.from('linear_issues').upsert({
           id: issue.id,
           identifier: issue.identifier,
@@ -170,6 +195,21 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        const commentNodes = issue.comments?.nodes ?? [];
+        for (const comment of commentNodes) {
+          await supabase.from('linear_comments').upsert({
+            id: comment.id,
+            issue_id: issue.id,
+            body: comment.body,
+            user_id: comment.user?.id ?? null,
+            user_name: comment.user?.name ?? null,
+            user_avatar_url: comment.user?.avatarUrl ?? null,
+            created_at: comment.createdAt,
+            updated_at: comment.updatedAt,
+            synced_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
+        }
+
         syncResults.issues++;
       }
 
@@ -177,13 +217,46 @@ export async function POST(request: NextRequest) {
       if (!cursor) hasNextPage = false;
     }
 
+    if (!incremental && syncedIssueIds.size > 0) {
+      syncResults.prunedIssues = await pruneStaleLinearIssues(
+        supabase,
+        teamId,
+        syncedIssueIds
+      );
+      const archiveResult = await archiveTicketsRemovedFromLinear(supabase, teamId);
+      syncResults.archivedTickets = archiveResult.archived;
+    }
+
+    const reconcileResult = await reconcileLinearIssuesToTickets(supabase, teamId);
+    syncResults.tickets = reconcileResult.reconciled;
+    syncResults.ticketsCreated = reconcileResult.created;
+    syncResults.ticketsUpdated = reconcileResult.updated;
+    if (reconcileResult.errors.length > 0) {
+      console.error('Linear reconcile errors:', reconcileResult.errors);
+    }
+
+    try {
+      const commentBridge = await bridgeAllCachedLinearComments(supabase);
+      syncResults.bridgedComments = commentBridge.bridged;
+    } catch (bridgeErr) {
+      console.warn('Linear comment bridge failed:', bridgeErr);
+    }
+
+    await supabase.from('linear_teams').update({
+      synced_at: new Date().toISOString(),
+    }).eq('id', teamId);
+
     return NextResponse.json({
       success: true,
-      message: 'Sync completed successfully',
+      message: incremental ? 'Incremental sync completed' : 'Sync completed successfully',
+      mode: incremental ? 'incremental' : 'full',
       synced: syncResults,
+      reconcileErrors: reconcileResult.errors.length > 0 ? reconcileResult.errors : undefined,
     });
   } catch (error) {
     console.error('Error syncing Linear data:', error);
-    return NextResponse.json({ error: 'Failed to sync data', details: String(error) }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to sync data';
+    const status = message.includes('LINEAR_API_KEY is not configured') ? 503 : 500;
+    return NextResponse.json({ error: message, details: String(error) }, { status });
   }
 }

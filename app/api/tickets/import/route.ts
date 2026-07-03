@@ -2,50 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-
-const STATUS_MAP: Record<string, string> = {
-  'Backlog': 'backlog',
-  'Todo': 'todo',
-  'In Progress': 'in_progress',
-  'In Review': 'in_review',
-  'Done': 'done',
-  'Canceled': 'canceled',
-};
-
-const PRIORITY_MAP: Record<string, string> = {
-  'Urgent': 'critical',
-  'High': 'high',
-  'Medium': 'medium',
-  'Low': 'low',
-  'No priority': 'none',
-};
-
-const LABEL_TO_TYPE: Record<string, string> = {
-  'Bug': 'bug',
-  'Critical': 'bug',
-  'Feature': 'feature_request',
-  'Enhancement': 'improvement',
-  'Technical Debt': 'improvement',
-};
-
-/**
- * Parse Linear date format: "Thu Oct 23 2025 14:05:25 GMT+0000 (GMT)"
- * Strips the parenthesized timezone name before parsing.
- */
-function parseLinearDate(dateStr: string): string | null {
-  if (!dateStr || !dateStr.trim()) return null;
-  try {
-    let clean = dateStr.trim();
-    if (clean.includes('(')) {
-      clean = clean.substring(0, clean.indexOf('(')).trim();
-    }
-    const dt = new Date(clean);
-    if (isNaN(dt.getTime())) return null;
-    return dt.toISOString();
-  } catch {
-    return null;
-  }
-}
+import {
+  buildTicketRowFromLinearIssue,
+  LINEAR_STATUS_NAME_TO_TICKET_STATUS,
+  parseLinearDate,
+} from '@/lib/linear-ticket-map';
 
 /**
  * Parse CSV with proper handling of:
@@ -156,6 +117,7 @@ export async function GET(request: NextRequest) {
 
     for (const row of csvRows) {
       const externalId = (row['ID'] ?? '').trim();
+      const linearIdentifier = (row['Identifier'] ?? '').trim();
       const title = (row['Title'] ?? '').trim();
       if (!externalId || !title) {
         skipped.push({ id: externalId || '?', reason: 'Missing ID or title' });
@@ -163,25 +125,13 @@ export async function GET(request: NextRequest) {
       }
 
       const rawStatus = (row['Status'] ?? '').trim();
-      const status = STATUS_MAP[rawStatus];
-      if (!status) {
+      if (!LINEAR_STATUS_NAME_TO_TICKET_STATUS[rawStatus]) {
         skipped.push({ id: externalId, reason: `Unknown status: ${rawStatus}` });
         continue;
       }
 
-      const rawPriority = (row['Priority'] ?? '').trim();
-      const priority = PRIORITY_MAP[rawPriority] ?? 'none';
-
       const rawLabels = (row['Labels'] ?? '').trim();
       const labels = rawLabels ? rawLabels.split(',').map(l => l.trim()).filter(Boolean) : [];
-
-      let ticketType = 'issue';
-      for (const label of labels) {
-        if (LABEL_TO_TYPE[label]) {
-          ticketType = LABEL_TO_TYPE[label];
-          break;
-        }
-      }
 
       const description = (row['Description'] ?? '').trim() || null;
       const project = (row['Project'] ?? '').trim() || null;
@@ -201,27 +151,33 @@ export async function GET(request: NextRequest) {
       const createdAt = parseLinearDate(row['Created'] ?? '');
       const updatedAt = parseLinearDate(row['Updated'] ?? '');
       const dueDate = parseLinearDate(row['Due Date'] ?? '');
-      let resolvedAt: string | null = null;
-      if (status === 'done') resolvedAt = parseLinearDate(row['Completed'] ?? '');
-      if (status === 'canceled') resolvedAt = parseLinearDate(row['Canceled'] ?? '');
+      const completedAt = parseLinearDate(row['Completed'] ?? '');
+      const canceledAt = parseLinearDate(row['Canceled'] ?? '');
 
-      const ticket: Record<string, unknown> = {
-        external_id: externalId,
-        title,
-        description,
-        type: ticketType,
-        priority,
-        status,
-        creator_id: creatorId,
-        assignee_id: assigneeId,
-        labels,
-        project,
-        story_points: storyPoints,
-        due_date: dueDate,
-        resolved_at: resolvedAt,
-      };
-      if (createdAt) ticket.created_at = createdAt;
-      if (updatedAt) ticket.updated_at = updatedAt;
+      const ticket = buildTicketRowFromLinearIssue(
+        {
+          id: externalId,
+          identifier: linearIdentifier || externalId,
+          title,
+          description,
+          priority_label: (row['Priority'] ?? '').trim() || null,
+          state_name: rawStatus,
+          assignee_email: assigneeEmail || null,
+          creator_email: creatorEmail || null,
+          project_name: project,
+          estimate: storyPoints,
+          due_date: dueDate,
+          created_at: createdAt,
+          updated_at: updatedAt,
+          completed_at: completedAt,
+          canceled_at: canceledAt,
+          label_names: labels,
+        },
+        {
+          assignee_id: assigneeId,
+          creator_id: creatorId,
+        }
+      );
 
       tickets.push(ticket);
     }

@@ -8,6 +8,9 @@ import {
   LinearWebhookPayload,
   LinearWebhookAction
 } from '@/lib/linear';
+import { reconcileLinearIssueById, archiveTicketByExternalId } from '@/lib/linear-reconcile';
+import { bridgeLinearCommentToTicket, removeBridgedLinearComment } from '@/lib/linear-comment-bridge';
+import { logLinearIssueUpdateActivity } from '@/lib/linear-activity-bridge';
 
 /**
  * POST /api/linear/webhooks
@@ -148,12 +151,28 @@ async function handleIssueEvent(
   };
 
   if (action === 'remove') {
-    // Delete the issue
-    await supabase
-      .from('linear_issues')
-      .delete()
-      .eq('id', issueData.id);
+    await supabase.from('linear_issue_labels').delete().eq('issue_id', issueData.id);
+    await supabase.from('linear_issues').delete().eq('id', issueData.id);
+    try {
+      await archiveTicketByExternalId(supabase, issueData.id);
+    } catch (err) {
+      console.warn(`Failed to archive CRM ticket for removed Linear issue ${issueData.id}:`, err);
+    }
     return;
+  }
+
+  const { data: ticketBefore } = await supabase
+    .from('tickets')
+    .select('id, title, description, priority, status, assignee_id')
+    .eq('external_id', issueData.id)
+    .maybeSingle();
+
+  if (action === 'update' && ticketBefore) {
+    try {
+      await logLinearIssueUpdateActivity(supabase, ticketBefore, issueData);
+    } catch (err) {
+      console.warn(`Failed to log Linear activity for ${issueData.id}:`, err);
+    }
   }
 
   // Ensure team exists
@@ -231,6 +250,11 @@ async function handleIssueEvent(
       }))
     );
   }
+
+  const reconcile = await reconcileLinearIssueById(supabase, issueData.id);
+  if (!reconcile.ok) {
+    console.warn(`Linear webhook reconcile failed for ${issueData.id}:`, reconcile.error);
+  }
 }
 
 // Handle Comment events
@@ -253,6 +277,11 @@ async function handleCommentEvent(
       .from('linear_comments')
       .delete()
       .eq('id', commentData.id);
+    try {
+      await removeBridgedLinearComment(supabase, commentData.id);
+    } catch (err) {
+      console.warn(`Failed to remove bridged comment ${commentData.id}:`, err);
+    }
     return;
   }
 
@@ -267,6 +296,12 @@ async function handleCommentEvent(
     updated_at: commentData.updatedAt,
     synced_at: new Date().toISOString(),
   }, { onConflict: 'id' });
+
+  try {
+    await bridgeLinearCommentToTicket(supabase, commentData);
+  } catch (err) {
+    console.warn(`Failed to bridge Linear comment ${commentData.id}:`, err);
+  }
 }
 
 // Handle Project events

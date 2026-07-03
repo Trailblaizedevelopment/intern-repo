@@ -1,21 +1,10 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { linearGQLWithApiKey } from '@/lib/linear';
+import { formatCachedLinearIssue } from '@/lib/linear-issue-format';
 
-const LINEAR_API_KEY = process.env.LINEAR_API_KEY || '';
 const LINEAR_TEAM_ID = 'ba3a89b4-61f0-4a3e-85e4-b264de5cb592';
-const LINEAR_GRAPHQL = 'https://api.linear.app/graphql';
-
-function linearGQL(query: string, variables?: Record<string, unknown>) {
-  return fetch(LINEAR_GRAPHQL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: LINEAR_API_KEY,
-    },
-    body: JSON.stringify({ query, variables }),
-  }).then(r => r.json());
-}
 
 /**
  * GET /api/linear/issues
@@ -39,7 +28,12 @@ export async function GET(request: NextRequest) {
     if (source === 'cache') {
       let query = supabase
         .from('linear_issues')
-        .select('*')
+        .select(`
+          id, identifier, title, priority, url,
+          state_name, state_color,
+          linear_projects ( name ),
+          linear_teams ( name, key )
+        `)
         .order('updated_at', { ascending: false });
 
       if (teamId) query = query.eq('team_id', teamId);
@@ -48,7 +42,8 @@ export async function GET(request: NextRequest) {
 
       const { data, error } = await query.limit(200);
       if (error) throw new Error(error.message);
-      return NextResponse.json({ data, source: 'cache' });
+      const formatted = (data ?? []).map(formatCachedLinearIssue);
+      return NextResponse.json({ data: formatted, source: 'cache' });
     }
 
     // Live from Linear using API key
@@ -72,10 +67,12 @@ export async function GET(request: NextRequest) {
     if (projectId) filter.project = { id: { eq: projectId } };
     if (status) filter.state = { type: { eq: status } };
 
-    const result = await linearGQL(gqlQuery, { filter, first: 200 });
-    if (result.errors) throw new Error(result.errors[0]?.message);
+    const result = await linearGQLWithApiKey<{ issues?: { nodes: unknown[] } }>(gqlQuery, {
+      filter,
+      first: 200,
+    });
 
-    return NextResponse.json({ data: result.data?.issues?.nodes ?? [], source: 'live' });
+    return NextResponse.json({ data: result?.issues?.nodes ?? [], source: 'live' });
   } catch (error) {
     console.error('Error fetching Linear issues:', error);
     return NextResponse.json({ error: 'Failed to fetch issues' }, { status: 500 });
@@ -120,11 +117,12 @@ export async function POST(request: NextRequest) {
     if (estimate) input.estimate = estimate;
     if (dueDate) input.dueDate = dueDate;
 
-    const result = await linearGQL(mutation, { input });
-    if (result.errors) throw new Error(result.errors[0]?.message);
+    const result = await linearGQLWithApiKey<{
+      issueCreate?: { issue: unknown };
+    }>(mutation, { input });
 
     return NextResponse.json({
-      data: result.data?.issueCreate?.issue,
+      data: result?.issueCreate?.issue,
       message: 'Issue created successfully',
     });
   } catch (error) {
