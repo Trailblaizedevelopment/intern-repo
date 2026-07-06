@@ -1,3 +1,4 @@
+import { getGitHubRepoFull, getGitHubToken } from '../github-repo';
 import {
   BrainConnector,
   ConnectorCallResult,
@@ -6,21 +7,16 @@ import {
 } from './types';
 
 const CONNECTOR_ID = 'github';
-const DEFAULT_REPO = 'Trailblaizedevelopment/Trailblaize-Web';
-
-function getToken(): string | null {
-  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || null;
-}
 
 function resolveRepo(input?: unknown): { owner: string; repo: string; full: string } | null {
-  const full = (typeof input === 'string' && input.trim()) || process.env.GITHUB_REPO || DEFAULT_REPO;
+  const full = (typeof input === 'string' && input.trim()) || getGitHubRepoFull();
   const [owner, repo] = full.split('/');
   if (!owner || !repo) return null;
   return { owner, repo, full };
 }
 
 async function ghFetch(path: string): Promise<unknown> {
-  const token = getToken();
+  const token = getGitHubToken();
   if (!token) throw new Error('GITHUB_TOKEN not configured');
 
   const res = await fetch(`https://api.github.com${path}`, {
@@ -70,7 +66,7 @@ export const githubConnector: BrainConnector = {
   kind: 'in-process',
 
   isAvailable() {
-    return Boolean(getToken());
+    return Boolean(getGitHubToken());
   },
 
   async listTools(): Promise<ConnectorTool[]> {

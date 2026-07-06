@@ -1,12 +1,15 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { isCursorConfigured } from '../cursor-api';
+import { watchCursorAgent } from '../cursor-watch';
 import { runBrainAgent } from '../agent';
 import { postSlackMessage } from '../slack/client';
-import { appendTaskLog, claimNextRunnableTask, getBrainTask } from './store';
+import { appendTaskLog, claimNextRunnableTask, getBrainTask, updateTaskStatus } from './store';
 import { BrainTaskRow } from './types';
 
 const TICK_INTERVAL_MS = parseInt(process.env.BRAIN_TASK_TICK_MS || '120000', 10) || 120_000;
+const CURSOR_POLL_INTERVAL_MS = parseInt(process.env.BRAIN_CURSOR_POLL_MS || '60000', 10) || 60_000;
 
-function buildTaskIterationPrompt(task: BrainTaskRow): string {
+function buildTaskIterationPrompt(task: BrainTaskRow, cursorNote?: string): string {
   const parts = [
     `Continue brain_task ${task.id}.`,
     `Goal: ${task.goal}`,
@@ -14,12 +17,17 @@ function buildTaskIterationPrompt(task: BrainTaskRow): string {
   if (task.linear_issue_id) parts.push(`Linear: ${task.linear_issue_id}`);
   if (task.plan) parts.push(`Plan:\n${task.plan}`);
   if (task.cursor_agent_id) {
-    parts.push(`Cursor agent already dispatched: ${task.cursor_agent_id}`);
-    if (task.cursor_agent_url) parts.push(`URL: ${task.cursor_agent_url}`);
+    parts.push(`Cursor agent: ${task.cursor_agent_id}`);
+    if (task.cursor_agent_url) parts.push(`Dashboard: ${task.cursor_agent_url}`);
+    if (task.cursor_run_status) parts.push(`Run status: ${task.cursor_run_status}`);
+    if (task.cursor_pr_url) parts.push(`PR: ${task.cursor_pr_url}`);
+    if (task.cursor_branch) parts.push(`Branch: ${task.cursor_branch}`);
   }
+  if (cursorNote) parts.push(cursorNote);
   parts.push(
     `Iteration ${task.iteration_count + 1}/${task.max_iterations}. Deadline: ${task.deadline_at || 'none'}.`,
-    'Use tools to make progress. Call tasks_complete when done, tasks_block if stuck, or cursor_dispatch_agent for code work.'
+    'Use tools to make progress. Call tasks_complete when done, tasks_block if stuck.',
+    'If Cursor already finished with a PR, verify via github_get_pr then tasks_complete — do not re-dispatch unless follow-up work is needed.'
   );
   return parts.join('\n\n');
 }
@@ -28,7 +36,8 @@ function buildTaskSystemAppend(task: BrainTaskRow): string {
   return [
     'TASK ORCHESTRATION MODE — you are executing one iteration of a background goal.',
     `Task id: ${task.id} (pass to tasks_* tools or rely on task context).`,
-    'Be action-oriented: research in Linear/GitHub, dispatch Cursor for implementation, then complete or block.',
+    'Brain orchestrates; Cursor implements on Trailblaize-Web. Base branch develop; PRs target develop only.',
+    'Be action-oriented: research in Linear/GitHub, dispatch Cursor once for implementation, then complete when PR exists.',
     'Do not ask the user questions — make reasonable assumptions and log them in the summary.',
   ].join('\n');
 }
@@ -38,31 +47,150 @@ async function notifySlack(task: BrainTaskRow, message: string): Promise<void> {
   await postSlackMessage(task.slack_channel, message, task.slack_thread_ts || undefined);
 }
 
+async function scheduleNextRun(
+  supabase: SupabaseClient,
+  taskId: string,
+  delayMs: number,
+  status: BrainTaskRow['status'] = 'running'
+): Promise<void> {
+  await supabase
+    .from('brain_tasks')
+    .update({
+      status,
+      next_run_at: new Date(Date.now() + delayMs).toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId);
+}
+
+async function persistCursorWatch(
+  supabase: SupabaseClient,
+  taskId: string,
+  watch: Awaited<ReturnType<typeof watchCursorAgent>>
+): Promise<void> {
+  await supabase
+    .from('brain_tasks')
+    .update({
+      cursor_run_id: watch.runId,
+      cursor_run_status: watch.runStatus,
+      cursor_pr_url: watch.prUrl,
+      cursor_branch: watch.branch,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId);
+}
+
+/**
+ * Poll Cursor when a task has a dispatched agent. Returns true if this tick was
+ * handled without running a full Brain agent iteration.
+ */
+async function handleCursorWatchTick(
+  supabase: SupabaseClient,
+  task: BrainTaskRow
+): Promise<{ handled: boolean; result?: TaskRunnerResult }> {
+  if (!task.cursor_agent_id || !isCursorConfigured()) {
+    return { handled: false };
+  }
+
+  const prevRunStatus = task.cursor_run_status;
+  const watch = await watchCursorAgent(task.cursor_agent_id, task.cursor_run_id);
+  await persistCursorWatch(supabase, task.id, watch);
+
+  if (watch.phase === 'running') {
+    await appendTaskLog(supabase, task.id, {
+      kind: 'cursor',
+      message: `Cursor run ${watch.runStatus || 'RUNNING'}${watch.branch ? ` on ${watch.branch}` : ''}`,
+    });
+    await scheduleNextRun(supabase, task.id, CURSOR_POLL_INTERVAL_MS);
+    return {
+      handled: true,
+      result: {
+        processed: true,
+        taskId: task.id,
+        status: 'running',
+        reply: `Waiting for Cursor (${watch.runStatus})`,
+      },
+    };
+  }
+
+  if (watch.phase === 'failed') {
+    const reason = `Cursor run ${watch.runStatus}: ${watch.summary || 'failed'}`;
+    await appendTaskLog(supabase, task.id, { kind: 'error', message: reason });
+    await updateTaskStatus(supabase, task.id, 'blocked', { error: reason });
+    const refreshed = await getBrainTask(supabase, task.id);
+    if (refreshed) {
+      await notifySlack(refreshed, `*Brain task blocked*\n${reason}`);
+    }
+    return {
+      handled: true,
+      result: { processed: true, taskId: task.id, status: 'blocked', error: reason },
+    };
+  }
+
+  if (watch.phase === 'finished') {
+    const justFinished = prevRunStatus !== 'FINISHED';
+    const prLine = watch.prUrl ? `PR: ${watch.prUrl}` : watch.branch ? `Branch: ${watch.branch}` : '';
+    await appendTaskLog(supabase, task.id, {
+      kind: 'cursor',
+      message: `Cursor FINISHED. ${prLine} ${watch.summary?.slice(0, 200) || ''}`.trim(),
+    });
+
+    if (justFinished && task.slack_channel) {
+      await notifySlack(task, [
+        '*Cursor agent finished*',
+        task.linear_issue_id ? `Linear: ${task.linear_issue_id}` : null,
+        prLine || null,
+        watch.summary?.slice(0, 300) || null,
+        task.cursor_agent_url ? `<${task.cursor_agent_url}|View agent>` : null,
+      ]
+        .filter(Boolean)
+        .join('\n'));
+    }
+
+    // Let Brain verify PR and complete — fall through to agent iteration
+    return { handled: false };
+  }
+
+  return { handled: false };
+}
+
 export interface TaskRunnerResult {
   processed: boolean;
   taskId?: string;
   status?: string;
   reply?: string;
   error?: string;
+  mode?: 'poll' | 'agent';
 }
 
 export async function runOneTaskIteration(supabase: SupabaseClient): Promise<TaskRunnerResult> {
   const task = await claimNextRunnableTask(supabase);
   if (!task) return { processed: false };
 
-  const prevStatus = task.status;
+  const watchTick = await handleCursorWatchTick(supabase, task);
+  if (watchTick.handled && watchTick.result) {
+    return { ...watchTick.result, mode: 'poll' };
+  }
+
+  const refreshedForPrompt = (await getBrainTask(supabase, task.id)) || task;
+  const cursorNote =
+    refreshedForPrompt.cursor_run_status === 'FINISHED'
+      ? 'Cursor run FINISHED. Verify the PR on GitHub, confirm acceptance criteria, then tasks_complete with summary.'
+      : undefined;
+
+  const prevStatus = refreshedForPrompt.status;
   await supabase
     .from('brain_tasks')
     .update({
       status: 'running',
-      iteration_count: task.iteration_count + 1,
+      iteration_count: refreshedForPrompt.iteration_count + 1,
       updated_at: new Date().toISOString(),
     })
     .eq('id', task.id);
 
   await appendTaskLog(supabase, task.id, {
     kind: 'info',
-    message: `Iteration ${task.iteration_count + 1} started`,
+    message: `Agent iteration ${refreshedForPrompt.iteration_count + 1} started`,
   });
 
   let reply = '';
@@ -70,17 +198,17 @@ export async function runOneTaskIteration(supabase: SupabaseClient): Promise<Tas
 
   try {
     const result = await runBrainAgent(
-      [{ role: 'user', content: buildTaskIterationPrompt(task) }],
-      { supabase, employeeId: task.employee_id },
+      [{ role: 'user', content: buildTaskIterationPrompt(refreshedForPrompt, cursorNote) }],
+      { supabase, employeeId: refreshedForPrompt.employee_id },
       null,
       {
-        surface: task.source === 'slack' ? 'slack' : 'workspace',
-        systemAppend: buildTaskSystemAppend(task),
+        surface: refreshedForPrompt.source === 'slack' ? 'slack' : 'workspace',
+        systemAppend: buildTaskSystemAppend(refreshedForPrompt),
         maxIterations: parseInt(process.env.BRAIN_TASK_TOOL_ITERATIONS || '10', 10) || 10,
-        taskId: task.id,
-        conversationId: task.conversation_id,
-        slackChannel: task.slack_channel,
-        slackThreadTs: task.slack_thread_ts,
+        taskId: refreshedForPrompt.id,
+        conversationId: refreshedForPrompt.conversation_id,
+        slackChannel: refreshedForPrompt.slack_channel,
+        slackThreadTs: refreshedForPrompt.slack_thread_ts,
       }
     );
     reply = result.reply;
@@ -95,32 +223,26 @@ export async function runOneTaskIteration(supabase: SupabaseClient): Promise<Tas
 
   const refreshed = await getBrainTask(supabase, task.id);
   if (!refreshed) {
-    return { processed: true, taskId: task.id, error: 'Task disappeared after run' };
+    return { processed: true, taskId: task.id, error: 'Task disappeared after run', mode: 'agent' };
   }
 
   const terminal = ['completed', 'failed', 'cancelled'].includes(refreshed.status);
 
   if (!terminal && refreshed.status !== 'blocked') {
-    const nextRun = new Date(Date.now() + TICK_INTERVAL_MS).toISOString();
-    await supabase
-      .from('brain_tasks')
-      .update({
-        status: 'running',
-        next_run_at: nextRun,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', task.id);
+    const delay = refreshed.cursor_agent_id && refreshed.cursor_run_status !== 'FINISHED'
+      ? CURSOR_POLL_INTERVAL_MS
+      : TICK_INTERVAL_MS;
+    await scheduleNextRun(supabase, refreshed.id, delay);
   }
 
   if (prevStatus !== refreshed.status || terminal) {
-    const headline = terminal
-      ? `*Brain task ${terminal ? refreshed.status : refreshed.status}*`
-      : `*Brain task update*`;
+    const headline = terminal ? `*Brain task ${refreshed.status}*` : `*Brain task update*`;
     const body = [
       headline,
       refreshed.linear_issue_id ? `Linear: ${refreshed.linear_issue_id}` : null,
       refreshed.goal.slice(0, 200),
       refreshed.result_summary || refreshed.error || reply.slice(0, 300),
+      refreshed.cursor_pr_url ? `<${refreshed.cursor_pr_url}|PR>` : null,
       refreshed.cursor_agent_url ? `<${refreshed.cursor_agent_url}|Cursor agent>` : null,
     ]
       .filter(Boolean)
@@ -134,5 +256,6 @@ export async function runOneTaskIteration(supabase: SupabaseClient): Promise<Tas
     status: refreshed.status,
     reply: reply.slice(0, 500),
     error: runError,
+    mode: 'agent',
   };
 }

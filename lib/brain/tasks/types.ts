@@ -24,6 +24,10 @@ export interface BrainTaskRow {
   status: BrainTaskStatus;
   cursor_agent_id: string | null;
   cursor_agent_url: string | null;
+  cursor_run_id: string | null;
+  cursor_run_status: string | null;
+  cursor_pr_url: string | null;
+  cursor_branch: string | null;
   github_repo: string;
   max_minutes: number;
   iteration_count: number;

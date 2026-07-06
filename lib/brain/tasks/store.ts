@@ -1,9 +1,10 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { getGitHubRepoFull } from '../github-repo';
 import { grillTaskPlan } from '../grill';
 import { BrainTaskLogEntry, BrainTaskRow, BrainTaskStatus, CreateBrainTaskInput } from './types';
 
 function defaultRepo(): string {
-  return process.env.GITHUB_REPO || 'Trailblaizedevelopment/Trailblaize-Web';
+  return getGitHubRepoFull();
 }
 
 export async function appendTaskLog(

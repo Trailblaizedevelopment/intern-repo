@@ -105,7 +105,9 @@ function buildSystemPrompt(
   }
   if (hasCursor) {
     toolGuidance.push(
-      '- Use cursor_dispatch_agent for code implementation on Trailblaize-Web. Include Linear ticket context in the prompt. Prefer plan mode for ambiguous work.'
+      '- Use cursor_dispatch_agent for code implementation on Trailblaize-Web. Defaults: branch from develop, PR targets develop, injects AGENTS.md + guardrails. Include Linear ticket ID.',
+      '- After dispatch, the task runner polls Cursor automatically — do not dispatch twice unless follow-up work is needed.',
+      '- When Cursor finishes, verify PR via github_get_pr then tasks_complete.'
     );
   }
   if (hasTasks) {
