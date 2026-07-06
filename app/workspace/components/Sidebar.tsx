@@ -39,6 +39,7 @@ import {
   MoreHorizontal,
   Send,
   Sparkles,
+  Brain,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -372,6 +373,16 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
                   </Link>
                 );
               })}
+              {/* Dev Console — founding engineer only (server enforces access) */}
+              {profile?.email?.toLowerCase() === 'devin@trailblaize.net' && (
+                <Link
+                  href="/workspace/dev-console"
+                  className={`ws-nav-item ${isActive('/workspace/dev-console') ? 'active' : ''}`}
+                >
+                  <Brain size={20} />
+                  {!collapsed && <span>Dev Console</span>}
+                </Link>
+              )}
             </>
           )}
         </nav>
