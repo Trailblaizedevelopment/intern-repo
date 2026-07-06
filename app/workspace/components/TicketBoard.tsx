@@ -1326,8 +1326,7 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
     [roadmapTickets, visibleDayKeys]
   );
 
-  const gridCols = `minmax(200px, 1fr) repeat(7, minmax(52px, 1fr))`;
-  const gridStyle = { display: 'grid' as const, gridTemplateColumns: gridCols };
+  const gridStyle = { display: 'grid' as const };
 
   const filterStats = useMemo(() => {
     if (allWeeks.length === 0) {
@@ -1386,101 +1385,112 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
 
       <div className="tkt__roadmap-sheet">
         <div className="tkt__roadmap-scroll">
-          <div className="tkt__roadmap-header-row" style={gridStyle}>
-            <div className="tkt__roadmap-label-col tkt__roadmap-label-col--header">Work item</div>
+          <div className="tkt__roadmap-grid" style={gridStyle}>
+            <div className="tkt__roadmap-label-col tkt__roadmap-label-col--header tkt__roadmap-grid-head">
+              Work item
+            </div>
             {visibleDays.map(day => (
               <div
                 key={day.key}
-                className={`tkt__roadmap-day-col ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
+                className={`tkt__roadmap-day-col tkt__roadmap-grid-head ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
               >
                 <span className="tkt__roadmap-day-name">{day.dayName}</span>
                 <span className="tkt__roadmap-day-date">{day.dateLabel}</span>
               </div>
             ))}
+
+            {visibleTickets.length === 0 ? (
+              <div className="tkt__roadmap-empty tkt__roadmap-grid-span">
+                {roadmapTickets.length === 0 ? (
+                  <>
+                    No active Linear tickets with due dates in this range.
+                    <p className="tkt__roadmap-empty-hint">
+                      {filterStats.linear} Linear-linked · {filterStats.withDue} with due dates ·{' '}
+                      {filterStats.inRange} in range ({rangeLabel})
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    Nothing due this week — use ← → to browse other weeks ({roadmapTickets.length} ticket
+                    {roadmapTickets.length === 1 ? '' : 's'} in range).
+                  </>
+                )}
+              </div>
+            ) : (
+              visibleTickets.map((ticket, rowIdx) => {
+                const dueDayKey = ticket.due_date ? dueDateDayKey(ticket.due_date) : '';
+                const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+                const ticketId = ticket.linear_identifier || `#${ticket.number}`;
+                const isLastRow = rowIdx === visibleTickets.length - 1;
+                const cellClass = isLastRow ? 'tkt__roadmap-grid-cell tkt__roadmap-grid-cell--last' : 'tkt__roadmap-grid-cell';
+
+                return (
+                  <React.Fragment key={ticket.id}>
+                    <Tooltip
+                      content={<RoadmapTicketTooltip ticket={ticket} />}
+                      side="bottom"
+                      align="start"
+                      delayMs={200}
+                      interactive
+                      interactiveHideDelayMs={250}
+                      className="tkt__roadmap-tip-panel"
+                    >
+                      <div
+                        className={`tkt__roadmap-label-col tkt__roadmap-label-col--work ${cellClass}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onTicketClick(ticket)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onTicketClick(ticket);
+                          }
+                        }}
+                      >
+                        <p className="tkt__roadmap-work-item">
+                          <span className="tkt__roadmap-work-id">{ticketId}</span>
+                          <span className="tkt__roadmap-work-sep"> — </span>
+                          <span className="tkt__roadmap-work-title">{ticket.title}</span>
+                        </p>
+                      </div>
+                    </Tooltip>
+                    {visibleDays.map(day => (
+                      <div
+                        key={day.key}
+                        className={`tkt__roadmap-day-col tkt__roadmap-day-cell ${cellClass} ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
+                      >
+                        {dueDayKey === day.key && (
+                          <button
+                            type="button"
+                            className="tkt__roadmap-day-marker"
+                            style={{ backgroundColor: priorityCfg.color }}
+                            title={`Open ${ticketId} in Linear`}
+                            aria-label={`Open ${ticketId} in Linear`}
+                            onClick={e => {
+                              e.stopPropagation();
+                              openLinearTicket(ticket);
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </React.Fragment>
+                );
+              })
+            )}
           </div>
 
-          <div className="tkt__roadmap-body">
-          {visibleTickets.length === 0 ? (
-            <div className="tkt__roadmap-empty">
-              {roadmapTickets.length === 0 ? (
-                <>
-                  No active Linear tickets with due dates in this range.
-                  <p className="tkt__roadmap-empty-hint">
-                    {filterStats.linear} Linear-linked · {filterStats.withDue} with due dates ·{' '}
-                    {filterStats.inRange} in range ({rangeLabel})
-                  </p>
-                </>
-              ) : (
-                <>
-                  Nothing due this week — use ← → to browse other weeks ({roadmapTickets.length} ticket
-                  {roadmapTickets.length === 1 ? '' : 's'} in range).
-                </>
-              )}
+          {visibleTickets.length > 0 ? (
+            <div className="tkt__roadmap-footer">
+              <span className="tkt__roadmap-footer-label">
+                End of {visibleWeek?.label ?? 'this week'} · {visibleTickets.length} ticket
+                {visibleTickets.length === 1 ? '' : 's'} due
+              </span>
+              <span className="tkt__roadmap-footer-hint">Hover a row for details · click dot to open in Linear</span>
             </div>
           ) : (
-            visibleTickets.map(ticket => {
-              const dueDayKey = ticket.due_date ? dueDateDayKey(ticket.due_date) : '';
-              const priorityCfg = PRIORITY_CONFIG[ticket.priority];
-              const ticketId = ticket.linear_identifier || `#${ticket.number}`;
-              return (
-                <div
-                  key={ticket.id}
-                  className="tkt__roadmap-row"
-                  style={gridStyle}
-                >
-                  <Tooltip
-                    content={<RoadmapTicketTooltip ticket={ticket} />}
-                    side="bottom"
-                    align="start"
-                    delayMs={200}
-                    interactive
-                    interactiveHideDelayMs={250}
-                    className="tkt__roadmap-tip-panel"
-                  >
-                    <div
-                      className="tkt__roadmap-label-col tkt__roadmap-label-col--work"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onTicketClick(ticket)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onTicketClick(ticket);
-                        }
-                      }}
-                    >
-                      <p className="tkt__roadmap-work-item">
-                        <span className="tkt__roadmap-work-id">{ticketId}</span>
-                        <span className="tkt__roadmap-work-sep"> — </span>
-                        <span className="tkt__roadmap-work-title">{ticket.title}</span>
-                      </p>
-                    </div>
-                  </Tooltip>
-                  {visibleDays.map(day => (
-                    <div
-                      key={day.key}
-                      className={`tkt__roadmap-day-col tkt__roadmap-day-cell ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
-                    >
-                      {dueDayKey === day.key && (
-                        <button
-                          type="button"
-                          className="tkt__roadmap-day-marker"
-                          style={{ backgroundColor: priorityCfg.color }}
-                          title={`Open ${ticketId} in Linear`}
-                          aria-label={`Open ${ticketId} in Linear`}
-                          onClick={e => {
-                            e.stopPropagation();
-                            openLinearTicket(ticket);
-                          }}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              );
-            })
+            <div className="tkt__roadmap-footer tkt__roadmap-footer--spacer" aria-hidden="true" />
           )}
-          </div>
         </div>
       </div>
     </div>

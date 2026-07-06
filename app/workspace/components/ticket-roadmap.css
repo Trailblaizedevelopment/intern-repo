@@ -5,7 +5,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0.75rem 1rem 1rem;
+  padding: 0.75rem 0 1rem;
   overflow: hidden;
 }
 
@@ -93,6 +93,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  width: 100%;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #fff;
@@ -104,20 +105,37 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
 }
 
-.tkt__roadmap-header-row {
+.tkt__roadmap-grid {
   display: grid;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  grid-template-columns: minmax(0, 1.35fr) repeat(7, minmax(0, 1fr));
+  box-sizing: border-box;
+}
+
+.tkt__roadmap-grid-head {
   position: sticky;
   top: 0;
   z-index: 2;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.tkt__roadmap-body {
-  min-height: 0;
+.tkt__roadmap-grid-span {
+  grid-column: 1 / -1;
+}
+
+.tkt__roadmap-grid-cell {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.tkt__roadmap-grid-cell--last {
+  border-bottom: none;
 }
 
 .tkt__roadmap-label-col {
@@ -146,6 +164,11 @@
   justify-content: center;
   gap: 0.08rem;
   min-width: 0;
+}
+
+.tkt__roadmap-header-row .tkt__roadmap-day-col:last-child,
+.tkt__roadmap-grid > .tkt__roadmap-day-col:nth-child(8n) {
+  border-right: none;
 }
 
 .tkt__roadmap-day-col--today {
@@ -177,11 +200,12 @@
 
 .tkt__roadmap-row {
   display: grid;
+  width: 100%;
   border-bottom: 1px solid #f3f4f6;
-  cursor: pointer;
   transition: background 0.12s;
 }
 
+/* legacy row class — kept if referenced elsewhere */
 .tkt__roadmap-row:hover {
   background: #fafafa;
 }
@@ -408,6 +432,37 @@
   margin-top: 0.5rem;
   font-size: 0.72rem;
   color: #b0b7c3;
+}
+
+.tkt__roadmap-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 1rem;
+  border-top: 1px dashed #e5e7eb;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+  text-align: center;
+}
+
+.tkt__roadmap-footer-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.tkt__roadmap-footer-hint {
+  font-size: 0.68rem;
+  color: #9ca3af;
+}
+
+.tkt__roadmap-footer--spacer {
+  border-top: none;
+  background: transparent;
+  min-height: 0;
+  padding: 0;
 }
 
 @media (max-width: 900px) {
