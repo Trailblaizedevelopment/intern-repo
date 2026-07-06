@@ -78,9 +78,9 @@ export function AgentRunsPanel({ runs, stats, loading }: AgentRunsPanelProps) {
   const filters: SurfaceFilter[] = ['all', 'slack', 'workspace', 'task'];
 
   return (
-    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+    <div className="dev-console-panel" style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
       {/* Header + stats strip */}
-      <div style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB' }}>
+      <div className="dev-console-panel-head" style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>Agent runs</span>
@@ -94,18 +94,18 @@ export function AgentRunsPanel({ runs, stats, loading }: AgentRunsPanelProps) {
           {loading && <Loader2 size={14} style={{ color: '#9CA3AF', animation: 'spin 1s linear infinite' }} />}
         </div>
 
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div className="dev-console-runs-stats" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <MiniStat label="Spend (7d)" value={fmtCostUsd(stats.costUsd7d)} highlight />
           <MiniStat label="Spend (24h)" value={fmtCostUsd(stats.costUsd24h)} />
           <MiniStat label="24h runs" value={String(stats.runs24h)} />
           <MiniStat label="Avg / run (7d)" value={stats.avgCostPerRun7d != null ? fmtCostUsd(stats.avgCostPerRun7d) : '—'} />
           <MiniStat label="Tokens (24h)" value={stats.totalTokens24h >= 1000 ? `${(stats.totalTokens24h / 1000).toFixed(1)}k` : String(stats.totalTokens24h)} />
         </div>
-        <p style={{ margin: '8px 0 0', fontSize: '0.625rem', color: '#9CA3AF' }}>
+        <p className="dev-console-runs-pricing-note" style={{ margin: '8px 0 0', fontSize: '0.625rem', color: '#9CA3AF' }}>
           Est. Anthropic API · {stats.defaultModel.replace('claude-', '')} · {stats.pricingLabel}
         </p>
         {Object.keys(stats.costBySurface7d).length > 0 && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <div className="dev-console-runs-cost-tags" style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             {(['slack', 'task', 'workspace'] as const).map(surface => {
               const cost = stats.costBySurface7d[surface];
               if (cost == null || cost === 0) return null;
@@ -121,7 +121,7 @@ export function AgentRunsPanel({ runs, stats, loading }: AgentRunsPanelProps) {
       </div>
 
       {/* Surface filters */}
-      <div style={{ display: 'flex', gap: 6, padding: '10px 14px', borderBottom: '1px solid #F3F4F6', flexWrap: 'wrap' }}>
+      <div className="dev-console-runs-filters" style={{ display: 'flex', gap: 6, padding: '10px 14px', borderBottom: '1px solid #F3F4F6', flexWrap: 'wrap' }}>
         {filters.map(f => {
           const count = f === 'all' ? stats.runs24h : (stats.bySurface24h[f] ?? 0);
           const active = filter === f;
@@ -146,7 +146,7 @@ export function AgentRunsPanel({ runs, stats, loading }: AgentRunsPanelProps) {
       </div>
 
       {/* Run list */}
-      <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+      <div className="dev-console-runs-list" style={{ maxHeight: 420, overflowY: 'auto' }}>
         {filtered.length === 0 ? (
           <p style={{ padding: 28, margin: 0, textAlign: 'center', fontSize: '0.8125rem', color: '#9CA3AF' }}>
             No agent runs yet. Message Brain in Slack to start.
@@ -214,14 +214,14 @@ function AgentRunRow({
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
+          <div className="dev-console-run-meta" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.625rem', fontWeight: 600, padding: '2px 7px', borderRadius: 999, background: meta.bg, color: meta.color }}>
               <SurfaceIcon size={10} /> {meta.label}
             </span>
             {run.model && (
               <span style={{ fontSize: '0.625rem', color: '#9CA3AF' }}>{run.model.replace('claude-', '')}</span>
             )}
-            <span style={{ fontSize: '0.6875rem', color: '#9CA3AF', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="dev-console-run-meta-spacer" style={{ fontSize: '0.6875rem', color: '#9CA3AF', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 600, color: '#059669' }}>{fmtCostUsd(run.estimated_cost_usd)}</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                 <Zap size={10} /> {run.tool_call_count}

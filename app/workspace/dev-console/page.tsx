@@ -1,5 +1,6 @@
 'use client';
 
+import './dev-console.css';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -128,23 +129,24 @@ function StatCard({ label, value, sub, icon: Icon, accent }: {
   accent: string;
 }) {
   return (
-    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px 16px', flex: 1, minWidth: 140 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+    <div className="dev-console-kpi-item" style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px 16px', flex: 1, minWidth: 140 }}>
+      <div className="dev-console-kpi-label-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span className="dev-console-kpi-label" style={{ fontSize: '0.6875rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+        <div className="dev-console-kpi-icon" style={{ width: 28, height: 28, borderRadius: 8, background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
           <Icon size={14} />
         </div>
       </div>
-      <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', lineHeight: 1.1 }}>{value}</div>
-      {sub && <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 4 }}>{sub}</div>}
+      <div className="dev-console-kpi-value" style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', lineHeight: 1.1 }}>{value}</div>
+      {sub && <div className="dev-console-kpi-sub" style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
 
-function ConnectorStrip({ connectors }: { connectors: ConnectorStatus[] }) {
+function ConnectorStrip({ connectors, className }: { connectors: ConnectorStatus[]; className?: string }) {
   if (connectors.length === 0) return null;
   return (
     <div
+      className={className}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -344,9 +346,9 @@ export default function DevConsolePage() {
   const connectors = data?.connectors ?? [];
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 4px 32px' }}>
-      {/* Header — single row, no wrap */}
-      <div
+    <div className="dev-console" style={{ maxWidth: 1080, margin: '0 auto', padding: '0 4px 32px' }}>
+      <header
+        className="dev-console-header"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -356,7 +358,7 @@ export default function DevConsolePage() {
           flexWrap: 'nowrap',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: 1 }}>
+        <div className="dev-console-header-brand dev-console-header-title-block" style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: 1 }}>
           <h1
             style={{
               margin: 0,
@@ -368,16 +370,28 @@ export default function DevConsolePage() {
               letterSpacing: '-0.01em',
             }}
           >
-            Trailblaize Brain
+            <span className="dev-console-title-full">Trailblaize Brain</span>
+            <span className="dev-console-title-short">Brain</span>
           </h1>
-          <div style={{ width: 1, height: 18, background: '#E5E7EB', flexShrink: 0 }} aria-hidden />
-          <ConnectorStrip connectors={connectors} />
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <ViewSwitcher value={consoleView} onChange={handleViewChange} />
+          <div className="dev-console-header-divider" style={{ width: 1, height: 18, background: '#E5E7EB', flexShrink: 0 }} aria-hidden />
+          <ConnectorStrip connectors={connectors} className="dev-console-integrations" />
           <button
             type="button"
+            className="dev-console-refresh-brand"
+            onClick={() => loadDashboard(true)}
+            disabled={refreshing}
+            aria-label="Refresh dashboard"
+            title="Refresh"
+          >
+            <RefreshCw size={15} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} />
+          </button>
+        </div>
+
+        <div className="dev-console-header-actions dev-console-header-controls" style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <ViewSwitcher value={consoleView} onChange={handleViewChange} className="dev-console-view-switcher" />
+          <button
+            type="button"
+            className="dev-console-refresh-actions"
             onClick={() => loadDashboard(true)}
             disabled={refreshing}
             aria-label="Refresh dashboard"
@@ -400,7 +414,7 @@ export default function DevConsolePage() {
             <RefreshCw size={15} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} />
           </button>
         </div>
-      </div>
+      </header>
 
       {error && (
         <div style={{ padding: '10px 14px', marginBottom: 16, borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', fontSize: '0.8125rem' }}>
@@ -416,14 +430,14 @@ export default function DevConsolePage() {
         <>
           {consoleView === 'dashboard' && (
             <>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div className="dev-console-kpi-grid" style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
                 <StatCard label="Weekly spend" value={fmtCostUsd(data.agentRunStats.costUsd7d)} sub={`${fmtCostUsd(data.agentRunStats.costUsd24h)} today · est. API cost`} icon={DollarSign} accent="#059669" />
                 <StatCard label="Agent runs (24h)" value={data.agentRunStats.runs24h} sub={`${data.agentRunStats.successRate24h}% success · ${data.agentRunStats.runningNow} live`} icon={Brain} accent="#4F46E5" />
                 <StatCard label="Avg / run (7d)" value={data.agentRunStats.avgCostPerRun7d != null ? fmtCostUsd(data.agentRunStats.avgCostPerRun7d) : '—'} sub={data.agentRunStats.pricingLabel} icon={Clock} accent="#2563EB" />
                 <StatCard label="Tool calls (24h)" value={stats.toolCalls24h} sub={`${stats.toolSuccessRate24h}% success`} icon={Wrench} accent="#7C3AED" />
               </div>
 
-              <div style={{ marginBottom: 16 }}>
+              <div className="dev-console-section-gap" style={{ marginBottom: 16 }}>
                 <AgentRunsPanel runs={data.recentAgentRuns} stats={data.agentRunStats} loading={refreshing} />
               </div>
 
@@ -437,9 +451,9 @@ export default function DevConsolePage() {
                 }
               />
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="dev-console-bottom-grid dev-console-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="dev-console-bottom-panel dev-console-panel" style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+                  <div className="dev-console-bottom-panel-head dev-console-panel-head" style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>Orchestration tasks</span>
                     <span style={{ fontSize: '0.6875rem', color: '#9CA3AF' }}>{data.recentTasks.length} recent</span>
                   </div>
@@ -459,37 +473,39 @@ export default function DevConsolePage() {
                   )}
                 </div>
 
-                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB' }}>
+                <div className="dev-console-bottom-panel dev-console-panel" style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+                  <div className="dev-console-bottom-panel-head dev-console-panel-head" style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB' }}>
                     <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>Recent tool calls</span>
                   </div>
-                  <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                  <div className="dev-console-tool-list" style={{ maxHeight: 480, overflowY: 'auto' }}>
                     {data.recentActions.length === 0 ? (
                       <p style={{ padding: 24, margin: 0, textAlign: 'center', fontSize: '0.8125rem', color: '#9CA3AF' }}>
                         No tool calls logged yet.
                       </p>
                     ) : (
                       data.recentActions.map(action => (
-                        <div key={action.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderBottom: '1px solid #F3F4F6' }}>
-                          {action.status === 'success' ? (
-                            <CheckCircle2 size={14} style={{ color: '#059669', marginTop: 2, flexShrink: 0 }} />
-                          ) : (
-                            <XCircle size={14} style={{ color: '#DC2626', marginTop: 2, flexShrink: 0 }} />
-                          )}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#374151' }}>
-                                {action.connector_name ? `${action.connector_name}:` : ''}{action.skill_name.replace(/^linear_/, '')}
-                              </span>
-                              <span style={{ fontSize: '0.625rem', padding: '1px 6px', borderRadius: 999, background: '#F3F4F6', color: '#6B7280' }}>{action.source}</span>
-                            </div>
-                            {action.error && (
-                              <p style={{ margin: '2px 0 0', fontSize: '0.6875rem', color: '#991B1B' }}>{action.error.slice(0, 100)}</p>
+                        <div key={action.id} className="dev-console-tool-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderBottom: '1px solid #F3F4F6' }}>
+                          <div className="dev-console-tool-row-icon">
+                            {action.status === 'success' ? (
+                              <CheckCircle2 size={14} style={{ color: '#059669', marginTop: 2, flexShrink: 0 }} />
+                            ) : (
+                              <XCircle size={14} style={{ color: '#DC2626', marginTop: 2, flexShrink: 0 }} />
                             )}
                           </div>
-                          <span style={{ fontSize: '0.6875rem', color: '#9CA3AF', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <Clock size={10} /> {fmtRelative(action.created_at)}
-                          </span>
+                          <div className="dev-console-tool-row-body" style={{ flex: 1, minWidth: 0 }}>
+                            <div className="dev-console-tool-row-main" style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap' }}>
+                              <span className="dev-console-tool-row-name" style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#374151' }}>
+                                {action.connector_name ? `${action.connector_name}:` : ''}{action.skill_name.replace(/^linear_/, '')}
+                              </span>
+                              <span className="dev-console-tool-row-source" style={{ fontSize: '0.625rem', padding: '1px 6px', borderRadius: 999, background: '#F3F4F6', color: '#6B7280', flexShrink: 0 }}>{action.source}</span>
+                            </div>
+                            {action.error && (
+                              <p className="dev-console-tool-row-error" style={{ margin: '2px 0 0', fontSize: '0.6875rem', color: '#991B1B' }}>{action.error.slice(0, 100)}</p>
+                            )}
+                            <span className="dev-console-tool-row-time" style={{ fontSize: '0.6875rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <Clock size={10} /> {fmtRelative(action.created_at)}
+                            </span>
+                          </div>
                         </div>
                       ))
                     )}

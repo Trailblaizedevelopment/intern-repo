@@ -108,10 +108,10 @@ export function GuideView({ connectors, automations, linearReadOnly, rateLimits 
   const [section, setSection] = useState<GuideSection>('start');
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 16, alignItems: 'start' }}>
+    <div className="dev-console-guide" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 16, alignItems: 'start' }}>
       {/* Nav */}
-      <nav style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 8, position: 'sticky', top: 12 }}>
-        <p style={{ margin: '4px 10px 10px', fontSize: '0.6875rem', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <nav className="dev-console-guide-nav" style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 8, position: 'sticky', top: 12 }}>
+        <p className="dev-console-guide-nav-label" style={{ margin: '4px 10px 10px', fontSize: '0.6875rem', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           User manual
         </p>
         {SECTIONS.map(s => {
@@ -121,6 +121,7 @@ export function GuideView({ connectors, automations, linearReadOnly, rateLimits 
             <button
               key={s.id}
               type="button"
+              data-active={active ? 'true' : undefined}
               onClick={() => setSection(s.id)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 8,
@@ -138,7 +139,7 @@ export function GuideView({ connectors, automations, linearReadOnly, rateLimits 
       </nav>
 
       {/* Content */}
-      <article style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px 28px', minHeight: 420 }}>
+      <article className="dev-console-guide-article" style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '24px 28px', minHeight: 420 }}>
         {section === 'start' && <QuickStart rateLimits={rateLimits} />}
         {section === 'setup' && (
           <SetupSection connectors={connectors} automations={automations} linearReadOnly={linearReadOnly} rateLimits={rateLimits} />

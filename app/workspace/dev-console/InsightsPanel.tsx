@@ -470,6 +470,7 @@ function AutomationsView({
       {error && <ErrorBanner message={error} />}
 
       <div
+        className="dev-console-automation-head"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr auto auto 48px',
@@ -497,6 +498,7 @@ function AutomationsView({
         return (
           <div
             key={a.id}
+            className="dev-console-automation-row"
             onClick={() => setSelectedId(a.id)}
             onKeyDown={e => {
               if (e.key === 'Enter') setSelectedId(a.id);
@@ -596,9 +598,9 @@ export function InsightsPanel({ activityByDay, automations, weekSpend, authHeade
   const [tab, setTab] = useState<InsightTab>('spend');
 
   return (
-    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+    <div className="dev-console-insights" style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
       {/* Tab bar */}
-      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #E5E7EB', padding: '0 8px' }}>
+      <div className="dev-console-insights-tabs" style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #E5E7EB', padding: '0 8px' }}>
         {TABS.map(t => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -634,7 +636,7 @@ export function InsightsPanel({ activityByDay, automations, weekSpend, authHeade
       </div>
 
       {/* Content — automations tab is edge-to-edge */}
-      <div style={{ padding: tab === 'automations' ? '20px 0 0' : '20px 24px', minHeight: 180 }}>
+      <div className="dev-console-insights-body" style={{ padding: tab === 'automations' ? '20px 0 0' : '20px 24px', minHeight: 180 }}>
         {tab === 'spend' && <SpendChart days={activityByDay} />}
         {tab === 'activity' && <ActivityChart days={activityByDay} />}
         {tab === 'automations' && (

@@ -1,0 +1,458 @@
+/* Dev Console — mobile-first overrides (max-width matches workspace mobile) */
+
+.dev-console {
+  width: 100%;
+}
+
+.dev-console-title-short {
+  display: none;
+}
+
+.dev-console-refresh-brand {
+  display: none;
+}
+
+/* ── Header ── */
+@media (max-width: 768px) {
+  .dev-console {
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding-bottom: 1rem !important;
+  }
+
+  .dev-console-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .dev-console-header-title-block {
+    display: flex !important;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dev-console-title-full {
+    display: none;
+  }
+
+  .dev-console-title-short {
+    display: inline;
+  }
+
+  .dev-console-header-divider,
+  .dev-console-integrations {
+    display: none !important;
+  }
+
+  .dev-console-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .dev-console-header-controls .dev-console-view-switcher {
+    flex: 1;
+    display: flex;
+  }
+
+  .dev-console-header-controls .dev-console-view-switcher > div {
+    flex: 1;
+    display: flex;
+  }
+
+  .dev-console-header-controls .dev-console-view-switcher button {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 4px !important;
+  }
+
+  .dev-console-header-brand {
+    width: 100%;
+    justify-content: space-between !important;
+  }
+
+  .dev-console-refresh-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid #E5E7EB;
+    background: white;
+    color: #6B7280;
+    flex-shrink: 0;
+    cursor: pointer;
+    margin-left: auto;
+  }
+
+  .dev-console-refresh-brand:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .dev-console-refresh-actions {
+    display: none !important;
+  }
+
+  .dev-console-header-actions {
+    width: 100%;
+  }
+
+  /* ── KPI strip (horizontal scroll, no cards) ── */
+  .dev-console-kpi-grid {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    gap: 0 !important;
+    margin: 0 -1rem 12px;
+    padding: 0 1rem 2px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-bottom: 1px solid #E5E7EB;
+  }
+
+  .dev-console-kpi-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dev-console-kpi-item {
+    flex: 0 0 auto;
+    min-width: 108px;
+    scroll-snap-align: start;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 10px 14px 12px 0 !important;
+    box-shadow: none !important;
+  }
+
+  .dev-console-kpi-item:not(:last-child) {
+    border-right: 1px solid #F3F4F6 !important;
+    margin-right: 2px;
+  }
+
+  .dev-console-kpi-icon {
+    display: none !important;
+  }
+
+  .dev-console-kpi-label-row {
+    margin-bottom: 4px !important;
+  }
+
+  .dev-console-kpi-value {
+    font-size: 1.125rem !important;
+  }
+
+  .dev-console-kpi-sub {
+    font-size: 0.625rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+  }
+
+  /* ── Flat panels (no card chrome) ── */
+  .dev-console-panel {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    border-top: 1px solid #E5E7EB !important;
+    margin-bottom: 0 !important;
+  }
+
+  .dev-console-panel-head {
+    padding: 12px 0 !important;
+    border-bottom: none !important;
+  }
+
+  .dev-console-panel > .dev-console-panel-head {
+    border-bottom: none !important;
+  }
+
+  .dev-console-split {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+
+  .dev-console-section-gap {
+    margin-bottom: 0 !important;
+  }
+
+  /* Agent runs: hide duplicate stat grid on mobile */
+  .dev-console-runs-stats {
+    display: none !important;
+  }
+
+  .dev-console-runs-pricing-note {
+    display: none !important;
+  }
+
+  .dev-console-runs-cost-tags {
+    margin-top: 4px !important;
+  }
+
+  .dev-console-runs-filters {
+    padding: 8px 0 !important;
+    border-bottom: none !important;
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+  }
+
+  .dev-console-runs-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dev-console-runs-filters button {
+    flex-shrink: 0;
+  }
+
+  .dev-console-panel button[style*='padding: 11px 14px'],
+  .dev-console-bottom-panel button[style*='padding: 12px 14px'] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Insights panel */
+  .dev-console-insights {
+    background: transparent !important;
+    border: none !important;
+    border-top: 1px solid #E5E7EB !important;
+    border-radius: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .dev-console-insights-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .dev-console-insights-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dev-console-insights-body {
+    padding: 16px 0 !important;
+    min-height: 140px !important;
+  }
+
+  /* Guide: horizontal section nav */
+  .dev-console-guide {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+
+  .dev-console-guide-nav {
+    position: static !important;
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto;
+    gap: 6px !important;
+    padding: 0 0 12px !important;
+    border: none !important;
+    background: transparent !important;
+    scrollbar-width: none;
+  }
+
+  .dev-console-guide-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dev-console-guide-nav-label {
+    display: none;
+  }
+
+  .dev-console-guide-nav button {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 8px 12px !important;
+    border: 1px solid #E5E7EB !important;
+    border-radius: 999px !important;
+    background: white !important;
+    width: auto !important;
+    color: #374151 !important;
+  }
+
+  .dev-console-guide-nav button[data-active='true'] {
+    border-color: #C7D2FE !important;
+    background: #EEF2FF !important;
+    color: #4338CA !important;
+    font-weight: 600 !important;
+  }
+
+  .dev-console-guide-article {
+    border: none !important;
+    border-radius: 0 !important;
+    border-top: 1px solid #E5E7EB !important;
+    padding: 16px 0 !important;
+    min-height: auto !important;
+  }
+
+  /* Brain Room */
+  .dev-console-room {
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 -1rem;
+    width: calc(100% + 2rem);
+  }
+
+  .dev-console-room .brain-room-scene {
+    height: min(52vh, 320px) !important;
+  }
+
+  .dev-console-room-stats {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    gap: 0 !important;
+    padding: 12px 16px !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dev-console-room-stats::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dev-console-room-stats > div:not(.dev-console-room-slack-hint) {
+    flex: 0 0 auto;
+    min-width: 72px;
+    padding-right: 16px;
+  }
+
+  .dev-console-room-slack-hint {
+    display: none !important;
+  }
+
+  .dev-console-room-footer {
+    padding: 8px 16px 12px !important;
+    font-size: 0.625rem !important;
+  }
+
+  /* Run rows: tighter on mobile */
+  .dev-console-run-meta {
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+
+  .dev-console-run-meta-spacer {
+    margin-left: 0 !important;
+    width: 100%;
+    justify-content: flex-start !important;
+    padding-top: 2px;
+  }
+
+  /* Bottom tasks / tool calls */
+  .dev-console-bottom-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+
+  .dev-console-bottom-panel {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    border-top: 1px solid #E5E7EB !important;
+  }
+
+  .dev-console-bottom-panel-head {
+    padding: 12px 0 !important;
+  }
+
+  .dev-console-tool-list {
+    max-height: none !important;
+    overflow-x: hidden !important;
+  }
+
+  .dev-console-tool-row {
+    padding: 10px 0 !important;
+    gap: 8px !important;
+  }
+
+  .dev-console-tool-row-body {
+    min-width: 0 !important;
+    overflow: hidden;
+  }
+
+  .dev-console-tool-row-main {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 4px !important;
+  }
+
+  .dev-console-tool-row-name {
+    display: block;
+    width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.35;
+  }
+
+  .dev-console-tool-row-error {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .dev-console-tool-row-time {
+    margin-top: 4px;
+    width: auto !important;
+    margin-left: 0 !important;
+  }
+
+  /* Automations list: stack on small screens */
+  .dev-console-automation-head,
+  .dev-console-automation-row {
+    grid-template-columns: 1fr auto !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .dev-console-automation-head span:nth-child(n + 3),
+  .dev-console-automation-row > :nth-child(n + 3) {
+    display: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .dev-console-tool-row-body {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    column-gap: 12px;
+  }
+
+  .dev-console-tool-row-main {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+
+  .dev-console-tool-row-error {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .dev-console-tool-row-time {
+    grid-column: 2;
+    grid-row: 1;
+    margin-top: 0;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .dev-console-tool-row-name {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+}

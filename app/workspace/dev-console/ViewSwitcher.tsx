@@ -14,11 +14,13 @@ const VIEWS: { id: ConsoleView; label: string; icon: React.ElementType }[] = [
 interface ViewSwitcherProps {
   value: ConsoleView;
   onChange: (view: ConsoleView) => void;
+  className?: string;
 }
 
-export function ViewSwitcher({ value, onChange }: ViewSwitcherProps) {
+export function ViewSwitcher({ value, onChange, className }: ViewSwitcherProps) {
   return (
     <div
+      className={className}
       style={{
         display: 'inline-flex',
         padding: 3,
