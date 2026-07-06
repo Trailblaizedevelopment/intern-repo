@@ -6,7 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  * GET /api/cron/brain-task-runner
  *
  * Picks one queued/running brain_task and runs a single agent iteration.
- * Schedule: every 2 minutes (vercel.json).
+ * Schedule: every 5 minutes (vercel.json).
  *
  * Auth: Authorization: Bearer CRON_SECRET or INTERNAL_API_KEY
  */

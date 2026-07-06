@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/brain-task-runner",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }
