@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/drip-batches",
       "schedule": "*/30 16-22 * * 1-5"
+    },
+    {
+      "path": "/api/cron/brain-morning-briefing",
+      "schedule": "30 12 * * 1-5"
     }
   ]
 }

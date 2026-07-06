@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "brain:briefing": "npx --yes tsx scripts/brain-morning-briefing.ts"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
