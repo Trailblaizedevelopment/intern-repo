@@ -28,6 +28,8 @@ export interface BrainTaskRow {
   cursor_run_status: string | null;
   cursor_pr_url: string | null;
   cursor_branch: string | null;
+  cursor_pr_merged: boolean;
+  integration_branch: string | null;
   github_repo: string;
   max_minutes: number;
   iteration_count: number;

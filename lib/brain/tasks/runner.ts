@@ -3,6 +3,7 @@ import { isCursorConfigured } from '../cursor-api';
 import { watchCursorAgent } from '../cursor-watch';
 import { runBrainAgent } from '../agent';
 import { postSlackMessage } from '../slack/client';
+import { handlePrMergeWatch } from './cursor-lock';
 import { appendTaskLog, claimNextRunnableTask, getBrainTask, updateTaskStatus } from './store';
 import { BrainTaskRow } from './types';
 
@@ -15,19 +16,23 @@ function buildTaskIterationPrompt(task: BrainTaskRow, cursorNote?: string): stri
     `Goal: ${task.goal}`,
   ];
   if (task.linear_issue_id) parts.push(`Linear: ${task.linear_issue_id}`);
+  if (task.integration_branch) {
+    parts.push(`Integration branch (PR target): ${task.integration_branch} — humans merge this → develop`);
+  }
   if (task.plan) parts.push(`Plan:\n${task.plan}`);
   if (task.cursor_agent_id) {
     parts.push(`Cursor agent: ${task.cursor_agent_id}`);
     if (task.cursor_agent_url) parts.push(`Dashboard: ${task.cursor_agent_url}`);
     if (task.cursor_run_status) parts.push(`Run status: ${task.cursor_run_status}`);
-    if (task.cursor_pr_url) parts.push(`PR: ${task.cursor_pr_url}`);
+    if (task.cursor_pr_url) parts.push(`PR: ${task.cursor_pr_url}${task.cursor_pr_merged ? ' (merged)' : ''}`);
     if (task.cursor_branch) parts.push(`Branch: ${task.cursor_branch}`);
   }
   if (cursorNote) parts.push(cursorNote);
   parts.push(
     `Iteration ${task.iteration_count + 1}/${task.max_iterations}. Deadline: ${task.deadline_at || 'none'}.`,
     'Use tools to make progress. Call tasks_complete when done, tasks_block if stuck.',
-    'If Cursor already finished with a PR, verify via github_get_pr then tasks_complete — do not re-dispatch unless follow-up work is needed.'
+    'If cursor PR merged into integration branch, use cursor_dispatch_agent with follow_up=true for next slice.',
+    'Never target develop or main with PRs — humans only.'
   );
   return parts.join('\n\n');
 }
@@ -36,7 +41,7 @@ function buildTaskSystemAppend(task: BrainTaskRow): string {
   return [
     'TASK ORCHESTRATION MODE — you are executing one iteration of a background goal.',
     `Task id: ${task.id} (pass to tasks_* tools or rely on task context).`,
-    'Brain orchestrates; Cursor implements on Trailblaize-Web. Base branch develop; PRs target develop only.',
+    'Brain orchestrates; Cursor implements on Trailblaize-Web. PRs target the task integration feature branch only — humans merge feature → develop.',
     'Be action-oriented: research in Linear/GitHub, dispatch Cursor once for implementation, then complete when PR exists.',
     'Do not ask the user questions — make reasonable assumptions and log them in the summary.',
   ].join('\n');
@@ -147,11 +152,52 @@ async function handleCursorWatchTick(
         .join('\n'));
     }
 
-    // Let Brain verify PR and complete — fall through to agent iteration
     return { handled: false };
   }
 
   return { handled: false };
+}
+
+async function handlePrMergeWatchTick(
+  supabase: SupabaseClient,
+  task: BrainTaskRow
+): Promise<{ handled: boolean; result?: TaskRunnerResult }> {
+  const mergeResult = await handlePrMergeWatch(supabase, task);
+  if (!mergeResult.handled || !mergeResult.merged) {
+    return { handled: false };
+  }
+
+  const refreshed = (await getBrainTask(supabase, task.id)) || task;
+  const msg = mergeResult.releasedDispatchLock
+    ? `PR merged into ${refreshed.integration_branch}. Dispatch lock released — follow-up allowed on integration branch.`
+    : mergeResult.mergedToProtected
+      ? `PR merged to protected branch — human action only. Agent will not continue.`
+      : `PR merged. Verify and tasks_complete.`;
+
+  if (refreshed.slack_channel) {
+    await notifySlack(refreshed, [
+      '*PR merged*',
+      refreshed.linear_issue_id ? `Linear: ${refreshed.linear_issue_id}` : null,
+      refreshed.cursor_pr_url || null,
+      mergeResult.releasedDispatchLock
+        ? `Ready for follow-up dispatch on ${refreshed.integration_branch}.`
+        : null,
+    ]
+      .filter(Boolean)
+      .join('\n'));
+  }
+
+  await scheduleNextRun(supabase, task.id, TICK_INTERVAL_MS);
+  return {
+    handled: true,
+    result: {
+      processed: true,
+      taskId: task.id,
+      status: refreshed.status,
+      reply: msg,
+      mode: 'poll',
+    },
+  };
 }
 
 export interface TaskRunnerResult {
@@ -167,15 +213,21 @@ export async function runOneTaskIteration(supabase: SupabaseClient): Promise<Tas
   const task = await claimNextRunnableTask(supabase);
   if (!task) return { processed: false };
 
+  const prMergeTick = await handlePrMergeWatchTick(supabase, task);
+  if (prMergeTick.handled && prMergeTick.result) {
+    return prMergeTick.result;
+  }
+
   const watchTick = await handleCursorWatchTick(supabase, task);
   if (watchTick.handled && watchTick.result) {
     return { ...watchTick.result, mode: 'poll' };
   }
 
   const refreshedForPrompt = (await getBrainTask(supabase, task.id)) || task;
-  const cursorNote =
-    refreshedForPrompt.cursor_run_status === 'FINISHED'
-      ? 'Cursor run FINISHED. Verify the PR on GitHub, confirm acceptance criteria, then tasks_complete with summary.'
+  const cursorNote = refreshedForPrompt.cursor_pr_merged
+    ? `PR merged into ${refreshedForPrompt.integration_branch}. tasks_complete if done, or cursor_dispatch_agent with follow_up=true for next slice.`
+    : refreshedForPrompt.cursor_run_status === 'FINISHED'
+      ? 'Cursor FINISHED. Verify PR targets integration branch (not develop), then tasks_complete.'
       : undefined;
 
   const prevStatus = refreshedForPrompt.status;

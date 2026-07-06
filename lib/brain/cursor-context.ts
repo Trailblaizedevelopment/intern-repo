@@ -4,6 +4,7 @@ export interface BuildCursorPromptInput {
   implementation: string;
   linearIssueId?: string | null;
   taskGoal?: string | null;
+  integrationBranch: string;
 }
 
 function slugFromGoal(goal: string): string {
@@ -20,6 +21,7 @@ export async function buildCursorDispatchPrompt(input: BuildCursorPromptInput): 
   const develop = getDevelopBranch();
   const repo = getGitHubRepoFull();
   const linear = input.linearIssueId?.trim() || null;
+  const integration = input.integrationBranch;
   const branchHint = linear
     ? `cursor/${linear}-${slugFromGoal(input.taskGoal || input.implementation)}`
     : `cursor/${slugFromGoal(input.taskGoal || input.implementation)}`;
@@ -33,11 +35,12 @@ export async function buildCursorDispatchPrompt(input: BuildCursorPromptInput): 
     '## Implementation instructions',
     input.implementation.trim(),
     '',
-    '## Repository conventions (mandatory)',
+    '## Branch & PR rules (mandatory — non-negotiable)',
     `- Repository: ${repo}`,
-    `- Base branch: **${develop}** (branch FROM ${develop}, never from main)`,
-    `- PR target: **${develop}** only — never open PRs to main`,
-    `- Branch naming: **${branchHint}** (prefix cursor/, include Linear ID when available)`,
+    `- Integration branch (PR base): **${integration}**`,
+    `- Work branch: **${branchHint}** (prefix cursor/, include Linear ID when available)`,
+    `- Branch FROM: **${integration}** (not ${develop} directly for PR base)`,
+    `- **NEVER open a PR targeting ${develop} or main** — humans merge ${integration} → ${develop} after review`,
     '- You implement code; Brain orchestrates. Follow acceptance criteria in the ticket.',
     '',
     '## AGENTS.md (orchestration charter)',
@@ -50,8 +53,8 @@ export async function buildCursorDispatchPrompt(input: BuildCursorPromptInput): 
     rules.workflowExcerpt,
     '',
     '## Done criteria',
-    '- Changes committed on cursor/ branch',
-    `- PR opened targeting ${develop}`,
+    `- Changes on a cursor/ branch, PR opened targeting **${integration}** only`,
+    `- Do NOT merge the PR — a human will review and merge`,
     linear ? `- Reference ${linear} in PR title and commits` : null,
     '- Summarize what changed and how to verify',
   ]

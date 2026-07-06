@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { deriveIntegrationBranch } from '../integration-branch';
 import { getGitHubRepoFull } from '../github-repo';
 import { grillTaskPlan } from '../grill';
 import { BrainTaskLogEntry, BrainTaskRow, BrainTaskStatus, CreateBrainTaskInput } from './types';
@@ -27,6 +28,7 @@ export async function createBrainTask(
 ): Promise<BrainTaskRow> {
   const maxMinutes = input.maxMinutes ?? 60;
   const deadline = new Date(Date.now() + maxMinutes * 60_000).toISOString();
+  const integrationBranch = deriveIntegrationBranch(input.linearIssueId, input.goal);
 
   const { data: created, error } = await supabase
     .from('brain_tasks')
@@ -39,6 +41,7 @@ export async function createBrainTask(
         goal: input.goal.trim(),
         status: 'planning',
         github_repo: defaultRepo(),
+        integration_branch: integrationBranch,
         max_minutes: maxMinutes,
         max_iterations: parseInt(process.env.BRAIN_TASK_MAX_ITERATIONS || '12', 10) || 12,
         deadline_at: deadline,

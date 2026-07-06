@@ -105,9 +105,10 @@ function buildSystemPrompt(
   }
   if (hasCursor) {
     toolGuidance.push(
-      '- Use cursor_dispatch_agent for code implementation on Trailblaize-Web. Defaults: branch from develop, PR targets develop, injects AGENTS.md + guardrails. Include Linear ticket ID.',
-      '- After dispatch, the task runner polls Cursor automatically — do not dispatch twice unless follow-up work is needed.',
-      '- When Cursor finishes, verify PR via github_get_pr then tasks_complete.'
+      '- Use cursor_dispatch_agent for implementation. PRs target the task integration feature branch (feature/TRA-xxx-...) — NEVER develop or main.',
+      '- Integration branch is created from develop automatically. Humans merge feature → develop after review.',
+      '- Only one dispatch per task unless follow_up=true (after cursor PR merges into integration branch).',
+      '- Runner polls Cursor and PR merge into integration branch automatically.'
     );
   }
   if (hasTasks) {
