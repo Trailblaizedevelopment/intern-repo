@@ -12,14 +12,22 @@ const CONVERSATION_KEY = 'brain-conversation-id';
 interface DisplayMessage {
   role: 'user' | 'assistant';
   text: string;
-  tools?: Array<{ name: string; ok: boolean }>;
+  tools?: Array<{ name: string; connector?: string; ok: boolean }>;
+}
+
+interface ConnectorStatus {
+  id: string;
+  label: string;
+  kind: string;
+  available: boolean;
+  toolCount: number;
 }
 
 const SUGGESTIONS = [
   'What tickets are due this week?',
   "What's assigned to me right now?",
+  'Search Linear for open bugs',
   'Give me a morning summary of the board',
-  'Anything overdue?',
 ];
 
 export default function DevConsolePage() {
@@ -32,6 +40,7 @@ export default function DevConsolePage() {
   const [restoring, setRestoring] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [connectors, setConnectors] = useState<ConnectorStatus[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -79,6 +88,15 @@ export default function DevConsolePage() {
     return () => {
       cancelled = true;
     };
+  }, [session, isDevin, authHeaders]);
+
+  // Load connector status
+  useEffect(() => {
+    if (!session?.access_token || !isDevin) return;
+    fetch('/api/brain/connectors', { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.connectors) setConnectors(data.connectors); })
+      .catch(() => {});
   }, [session, isDevin, authHeaders]);
 
   useEffect(() => {
@@ -153,11 +171,25 @@ export default function DevConsolePage() {
           <div>
             <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>Trailblaize Brain</h1>
             <p style={{ margin: 0, fontSize: '0.75rem', color: '#6B7280' }}>
-              Dev Console — ticket triage (read-only, Phase 1)
+              MCP connectors — CRM tickets + Linear (read-only)
             </p>
           </div>
         </div>
-        <button
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {connectors.map(c => (
+            <span
+              key={c.id}
+              title={`${c.label} — ${c.toolCount} tools`}
+              style={{
+                fontSize: '0.6875rem', fontWeight: 600, padding: '3px 8px', borderRadius: 999,
+                background: c.available ? '#ECFDF5' : '#F3F4F6',
+                color: c.available ? '#065F46' : '#9CA3AF',
+              }}
+            >
+              {c.id} {c.available ? `(${c.toolCount})` : 'off'}
+            </span>
+          ))}
+          <button
           onClick={newChat}
           style={{
             display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8,
@@ -167,6 +199,7 @@ export default function DevConsolePage() {
         >
           <Plus size={15} /> New chat
         </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -227,7 +260,7 @@ export default function DevConsolePage() {
                           background: t.ok ? '#EEF2FF' : '#FEE2E2', color: t.ok ? '#4338CA' : '#991B1B',
                         }}
                       >
-                        <Wrench size={10} /> {t.name}
+                        <Wrench size={10} /> {t.connector ? `${t.connector}:` : ''}{t.name.replace(/^(tickets|linear)_/, '')}
                       </span>
                     ))}
                   </div>

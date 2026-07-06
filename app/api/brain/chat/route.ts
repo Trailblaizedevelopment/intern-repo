@@ -154,6 +154,7 @@ export async function POST(request: NextRequest) {
       source: 'chat',
       conversation_id: conversationId,
       skill_name: e.name,
+      connector_name: e.connector || e.name.split('_')[0] || null,
       input: e.input,
       output: e.ok ? e.output : null,
       status: e.ok ? 'success' : 'failed',

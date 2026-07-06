@@ -1,31 +1,11 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  BrainConnector,
+  ConnectorCallResult,
+  ConnectorContext,
+  ConnectorTool,
+} from './types';
 
-/**
- * Trailblaize Brain — fixed skill registry (Phase 1: ticket triage).
- *
- * Skills are plain TypeScript functions exposed to the LLM as Anthropic tools.
- * No dynamic loading; the model can only call what is defined here.
- */
-
-export interface SkillContext {
-  supabase: SupabaseClient;
-  /** Devin's employees.id — used to resolve "my tickets". */
-  employeeId: string | null;
-}
-
-export interface SkillResult {
-  ok: boolean;
-  data?: unknown;
-  error?: string;
-}
-
-export interface SkillDefinition {
-  name: string;
-  description: string;
-  /** Anthropic tool input_schema (JSON Schema). */
-  inputSchema: Record<string, unknown>;
-  execute: (input: Record<string, unknown>, ctx: SkillContext) => Promise<SkillResult>;
-}
+const CONNECTOR_ID = 'tickets';
 
 const ACTIVE_STATUSES = ['backlog', 'todo', 'open', 'in_progress', 'in_review', 'testing'];
 const ALL_STATUSES = [...ACTIVE_STATUSES, 'done', 'canceled'];
@@ -35,7 +15,6 @@ const TICKET_LIST_SELECT =
   'id, number, title, status, priority, type, due_date, story_points, labels, project, linear_identifier, linear_url, created_at, updated_at, ' +
   'assignee:employees!tickets_assignee_id_fkey(id, name, email)';
 
-/** YYYY-MM-DD for "today" in Central Time (company timezone). */
 function todayCentral(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(new Date());
 }
@@ -45,7 +24,6 @@ function isoDateOrNull(value: unknown): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
-/** Normalize due_date (date or timestamptz) to YYYY-MM-DD for comparisons. */
 function dueDay(due: string | null): string | null {
   if (!due) return null;
   return due.slice(0, 10);
@@ -87,40 +65,10 @@ function formatTicketRow(t: TicketRow) {
   };
 }
 
-// ── query_tickets ────────────────────────────────────────────────────────────
+type ToolHandler = (input: Record<string, unknown>, ctx: ConnectorContext) => Promise<ConnectorCallResult>;
 
-const queryTickets: SkillDefinition = {
-  name: 'query_tickets',
-  description:
-    'Search and filter CRM tickets (synced with Linear). Use for questions like "what is due this week", ' +
-    '"my in-progress tickets", "open bugs", "overdue work". Returns up to 25 tickets sorted by due date then priority. ' +
-    'Statuses: backlog, todo, open, in_progress, in_review, testing, done, canceled. "active" means all non-done, non-canceled.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      status: {
-        type: 'string',
-        enum: [...ALL_STATUSES, 'active'],
-        description: 'Filter by status. Use "active" for all open work.',
-      },
-      priority: { type: 'string', enum: PRIORITIES },
-      assignee_me: {
-        type: 'boolean',
-        description: 'True to only show tickets assigned to the current user (Devin).',
-      },
-      unassigned: { type: 'boolean', description: 'True to only show tickets with no assignee.' },
-      overdue: {
-        type: 'boolean',
-        description: 'True to only show active tickets with a due date before today (Central Time).',
-      },
-      due_on: { type: 'string', description: 'Exact due date, YYYY-MM-DD.' },
-      due_before: { type: 'string', description: 'Due date strictly before this date, YYYY-MM-DD.' },
-      due_after: { type: 'string', description: 'Due date on or after this date, YYYY-MM-DD.' },
-      search: { type: 'string', description: 'Free-text search in title/description.' },
-      limit: { type: 'number', description: 'Max results, 1-25. Default 20.' },
-    },
-  },
-  async execute(input, ctx) {
+const TOOL_HANDLERS: Record<string, ToolHandler> = {
+  query_tickets: async (input, ctx) => {
     const limit = Math.min(Math.max(Number(input.limit) || 20, 1), 25);
     const today = todayCentral();
 
@@ -155,7 +103,6 @@ const queryTickets: SkillDefinition = {
     }
     const dueOn = isoDateOrNull(input.due_on);
     if (dueOn) {
-      // due_date may be stored as date or timestamptz — bound to the full day.
       query = query.gte('due_date', dueOn).lt('due_date', `${dueOn}T23:59:59.999`);
     }
     const dueBefore = isoDateOrNull(input.due_before);
@@ -178,30 +125,11 @@ const queryTickets: SkillDefinition = {
     const rows = (data as unknown as TicketRow[]) || [];
     return {
       ok: true,
-      data: {
-        count: rows.length,
-        today,
-        tickets: rows.map(formatTicketRow),
-      },
+      data: { count: rows.length, today, tickets: rows.map(formatTicketRow) },
     };
   },
-};
 
-// ── get_ticket ───────────────────────────────────────────────────────────────
-
-const getTicket: SkillDefinition = {
-  name: 'get_ticket',
-  description:
-    'Fetch full detail for one ticket, including description and recent activity. ' +
-    'Identifier can be a Linear identifier (TRA-123), a plain ticket number (238 or #238), a UUID, or a title fragment.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      identifier: { type: 'string', description: 'TRA-123, #238, 238, UUID, or title fragment.' },
-    },
-    required: ['identifier'],
-  },
-  async execute(input, ctx) {
+  get_ticket: async (input, ctx) => {
     const raw = String(input.identifier || '').trim();
     if (!raw) return { ok: false, error: 'identifier is required' };
 
@@ -230,6 +158,7 @@ const getTicket: SkillDefinition = {
     const { data: rawData, error } = await query.maybeSingle();
     if (error) return { ok: false, error: error.message };
     if (!rawData) return { ok: false, error: `No ticket found for "${raw}"` };
+
     const data = rawData as unknown as TicketRow & {
       description: string | null;
       sprint: string | null;
@@ -261,25 +190,8 @@ const getTicket: SkillDefinition = {
       },
     };
   },
-};
 
-// ── ticket_summary ───────────────────────────────────────────────────────────
-
-const ticketSummary: SkillDefinition = {
-  name: 'ticket_summary',
-  description:
-    'Aggregate snapshot of active tickets: counts by status and priority, overdue, due today, due within 7 days, ' +
-    'and unassigned. Use for standup-style questions like "how does the board look" or "morning summary".',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      assignee_me: {
-        type: 'boolean',
-        description: 'True to scope the summary to tickets assigned to the current user (Devin).',
-      },
-    },
-  },
-  async execute(input, ctx) {
+  ticket_summary: async (input, ctx) => {
     let query = ctx.supabase
       .from('tickets')
       .select(TICKET_LIST_SELECT)
@@ -346,19 +258,71 @@ const ticketSummary: SkillDefinition = {
   },
 };
 
-// ── Registry ─────────────────────────────────────────────────────────────────
+const STATIC_TOOLS: ConnectorTool[] = [
+  {
+    name: `${CONNECTOR_ID}_query_tickets`,
+    mcpName: 'query_tickets',
+    description:
+      '[CRM cache] Search and filter tickets synced from Linear. Fast local board data. ' +
+      'Use for due dates, assignee filters, overdue, standup lists.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: [...ALL_STATUSES, 'active'] },
+        priority: { type: 'string', enum: PRIORITIES },
+        assignee_me: { type: 'boolean' },
+        unassigned: { type: 'boolean' },
+        overdue: { type: 'boolean' },
+        due_on: { type: 'string' },
+        due_before: { type: 'string' },
+        due_after: { type: 'string' },
+        search: { type: 'string' },
+        limit: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: `${CONNECTOR_ID}_get_ticket`,
+    mcpName: 'get_ticket',
+    description: '[CRM cache] Full ticket detail + recent activity. Identifier: TRA-123, #238, UUID, or title.',
+    inputSchema: {
+      type: 'object',
+      properties: { identifier: { type: 'string' } },
+      required: ['identifier'],
+    },
+  },
+  {
+    name: `${CONNECTOR_ID}_ticket_summary`,
+    mcpName: 'ticket_summary',
+    description: '[CRM cache] Aggregate board snapshot: counts, overdue, due today/week, unassigned.',
+    inputSchema: {
+      type: 'object',
+      properties: { assignee_me: { type: 'boolean' } },
+    },
+  },
+];
 
-export const BRAIN_SKILLS: SkillDefinition[] = [queryTickets, getTicket, ticketSummary];
+export const ticketsConnector: BrainConnector = {
+  id: CONNECTOR_ID,
+  label: 'CRM Tickets (Supabase)',
+  kind: 'in-process',
 
-export function getSkill(name: string): SkillDefinition | undefined {
-  return BRAIN_SKILLS.find(s => s.name === name);
-}
+  isAvailable() {
+    return true;
+  },
 
-/** Anthropic `tools` array for the Messages API. */
-export function getAnthropicTools() {
-  return BRAIN_SKILLS.map(s => ({
-    name: s.name,
-    description: s.description,
-    input_schema: s.inputSchema,
-  }));
-}
+  async listTools() {
+    return STATIC_TOOLS;
+  },
+
+  async callTool(toolName, input, ctx) {
+    const mcpName = toolName.startsWith(`${CONNECTOR_ID}_`)
+      ? toolName.slice(CONNECTOR_ID.length + 1)
+      : toolName;
+    const handler = TOOL_HANDLERS[mcpName];
+    if (!handler) {
+      return { ok: false, error: `Unknown tickets tool: ${toolName}` };
+    }
+    return handler(input, ctx);
+  },
+};

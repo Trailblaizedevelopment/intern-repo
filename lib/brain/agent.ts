@@ -1,17 +1,18 @@
-import { SkillContext, getAnthropicTools, getSkill } from './skills';
+import {
+  ConnectorContext,
+  callConnectorTool,
+  getAnthropicTools,
+} from './router';
 
 /**
  * Trailblaize Brain agent loop — Anthropic Messages API with tool calling.
- * Same raw-fetch pattern as app/api/development/generate-spec/route.ts,
- * extended with a bounded tool-use loop.
+ * Tools are routed through the MCP connector router (tickets + Linear).
  */
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 const MAX_TOOL_ITERATIONS = 8;
 const MAX_TOKENS = 2048;
-
-// ── Anthropic message types (subset we use) ─────────────────────────────────
 
 interface TextBlock {
   type: 'text';
@@ -41,6 +42,7 @@ export interface BrainMessage {
 
 export interface ToolEvent {
   name: string;
+  connector?: string;
   input: Record<string, unknown>;
   ok: boolean;
   output: unknown;
@@ -53,7 +55,7 @@ export interface AgentRunResult {
   toolEvents: ToolEvent[];
 }
 
-function buildSystemPrompt(employeeName: string | null): string {
+function buildSystemPrompt(employeeName: string | null, toolNames: string[]): string {
   const now = new Date();
   const centralDate = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Chicago',
@@ -63,21 +65,34 @@ function buildSystemPrompt(employeeName: string | null): string {
     day: 'numeric',
   }).format(now);
 
+  const hasLinear = toolNames.some(n => n.startsWith('linear_'));
+  const hasTickets = toolNames.some(n => n.startsWith('tickets_'));
+
+  const toolGuidance: string[] = [];
+  if (hasTickets) {
+    toolGuidance.push(
+      '- Prefer tickets_* tools for fast CRM board queries (due dates, assignee, standup summaries).'
+    );
+  }
+  if (hasLinear) {
+    toolGuidance.push(
+      '- Use linear_* tools for live Linear workspace data (search, issue detail, projects, comments).'
+    );
+  }
+
   return [
     `You are Trailblaize Brain, the engineering co-pilot for ${employeeName || 'Devin'} (founding engineer) inside the Trailblaize internal CRM.`,
     '',
     `Today is ${centralDate} (Central Time — company timezone).`,
     '',
-    'You answer questions about the engineering ticket board (CRM tickets synced two-way with Linear). ' +
-      'Use the provided tools to fetch real data — never invent ticket numbers, statuses, or due dates. ' +
-      'If a tool returns no results, say so plainly.',
+    'You answer questions about engineering work using connector tools — never invent ticket numbers or statuses.',
+    'If a tool returns no results, say so plainly.',
     '',
-    'Guidelines:',
-    '- "My tickets" means tickets assigned to the current user; pass assignee_me: true.',
-    '- Ticket statuses: backlog, todo, open, in_progress, in_review, testing, done, canceled.',
-    '- Reference tickets by their Linear identifier (e.g. TRA-238) when available, otherwise #number.',
-    '- Keep answers concise and scannable. Use short markdown lists for multiple tickets; include status, due date, and priority when relevant.',
-    '- You currently have read-only access. If asked to update tickets, create automations, or launch agents, explain that write skills ship in Phase 2.',
+    'Tool routing:',
+    ...toolGuidance,
+    '- Reference tickets by Linear identifier (e.g. TRA-238) when available.',
+    '- Keep answers concise. Use markdown lists for multiple items.',
+    '- Linear write tools are disabled in read-only mode; CRM ticket updates ship in a later phase.',
   ].join('\n');
 }
 
@@ -86,49 +101,21 @@ interface AnthropicResponse {
   stop_reason: string;
 }
 
-async function callAnthropic(
-  apiKey: string,
-  system: string,
-  messages: BrainMessage[]
-): Promise<AnthropicResponse> {
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: process.env.BRAIN_MODEL || DEFAULT_MODEL,
-      max_tokens: MAX_TOKENS,
-      system,
-      tools: getAnthropicTools(),
-      messages,
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error('[brain] Anthropic API error:', response.status, errText);
-    throw new Error(`Anthropic API error: ${response.status}`);
-  }
-
-  return (await response.json()) as AnthropicResponse;
-}
-
-/** Truncate tool output so oversized results don't blow up the context window. */
 function serializeToolOutput(result: unknown): string {
   const json = JSON.stringify(result);
   return json.length > 12000 ? `${json.slice(0, 12000)}…(truncated)` : json;
 }
 
-/**
- * Runs the agent loop: send history, execute any requested tools,
- * feed results back, repeat until the model produces a final text answer.
- */
+function createConnectorContext(
+  supabase: ConnectorContext['supabase'],
+  employeeId: string | null
+): ConnectorContext {
+  return { supabase, employeeId, mcpSessions: new Map() };
+}
+
 export async function runBrainAgent(
   history: BrainMessage[],
-  ctx: SkillContext,
+  baseCtx: Pick<ConnectorContext, 'supabase' | 'employeeId'>,
   employeeName: string | null
 ): Promise<AgentRunResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -136,18 +123,48 @@ export async function runBrainAgent(
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
-  const system = buildSystemPrompt(employeeName);
+  const ctx = createConnectorContext(baseCtx.supabase, baseCtx.employeeId);
+  const anthropicTools = await getAnthropicTools(ctx);
+  if (anthropicTools.length === 0) {
+    throw new Error('No connector tools available — check LINEAR_API_KEY and database connection');
+  }
+
+  const system = buildSystemPrompt(
+    employeeName,
+    anthropicTools.map(t => t.name)
+  );
   const messages: BrainMessage[] = [...history];
   const toolEvents: ToolEvent[] = [];
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const response = await callAnthropic(apiKey, system, messages);
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: process.env.BRAIN_MODEL || DEFAULT_MODEL,
+        max_tokens: MAX_TOKENS,
+        system,
+        tools: anthropicTools,
+        messages,
+      }),
+    });
 
-    messages.push({ role: 'assistant', content: response.content });
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('[brain] Anthropic API error:', response.status, errText);
+      throw new Error(`Anthropic API error: ${response.status}`);
+    }
 
-    const toolUses = response.content.filter((b): b is ToolUseBlock => b.type === 'tool_use');
-    if (response.stop_reason !== 'tool_use' || toolUses.length === 0) {
-      const reply = response.content
+    const data = (await response.json()) as AnthropicResponse;
+    messages.push({ role: 'assistant', content: data.content });
+
+    const toolUses = data.content.filter((b): b is ToolUseBlock => b.type === 'tool_use');
+    if (data.stop_reason !== 'tool_use' || toolUses.length === 0) {
+      const reply = data.content
         .filter((b): b is TextBlock => b.type === 'text')
         .map(b => b.text)
         .join('\n')
@@ -157,17 +174,11 @@ export async function runBrainAgent(
 
     const results: ToolResultBlock[] = [];
     for (const use of toolUses) {
-      const skill = getSkill(use.name);
-      if (!skill) {
-        toolEvents.push({ name: use.name, input: use.input, ok: false, output: null, error: 'Unknown skill' });
-        results.push({ type: 'tool_result', tool_use_id: use.id, content: 'Error: unknown tool', is_error: true });
-        continue;
-      }
-
       try {
-        const result = await skill.execute(use.input || {}, ctx);
+        const result = await callConnectorTool(use.name, use.input || {}, ctx);
         toolEvents.push({
           name: use.name,
+          connector: result.connectorId,
           input: use.input,
           ok: result.ok,
           output: result.ok ? result.data : null,
@@ -180,10 +191,21 @@ export async function runBrainAgent(
           is_error: !result.ok,
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Skill execution failed';
-        console.error(`[brain] skill ${use.name} threw:`, err);
-        toolEvents.push({ name: use.name, input: use.input, ok: false, output: null, error: message });
-        results.push({ type: 'tool_result', tool_use_id: use.id, content: `Error: ${message}`, is_error: true });
+        const message = err instanceof Error ? err.message : 'Connector call failed';
+        console.error(`[brain] tool ${use.name} threw:`, err);
+        toolEvents.push({
+          name: use.name,
+          input: use.input,
+          ok: false,
+          output: null,
+          error: message,
+        });
+        results.push({
+          type: 'tool_result',
+          tool_use_id: use.id,
+          content: `Error: ${message}`,
+          is_error: true,
+        });
       }
     }
 
@@ -197,19 +219,12 @@ export async function runBrainAgent(
   };
 }
 
-// ── Display transform (server → UI) ─────────────────────────────────────────
-
 export interface DisplayMessage {
   role: 'user' | 'assistant';
   text: string;
-  tools?: Array<{ name: string; ok: boolean }>;
+  tools?: Array<{ name: string; connector?: string; ok: boolean }>;
 }
 
-/**
- * Collapses raw Anthropic history into renderable chat messages:
- * tool_use/tool_result plumbing becomes small "tools used" chips on the
- * assistant message that follows them.
- */
 export function toDisplayMessages(messages: BrainMessage[]): DisplayMessage[] {
   const display: DisplayMessage[] = [];
   let pendingTools: Array<{ name: string; ok: boolean }> = [];
@@ -232,7 +247,6 @@ export function toDisplayMessages(messages: BrainMessage[]): DisplayMessage[] {
       continue;
     }
 
-    // assistant
     const text = msg.content
       .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
       .map(b => b.text)
@@ -244,7 +258,17 @@ export function toDisplayMessages(messages: BrainMessage[]): DisplayMessage[] {
       pendingTools.push(...uses.map(u => ({ name: u.name, ok: true })));
     }
     if (text) {
-      display.push({ role: 'assistant', text, tools: pendingTools.length ? pendingTools : undefined });
+      display.push({
+        role: 'assistant',
+        text,
+        tools: pendingTools.length
+          ? pendingTools.map(t => ({
+              name: t.name,
+              connector: t.name.split('_')[0],
+              ok: t.ok,
+            }))
+          : undefined,
+      });
       pendingTools = [];
     }
   }
