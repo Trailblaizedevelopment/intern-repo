@@ -9,6 +9,8 @@ import {
   List,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   AlertTriangle,
   Sparkles,
@@ -627,7 +629,7 @@ export function TicketBoard() {
             <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')} title="List">
               <List size={16} />
             </button>
-            <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="Timeline">
+            <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="Roadmap">
               <GanttChart size={16} />
             </button>
             <button className={viewMode === 'dashboard' ? 'active' : ''} onClick={() => setViewMode('dashboard')} title="Analytics">
@@ -745,7 +747,7 @@ export function TicketBoard() {
       ) : viewMode === 'list' ? (
         <TicketListView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : viewMode === 'timeline' ? (
-        <TimelineView tickets={tickets} onTicketClick={setSelectedTicket} />
+        <RoadmapView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : (
         <DashboardView tickets={tickets} />
       )}
@@ -1086,78 +1088,236 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
 }
 
 // ═══════════════════════════════════════════
-// TIMELINE VIEW
+// ROADMAP VIEW (Linear, week-by-week)
 // ═══════════════════════════════════════════
 
-function TimelineView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
-  const now = new Date();
-  const startMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-  const endMonth = new Date(now.getFullYear(), now.getMonth() + 3, 0);
-  const totalDays = Math.ceil((endMonth.getTime() - startMonth.getTime()) / (1000 * 60 * 60 * 24));
+const ROADMAP_STATUSES: TicketStatus[] = ['in_progress', 'todo', 'open'];
+const ROADMAP_VISIBLE_WEEKS = 6;
+const ROADMAP_WEEKS_BACK = 2;
+const ROADMAP_MONTHS_FORWARD = 2;
 
-  const timelineTickets = tickets.filter(t => t.due_date);
+interface RoadmapWeek {
+  key: string;
+  start: Date;
+  end: Date;
+  label: string;
+  sublabel: string;
+  isCurrent: boolean;
+}
 
-  // Generate month headers
-  const months: { label: string; startPx: number; widthPx: number }[] = [];
-  for (let m = -2; m <= 2; m++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + m, 1);
-    const dEnd = new Date(now.getFullYear(), now.getMonth() + m + 1, 0);
-    const startDay = Math.max(0, Math.ceil((d.getTime() - startMonth.getTime()) / (1000 * 60 * 60 * 24)));
-    const endDay = Math.min(totalDays, Math.ceil((dEnd.getTime() - startMonth.getTime()) / (1000 * 60 * 60 * 24)));
-    months.push({
-      label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      startPx: (startDay / totalDays) * 100,
-      widthPx: ((endDay - startDay) / totalDays) * 100,
+function startOfWeekMonday(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function endOfWeekSunday(weekStart: Date): Date {
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + 6);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+
+function buildRoadmapWeeks(anchor: Date): { weeks: RoadmapWeek[]; rangeLabel: string } {
+  const today = new Date(anchor);
+  today.setHours(0, 0, 0, 0);
+  const rangeStart = startOfWeekMonday(addDays(today, -ROADMAP_WEEKS_BACK * 7));
+  const rangeEnd = endOfWeekSunday(startOfWeekMonday(addMonths(today, ROADMAP_MONTHS_FORWARD)));
+
+  const weeks: RoadmapWeek[] = [];
+  let cursor = new Date(rangeStart);
+  while (cursor.getTime() <= rangeEnd.getTime()) {
+    const start = new Date(cursor);
+    const end = endOfWeekSunday(start);
+    const isCurrent = today >= start && today <= end;
+    weeks.push({
+      key: start.toISOString().slice(0, 10),
+      start,
+      end,
+      label: start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      sublabel: `Wk ${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+      isCurrent,
     });
+    cursor = addDays(start, 7);
   }
 
-  const todayPct = Math.max(0, Math.min(100, ((now.getTime() - startMonth.getTime()) / (endMonth.getTime() - startMonth.getTime())) * 100));
+  const rangeLabel = `${rangeStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${rangeEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  return { weeks, rangeLabel };
+}
 
-  const getBarStyle = (ticket: TicketData) => {
-    const start = new Date(ticket.created_at);
-    const end = ticket.due_date ? new Date(ticket.due_date + 'T00:00:00') : now;
-    const leftPct = Math.max(0, ((start.getTime() - startMonth.getTime()) / (endMonth.getTime() - startMonth.getTime())) * 100);
-    const rightPct = Math.min(100, ((end.getTime() - startMonth.getTime()) / (endMonth.getTime() - startMonth.getTime())) * 100);
-    const width = Math.max(1, rightPct - leftPct);
-    return { left: `${leftPct}%`, width: `${width}%`, background: PRIORITY_BAR_COLORS[ticket.priority] || '#6b7280' };
-  };
+function dueDateWeekKey(dueDate: string): string {
+  const due = new Date(dueDate + 'T00:00:00');
+  return startOfWeekMonday(due).toISOString().slice(0, 10);
+}
 
-  // Group by status
-  const grouped: Record<string, TicketData[]> = {};
-  timelineTickets.forEach(t => {
-    const statusLabel = STATUS_COLUMNS.find(s => s.key === t.status)?.label || t.status;
-    if (!grouped[statusLabel]) grouped[statusLabel] = [];
-    grouped[statusLabel].push(t);
-  });
+function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
+  const anchor = useMemo(() => new Date(), []);
+  const { weeks: allWeeks, rangeLabel } = useMemo(() => buildRoadmapWeeks(anchor), [anchor]);
+
+  const defaultOffset = useMemo(() => {
+    const currentIdx = allWeeks.findIndex(w => w.isCurrent);
+    const idx = currentIdx >= 0 ? currentIdx : 0;
+    const max = Math.max(0, allWeeks.length - ROADMAP_VISIBLE_WEEKS);
+    return Math.min(Math.max(0, idx - 1), max);
+  }, [allWeeks]);
+
+  const [weekOffset, setWeekOffset] = useState(defaultOffset);
+
+  const maxOffset = Math.max(0, allWeeks.length - ROADMAP_VISIBLE_WEEKS);
+  const visibleWeeks = allWeeks.slice(weekOffset, weekOffset + ROADMAP_VISIBLE_WEEKS);
+
+  const roadmapTickets = useMemo(() => {
+    if (allWeeks.length === 0) return [];
+    const rangeStart = allWeeks[0].start.getTime();
+    const rangeEnd = allWeeks[allWeeks.length - 1].end.getTime();
+    return tickets
+      .filter(t => hasLinearLink(t))
+      .filter(t => t.due_date)
+      .filter(t => ROADMAP_STATUSES.includes(t.status))
+      .filter(t => {
+        const due = new Date(t.due_date! + 'T00:00:00').getTime();
+        return due >= rangeStart && due <= rangeEnd;
+      })
+      .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
+  }, [tickets, allWeeks]);
+
+  const visibleWeekKeys = useMemo(() => new Set(visibleWeeks.map(w => w.key)), [visibleWeeks]);
+
+  const visibleTickets = useMemo(
+    () => roadmapTickets.filter(t => t.due_date && visibleWeekKeys.has(dueDateWeekKey(t.due_date))),
+    [roadmapTickets, visibleWeekKeys]
+  );
+
+  const gridCols = `220px repeat(${visibleWeeks.length}, minmax(72px, 1fr))`;
 
   return (
-    <div className="tkt__timeline">
-      <div className="tkt__timeline-header">
-        {months.map((m, i) => (
-          <div key={i} className="tkt__timeline-month" style={{ left: `${m.startPx}%`, width: `${m.widthPx}%` }}>
-            {m.label}
-          </div>
-        ))}
-        <div className="tkt__timeline-today" style={{ left: `${todayPct}%` }} />
+    <div className="tkt__roadmap">
+      <div className="tkt__roadmap-toolbar">
+        <div className="tkt__roadmap-toolbar-text">
+          <h3 className="tkt__roadmap-title">Linear Roadmap</h3>
+          <p className="tkt__roadmap-subtitle">
+            In progress &amp; scheduled · due dates only · {rangeLabel}
+          </p>
+        </div>
+        <div className="tkt__roadmap-nav">
+          <button
+            type="button"
+            className="tkt__roadmap-nav-btn"
+            disabled={weekOffset <= 0}
+            onClick={() => setWeekOffset(o => Math.max(0, o - 1))}
+            aria-label="Previous week"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="tkt__roadmap-nav-label">
+            {visibleWeeks[0]?.sublabel}
+            {visibleWeeks.length > 1 && ` → ${visibleWeeks[visibleWeeks.length - 1]?.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+          </span>
+          <button
+            type="button"
+            className="tkt__roadmap-nav-btn"
+            disabled={weekOffset >= maxOffset}
+            onClick={() => setWeekOffset(o => Math.min(maxOffset, o + 1))}
+            aria-label="Next week"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <span className="tkt__roadmap-count">{visibleTickets.length} ticket{visibleTickets.length === 1 ? '' : 's'}</span>
       </div>
-      <div className="tkt__timeline-body">
-        {Object.keys(grouped).length === 0 ? (
-          <div className="tkt__list-empty">No tickets with due dates</div>
-        ) : (
-          Object.entries(grouped).map(([group, tix]) => (
-            <div key={group} className="tkt__timeline-group">
-              <div className="tkt__timeline-group-label">{group}</div>
-              {tix.map(t => (
-                <div key={t.id} className="tkt__timeline-row" onClick={() => onTicketClick(t)}>
-                  <span className="tkt__timeline-row-label">#{t.number} {t.title}</span>
-                  <div className="tkt__timeline-track">
-                    <div className="tkt__timeline-bar" style={getBarStyle(t)} title={`${t.title} — Due: ${t.due_date}`} />
-                  </div>
-                </div>
-              ))}
+
+      <div className="tkt__roadmap-sheet">
+        <div className="tkt__roadmap-header-row" style={{ gridTemplateColumns: gridCols }}>
+          <div className="tkt__roadmap-label-col tkt__roadmap-label-col--header">Ticket</div>
+          {visibleWeeks.map(week => (
+            <div
+              key={week.key}
+              className={`tkt__roadmap-week-col ${week.isCurrent ? 'tkt__roadmap-week-col--current' : ''}`}
+            >
+              <span className="tkt__roadmap-week-label">{week.label}</span>
+              {week.isCurrent && <span className="tkt__roadmap-week-today">This week</span>}
             </div>
-          ))
-        )}
+          ))}
+        </div>
+
+        <div className="tkt__roadmap-body">
+          {visibleTickets.length === 0 ? (
+            <div className="tkt__roadmap-empty">
+              No Linear tickets in progress or scheduled with due dates in this week range.
+            </div>
+          ) : (
+            visibleTickets.map(ticket => {
+              const statusCfg = STATUS_COLUMNS.find(s => s.key === ticket.status);
+              const dueKey = ticket.due_date ? dueDateWeekKey(ticket.due_date) : '';
+              const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+              return (
+                <div
+                  key={ticket.id}
+                  className="tkt__roadmap-row"
+                  style={{ gridTemplateColumns: gridCols }}
+                  onClick={() => onTicketClick(ticket)}
+                >
+                  <div className="tkt__roadmap-label-col">
+                    <div className="tkt__roadmap-ticket-ids">
+                      <LinearTicketLink ticket={ticket} className="tkt__roadmap-linear-id" />
+                      {statusCfg && (
+                        <span
+                          className="tkt__roadmap-status"
+                          style={{ color: statusCfg.color, borderColor: statusCfg.color }}
+                        >
+                          {statusCfg.label}
+                        </span>
+                      )}
+                    </div>
+                    <p className="tkt__roadmap-ticket-title" title={ticket.title}>{ticket.title}</p>
+                    <div className="tkt__roadmap-ticket-meta">
+                      {ticket.assignee ? (
+                        <span className="tkt__roadmap-assignee">{ticket.assignee.name}</span>
+                      ) : (
+                        <span className="tkt__roadmap-assignee tkt__roadmap-assignee--none">Unassigned</span>
+                      )}
+                      {ticket.due_date && (
+                        <span className="tkt__roadmap-due">
+                          <CalendarDays size={11} />
+                          {new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {visibleWeeks.map(week => (
+                    <div
+                      key={week.key}
+                      className={`tkt__roadmap-week-col tkt__roadmap-week-cell ${week.isCurrent ? 'tkt__roadmap-week-col--current' : ''}`}
+                    >
+                      {dueKey === week.key && (
+                        <span
+                          className="tkt__roadmap-marker"
+                          style={{ backgroundColor: priorityCfg.color }}
+                          title={`Due ${ticket.due_date}`}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
