@@ -56,7 +56,12 @@ export interface AgentRunResult {
   toolEvents: ToolEvent[];
 }
 
-function buildSystemPrompt(employeeName: string | null, toolNames: string[], linearWriteMode: boolean): string {
+function buildSystemPrompt(
+  employeeName: string | null,
+  toolNames: string[],
+  linearWriteMode: boolean,
+  surface: 'workspace' | 'slack' = 'workspace'
+): string {
   const now = new Date();
   const centralDate = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Chicago',
@@ -93,7 +98,9 @@ function buildSystemPrompt(employeeName: string | null, toolNames: string[], lin
     'Tool routing:',
     ...toolGuidance,
     '- Reference tickets by Linear identifier (e.g. TRA-238) when available.',
-    '- Keep answers concise. Use markdown lists for multiple items.',
+    surface === 'slack'
+      ? '- You are replying in Slack. Be concise. Use Slack mrkdwn (*bold*, • bullets). No emojis.'
+      : '- Keep answers concise. Use markdown lists for multiple items.',
   ].join('\n');
 }
 
@@ -117,7 +124,8 @@ function createConnectorContext(
 export async function runBrainAgent(
   history: BrainMessage[],
   baseCtx: Pick<ConnectorContext, 'supabase' | 'employeeId'>,
-  employeeName: string | null
+  employeeName: string | null,
+  surface: 'workspace' | 'slack' = 'workspace'
 ): Promise<AgentRunResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -135,7 +143,8 @@ export async function runBrainAgent(
   const system = buildSystemPrompt(
     employeeName,
     anthropicTools.map(t => t.name),
-    linearWriteMode
+    linearWriteMode,
+    surface
   );
   const messages: BrainMessage[] = [...history];
   const toolEvents: ToolEvent[] = [];

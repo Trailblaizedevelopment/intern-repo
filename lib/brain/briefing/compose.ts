@@ -8,7 +8,6 @@ function briefingTitle(snapshot: BriefingSnapshot): string {
   return `*TRA Engineering Briefing — ${snapshot.briefingDateLabel}*`;
 }
 
-/** Strip emoji / decorative symbols from LLM output. */
 function stripEmojis(text: string): string {
   return text
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
@@ -21,6 +20,11 @@ function normalizeBriefing(text: string, snapshot: BriefingSnapshot): string {
   let out = stripEmojis(text);
   out = out.replace(/^[─\-_=]{3,}\s*$/gm, '');
   out = out.replace(/\n{3,}/g, '\n\n').trim();
+
+  if (snapshot.overdue.length === 0) {
+    out = out.replace(/\n\*Overdue\*[\s\S]*?(?=\n\*[A-Z]|\n*$)/gi, '\n');
+    out = out.replace(/\n\*Overdue\*[^\n]*/gi, '');
+  }
 
   const title = briefingTitle(snapshot);
   const lines = out.split('\n');
@@ -44,35 +48,32 @@ function templateBriefing(snapshot: BriefingSnapshot): string {
 
   lines.push('*Completed Yesterday*');
   if (snapshot.completedYesterday.length === 0) {
-    lines.push('No issues marked completed yesterday.');
+    lines.push('No issues completed yesterday.');
   } else {
     for (const i of snapshot.completedYesterday.slice(0, 12)) {
-      lines.push(issueLine(i, i.assigneeName ? ` — ${i.assigneeName}` : ''));
+      lines.push(issueLine(i));
     }
     if (snapshot.completedYesterday.length > 12) {
-      lines.push(`(${snapshot.completedYesterday.length - 12} more not shown)`);
+      lines.push(`(${snapshot.completedYesterday.length - 12} more)`);
     }
   }
 
   const focus = snapshot.focusAssigneeEmail;
   lines.push('', '*Focus Today*');
 
-  if (snapshot.dueToday.length > 0) {
-    lines.push('_Due today_');
-    for (const i of snapshot.dueToday.slice(0, 10)) {
-      lines.push(
-        issueLine(i, ` — ${i.stateName}${i.priorityLabel ? ` · ${i.priorityLabel}` : ''}`)
-      );
-    }
-  } else {
+  if (snapshot.dueToday.length === 0 && snapshot.active.filter(a => a.assigneeEmail?.toLowerCase() === focus).length === 0) {
     lines.push('Nothing due today.');
-  }
-
-  const mine = snapshot.active.filter(a => a.assigneeEmail?.toLowerCase() === focus);
-  const inProgress = mine.filter(i => i.stateType === 'started' && !snapshot.dueToday.some(d => d.identifier === i.identifier));
-  if (inProgress.length > 0) {
-    lines.push('', '_In progress (assignee)_');
-    for (const i of inProgress.slice(0, 8)) {
+  } else {
+    if (snapshot.dueToday.length > 0) {
+      for (const i of snapshot.dueToday.slice(0, 10)) {
+        lines.push(issueLine(i, ` — ${i.stateName} · ${i.priorityLabel}`));
+      }
+    }
+    const mine = snapshot.active.filter(a => a.assigneeEmail?.toLowerCase() === focus);
+    const inProgress = mine.filter(
+      i => i.stateType === 'started' && !snapshot.dueToday.some(d => d.identifier === i.identifier)
+    );
+    for (const i of inProgress.slice(0, 6)) {
       const due = i.dueDate ? ` · due ${i.dueDate}` : '';
       lines.push(issueLine(i, ` — ${i.stateName}${due}`));
     }
@@ -80,20 +81,20 @@ function templateBriefing(snapshot: BriefingSnapshot): string {
 
   if (snapshot.overdue.length > 0) {
     lines.push('', '*Overdue*');
-    for (const i of snapshot.overdue.slice(0, 8)) {
-      lines.push(issueLine(i, ` — ${i.stateName} · due ${i.dueDate}`));
+    for (const i of snapshot.overdue.slice(0, 6)) {
+      lines.push(issueLine(i, ` — due ${i.dueDate}`));
     }
   }
 
-  const stateSummary = Object.entries(snapshot.countsByState)
+  const counts = Object.entries(snapshot.countsByState)
     .sort((a, b) => b[1] - a[1])
-    .map(([name, count]) => `${name}: ${count}`)
+    .map(([name, count]) => `${name} ${count}`)
     .join(' · ');
   lines.push(
     '',
     '*Board Snapshot*',
-    `Active: ${snapshot.active.length} · Due today: ${snapshot.dueToday.length} · Overdue: ${snapshot.overdue.length} · Completed yesterday: ${snapshot.completedYesterday.length}`,
-    stateSummary
+    `${snapshot.active.length} active · ${snapshot.dueToday.length} due today · ${snapshot.completedYesterday.length} completed yesterday`,
+    counts
   );
 
   return lines.join('\n');
@@ -101,30 +102,31 @@ function templateBriefing(snapshot: BriefingSnapshot): string {
 
 function buildSystemPrompt(snapshot: BriefingSnapshot): string {
   const title = briefingTitle(snapshot);
+  const overdueRule =
+    snapshot.overdue.length > 0
+      ? 'Include *Overdue* section.'
+      : 'Do NOT include an Overdue section (there are none).';
+
   return [
     'You write factual morning engineering briefings for Slack (mrkdwn).',
     `First line MUST be exactly: ${title}`,
     '',
-    'Section headers (bold with asterisks):',
-    '*Completed Yesterday*',
-    '*Focus Today*',
-    '*Overdue* (only if overdue issues exist)',
-    '*Board Snapshot*',
+    'Sections: *Completed Yesterday*, *Focus Today*, *Board Snapshot*.',
+    overdueRule,
     '',
     'Rules:',
-    '- NO emojis, NO unicode symbols, NO decorative lines (no ─── separators).',
-    '- NO motivational or editorial language (no "move the needle", "ship these", "fresh week", "needs a triage decision").',
-    '- State facts only. One bullet per issue.',
+    '- NO emojis. NO decorative lines. NO motivational or editorial language.',
+    '- Keep non-ticket lines short (one line).',
+    '- Completed Yesterday: ticket links only — NEVER include assignee names.',
+    '- Focus Today: due today first, then in-progress items for focus assignee.',
+    '- Board Snapshot: one summary line + one state-count line max.',
     '- Use Slack links: <url|TRA-123> Title — State · Priority',
-    '- Focus Today: due today first, then assignee in-progress items for the focus user.',
-    '- Board Snapshot: counts only, one or two lines.',
-    '- No markdown tables. Max ~3000 characters.',
+    '- No markdown tables. Max ~2500 characters.',
     '- Never invent ticket IDs.',
-    `Focus assignee email: ${snapshot.focusAssigneeEmail}`,
+    `Focus assignee: ${snapshot.focusAssigneeEmail}`,
   ].join('\n');
 }
 
-/** Generate Slack mrkdwn briefing via Anthropic, with deterministic fallback. */
 export async function composeMorningBriefing(snapshot: BriefingSnapshot): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return templateBriefing(snapshot);
@@ -141,7 +143,7 @@ export async function composeMorningBriefing(snapshot: BriefingSnapshot): Promis
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
-        max_tokens: 1200,
+        max_tokens: 1000,
         temperature: 0.2,
         system: buildSystemPrompt(snapshot),
         messages: [

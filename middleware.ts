@@ -8,6 +8,8 @@ const PUBLIC_API_PREFIXES = [
   '/api/onboarding/',
   '/api/avatar-proxy',
   '/api/auth/docusign',
+  '/api/brain/slack/',
+  '/api/cron/',
 ];
 
 export function middleware(req: NextRequest) {
