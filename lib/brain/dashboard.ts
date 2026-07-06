@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BrainAgentRunRow } from './agent-runs';
+import { estimateInputCostUsd, estimateOutputCostUsd, estimateRunCostUsd, getDefaultModelId, getPricingLabel } from './pricing';
 import { BrainTaskRow } from './tasks/types';
 
 export interface BrainActionLogRow {
@@ -19,6 +20,7 @@ export interface BrainAutomationRow {
   kind: string;
   schedule: string | null;
   enabled: boolean;
+  config: Record<string, unknown>;
   last_run_at: string | null;
   last_status: string | null;
   last_error: string | null;
@@ -39,6 +41,7 @@ export interface BrainActivityDay {
   toolCalls: number;
   tasksCompleted: number;
   agentRuns: number;
+  costUsd: number;
 }
 
 export interface BrainAgentRunStats {
@@ -46,8 +49,20 @@ export interface BrainAgentRunStats {
   successRate24h: number;
   avgLatencyMs24h: number | null;
   totalTokens24h: number;
+  costUsd24h: number;
+  costUsd7d: number;
+  avgCostPerRun7d: number | null;
   runningNow: number;
   bySurface24h: Record<string, number>;
+  costBySurface7d: Record<string, number>;
+  pricingLabel: string;
+  defaultModel: string;
+}
+
+export interface BrainAgentRunWithCost extends BrainAgentRunRow {
+  estimated_cost_usd: number;
+  input_cost_usd: number;
+  output_cost_usd: number;
 }
 
 export interface BrainDashboardData {
@@ -56,9 +71,20 @@ export interface BrainDashboardData {
   activeTasks: BrainTaskRow[];
   recentTasks: BrainTaskRow[];
   recentActions: BrainActionLogRow[];
-  recentAgentRuns: BrainAgentRunRow[];
+  recentAgentRuns: BrainAgentRunWithCost[];
   automations: BrainAutomationRow[];
   activityByDay: BrainActivityDay[];
+}
+
+function enrichRunWithCost(run: BrainAgentRunRow): BrainAgentRunWithCost {
+  const inputCost = estimateInputCostUsd(run.model, run.input_tokens);
+  const outputCost = estimateOutputCostUsd(run.model, run.output_tokens);
+  return {
+    ...run,
+    estimated_cost_usd: inputCost + outputCost,
+    input_cost_usd: inputCost,
+    output_cost_usd: outputCost,
+  };
 }
 
 function startOfTodayIso(): string {
@@ -78,7 +104,7 @@ function dayKey(iso: string): string {
 function buildActivityByDay(
   actions: BrainActionLogRow[],
   tasks: BrainTaskRow[],
-  agentRuns: Pick<BrainAgentRunRow, 'created_at'>[],
+  agentRuns: BrainAgentRunRow[],
   days = 7
 ): BrainActivityDay[] {
   const keys: string[] = [];
@@ -91,6 +117,7 @@ function buildActivityByDay(
   const toolByDay = new Map<string, number>();
   const tasksByDay = new Map<string, number>();
   const runsByDay = new Map<string, number>();
+  const costByDay = new Map<string, number>();
 
   for (const a of actions) {
     const k = dayKey(a.created_at);
@@ -106,6 +133,7 @@ function buildActivityByDay(
   for (const r of agentRuns) {
     const k = dayKey(r.created_at);
     runsByDay.set(k, (runsByDay.get(k) ?? 0) + 1);
+    costByDay.set(k, (costByDay.get(k) ?? 0) + estimateRunCostUsd(r.model, r.input_tokens, r.output_tokens));
   }
 
   return keys.map(date => ({
@@ -113,19 +141,41 @@ function buildActivityByDay(
     toolCalls: toolByDay.get(date) ?? 0,
     tasksCompleted: tasksByDay.get(date) ?? 0,
     agentRuns: runsByDay.get(date) ?? 0,
+    costUsd: Math.round((costByDay.get(date) ?? 0) * 10000) / 10000,
   }));
 }
 
-function buildAgentRunStats(runs: BrainAgentRunRow[], dayAgo: string): BrainAgentRunStats {
+function buildAgentRunStats(
+  runs: BrainAgentRunRow[],
+  dayAgo: string,
+  weekAgo: string
+): BrainAgentRunStats {
   const runs24h = runs.filter(r => r.created_at >= dayAgo);
+  const runs7d = runs.filter(r => r.created_at >= weekAgo);
   const success24h = runs24h.filter(r => r.status === 'success').length;
   const latencies = runs24h
     .map(r => r.latency_ms)
     .filter((ms): ms is number => ms != null && ms > 0);
   const bySurface24h: Record<string, number> = {};
+  const costBySurface7d: Record<string, number> = {};
+
   for (const r of runs24h) {
     bySurface24h[r.surface] = (bySurface24h[r.surface] ?? 0) + 1;
   }
+
+  let costUsd24h = 0;
+  let costUsd7d = 0;
+  for (const r of runs24h) {
+    costUsd24h += estimateRunCostUsd(r.model, r.input_tokens, r.output_tokens);
+  }
+  for (const r of runs7d) {
+    costUsd7d += estimateRunCostUsd(r.model, r.input_tokens, r.output_tokens);
+    costBySurface7d[r.surface] =
+      (costBySurface7d[r.surface] ?? 0) +
+      estimateRunCostUsd(r.model, r.input_tokens, r.output_tokens);
+  }
+
+  const defaultModel = getDefaultModelId();
 
   return {
     runs24h: runs24h.length,
@@ -135,8 +185,17 @@ function buildAgentRunStats(runs: BrainAgentRunRow[], dayAgo: string): BrainAgen
         ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
         : null,
     totalTokens24h: runs24h.reduce((sum, r) => sum + r.input_tokens + r.output_tokens, 0),
+    costUsd24h: Math.round(costUsd24h * 10000) / 10000,
+    costUsd7d: Math.round(costUsd7d * 10000) / 10000,
+    avgCostPerRun7d:
+      runs7d.length > 0 ? Math.round((costUsd7d / runs7d.length) * 10000) / 10000 : null,
     runningNow: runs.filter(r => r.status === 'running').length,
     bySurface24h,
+    costBySurface7d: Object.fromEntries(
+      Object.entries(costBySurface7d).map(([k, v]) => [k, Math.round(v * 10000) / 10000])
+    ),
+    pricingLabel: getPricingLabel(defaultModel),
+    defaultModel,
   };
 }
 
@@ -180,7 +239,7 @@ export async function getBrainDashboard(supabase: SupabaseClient): Promise<Brain
       .gte('updated_at', weekAgo),
     supabase
       .from('brain_agent_runs')
-      .select('created_at')
+      .select('*')
       .gte('created_at', weekAgo),
     supabase
       .from('brain_agent_runs')
@@ -206,8 +265,9 @@ export async function getBrainDashboard(supabase: SupabaseClient): Promise<Brain
   const recentTasks = (recentTasksRes.data as BrainTaskRow[]) ?? [];
   const recentActions = (actionsRes.data as BrainActionLogRow[]) ?? [];
   const automations = (automationsRes.data as BrainAutomationRow[]) ?? [];
-  const recentAgentRuns = (agentRunsRes.data as BrainAgentRunRow[]) ?? [];
-  const weekAgentRuns = (weekAgentRunsRes.data as Pick<BrainAgentRunRow, 'created_at'>[]) ?? [];
+  const recentAgentRunsRaw = (agentRunsRes.data as BrainAgentRunRow[]) ?? [];
+  const weekAgentRuns = (weekAgentRunsRes.data as BrainAgentRunRow[]) ?? [];
+  const recentAgentRuns = recentAgentRunsRaw.map(enrichRunWithCost);
 
   const actions24h = recentActions.filter(a => a.created_at >= dayAgo);
   const success24h = actions24h.filter(a => a.status === 'success').length;
@@ -220,7 +280,7 @@ export async function getBrainDashboard(supabase: SupabaseClient): Promise<Brain
 
   const weekActions = (weekActionsRes.data as BrainActionLogRow[]) ?? [];
   const weekTasks = (weekTasksRes.data as Pick<BrainTaskRow, 'id' | 'status' | 'updated_at'>[]) ?? [];
-  const agentRunStats = buildAgentRunStats(recentAgentRuns, dayAgo);
+  const agentRunStats = buildAgentRunStats(recentAgentRunsRaw, dayAgo, weekAgo);
   agentRunStats.runningNow = runningRunsRes.count ?? agentRunStats.runningNow;
 
   return {

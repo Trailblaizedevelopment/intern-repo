@@ -20,7 +20,10 @@ import type { BrainAgentRunWithCost } from '@/lib/brain/dashboard';
 import { fmtCostUsd } from '@/lib/brain/pricing';
 import type { BrainTaskRow, BrainTaskStatus } from '@/lib/brain/tasks/types';
 import { AgentRunsPanel, type AgentRunStats } from './AgentRunsPanel';
+import { BrainRoomView } from './BrainRoomView';
+import { GuideView } from './GuideView';
 import { InsightsPanel } from './InsightsPanel';
+import { ViewSwitcher, loadSavedView, saveView, type ConsoleView } from './ViewSwitcher';
 
 const DEV_CONSOLE_EMAIL = 'devin@trailblaize.net';
 const REFRESH_MS = 30_000;
@@ -45,8 +48,10 @@ interface ActionRow {
 interface AutomationRow {
   id: string;
   name: string;
+  kind: string;
   schedule: string | null;
   enabled: boolean;
+  config: Record<string, unknown>;
   last_run_at: string | null;
   last_status: string | null;
   last_error: string | null;
@@ -136,6 +141,67 @@ function StatCard({ label, value, sub, icon: Icon, accent }: {
   );
 }
 
+function ConnectorStrip({ connectors }: { connectors: ConnectorStatus[] }) {
+  if (connectors.length === 0) return null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        minWidth: 0,
+        overflow: 'hidden',
+        flex: 1,
+      }}
+      title="Connected integrations and available tools"
+    >
+      <span
+        style={{
+          fontSize: '0.625rem',
+          fontWeight: 600,
+          color: '#9CA3AF',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          flexShrink: 0,
+        }}
+      >
+        Integrations
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, overflow: 'hidden' }}>
+        {connectors.map(c => (
+          <span
+            key={c.id}
+            title={`${c.label}${c.available ? ` · ${c.toolCount} tools` : ' · offline'}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              flexShrink: 0,
+              fontSize: '0.6875rem',
+              color: c.available ? '#4B5563' : '#9CA3AF',
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                flexShrink: 0,
+                background: c.available ? '#111827' : '#E5E7EB',
+                boxShadow: c.available ? '0 0 0 2px #F3F4F6' : undefined,
+              }}
+            />
+            <span style={{ fontWeight: 500, textTransform: 'capitalize' }}>{c.id}</span>
+            {c.available && (
+              <span style={{ color: '#9CA3AF', fontVariantNumeric: 'tabular-nums' }}>{c.toolCount}</span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TaskRow({ task, expanded, onToggle }: { task: BrainTaskRow; expanded: boolean; onToggle: () => void }) {
   return (
     <div style={{ borderBottom: '1px solid #F3F4F6' }}>
@@ -210,8 +276,18 @@ export default function DevConsolePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [consoleView, setConsoleView] = useState<ConsoleView>('dashboard');
 
   const isDevin = profile?.email?.toLowerCase() === DEV_CONSOLE_EMAIL;
+
+  useEffect(() => {
+    setConsoleView(loadSavedView());
+  }, []);
+
+  const handleViewChange = useCallback((view: ConsoleView) => {
+    setConsoleView(view);
+    saveView(view);
+  }, []);
 
   useEffect(() => {
     if (!authLoading && profile && !isDevin) {
@@ -269,57 +345,61 @@ export default function DevConsolePage() {
 
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 4px 32px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '4px 4px 16px', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', color: 'white' }}>
-            <Brain size={20} />
-          </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>Trailblaize Brain</h1>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: '#6B7280' }}>
-              Agent ops dashboard · chat lives in Slack
-              {data?.linear_read_only === false ? ' · Linear write mode' : ' · Linear read-only'}
-              {data?.rate_limits ? ` · ${data.rate_limits.per_minute}/min cap` : ''}
-            </p>
-          </div>
+      {/* Header — single row, no wrap */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          padding: '6px 4px 14px',
+          flexWrap: 'nowrap',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: 1 }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '0.9375rem',
+              fontWeight: 700,
+              color: '#111827',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Trailblaize Brain
+          </h1>
+          <div style={{ width: 1, height: 18, background: '#E5E7EB', flexShrink: 0 }} aria-hidden />
+          <ConnectorStrip connectors={connectors} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {connectors.map(c => (
-            <span
-              key={c.id}
-              title={`${c.label} — ${c.toolCount} tools`}
-              style={{
-                fontSize: '0.6875rem', fontWeight: 600, padding: '3px 8px', borderRadius: 999,
-                background: c.available ? '#ECFDF5' : '#F3F4F6',
-                color: c.available ? '#065F46' : '#9CA3AF',
-              }}
-            >
-              {c.id} {c.available ? `(${c.toolCount})` : 'off'}
-            </span>
-          ))}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <ViewSwitcher value={consoleView} onChange={handleViewChange} />
           <button
             type="button"
             onClick={() => loadDashboard(true)}
             disabled={refreshing}
+            aria-label="Refresh dashboard"
+            title="Refresh"
             style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8,
-              border: '1px solid #E5E7EB', background: 'white', color: '#374151', fontSize: '0.8125rem',
-              fontWeight: 500, cursor: refreshing ? 'default' : 'pointer', opacity: refreshing ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              border: '1px solid #E5E7EB',
+              background: 'white',
+              color: '#6B7280',
+              cursor: refreshing ? 'default' : 'pointer',
+              opacity: refreshing ? 0.6 : 1,
+              flexShrink: 0,
             }}
           >
-            <RefreshCw size={14} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} />
-            Refresh
+            <RefreshCw size={15} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} />
           </button>
         </div>
-      </div>
-
-      {/* Slack banner */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', marginBottom: 16, borderRadius: 10, background: '#EEF2FF', border: '1px solid #C7D2FE' }}>
-        <MessageSquare size={16} style={{ color: '#4338CA', flexShrink: 0 }} />
-        <p style={{ margin: 0, fontSize: '0.8125rem', color: '#3730A3', lineHeight: 1.45 }}>
-          Brain runs in Slack — @mention the bot or reply in a thread. This page is read-only: agent runs, tool calls, and task orchestration.
-        </p>
       </div>
 
       {error && (
@@ -334,87 +414,108 @@ export default function DevConsolePage() {
         </div>
       ) : data && stats ? (
         <>
-          {/* KPI row */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-            <StatCard label="Weekly spend" value={fmtCostUsd(data.agentRunStats.costUsd7d)} sub={`${fmtCostUsd(data.agentRunStats.costUsd24h)} today · est. API cost`} icon={DollarSign} accent="#059669" />
-            <StatCard label="Agent runs (24h)" value={data.agentRunStats.runs24h} sub={`${data.agentRunStats.successRate24h}% success · ${data.agentRunStats.runningNow} live`} icon={Brain} accent="#4F46E5" />
-            <StatCard label="Avg / run (7d)" value={data.agentRunStats.avgCostPerRun7d != null ? fmtCostUsd(data.agentRunStats.avgCostPerRun7d) : '—'} sub={data.agentRunStats.pricingLabel} icon={Clock} accent="#2563EB" />
-            <StatCard label="Tool calls (24h)" value={stats.toolCalls24h} sub={`${stats.toolSuccessRate24h}% success`} icon={Wrench} accent="#7C3AED" />
-          </div>
-
-          {/* Agent runs panel — primary view */}
-          <div style={{ marginBottom: 16 }}>
-            <AgentRunsPanel runs={data.recentAgentRuns} stats={data.agentRunStats} loading={refreshing} />
-          </div>
-
-          <InsightsPanel
-            activityByDay={data.activityByDay}
-            automations={data.automations}
-            weekSpend={data.agentRunStats.costUsd7d}
-          />
-
-          {/* Main grid: tasks + activity feed */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {/* Active & recent tasks */}
-            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>Orchestration tasks</span>
-                <span style={{ fontSize: '0.6875rem', color: '#9CA3AF' }}>{data.recentTasks.length} recent</span>
+          {consoleView === 'dashboard' && (
+            <>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                <StatCard label="Weekly spend" value={fmtCostUsd(data.agentRunStats.costUsd7d)} sub={`${fmtCostUsd(data.agentRunStats.costUsd24h)} today · est. API cost`} icon={DollarSign} accent="#059669" />
+                <StatCard label="Agent runs (24h)" value={data.agentRunStats.runs24h} sub={`${data.agentRunStats.successRate24h}% success · ${data.agentRunStats.runningNow} live`} icon={Brain} accent="#4F46E5" />
+                <StatCard label="Avg / run (7d)" value={data.agentRunStats.avgCostPerRun7d != null ? fmtCostUsd(data.agentRunStats.avgCostPerRun7d) : '—'} sub={data.agentRunStats.pricingLabel} icon={Clock} accent="#2563EB" />
+                <StatCard label="Tool calls (24h)" value={stats.toolCalls24h} sub={`${stats.toolSuccessRate24h}% success`} icon={Wrench} accent="#7C3AED" />
               </div>
-              {data.recentTasks.length === 0 ? (
-                <p style={{ padding: 24, margin: 0, textAlign: 'center', fontSize: '0.8125rem', color: '#9CA3AF' }}>
-                  No orchestration tasks yet. Ask Brain in Slack to start durable work.
-                </p>
-              ) : (
-                data.recentTasks.map(task => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    expanded={expandedTaskId === task.id}
-                    onToggle={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-                  />
-                ))
-              )}
-            </div>
 
-            {/* Tool audit trail */}
-            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB' }}>
-                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>Recent tool calls</span>
+              <div style={{ marginBottom: 16 }}>
+                <AgentRunsPanel runs={data.recentAgentRuns} stats={data.agentRunStats} loading={refreshing} />
               </div>
-              <div style={{ maxHeight: 480, overflowY: 'auto' }}>
-                {data.recentActions.length === 0 ? (
-                  <p style={{ padding: 24, margin: 0, textAlign: 'center', fontSize: '0.8125rem', color: '#9CA3AF' }}>
-                    No tool calls logged yet.
-                  </p>
-                ) : (
-                  data.recentActions.map(action => (
-                    <div key={action.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderBottom: '1px solid #F3F4F6' }}>
-                      {action.status === 'success' ? (
-                        <CheckCircle2 size={14} style={{ color: '#059669', marginTop: 2, flexShrink: 0 }} />
-                      ) : (
-                        <XCircle size={14} style={{ color: '#DC2626', marginTop: 2, flexShrink: 0 }} />
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#374151' }}>
-                            {action.connector_name ? `${action.connector_name}:` : ''}{action.skill_name.replace(/^linear_/, '')}
+
+              <InsightsPanel
+                activityByDay={data.activityByDay}
+                automations={data.automations}
+                weekSpend={data.agentRunStats.costUsd7d}
+                authHeaders={authHeaders}
+                onAutomationsChange={automations =>
+                  setData(prev => (prev ? { ...prev, automations } : prev))
+                }
+              />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>Orchestration tasks</span>
+                    <span style={{ fontSize: '0.6875rem', color: '#9CA3AF' }}>{data.recentTasks.length} recent</span>
+                  </div>
+                  {data.recentTasks.length === 0 ? (
+                    <p style={{ padding: 24, margin: 0, textAlign: 'center', fontSize: '0.8125rem', color: '#9CA3AF' }}>
+                      No orchestration tasks yet. Ask Brain in Slack to start durable work.
+                    </p>
+                  ) : (
+                    data.recentTasks.map(task => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        expanded={expandedTaskId === task.id}
+                        onToggle={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                      />
+                    ))
+                  )}
+                </div>
+
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 14px', borderBottom: '1px solid #E5E7EB' }}>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>Recent tool calls</span>
+                  </div>
+                  <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                    {data.recentActions.length === 0 ? (
+                      <p style={{ padding: 24, margin: 0, textAlign: 'center', fontSize: '0.8125rem', color: '#9CA3AF' }}>
+                        No tool calls logged yet.
+                      </p>
+                    ) : (
+                      data.recentActions.map(action => (
+                        <div key={action.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderBottom: '1px solid #F3F4F6' }}>
+                          {action.status === 'success' ? (
+                            <CheckCircle2 size={14} style={{ color: '#059669', marginTop: 2, flexShrink: 0 }} />
+                          ) : (
+                            <XCircle size={14} style={{ color: '#DC2626', marginTop: 2, flexShrink: 0 }} />
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#374151' }}>
+                                {action.connector_name ? `${action.connector_name}:` : ''}{action.skill_name.replace(/^linear_/, '')}
+                              </span>
+                              <span style={{ fontSize: '0.625rem', padding: '1px 6px', borderRadius: 999, background: '#F3F4F6', color: '#6B7280' }}>{action.source}</span>
+                            </div>
+                            {action.error && (
+                              <p style={{ margin: '2px 0 0', fontSize: '0.6875rem', color: '#991B1B' }}>{action.error.slice(0, 100)}</p>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.6875rem', color: '#9CA3AF', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Clock size={10} /> {fmtRelative(action.created_at)}
                           </span>
-                          <span style={{ fontSize: '0.625rem', padding: '1px 6px', borderRadius: 999, background: '#F3F4F6', color: '#6B7280' }}>{action.source}</span>
                         </div>
-                        {action.error && (
-                          <p style={{ margin: '2px 0 0', fontSize: '0.6875rem', color: '#991B1B' }}>{action.error.slice(0, 100)}</p>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '0.6875rem', color: '#9CA3AF', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <Clock size={10} /> {fmtRelative(action.created_at)}
-                      </span>
-                    </div>
-                  ))
-                )}
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
+
+          {consoleView === 'brain-room' && (
+            <BrainRoomView
+              agentRunStats={data.agentRunStats}
+              activeTasks={stats.activeTasks}
+              connectors={connectors}
+              runningNow={data.agentRunStats.runningNow}
+            />
+          )}
+
+          {consoleView === 'guide' && (
+            <GuideView
+              connectors={connectors}
+              automations={data.automations}
+              linearReadOnly={data.linear_read_only !== false}
+              rateLimits={data.rate_limits}
+            />
+          )}
         </>
       ) : null}
 

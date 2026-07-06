@@ -12,15 +12,22 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
-import type { BrainAgentRunRow } from '@/lib/brain/agent-runs';
+import type { BrainAgentRunWithCost } from '@/lib/brain/dashboard';
+import { fmtCostUsd } from '@/lib/brain/pricing';
 
 export interface AgentRunStats {
   runs24h: number;
   successRate24h: number;
   avgLatencyMs24h: number | null;
   totalTokens24h: number;
+  costUsd24h: number;
+  costUsd7d: number;
+  avgCostPerRun7d: number | null;
   runningNow: number;
   bySurface24h: Record<string, number>;
+  costBySurface7d: Record<string, number>;
+  pricingLabel: string;
+  defaultModel: string;
 }
 
 type SurfaceFilter = 'all' | 'slack' | 'workspace' | 'task';
@@ -54,7 +61,7 @@ function fmtTokens(input: number, output: number): string {
 }
 
 interface AgentRunsPanelProps {
-  runs: BrainAgentRunRow[];
+  runs: BrainAgentRunWithCost[];
   stats: AgentRunStats;
   loading?: boolean;
 }
@@ -88,11 +95,29 @@ export function AgentRunsPanel({ runs, stats, loading }: AgentRunsPanelProps) {
         </div>
 
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <MiniStat label="Spend (7d)" value={fmtCostUsd(stats.costUsd7d)} highlight />
+          <MiniStat label="Spend (24h)" value={fmtCostUsd(stats.costUsd24h)} />
           <MiniStat label="24h runs" value={String(stats.runs24h)} />
-          <MiniStat label="Success" value={`${stats.successRate24h}%`} />
-          <MiniStat label="Avg latency" value={stats.avgLatencyMs24h != null ? fmtLatency(stats.avgLatencyMs24h) : '—'} />
+          <MiniStat label="Avg / run (7d)" value={stats.avgCostPerRun7d != null ? fmtCostUsd(stats.avgCostPerRun7d) : '—'} />
           <MiniStat label="Tokens (24h)" value={stats.totalTokens24h >= 1000 ? `${(stats.totalTokens24h / 1000).toFixed(1)}k` : String(stats.totalTokens24h)} />
         </div>
+        <p style={{ margin: '8px 0 0', fontSize: '0.625rem', color: '#9CA3AF' }}>
+          Est. Anthropic API · {stats.defaultModel.replace('claude-', '')} · {stats.pricingLabel}
+        </p>
+        {Object.keys(stats.costBySurface7d).length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            {(['slack', 'task', 'workspace'] as const).map(surface => {
+              const cost = stats.costBySurface7d[surface];
+              if (cost == null || cost === 0) return null;
+              const meta = SURFACE_META[surface];
+              return (
+                <span key={surface} style={{ fontSize: '0.625rem', padding: '2px 8px', borderRadius: 999, background: meta.bg, color: meta.color, fontWeight: 600 }}>
+                  {meta.label} {fmtCostUsd(cost)}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Surface filters */}
@@ -141,11 +166,11 @@ export function AgentRunsPanel({ runs, stats, loading }: AgentRunsPanelProps) {
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function MiniStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div>
       <div style={{ fontSize: '0.625rem', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-      <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#111827' }}>{value}</div>
+      <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: highlight ? '#059669' : '#111827' }}>{value}</div>
     </div>
   );
 }
@@ -155,7 +180,7 @@ function AgentRunRow({
   expanded,
   onToggle,
 }: {
-  run: BrainAgentRunRow;
+  run: BrainAgentRunWithCost;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -197,6 +222,7 @@ function AgentRunRow({
               <span style={{ fontSize: '0.625rem', color: '#9CA3AF' }}>{run.model.replace('claude-', '')}</span>
             )}
             <span style={{ fontSize: '0.6875rem', color: '#9CA3AF', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 600, color: '#059669' }}>{fmtCostUsd(run.estimated_cost_usd)}</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                 <Zap size={10} /> {run.tool_call_count}
               </span>
@@ -214,6 +240,9 @@ function AgentRunRow({
       {expanded && (
         <div style={{ padding: '0 14px 12px 52px', fontSize: '0.75rem', color: '#6B7280' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, marginBottom: 8 }}>
+            <Detail label="Cost" value={fmtCostUsd(run.estimated_cost_usd)} />
+            <Detail label="Input cost" value={fmtCostUsd(run.input_cost_usd)} />
+            <Detail label="Output cost" value={fmtCostUsd(run.output_cost_usd)} />
             <Detail label="Status" value={run.status} />
             <Detail label="Iterations" value={String(run.iteration_count)} />
             <Detail label="Input tok" value={String(run.input_tokens)} />
