@@ -1,4 +1,7 @@
+import { cursorConnector } from './connectors/cursor';
+import { githubConnector } from './connectors/github';
 import { linearConnector } from './connectors/linear';
+import { tasksConnector } from './connectors/tasks';
 import {
   BrainConnector,
   ConnectorCallResult,
@@ -8,8 +11,13 @@ import {
 
 export type { ConnectorContext } from './connectors/types';
 
-/** Linear is the sole ticket/work-item source for Brain. */
-const CONNECTORS: BrainConnector[] = [linearConnector];
+/** Connectors: Linear (tickets), GitHub (read), Cursor (dispatch), Tasks (orchestration). */
+const CONNECTORS: BrainConnector[] = [
+  linearConnector,
+  githubConnector,
+  cursorConnector,
+  tasksConnector,
+];
 
 /** Tool name → connector id (built on first listTools call per run). */
 const toolRouting = new Map<string, string>();

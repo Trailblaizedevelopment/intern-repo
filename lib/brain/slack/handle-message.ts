@@ -121,7 +121,12 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
       history,
       { supabase, employeeId: employee.employeeId },
       employee.employeeName,
-      'slack'
+      {
+        surface: 'slack',
+        conversationId,
+        slackChannel: ctx.channel,
+        slackThreadTs: ctx.threadTs,
+      }
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Agent run failed';

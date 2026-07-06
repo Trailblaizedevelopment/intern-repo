@@ -6,6 +6,12 @@ export interface ConnectorContext {
   employeeId: string | null;
   /** Per-run MCP HTTP sessions (keyed by connector id). */
   mcpSessions: Map<string, unknown>;
+  /** Active brain_task id when running task orchestration loop. */
+  taskId?: string | null;
+  conversationId?: string | null;
+  surface?: 'workspace' | 'slack';
+  slackChannel?: string | null;
+  slackThreadTs?: string | null;
 }
 
 export interface ConnectorTool {

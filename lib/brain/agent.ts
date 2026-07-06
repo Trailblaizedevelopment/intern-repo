@@ -56,11 +56,22 @@ export interface AgentRunResult {
   toolEvents: ToolEvent[];
 }
 
+export interface AgentRunOptions {
+  surface?: 'workspace' | 'slack';
+  systemAppend?: string;
+  maxIterations?: number;
+  taskId?: string | null;
+  conversationId?: string | null;
+  slackChannel?: string | null;
+  slackThreadTs?: string | null;
+}
+
 function buildSystemPrompt(
   employeeName: string | null,
   toolNames: string[],
   linearWriteMode: boolean,
-  surface: 'workspace' | 'slack' = 'workspace'
+  surface: 'workspace' | 'slack' = 'workspace',
+  systemAppend?: string
 ): string {
   const now = new Date();
   const centralDate = new Intl.DateTimeFormat('en-US', {
@@ -72,6 +83,9 @@ function buildSystemPrompt(
   }).format(now);
 
   const hasLinear = toolNames.some(n => n.startsWith('linear_'));
+  const hasGitHub = toolNames.some(n => n.startsWith('github_'));
+  const hasCursor = toolNames.some(n => n.startsWith('cursor_'));
+  const hasTasks = toolNames.some(n => n.startsWith('tasks_'));
 
   const toolGuidance: string[] = [];
   if (hasLinear) {
@@ -86,8 +100,22 @@ function buildSystemPrompt(
       toolGuidance.push('- Linear write tools are disabled (read-only). Do not attempt creates or updates.');
     }
   }
+  if (hasGitHub) {
+    toolGuidance.push('- Use github_* for PR context on Trailblaize-Web. Read-only.');
+  }
+  if (hasCursor) {
+    toolGuidance.push(
+      '- Use cursor_dispatch_agent for code implementation on Trailblaize-Web. Include Linear ticket context in the prompt. Prefer plan mode for ambiguous work.'
+    );
+  }
+  if (hasTasks) {
+    toolGuidance.push(
+      '- Use tasks_start_goal when asked to work for an extended period (e.g. "work on this for an hour"). The background runner loops until tasks_complete, tasks_fail, deadline, or max iterations.',
+      '- During an active task iteration, call tasks_complete with a summary when done, tasks_block if you need human input, or cursor_dispatch_agent for code changes.'
+    );
+  }
 
-  return [
+  const lines = [
     `You are Trailblaize Brain, the engineering co-pilot for ${employeeName || 'Devin'} (founding engineer) inside the Trailblaize internal CRM.`,
     '',
     `Today is ${centralDate} (Central Time — company timezone).`,
@@ -101,7 +129,10 @@ function buildSystemPrompt(
     surface === 'slack'
       ? '- You are replying in Slack. Be concise. Use Slack mrkdwn (*bold*, • bullets). No emojis.'
       : '- Keep answers concise. Use markdown lists for multiple items.',
-  ].join('\n');
+  ];
+
+  if (systemAppend) lines.push('', systemAppend);
+  return lines.join('\n');
 }
 
 interface AnthropicResponse {
@@ -116,23 +147,37 @@ function serializeToolOutput(result: unknown): string {
 
 function createConnectorContext(
   supabase: ConnectorContext['supabase'],
-  employeeId: string | null
+  employeeId: string | null,
+  options: AgentRunOptions = {}
 ): ConnectorContext {
-  return { supabase, employeeId, mcpSessions: new Map() };
+  return {
+    supabase,
+    employeeId,
+    mcpSessions: new Map(),
+    taskId: options.taskId ?? null,
+    conversationId: options.conversationId ?? null,
+    surface: options.surface ?? 'workspace',
+    slackChannel: options.slackChannel ?? null,
+    slackThreadTs: options.slackThreadTs ?? null,
+  };
 }
 
 export async function runBrainAgent(
   history: BrainMessage[],
   baseCtx: Pick<ConnectorContext, 'supabase' | 'employeeId'>,
   employeeName: string | null,
-  surface: 'workspace' | 'slack' = 'workspace'
+  options: AgentRunOptions | 'workspace' | 'slack' = 'workspace'
 ): Promise<AgentRunResult> {
+  const opts: AgentRunOptions =
+    typeof options === 'string' ? { surface: options } : options;
+  const surface = opts.surface ?? 'workspace';
+  const maxIterations = opts.maxIterations ?? MAX_TOOL_ITERATIONS;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
-  const ctx = createConnectorContext(baseCtx.supabase, baseCtx.employeeId);
+  const ctx = createConnectorContext(baseCtx.supabase, baseCtx.employeeId, opts);
   const anthropicTools = await getAnthropicTools(ctx);
   if (anthropicTools.length === 0) {
     throw new Error('No connector tools available — check LINEAR_API_KEY and database connection');
@@ -144,12 +189,13 @@ export async function runBrainAgent(
     employeeName,
     anthropicTools.map(t => t.name),
     linearWriteMode,
-    surface
+    surface,
+    opts.systemAppend
   );
   const messages: BrainMessage[] = [...history];
   const toolEvents: ToolEvent[] = [];
 
-  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+  for (let i = 0; i < maxIterations; i++) {
     const response = await fetch(ANTHROPIC_API_URL, {
       method: 'POST',
       headers: {
@@ -233,7 +279,7 @@ export async function runBrainAgent(
   }
 
   return {
-    reply: `I hit the limit of ${MAX_TOOL_ITERATIONS} tool-call rounds for this message. Try a narrower question or split the task into steps (e.g. "list due tickets" then "rank by priority").`,
+    reply: `I hit the limit of ${maxIterations} tool-call rounds for this message. Try a narrower question or split the task into steps (e.g. "list due tickets" then "rank by priority").`,
     messages,
     toolEvents,
   };
