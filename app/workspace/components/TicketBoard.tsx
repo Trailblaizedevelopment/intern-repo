@@ -47,6 +47,7 @@ import { useToast } from '@/components/Toast';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
+import ReactMarkdown from 'react-markdown';
 import { getLinearMobileProjectName, mapCrmAppToLinearProjectName } from '@/lib/linear-project-map';
 import { hasLinearLink, resolveLinearTicketUrl } from '@/lib/linear-issue-url';
 import {
@@ -1205,6 +1206,83 @@ function dueDateDayKey(dueDate: string): string {
   return localDateKey(parseDueDateLocal(dueDate));
 }
 
+function ticketDescriptionForMarkdown(description: string | null): string | null {
+  if (!description?.trim()) return null;
+
+  let text = description.trim();
+  if (/<[a-z][\s\S]*>/i.test(text)) {
+    text = text
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '- ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  return text.length > 0 ? text : null;
+}
+
+function RoadmapTicketDescription({ description }: { description: string | null }) {
+  const md = ticketDescriptionForMarkdown(description);
+  if (!md) {
+    return <p className="tkt__roadmap-tip-empty">No description synced from Linear yet.</p>;
+  }
+
+  return (
+    <div className="tkt__roadmap-tip-desc tkt__roadmap-tip-md">
+      <ReactMarkdown
+        components={{
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {md}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+function RoadmapTicketTooltip({ ticket }: { ticket: TicketData }) {
+  const statusCfg = STATUS_COLUMNS.find(s => s.key === ticket.status);
+  const id = ticket.linear_identifier || `#${ticket.number}`;
+
+  return (
+    <div className="tkt__roadmap-tip">
+      <p className="ui-tooltip__title">{id}</p>
+      <dl className="tkt__roadmap-tip-meta">
+        <div>
+          <dt>Status</dt>
+          <dd>{statusCfg?.label ?? ticket.status}</dd>
+        </div>
+        <div>
+          <dt>Assignee</dt>
+          <dd>{ticket.assignee?.name ?? 'Unassigned'}</dd>
+        </div>
+        {ticket.due_date && (
+          <div>
+            <dt>Due</dt>
+            <dd>{formatDueDateShort(ticket.due_date)}</dd>
+          </div>
+        )}
+      </dl>
+      <RoadmapTicketDescription description={ticket.description} />
+    </div>
+  );
+}
+
+function openLinearTicket(ticket: TicketData) {
+  const url = resolveLinearTicketUrl(ticket);
+  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
   const today = useMemo(() => {
     const d = new Date();
@@ -1341,53 +1419,59 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
             </div>
           ) : (
             visibleTickets.map(ticket => {
-              const statusCfg = STATUS_COLUMNS.find(s => s.key === ticket.status);
               const dueDayKey = ticket.due_date ? dueDateDayKey(ticket.due_date) : '';
               const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+              const ticketId = ticket.linear_identifier || `#${ticket.number}`;
               return (
                 <div
                   key={ticket.id}
                   className="tkt__roadmap-row"
                   style={gridStyle}
-                  onClick={() => onTicketClick(ticket)}
                 >
-                  <div className="tkt__roadmap-label-col">
-                    <div className="tkt__roadmap-ticket-ids">
-                      <LinearTicketLink ticket={ticket} className="tkt__roadmap-linear-id" />
-                      {statusCfg && (
-                        <span
-                          className="tkt__roadmap-status"
-                          style={{ color: statusCfg.color, borderColor: statusCfg.color }}
-                        >
-                          {statusCfg.label}
-                        </span>
-                      )}
+                  <Tooltip
+                    content={<RoadmapTicketTooltip ticket={ticket} />}
+                    side="bottom"
+                    align="start"
+                    delayMs={200}
+                    interactive
+                    interactiveHideDelayMs={250}
+                    className="tkt__roadmap-tip-panel"
+                  >
+                    <div
+                      className="tkt__roadmap-label-col tkt__roadmap-label-col--work"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onTicketClick(ticket)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onTicketClick(ticket);
+                        }
+                      }}
+                    >
+                      <p className="tkt__roadmap-work-item">
+                        <span className="tkt__roadmap-work-id">{ticketId}</span>
+                        <span className="tkt__roadmap-work-sep"> — </span>
+                        <span className="tkt__roadmap-work-title">{ticket.title}</span>
+                      </p>
                     </div>
-                    <p className="tkt__roadmap-ticket-title" title={ticket.title}>{ticket.title}</p>
-                    <div className="tkt__roadmap-ticket-meta">
-                      {ticket.assignee ? (
-                        <span className="tkt__roadmap-assignee">{ticket.assignee.name}</span>
-                      ) : (
-                        <span className="tkt__roadmap-assignee tkt__roadmap-assignee--none">Unassigned</span>
-                      )}
-                      {ticket.due_date && (
-                        <span className="tkt__roadmap-due">
-                          <CalendarDays size={11} />
-                          {formatDueDateShort(ticket.due_date)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  </Tooltip>
                   {visibleDays.map(day => (
                     <div
                       key={day.key}
                       className={`tkt__roadmap-day-col tkt__roadmap-day-cell ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
                     >
                       {dueDayKey === day.key && (
-                        <span
+                        <button
+                          type="button"
                           className="tkt__roadmap-day-marker"
                           style={{ backgroundColor: priorityCfg.color }}
-                          title={`Due ${formatDueDateShort(ticket.due_date!)} · ${ticket.title}`}
+                          title={`Open ${ticketId} in Linear`}
+                          aria-label={`Open ${ticketId} in Linear`}
+                          onClick={e => {
+                            e.stopPropagation();
+                            openLinearTicket(ticket);
+                          }}
                         />
                       )}
                     </div>
