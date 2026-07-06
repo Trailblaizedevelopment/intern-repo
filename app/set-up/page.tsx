@@ -766,59 +766,18 @@ function SetUpPage() {
     }
   }
 
-  // ─── Step 0: Overview (animated walkthrough) ─────────────────────────────
+  // ─── Step 0: Landing CTA ─────────────────────────────────────────────────────
+  // Marketing/demo slides removed — covered by the landing page.
+  // /set-up now drops directly into the CTA → onboarding form.
 
   if (step === 0) {
-    const TOTAL_SUBSTEPS = 6;
-
-    // Slide 0: 6 real Alpha Chapter profile cards
-    const slide0Profiles = [
-      { name: 'Nash Dehmer',   bio: 'Dir of Operations @ US Senate',         location: 'Washington, DC', chapter: 'Alpha · PoliSci \'23', avatar: RA.nashDehmer,  initials: 'ND', color: '#6366F1' },
-      { name: 'Ethan Hill',    bio: 'Financial Services Rep @ Fidelity',      location: 'Dallas, TX',     chapter: 'Alpha · Finance \'26', avatar: RA.ethanHill,   initials: 'EH', color: '#0F172A' },
-      { name: 'Jake Coppen',   bio: 'Founder @ Scratch AI',                   location: 'New York, NY',   chapter: 'Alpha · Finance \'26', avatar: RA.jakeCoppen,  initials: 'JC', color: '#0F172A' },
-      { name: 'Gavin Murrey',  bio: 'Credit Portfolio Analyst @ JPMorgan',   location: null,              chapter: 'Alpha · Finance \'26', avatar: RA.gavinMurrey, initials: 'GM', color: '#8B5CF6' },
-      { name: 'Payne Parker',  bio: 'Account Executive @ Knight Commercial', location: 'Dallas, TX',     chapter: 'Alpha · Marketing \'26', avatar: RA.payneParker, initials: 'PP', color: '#EC4899' },
-      { name: 'Andrew Longo',  bio: 'GTM @ Glean',                            location: 'Nashville, TN',  chapter: 'Alpha · Marketing \'26', avatar: RA.andrewLongo, initials: 'AL', color: '#F59E0B' },
-    ];
-
     return (
       <div style={{ background: 'white', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column' }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
-          @keyframes cardFloat {
-            from { opacity: 0; transform: translateY(28px) scale(0.96); }
-            to   { opacity: 1; transform: translateY(0)   scale(1); }
-          }
-          @keyframes cardsScroll {
-            from { transform: translateX(110vw); }
-            to   { transform: translateX(-420px); }
-          }
-          @keyframes avatarPop {
-            from { opacity: 0; transform: scale(0.72); }
-            to   { opacity: 1; transform: scale(1); }
-          }
-          @keyframes bubbleSlideLeft {
-            from { opacity: 0; transform: translateX(-24px); }
-            to   { opacity: 1; transform: translateX(0); }
-          }
-          @keyframes bubbleSlideRight {
-            from { opacity: 0; transform: translateX(24px); }
-            to   { opacity: 1; transform: translateX(0); }
-          }
-          @keyframes connectedBadge {
-            from { opacity: 0; transform: scale(0.8) translateY(8px); }
-            to   { opacity: 1; transform: scale(1) translateY(0); }
-          }
-          @keyframes spaceCardIn {
-            from { opacity: 0; transform: translateX(-12px); }
-            to   { opacity: 1; transform: translateX(0); }
-          }
-          @keyframes phoneIn {
-            from { opacity: 0; transform: scale(0.88); }
-            to   { opacity: 1; transform: scale(1); }
-          }
-          @media (max-width: 580px) {
-            .slide0-grid { grid-template-columns: 1fr 1fr !important; }
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
           }
         `}</style>
 
@@ -829,259 +788,36 @@ function SetUpPage() {
         )}
 
         {/* Nav */}
-        <nav style={{ padding: '0 28px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F3F4F6', background: 'white', flexShrink: 0 }}>
+        <nav style={{ padding: '0 28px', height: '64px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F3F4F6', background: 'white' }}>
           <img src="/logos/logo-wordmark-navy.png" alt="Trailblaize" style={{ height: '28px' }} />
-          <button
-            onClick={() => goToStep(1)}
-            style={{ padding: '8px 20px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.875rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            Get Started
-          </button>
         </nav>
 
-        {/* Progress dots */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '14px 0', borderBottom: '1px solid #F3F4F6', flexShrink: 0 }}>
-          {Array.from({ length: TOTAL_SUBSTEPS }).map((_, i) => (
-            <div key={i} style={{
-              width: i === subStep ? '22px' : '7px',
-              height: '7px',
-              borderRadius: '4px',
-              background: i === subStep ? '#0F172A' : '#D1D5DB',
-              transition: 'all 0.3s ease',
-            }} />
-          ))}
-        </div>
-
-        {/* Slide content */}
-        <div style={{
-          flex: 1,
-          opacity: subStepVisible ? 1 : 0,
-          transform: subStepVisible ? 'translateY(0)' : 'translateY(20px)',
-          transition: 'opacity 0.22s ease, transform 0.22s ease',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-
-          {/* ── Slide 0: Your network, in one place. ── */}
-          {subStep === 0 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '720px', margin: '0 auto', width: '100%' }}>
-              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-                Your network, in one place.
-              </h1>
-              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 32px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
-                Every member and alumni, one tap away.
-              </p>
-              <div className="slide0-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', width: '100%', maxWidth: '600px' }}>
-                {slide0Profiles.map((profile, i) => (
-                  <div
-                    key={profile.name}
-                    style={{
-                      background: 'white',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '12px',
-                      padding: '14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                      animation: `cardFloat 0.55s ease ${i * 0.1 + 0.1}s both`,
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                    }}
-                  >
-                    <AvatarImg src={profile.avatar} name={profile.name} initials={profile.initials} bg={profile.color} size={40} />
-                    <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: '#111827', lineHeight: 1.2, fontFamily: "'Instrument Serif', Georgia, serif" }}>{profile.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: '#6B7280', lineHeight: 1.3, fontFamily: "'Instrument Serif', Georgia, serif" }}>{profile.bio}</div>
-                    {profile.location && (
-                      <div style={{ fontSize: '0.67rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>📍 {profile.location}</div>
-                    )}
-                    <div style={{ fontSize: '0.65rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>🏛️ {profile.chapter}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Slide 1: Open Up Your Verified Network ── */}
-          {subStep === 1 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '720px', margin: '0 auto', width: '100%' }}>
-              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-                Open Up Your <span style={{ fontStyle: 'italic' }}>Verified</span> Network
-              </h1>
-              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 24px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
-                Filter by industry, location, or interests.
-              </p>
-              <div style={{ width: '100%', maxWidth: '620px', animation: 'cardFloat 0.4s ease 0.1s both' }}>
-                <NetworkFilterAnimation />
-              </div>
-            </div>
-          )}
-
-          {/* ── Slide 2: Start a conversation that matters. ── */}
-          {subStep === 2 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '520px', margin: '0 auto', width: '100%' }}>
-              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-                Start a conversation that matters.
-              </h1>
-              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 32px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
-                Message any alumni directly — no LinkedIn required.
-              </p>
-
-              {/* Avatars */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: '420px', marginBottom: '20px' }}>
-                {/* Chadwick (active, initiator) */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', animation: 'avatarPop 0.4s ease 0.1s both' }}>
-                  <AvatarImg src="/faces/face3.jpg" name="Chadwick Mask" initials="CM" bg="#0EA5E9" size={56} style={{ border: '2px solid #E5E7EB' }} />
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', fontFamily: "'Instrument Serif', Georgia, serif" }}>Chadwick Mask</div>
-                    <div style={{ fontSize: '0.7rem', color: '#6B7280', fontFamily: "'Instrument Serif', Georgia, serif" }}>Finance · Active &apos;29</div>
-                  </div>
-                </div>
-                {/* Nash (alumni, responder) */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', animation: 'avatarPop 0.4s ease 0.25s both' }}>
-                  <AvatarImg src={RA.nashDehmer} name="Nash Dehmer" initials="ND" bg="#6366F1" size={56} style={{ border: '2px solid #E5E7EB' }} />
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827', fontFamily: "'Instrument Serif', Georgia, serif" }}>Nash Dehmer</div>
-                    <div style={{ fontSize: '0.7rem', color: '#6B7280', fontFamily: "'Instrument Serif', Georgia, serif" }}>US Senate · DC &apos;23</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Message bubbles */}
-              <div style={{ width: '100%', maxWidth: '420px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', animation: 'bubbleSlideLeft 0.4s ease 0.8s both', opacity: 0 }}>
-                  <AvatarImg src="/faces/face3.jpg" name="Chadwick" initials="CM" bg="#0EA5E9" size={28} />
-                  <div style={{ background: '#F3F4F6', borderRadius: '14px 14px 14px 2px', padding: '10px 14px', maxWidth: '280px' }}>
-                    <p style={{ fontSize: '0.8125rem', color: '#111827', margin: 0, lineHeight: 1.5, fontFamily: "'Instrument Serif', Georgia, serif" }}>
-                      Hey Nash, saw you&apos;re working at the US Senate in DC — exploring a career in policy after graduation. Any advice on how to break in?
-                    </p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', justifyContent: 'flex-end', animation: 'bubbleSlideRight 0.4s ease 2.4s both', opacity: 0 }}>
-                  <div style={{ background: '#0F172A', borderRadius: '14px 14px 2px 14px', padding: '10px 14px', maxWidth: '280px' }}>
-                    <p style={{ fontSize: '0.8125rem', color: 'white', margin: 0, lineHeight: 1.5, fontFamily: "'Instrument Serif', Georgia, serif" }}>
-                      Definitely happy to help. My path was a bit unconventional — send me a message and let&apos;s find time to chat this week.
-                    </p>
-                  </div>
-                  <AvatarImg src={RA.nashDehmer} name="Nash" initials="ND" bg="#6366F1" size={28} />
-                </div>
-              </div>
-
-              {/* Connected badge */}
-              <div style={{ animation: 'connectedBadge 0.4s ease 4.4s both', opacity: 0 }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '20px', padding: '7px 18px' }}>
-                  <Check size={14} color="#16A34A" strokeWidth={2.5} />
-                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#16A34A', fontFamily: "'Instrument Serif', Georgia, serif" }}>Connected</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Slide 3: Your chapter. Your alumni. One tap away. ── */}
-          {subStep === 3 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 24px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
-              <h1 style={{ fontSize: 'clamp(1.75rem, 4.5vw, 2.75rem)', fontWeight: 700, color: '#111827', textAlign: 'center', margin: '0 0 8px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-                Your chapter. Your alumni.
-                <br />One tap away.
-              </h1>
-              <p style={{ fontSize: '1rem', color: '#6B7280', textAlign: 'center', margin: '0 0 28px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
-                Spaces aren&apos;t just Greek — universities, clubs, companies.
-              </p>
-
-              {/* Phone mockup */}
-              <div style={{
-                width: '210px',
-                minHeight: '340px',
-                border: '3px solid #111827',
-                borderRadius: '32px',
-                padding: '14px 12px 20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                animation: 'phoneIn 0.5s ease 0.1s both',
-                background: 'white',
-              }}>
-                <div style={{ width: '44px', height: '5px', background: '#D1D5DB', borderRadius: '4px', margin: '0 auto 4px' }} />
-                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: '2px', fontFamily: "'Instrument Serif', Georgia, serif" }}>Your Spaces</div>
-                {[
-                  { icon: '🎓', name: 'NYU',               sub: 'New York University',        count: '12,400+ alumni' },
-                  { icon: '🏛️', name: 'Kappa Kappa Gamma', sub: 'ΚΚΓ Chapter',                count: '850 members' },
-                  { icon: '💼', name: 'NYU Finance Club',   sub: 'Student Organization',       count: '320 members' },
-                  { icon: '🏢', name: 'Goldman Sachs',      sub: 'Alumni & Employees',         count: '200+ alumni' },
-                ].map((space, i) => (
-                  <div key={space.name} style={{
-                    background: '#F9FAFB',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '10px',
-                    padding: '10px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    animation: `spaceCardIn 0.4s ease ${i * 0.15 + 0.35}s both`,
-                    opacity: 0,
-                  }}>
-                    <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{space.icon}</span>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#111827', lineHeight: 1.2, fontFamily: "'Instrument Serif', Georgia, serif" }}>{space.name}</div>
-                      <div style={{ fontSize: '0.62rem', color: '#9CA3AF', fontFamily: "'Instrument Serif', Georgia, serif" }}>{space.count}</div>
-                    </div>
-                  </div>
-                ))}
-                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
-                  <div style={{ width: '40px', height: '4px', background: '#D1D5DB', borderRadius: '4px' }} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Slide 4 (NEW): Never lose touch again. ── */}
-          {subStep === 4 && (
-            <CommHubSlide />
-          )}
-
-          {/* ── Slide 5: Ready to claim your Space? (CTA) ── */}
-          {subStep === 5 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', maxWidth: '480px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
-              <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', fontWeight: 700, color: '#111827', margin: '0 0 16px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-                Ready to claim
-                <br />your Space?
-              </h1>
-              <p style={{ fontSize: '1.0625rem', color: '#6B7280', margin: '0 0 36px', lineHeight: 1.65, maxWidth: '340px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
-                Takes 2 minutes. No credit card required to get started.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '300px' }}>
-                <button
-                  onClick={() => goToStep(1)}
-                  style={{ padding: '14px 28px', borderRadius: '10px', background: '#0F172A', color: 'white', fontWeight: 700, fontSize: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                >
-                  Let&apos;s get started <ArrowRight size={18} />
-                </button>
-                <button
-                  onClick={() => router.push('/waitlist')}
-                  style={{ padding: '13px 28px', borderRadius: '10px', background: 'white', color: '#374151', fontWeight: 600, fontSize: '1rem', border: '1.5px solid #E5E7EB', cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                  Join the waitlist
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Bottom nav — hidden on CTA slide */}
-          {subStep < 5 && (
-            <div style={{ maxWidth: '720px', margin: '0 auto', width: '100%', padding: '24px 24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button
-                onClick={() => goToStep(1)}
-                style={{ fontSize: '0.8125rem', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
-              >
-                Skip to setup →
-              </button>
-              <button
-                onClick={advanceSubStep}
-                style={{ padding: '10px 28px', borderRadius: '8px', background: '#0F172A', color: 'white', fontWeight: 600, fontSize: '0.9375rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-              >
-                Next <ChevronRight size={16} />
-              </button>
-            </div>
-          )}
-
+        {/* CTA */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 32px' }}>
+          <div style={{
+            animation: 'fadeUp 0.45s ease 0.1s both',
+            opacity: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            maxWidth: '480px',
+            width: '100%',
+            textAlign: 'center',
+          }}>
+            <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', fontWeight: 700, color: '#111827', margin: '0 0 16px', fontFamily: "'Instrument Serif', Georgia, serif", letterSpacing: '-0.025em', lineHeight: 1.1 }}>
+              Ready to claim
+              <br />your Space?
+            </h1>
+            <p style={{ fontSize: '1.0625rem', color: '#6B7280', margin: '0 0 36px', lineHeight: 1.65, maxWidth: '340px', fontFamily: "'Instrument Serif', Georgia, serif" }}>
+              Create your account and start using Trailblaize today.
+            </p>
+            <button
+              onClick={() => goToStep(1)}
+              style={{ padding: '14px 28px', borderRadius: '10px', background: '#0F172A', color: 'white', fontWeight: 700, fontSize: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', maxWidth: '300px' }}
+            >
+              Let&apos;s get started <ArrowRight size={18} />
+            </button>
+          </div>
         </div>
       </div>
     );
