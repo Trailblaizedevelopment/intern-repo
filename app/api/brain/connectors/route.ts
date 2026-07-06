@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     connectors,
+    github_repo: process.env.GITHUB_REPO || 'Trailblaizedevelopment/Trailblaize-Web',
+    github_configured: Boolean(process.env.GITHUB_TOKEN || process.env.GH_TOKEN),
     linear_read_only: process.env.BRAIN_LINEAR_READ_ONLY !== 'false',
     linear_mcp_url: process.env.LINEAR_MCP_URL || 'https://mcp.linear.app/mcp',
     rate_limits: {

@@ -88,9 +88,18 @@ function buildSystemPrompt(
   const hasTasks = toolNames.some(n => n.startsWith('tasks_'));
 
   const toolGuidance: string[] = [];
+  if (hasGitHub) {
+    toolGuidance.push(
+      '- GitHub (Trailblaize-Web) questions use github_* tools ONLY — never Linear for PRs or code.',
+      '- Open PRs / pull requests → github_list_open_prs (or github_get_pr for one PR).',
+      '- Codebase "where is X" / "what file" → github_search_code, then github_get_file if you need contents.',
+      '- Read-only. Answer in 1–3 sentences plus file paths or PR links; no large code dumps unless asked.'
+    );
+  }
   if (hasLinear) {
     toolGuidance.push(
-      '- Linear is the only source of truth for tickets and engineering work. Use linear_* tools exclusively — never invent ticket IDs or statuses.'
+      '- Linear is the source of truth for tickets and engineering work status. Use linear_* for issues — never invent ticket IDs.',
+      '- Do NOT use Linear for GitHub PRs or repository file search.'
     );
     if (linearWriteMode) {
       toolGuidance.push(
@@ -99,9 +108,6 @@ function buildSystemPrompt(
     } else {
       toolGuidance.push('- Linear write tools are disabled (read-only). Do not attempt creates or updates.');
     }
-  }
-  if (hasGitHub) {
-    toolGuidance.push('- Use github_* for PR context on Trailblaize-Web. Read-only.');
   }
   if (hasCursor) {
     toolGuidance.push(
@@ -183,7 +189,9 @@ export async function runBrainAgent(
   const ctx = createConnectorContext(baseCtx.supabase, baseCtx.employeeId, opts);
   const anthropicTools = await getAnthropicTools(ctx);
   if (anthropicTools.length === 0) {
-    throw new Error('No connector tools available — check LINEAR_API_KEY and database connection');
+    throw new Error(
+      'No connector tools available — check LINEAR_API_KEY, GITHUB_TOKEN, and database connection'
+    );
   }
 
   const linearWriteMode = process.env.BRAIN_LINEAR_READ_ONLY === 'false';

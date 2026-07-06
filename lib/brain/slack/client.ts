@@ -56,6 +56,61 @@ export async function postSlackMessage(
   return { ok: true };
 }
 
+/** Post a single thread message and return its ts (for later chat.update). */
+export async function postSlackMessageReturningTs(
+  channel: string,
+  text: string,
+  threadTs?: string
+): Promise<{ ok: boolean; ts?: string; error?: string }> {
+  const result = await slackApi<{ ts?: string }>('chat.postMessage', {
+    channel,
+    text,
+    thread_ts: threadTs,
+    unfurl_links: false,
+    unfurl_media: false,
+  });
+  if (!result.ok) {
+    return { ok: false, error: result.error || 'chat.postMessage failed' };
+  }
+  return { ok: true, ts: result.ts };
+}
+
+export async function updateSlackMessage(
+  channel: string,
+  ts: string,
+  text: string
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await slackApi('chat.update', {
+    channel,
+    ts,
+    text,
+    unfurl_links: false,
+    unfurl_media: false,
+  });
+  if (!result.ok) return { ok: false, error: result.error || 'chat.update failed' };
+  return { ok: true };
+}
+
+/** Replace a placeholder message with the final reply; posts extra chunks if needed. */
+export async function replaceSlackThreadReply(
+  channel: string,
+  messageTs: string,
+  threadTs: string,
+  text: string
+): Promise<{ ok: boolean; error?: string }> {
+  const chunks = chunkSlackMessage(text);
+  const firstText = (chunks.length > 1 ? `(1/${chunks.length})\n` : '') + chunks[0];
+  const updated = await updateSlackMessage(channel, messageTs, firstText);
+  if (!updated.ok) return updated;
+
+  for (let i = 1; i < chunks.length; i++) {
+    const prefix = `(${i + 1}/${chunks.length})\n`;
+    const posted = await postSlackMessage(channel, prefix + chunks[i], threadTs);
+    if (!posted.ok) return posted;
+  }
+  return { ok: true };
+}
+
 export async function openDmChannel(userId: string): Promise<{ ok: boolean; channel?: string; error?: string }> {
   const opened = await slackApi<{ channel?: { id: string } }>('conversations.open', { users: userId });
   if (!opened.ok) return { ok: false, error: opened.error };

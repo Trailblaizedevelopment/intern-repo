@@ -11,10 +11,10 @@ import {
 
 export type { ConnectorContext } from './connectors/types';
 
-/** Connectors: Linear (tickets), GitHub (read), Cursor (dispatch), Tasks (orchestration). */
+/** Connectors: GitHub (repo/PRs), Linear (tickets), Cursor (dispatch), Tasks (orchestration). */
 const CONNECTORS: BrainConnector[] = [
-  linearConnector,
   githubConnector,
+  linearConnector,
   cursorConnector,
   tasksConnector,
 ];

@@ -2,7 +2,8 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { BrainMessage, runBrainAgent } from '../agent';
 import { checkBrainRateLimit } from '../rate-limit';
 import { sanitizeForActionLog } from '../sanitize-log';
-import { postSlackMessage } from './client';
+import { pickSlackAckPhrase } from './ack-phrases';
+import { postSlackMessage, postSlackMessageReturningTs, replaceSlackThreadReply } from './client';
 import { formatAgentReplyForSlack } from './format-reply';
 
 const MAX_STORED_MESSAGES = 40;
@@ -113,7 +114,15 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
 
   history.push({ role: 'user', content: message });
 
-  await postSlackMessage(ctx.channel, '_Thinking…_', ctx.threadTs);
+  const placeholder = await postSlackMessageReturningTs(
+    ctx.channel,
+    pickSlackAckPhrase(),
+    ctx.threadTs
+  );
+  if (!placeholder.ok || !placeholder.ts) {
+    console.error('[brain/slack] failed to post ack:', placeholder.error);
+    return;
+  }
 
   let result;
   try {
@@ -131,7 +140,7 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Agent run failed';
     console.error('[brain/slack] agent error:', err);
-    await postSlackMessage(ctx.channel, `Error: ${msg}`, ctx.threadTs);
+    await replaceSlackThreadReply(ctx.channel, placeholder.ts, ctx.threadTs, `Error: ${msg}`);
     return;
   }
 
@@ -157,7 +166,15 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
   }
 
   const slackText = formatAgentReplyForSlack(result.reply, result.toolEvents);
-  await postSlackMessage(ctx.channel, slackText, ctx.threadTs);
+  const replaced = await replaceSlackThreadReply(
+    ctx.channel,
+    placeholder.ts,
+    ctx.threadTs,
+    slackText
+  );
+  if (!replaced.ok) {
+    console.error('[brain/slack] failed to update reply:', replaced.error);
+  }
 }
 
 /** Strip bot @mention from channel messages. */

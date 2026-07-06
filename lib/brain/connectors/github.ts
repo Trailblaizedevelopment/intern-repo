@@ -1,4 +1,12 @@
-import { getGitHubRepoFull, getGitHubToken } from '../github-repo';
+import {
+  getDevelopBranch,
+  getGitHubRepoFull,
+  getGitHubToken,
+  getPullRequest,
+  getRepoFileContents,
+  listOpenPullRequests,
+  searchRepoCode,
+} from '../github-repo';
 import {
   BrainConnector,
   ConnectorCallResult,
@@ -7,48 +15,24 @@ import {
 } from './types';
 
 const CONNECTOR_ID = 'github';
-
-function resolveRepo(input?: unknown): { owner: string; repo: string; full: string } | null {
-  const full = (typeof input === 'string' && input.trim()) || getGitHubRepoFull();
-  const [owner, repo] = full.split('/');
-  if (!owner || !repo) return null;
-  return { owner, repo, full };
-}
-
-async function ghFetch(path: string): Promise<unknown> {
-  const token = getGitHubToken();
-  if (!token) throw new Error('GITHUB_TOKEN not configured');
-
-  const res = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200)}`);
-  }
-  return res.json();
-}
+const DEFAULT_REPO = getGitHubRepoFull();
 
 const TOOLS: ConnectorTool[] = [
   {
     name: 'github_list_open_prs',
-    description: 'List open pull requests for the Trailblaize-Web repo (or specified repo).',
+    description:
+      'List open GitHub pull requests on Trailblaize-Web. Use for ANY question about open PRs, pull requests, or what is in review on GitHub. Do NOT use Linear tools for PRs.',
     inputSchema: {
       type: 'object',
       properties: {
-        repo: { type: 'string', description: 'owner/repo, default from GITHUB_REPO' },
-        limit: { type: 'number', description: 'Max PRs (default 10)' },
+        repo: { type: 'string', description: `owner/repo (default ${DEFAULT_REPO})` },
+        limit: { type: 'number', description: 'Max PRs to return (default 10, max 30)' },
       },
     },
   },
   {
     name: 'github_get_pr',
-    description: 'Get details for a single pull request by number.',
+    description: 'Get details for one GitHub pull request by number on Trailblaize-Web.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -58,11 +42,49 @@ const TOOLS: ConnectorTool[] = [
       required: ['number'],
     },
   },
+  {
+    name: 'github_search_code',
+    description:
+      'Search the Trailblaize-Web codebase on GitHub by keyword. Use for "where is X", "what file has Y", outreach sequences, profile cards, email templates, etc. Returns file paths — follow with github_get_file if needed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Keywords to search (e.g. "profile card", "outreach sequence email")',
+        },
+        repo: { type: 'string', description: 'owner/repo' },
+        limit: { type: 'number', description: 'Max results (default 8, max 30)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'github_get_file',
+    description:
+      'Read a file from Trailblaize-Web at a repo path (e.g. src/components/ProfileCard.tsx). Use after github_search_code or when the user names a path.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'File path in the repo' },
+        ref: {
+          type: 'string',
+          description: `Branch or commit (default ${getDevelopBranch()})`,
+        },
+        repo: { type: 'string', description: 'owner/repo' },
+      },
+      required: ['path'],
+    },
+  },
 ];
+
+function resolveRepo(input?: unknown): string | undefined {
+  return typeof input === 'string' && input.trim() ? input.trim() : undefined;
+}
 
 export const githubConnector: BrainConnector = {
   id: CONNECTOR_ID,
-  label: 'GitHub',
+  label: 'GitHub (Trailblaize-Web)',
   kind: 'in-process',
 
   isAvailable() {
@@ -75,57 +97,39 @@ export const githubConnector: BrainConnector = {
 
   async callTool(toolName: string, input: Record<string, unknown>): Promise<ConnectorCallResult> {
     try {
+      const repo = resolveRepo(input.repo);
+
       if (toolName === 'github_list_open_prs') {
-        const resolved = resolveRepo(input.repo);
-        if (!resolved) return { ok: false, error: 'Invalid repo' };
-        const limit = Math.min(Number(input.limit) || 10, 30);
-        const pulls = (await ghFetch(
-          `/repos/${resolved.owner}/${resolved.repo}/pulls?state=open&sort=updated&direction=desc&per_page=${limit}`
-        )) as Array<Record<string, unknown>>;
-        return {
-          ok: true,
-          data: {
-            repo: resolved.full,
-            prs: pulls.map(p => ({
-              number: p.number,
-              title: p.title,
-              url: p.html_url,
-              author: (p.user as { login?: string })?.login,
-              draft: p.draft,
-              created_at: p.created_at,
-              updated_at: p.updated_at,
-              head: (p.head as { ref?: string })?.ref,
-              base: (p.base as { ref?: string })?.ref,
-            })),
-          },
-        };
+        const data = await listOpenPullRequests({
+          repoFull: repo,
+          limit: Number(input.limit) || 10,
+        });
+        return { ok: true, data };
       }
 
       if (toolName === 'github_get_pr') {
         const num = Number(input.number);
         if (!num) return { ok: false, error: 'number is required' };
-        const resolved = resolveRepo(input.repo);
-        if (!resolved) return { ok: false, error: 'Invalid repo' };
-        const pr = (await ghFetch(`/repos/${resolved.owner}/${resolved.repo}/pulls/${num}`)) as Record<
-          string,
-          unknown
-        >;
-        return {
-          ok: true,
-          data: {
-            number: pr.number,
-            title: pr.title,
-            state: pr.state,
-            merged: pr.merged,
-            url: pr.html_url,
-            body: typeof pr.body === 'string' ? pr.body.slice(0, 2000) : null,
-            author: (pr.user as { login?: string })?.login,
-            head: (pr.head as { ref?: string })?.ref,
-            base: (pr.base as { ref?: string })?.ref,
-            created_at: pr.created_at,
-            updated_at: pr.updated_at,
-          },
-        };
+        const data = await getPullRequest(num, repo);
+        return { ok: true, data };
+      }
+
+      if (toolName === 'github_search_code') {
+        const query = typeof input.query === 'string' ? input.query.trim() : '';
+        if (!query) return { ok: false, error: 'query is required' };
+        const data = await searchRepoCode(query, {
+          repoFull: repo,
+          limit: Number(input.limit) || 8,
+        });
+        return { ok: true, data };
+      }
+
+      if (toolName === 'github_get_file') {
+        const path = typeof input.path === 'string' ? input.path.trim() : '';
+        if (!path) return { ok: false, error: 'path is required' };
+        const ref = typeof input.ref === 'string' ? input.ref.trim() : undefined;
+        const data = await getRepoFileContents(path, { repoFull: repo, ref });
+        return { ok: true, data };
       }
 
       return { ok: false, error: `Unknown tool: ${toolName}` };

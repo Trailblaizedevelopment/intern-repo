@@ -16,6 +16,14 @@ import {
 const CONNECTOR_ID = 'linear';
 const DEFAULT_ENDPOINT = 'https://mcp.linear.app/mcp';
 
+/** Linear MCP tools that confuse the model for GitHub/repo questions — hide from Brain chat. */
+const LINEAR_TOOL_DENYLIST = new Set([
+  'list_diffs',
+  'get_diff',
+  'create_diff',
+  'update_diff',
+]);
+
 const TOOLS_CACHE_TTL_READ_MS = 5 * 60 * 1000;
 const TOOLS_CACHE_TTL_WRITE_MS = 60 * 1000;
 
@@ -125,6 +133,7 @@ export const linearConnector: BrainConnector = {
       const mcpTools = await client.listTools();
 
       const tools: ConnectorTool[] = mcpTools
+        .filter(t => !LINEAR_TOOL_DENYLIST.has(t.name))
         .filter(t => !readOnly || isReadOnlyMcpTool(t.name))
         .map(t => ({
           name: prefixedToolName(CONNECTOR_ID, t.name),
@@ -147,6 +156,7 @@ export const linearConnector: BrainConnector = {
           const client = getClient(ctx);
           const mcpTools = await client.listTools();
           const tools: ConnectorTool[] = mcpTools
+            .filter(t => !LINEAR_TOOL_DENYLIST.has(t.name))
             .filter(t => !readOnly || isReadOnlyMcpTool(t.name))
             .map(t => ({
               name: prefixedToolName(CONNECTOR_ID, t.name),
