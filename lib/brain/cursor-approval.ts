@@ -24,16 +24,11 @@ export function cursorApprovalRequired(): boolean {
   return process.env.BRAIN_CURSOR_REQUIRE_APPROVAL !== 'false';
 }
 
-export function cursorCostEstimateLabel(): string {
-  return (process.env.BRAIN_CURSOR_COST_ESTIMATE || '~$3–15').trim();
-}
-
 export function formatCursorApprovalSlackMessage(pending: PendingCursorDispatch): string {
   const lines = [
     '*Cursor dispatch approval needed*',
     pending.linear_issue_id ? `Linear: \`${pending.linear_issue_id}\`` : null,
     `Branch: \`${pending.integration_branch}\``,
-    `Est. cost: ${cursorCostEstimateLabel()} per run`,
     '',
     'Reply *yes dispatch* to approve or *cancel* to skip.',
   ];
@@ -121,7 +116,6 @@ export async function requestCursorDispatchApproval(
       status: 'awaiting_approval',
       integration_branch: integrationBranch,
       linear_issue_id: linearIssueId,
-      cost_estimate: cursorCostEstimateLabel(),
       message: slackMsg,
     },
   };
