@@ -135,6 +135,7 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
         conversationId,
         slackChannel: ctx.channel,
         slackThreadTs: ctx.threadTs,
+        slackUserId: ctx.userId,
       }
     );
   } catch (err) {

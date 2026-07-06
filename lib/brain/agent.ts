@@ -3,6 +3,12 @@ import {
   callConnectorTool,
   getAnthropicTools,
 } from './router';
+import {
+  extractUserMessagePreview,
+  finalizeAgentRun,
+  resolveAgentRunSurface,
+  startAgentRun,
+} from './agent-runs';
 
 /**
  * Trailblaize Brain agent loop — Anthropic Messages API with tool calling.
@@ -64,6 +70,7 @@ export interface AgentRunOptions {
   conversationId?: string | null;
   slackChannel?: string | null;
   slackThreadTs?: string | null;
+  slackUserId?: string | null;
 }
 
 function buildSystemPrompt(
@@ -147,6 +154,7 @@ function buildSystemPrompt(
 interface AnthropicResponse {
   content: ContentBlock[];
   stop_reason: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
 }
 
 function serializeToolOutput(result: unknown): string {
@@ -181,17 +189,74 @@ export async function runBrainAgent(
     typeof options === 'string' ? { surface: options } : options;
   const surface = opts.surface ?? 'workspace';
   const maxIterations = opts.maxIterations ?? MAX_TOOL_ITERATIONS;
+  const model = process.env.BRAIN_MODEL || DEFAULT_MODEL;
+  const startedAt = Date.now();
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let apiIterations = 0;
+
+  const runSurface = resolveAgentRunSurface({ surface, taskId: opts.taskId });
+  const runId = await startAgentRun(baseCtx.supabase, {
+    employeeId: baseCtx.employeeId,
+    surface: runSurface,
+    conversationId: opts.conversationId,
+    taskId: opts.taskId,
+    slackChannel: opts.slackChannel,
+    slackThreadTs: opts.slackThreadTs,
+    slackUserId: opts.slackUserId,
+    model,
+    userMessagePreview: extractUserMessagePreview(history),
+  });
+
+  const finishRun = async (
+    status: 'success' | 'failed',
+    reply: string,
+    toolEvents: ToolEvent[],
+    error?: string
+  ): Promise<AgentRunResult> => {
+    await finalizeAgentRun(baseCtx.supabase, runId, {
+      status,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - startedAt,
+      toolCallCount: toolEvents.length,
+      iterationCount: apiIterations,
+      replyPreview: reply,
+      error,
+    });
+    return { reply, messages, toolEvents };
+  };
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
+    const msg = 'ANTHROPIC_API_KEY not configured';
+    await finalizeAgentRun(baseCtx.supabase, runId, {
+      status: 'failed',
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - startedAt,
+      toolCallCount: 0,
+      iterationCount: 0,
+      error: msg,
+    });
+    throw new Error(msg);
   }
 
   const ctx = createConnectorContext(baseCtx.supabase, baseCtx.employeeId, opts);
   const anthropicTools = await getAnthropicTools(ctx);
   if (anthropicTools.length === 0) {
-    throw new Error(
-      'No connector tools available — check LINEAR_API_KEY, GITHUB_TOKEN, and database connection'
-    );
+    const msg =
+      'No connector tools available — check LINEAR_API_KEY, GITHUB_TOKEN, and database connection';
+    await finalizeAgentRun(baseCtx.supabase, runId, {
+      status: 'failed',
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - startedAt,
+      toolCallCount: 0,
+      iterationCount: 0,
+      error: msg,
+    });
+    throw new Error(msg);
   }
 
   const linearWriteMode = process.env.BRAIN_LINEAR_READ_ONLY === 'false';
@@ -206,94 +271,108 @@ export async function runBrainAgent(
   const messages: BrainMessage[] = [...history];
   const toolEvents: ToolEvent[] = [];
 
-  for (let i = 0; i < maxIterations; i++) {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: process.env.BRAIN_MODEL || DEFAULT_MODEL,
-        max_tokens: MAX_TOKENS,
-        system,
-        tools: anthropicTools,
-        messages,
-      }),
+  try {
+    for (let i = 0; i < maxIterations; i++) {
+      apiIterations += 1;
+      const response = await fetch(ANTHROPIC_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: MAX_TOKENS,
+          system,
+          tools: anthropicTools,
+          messages,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('[brain] Anthropic API error:', response.status, errText);
+        let detail = `Anthropic API error: ${response.status}`;
+        try {
+          const parsed = JSON.parse(errText) as { error?: { message?: string } };
+          if (parsed.error?.message) detail = parsed.error.message;
+        } catch {
+          // use generic message
+        }
+        throw new Error(detail);
+      }
+
+      const data = (await response.json()) as AnthropicResponse;
+      inputTokens += data.usage?.input_tokens ?? 0;
+      outputTokens += data.usage?.output_tokens ?? 0;
+      messages.push({ role: 'assistant', content: data.content });
+
+      const toolUses = data.content.filter((b): b is ToolUseBlock => b.type === 'tool_use');
+      if (data.stop_reason !== 'tool_use' || toolUses.length === 0) {
+        const reply = data.content
+          .filter((b): b is TextBlock => b.type === 'text')
+          .map(b => b.text)
+          .join('\n')
+          .trim();
+        return finishRun('success', reply || 'Done.', toolEvents);
+      }
+
+      const results: ToolResultBlock[] = [];
+      for (const use of toolUses) {
+        try {
+          const result = await callConnectorTool(use.name, use.input || {}, ctx);
+          toolEvents.push({
+            name: use.name,
+            connector: result.connectorId,
+            input: use.input,
+            ok: result.ok,
+            output: result.ok ? result.data : null,
+            error: result.error,
+          });
+          results.push({
+            type: 'tool_result',
+            tool_use_id: use.id,
+            content: result.ok ? serializeToolOutput(result.data) : `Error: ${result.error}`,
+            is_error: !result.ok,
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Connector call failed';
+          console.error(`[brain] tool ${use.name} threw:`, err);
+          toolEvents.push({
+            name: use.name,
+            input: use.input,
+            ok: false,
+            output: null,
+            error: message,
+          });
+          results.push({
+            type: 'tool_result',
+            tool_use_id: use.id,
+            content: `Error: ${message}`,
+            is_error: true,
+          });
+        }
+      }
+
+      messages.push({ role: 'user', content: results });
+    }
+
+    const reply = `I hit the limit of ${maxIterations} tool-call rounds for this message. Try a narrower question or split the task into steps (e.g. "list due tickets" then "rank by priority").`;
+    return finishRun('success', reply, toolEvents);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Agent run failed';
+    await finalizeAgentRun(baseCtx.supabase, runId, {
+      status: 'failed',
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - startedAt,
+      toolCallCount: toolEvents.length,
+      iterationCount: apiIterations,
+      error: msg,
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('[brain] Anthropic API error:', response.status, errText);
-      let detail = `Anthropic API error: ${response.status}`;
-      try {
-        const parsed = JSON.parse(errText) as { error?: { message?: string } };
-        if (parsed.error?.message) detail = parsed.error.message;
-      } catch {
-        // use generic message
-      }
-      throw new Error(detail);
-    }
-
-    const data = (await response.json()) as AnthropicResponse;
-    messages.push({ role: 'assistant', content: data.content });
-
-    const toolUses = data.content.filter((b): b is ToolUseBlock => b.type === 'tool_use');
-    if (data.stop_reason !== 'tool_use' || toolUses.length === 0) {
-      const reply = data.content
-        .filter((b): b is TextBlock => b.type === 'text')
-        .map(b => b.text)
-        .join('\n')
-        .trim();
-      return { reply: reply || 'Done.', messages, toolEvents };
-    }
-
-    const results: ToolResultBlock[] = [];
-    for (const use of toolUses) {
-      try {
-        const result = await callConnectorTool(use.name, use.input || {}, ctx);
-        toolEvents.push({
-          name: use.name,
-          connector: result.connectorId,
-          input: use.input,
-          ok: result.ok,
-          output: result.ok ? result.data : null,
-          error: result.error,
-        });
-        results.push({
-          type: 'tool_result',
-          tool_use_id: use.id,
-          content: result.ok ? serializeToolOutput(result.data) : `Error: ${result.error}`,
-          is_error: !result.ok,
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Connector call failed';
-        console.error(`[brain] tool ${use.name} threw:`, err);
-        toolEvents.push({
-          name: use.name,
-          input: use.input,
-          ok: false,
-          output: null,
-          error: message,
-        });
-        results.push({
-          type: 'tool_result',
-          tool_use_id: use.id,
-          content: `Error: ${message}`,
-          is_error: true,
-        });
-      }
-    }
-
-    messages.push({ role: 'user', content: results });
+    throw err;
   }
-
-  return {
-    reply: `I hit the limit of ${maxIterations} tool-call rounds for this message. Try a narrower question or split the task into steps (e.g. "list due tickets" then "rank by priority").`,
-    messages,
-    toolEvents,
-  };
 }
 
 export interface DisplayMessage {

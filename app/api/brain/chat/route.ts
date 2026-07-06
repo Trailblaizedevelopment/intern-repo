@@ -144,7 +144,8 @@ export async function POST(request: NextRequest) {
     result = await runBrainAgent(
       history,
       { supabase, employeeId: auth.identity.employeeId },
-      auth.identity.employeeName
+      auth.identity.employeeName,
+      { surface: 'workspace', conversationId: conversationId ?? undefined }
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Agent run failed';
