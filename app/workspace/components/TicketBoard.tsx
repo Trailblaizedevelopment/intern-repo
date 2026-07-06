@@ -1,5 +1,6 @@
 'use client';
 
+import './ticket-roadmap.css';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Plus,
@@ -9,6 +10,8 @@ import {
   List,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   AlertTriangle,
   Sparkles,
@@ -44,6 +47,7 @@ import { useToast } from '@/components/Toast';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { INTERNAL_AUTH_HEADER } from '@/lib/internal-auth';
+import ReactMarkdown from 'react-markdown';
 import { getLinearMobileProjectName, mapCrmAppToLinearProjectName } from '@/lib/linear-project-map';
 import { hasLinearLink, resolveLinearTicketUrl } from '@/lib/linear-issue-url';
 import {
@@ -627,7 +631,7 @@ export function TicketBoard() {
             <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')} title="List">
               <List size={16} />
             </button>
-            <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="Timeline">
+            <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="Roadmap">
               <GanttChart size={16} />
             </button>
             <button className={viewMode === 'dashboard' ? 'active' : ''} onClick={() => setViewMode('dashboard')} title="Analytics">
@@ -745,7 +749,7 @@ export function TicketBoard() {
       ) : viewMode === 'list' ? (
         <TicketListView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : viewMode === 'timeline' ? (
-        <TimelineView tickets={tickets} onTicketClick={setSelectedTicket} />
+        <RoadmapView tickets={tickets} onTicketClick={setSelectedTicket} />
       ) : (
         <DashboardView tickets={tickets} />
       )}
@@ -911,10 +915,10 @@ function TicketCard({ ticket, onClick, onDragStart }: { ticket: TicketData; onCl
             </Tooltip>
           )}
           {ticket.due_date && (
-            <Tooltip content={`Due ${new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`} side="top" align="end" delayMs={250} compact>
+            <Tooltip content={`Due ${parseDueDateLocal(ticket.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`} side="top" align="end" delayMs={250} compact>
               <span className="tkt__card-due">
                 <CalendarDays size={11} />
-                {new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {formatDueDateShort(ticket.due_date)}
               </span>
             </Tooltip>
           )}
@@ -1072,7 +1076,7 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
               </span>
               <span className="tkt__list-col tkt__list-col--assignee">{ticket.assignee?.name || 'Unassigned'}</span>
               <span className="tkt__list-col tkt__list-col--date">
-                {ticket.due_date ? new Date(ticket.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                {ticket.due_date ? formatDueDateShort(ticket.due_date) : '—'}
               </span>
               <span className="tkt__list-col tkt__list-col--date">
                 {new Date(ticket.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -1086,78 +1090,408 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
 }
 
 // ═══════════════════════════════════════════
-// TIMELINE VIEW
+// ROADMAP VIEW (Linear, week-by-week)
 // ═══════════════════════════════════════════
 
-function TimelineView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
-  const now = new Date();
-  const startMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-  const endMonth = new Date(now.getFullYear(), now.getMonth() + 3, 0);
-  const totalDays = Math.ceil((endMonth.getTime() - startMonth.getTime()) / (1000 * 60 * 60 * 24));
+const ROADMAP_STATUSES: TicketStatus[] = ['in_progress', 'todo', 'open', 'in_review'];
+const ROADMAP_WEEKS_BACK = 2;
+const ROADMAP_MONTHS_FORWARD = 2;
+const ROADMAP_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
-  const timelineTickets = tickets.filter(t => t.due_date);
+interface RoadmapWeek {
+  key: string;
+  start: Date;
+  end: Date;
+  label: string;
+  isCurrent: boolean;
+}
 
-  // Generate month headers
-  const months: { label: string; startPx: number; widthPx: number }[] = [];
-  for (let m = -2; m <= 2; m++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + m, 1);
-    const dEnd = new Date(now.getFullYear(), now.getMonth() + m + 1, 0);
-    const startDay = Math.max(0, Math.ceil((d.getTime() - startMonth.getTime()) / (1000 * 60 * 60 * 24)));
-    const endDay = Math.min(totalDays, Math.ceil((dEnd.getTime() - startMonth.getTime()) / (1000 * 60 * 60 * 24)));
-    months.push({
-      label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      startPx: (startDay / totalDays) * 100,
-      widthPx: ((endDay - startDay) / totalDays) * 100,
+interface RoadmapDay {
+  key: string;
+  date: Date;
+  dayName: string;
+  dateLabel: string;
+  isToday: boolean;
+}
+
+function startOfWeekSunday(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+function endOfWeekSaturday(weekStart: Date): Date {
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + 6);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+
+function localDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** CRM stores due_date as YYYY-MM-DD or full ISO (e.g. from Supabase timestamptz). */
+function parseDueDateLocal(dueDate: string): Date {
+  return new Date(dueDate.slice(0, 10) + 'T00:00:00');
+}
+
+function formatDueDateShort(dueDate: string): string {
+  return parseDueDateLocal(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatWeekRange(start: Date, end: Date): string {
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`;
+}
+
+function buildRoadmapWeeks(anchor: Date): { weeks: RoadmapWeek[]; rangeLabel: string } {
+  const today = new Date(anchor);
+  today.setHours(0, 0, 0, 0);
+  const rangeStart = startOfWeekSunday(addDays(today, -ROADMAP_WEEKS_BACK * 7));
+  const rangeEnd = endOfWeekSaturday(startOfWeekSunday(addMonths(today, ROADMAP_MONTHS_FORWARD)));
+
+  const weeks: RoadmapWeek[] = [];
+  let cursor = new Date(rangeStart);
+  while (cursor.getTime() <= rangeEnd.getTime()) {
+    const start = new Date(cursor);
+    const end = endOfWeekSaturday(start);
+    weeks.push({
+      key: localDateKey(start),
+      start,
+      end,
+      label: formatWeekRange(start, end),
+      isCurrent: today >= start && today <= end,
     });
+    cursor = addDays(start, 7);
   }
 
-  const todayPct = Math.max(0, Math.min(100, ((now.getTime() - startMonth.getTime()) / (endMonth.getTime() - startMonth.getTime())) * 100));
+  const rangeLabel = `${rangeStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${rangeEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  return { weeks, rangeLabel };
+}
 
-  const getBarStyle = (ticket: TicketData) => {
-    const start = new Date(ticket.created_at);
-    const end = ticket.due_date ? new Date(ticket.due_date + 'T00:00:00') : now;
-    const leftPct = Math.max(0, ((start.getTime() - startMonth.getTime()) / (endMonth.getTime() - startMonth.getTime())) * 100);
-    const rightPct = Math.min(100, ((end.getTime() - startMonth.getTime()) / (endMonth.getTime() - startMonth.getTime())) * 100);
-    const width = Math.max(1, rightPct - leftPct);
-    return { left: `${leftPct}%`, width: `${width}%`, background: PRIORITY_BAR_COLORS[ticket.priority] || '#6b7280' };
-  };
+function buildWeekDays(weekStart: Date, today: Date): RoadmapDay[] {
+  const days: RoadmapDay[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(weekStart, i);
+    const isToday = localDateKey(date) === localDateKey(today);
+    days.push({
+      key: localDateKey(date),
+      date,
+      dayName: ROADMAP_DAY_NAMES[i],
+      dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      isToday,
+    });
+  }
+  return days;
+}
 
-  // Group by status
-  const grouped: Record<string, TicketData[]> = {};
-  timelineTickets.forEach(t => {
-    const statusLabel = STATUS_COLUMNS.find(s => s.key === t.status)?.label || t.status;
-    if (!grouped[statusLabel]) grouped[statusLabel] = [];
-    grouped[statusLabel].push(t);
-  });
+function dueDateDayKey(dueDate: string): string {
+  return localDateKey(parseDueDateLocal(dueDate));
+}
+
+function ticketDescriptionForMarkdown(description: string | null): string | null {
+  if (!description?.trim()) return null;
+
+  let text = description.trim();
+  if (/<[a-z][\s\S]*>/i.test(text)) {
+    text = text
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '- ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  return text.length > 0 ? text : null;
+}
+
+function RoadmapTicketDescription({ description }: { description: string | null }) {
+  const md = ticketDescriptionForMarkdown(description);
+  if (!md) {
+    return <p className="tkt__roadmap-tip-empty">No description synced from Linear yet.</p>;
+  }
 
   return (
-    <div className="tkt__timeline">
-      <div className="tkt__timeline-header">
-        {months.map((m, i) => (
-          <div key={i} className="tkt__timeline-month" style={{ left: `${m.startPx}%`, width: `${m.widthPx}%` }}>
-            {m.label}
+    <div className="tkt__roadmap-tip-desc tkt__roadmap-tip-md">
+      <ReactMarkdown
+        components={{
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {md}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+function RoadmapTicketTooltip({ ticket }: { ticket: TicketData }) {
+  const statusCfg = STATUS_COLUMNS.find(s => s.key === ticket.status);
+  const id = ticket.linear_identifier || `#${ticket.number}`;
+
+  return (
+    <div className="tkt__roadmap-tip">
+      <p className="ui-tooltip__title">{id}</p>
+      <dl className="tkt__roadmap-tip-meta">
+        <div>
+          <dt>Status</dt>
+          <dd>{statusCfg?.label ?? ticket.status}</dd>
+        </div>
+        <div>
+          <dt>Assignee</dt>
+          <dd>{ticket.assignee?.name ?? 'Unassigned'}</dd>
+        </div>
+        {ticket.due_date && (
+          <div>
+            <dt>Due</dt>
+            <dd>{formatDueDateShort(ticket.due_date)}</dd>
           </div>
-        ))}
-        <div className="tkt__timeline-today" style={{ left: `${todayPct}%` }} />
-      </div>
-      <div className="tkt__timeline-body">
-        {Object.keys(grouped).length === 0 ? (
-          <div className="tkt__list-empty">No tickets with due dates</div>
-        ) : (
-          Object.entries(grouped).map(([group, tix]) => (
-            <div key={group} className="tkt__timeline-group">
-              <div className="tkt__timeline-group-label">{group}</div>
-              {tix.map(t => (
-                <div key={t.id} className="tkt__timeline-row" onClick={() => onTicketClick(t)}>
-                  <span className="tkt__timeline-row-label">#{t.number} {t.title}</span>
-                  <div className="tkt__timeline-track">
-                    <div className="tkt__timeline-bar" style={getBarStyle(t)} title={`${t.title} — Due: ${t.due_date}`} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))
         )}
+      </dl>
+      <RoadmapTicketDescription description={ticket.description} />
+    </div>
+  );
+}
+
+function openLinearTicket(ticket: TicketData) {
+  const url = resolveLinearTicketUrl(ticket);
+  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+  const { weeks: allWeeks, rangeLabel } = useMemo(() => buildRoadmapWeeks(today), [today]);
+
+  const defaultWeekIndex = useMemo(() => {
+    const currentIdx = allWeeks.findIndex(w => w.isCurrent);
+    return currentIdx >= 0 ? currentIdx : 0;
+  }, [allWeeks]);
+
+  const [weekIndex, setWeekIndex] = useState(defaultWeekIndex);
+
+  const visibleWeek = allWeeks[weekIndex];
+  const visibleDays = useMemo(
+    () => (visibleWeek ? buildWeekDays(visibleWeek.start, today) : []),
+    [visibleWeek, today]
+  );
+
+  const roadmapTickets = useMemo(() => {
+    if (allWeeks.length === 0) return [];
+    const rangeStart = allWeeks[0].start.getTime();
+    const rangeEnd = allWeeks[allWeeks.length - 1].end.getTime();
+    return tickets
+      .filter(t => hasLinearLink(t))
+      .filter(t => t.due_date)
+      .filter(t => ROADMAP_STATUSES.includes(t.status))
+      .filter(t => {
+        const due = parseDueDateLocal(t.due_date!).getTime();
+        return due >= rangeStart && due <= rangeEnd;
+      })
+      .sort((a, b) => parseDueDateLocal(a.due_date!).getTime() - parseDueDateLocal(b.due_date!).getTime());
+  }, [tickets, allWeeks]);
+
+  const visibleDayKeys = useMemo(() => new Set(visibleDays.map(d => d.key)), [visibleDays]);
+
+  const visibleTickets = useMemo(
+    () => roadmapTickets.filter(t => t.due_date && visibleDayKeys.has(dueDateDayKey(t.due_date))),
+    [roadmapTickets, visibleDayKeys]
+  );
+
+  const gridStyle = { display: 'grid' as const };
+
+  const filterStats = useMemo(() => {
+    if (allWeeks.length === 0) {
+      return { linear: 0, withDue: 0, inRange: 0 };
+    }
+    const rangeStart = allWeeks[0].start.getTime();
+    const rangeEnd = allWeeks[allWeeks.length - 1].end.getTime();
+    const linear = tickets.filter(t => hasLinearLink(t));
+    const withDue = linear.filter(t => t.due_date);
+    const inRange = withDue
+      .filter(t => ROADMAP_STATUSES.includes(t.status))
+      .filter(t => {
+        const due = parseDueDateLocal(t.due_date!).getTime();
+        return due >= rangeStart && due <= rangeEnd;
+      });
+    return { linear: linear.length, withDue: withDue.length, inRange: inRange.length };
+  }, [tickets, allWeeks]);
+
+  const maxWeekIndex = Math.max(0, allWeeks.length - 1);
+
+  return (
+    <div className="tkt__roadmap">
+      <div className="tkt__roadmap-toolbar">
+        <div className="tkt__roadmap-toolbar-text">
+          <h3 className="tkt__roadmap-title">Linear Roadmap</h3>
+          <p className="tkt__roadmap-subtitle">
+            Active work to ship · one week at a time · due on that day · {rangeLabel}
+          </p>
+        </div>
+        <div className="tkt__roadmap-nav">
+          <button
+            type="button"
+            className="tkt__roadmap-nav-btn"
+            disabled={weekIndex <= 0}
+            onClick={() => setWeekIndex(i => Math.max(0, i - 1))}
+            aria-label="Previous week"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="tkt__roadmap-nav-label">
+            {visibleWeek?.label}
+            {visibleWeek?.isCurrent && <span className="tkt__roadmap-nav-today"> · This week</span>}
+          </span>
+          <button
+            type="button"
+            className="tkt__roadmap-nav-btn"
+            disabled={weekIndex >= maxWeekIndex}
+            onClick={() => setWeekIndex(i => Math.min(maxWeekIndex, i + 1))}
+            aria-label="Next week"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <span className="tkt__roadmap-count">{visibleTickets.length} ticket{visibleTickets.length === 1 ? '' : 's'}</span>
+      </div>
+
+      <div className="tkt__roadmap-sheet">
+        <div className="tkt__roadmap-scroll">
+          <div className="tkt__roadmap-grid" style={gridStyle}>
+            <div className="tkt__roadmap-label-col tkt__roadmap-label-col--header tkt__roadmap-grid-head">
+              Work item
+            </div>
+            {visibleDays.map(day => (
+              <div
+                key={day.key}
+                className={`tkt__roadmap-day-col tkt__roadmap-grid-head ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
+              >
+                <span className="tkt__roadmap-day-name">{day.dayName}</span>
+                <span className="tkt__roadmap-day-date">{day.dateLabel}</span>
+              </div>
+            ))}
+
+            {visibleTickets.length === 0 ? (
+              <div className="tkt__roadmap-empty tkt__roadmap-grid-span">
+                {roadmapTickets.length === 0 ? (
+                  <>
+                    No active Linear tickets with due dates in this range.
+                    <p className="tkt__roadmap-empty-hint">
+                      {filterStats.linear} Linear-linked · {filterStats.withDue} with due dates ·{' '}
+                      {filterStats.inRange} in range ({rangeLabel})
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    Nothing due this week — use ← → to browse other weeks ({roadmapTickets.length} ticket
+                    {roadmapTickets.length === 1 ? '' : 's'} in range).
+                  </>
+                )}
+              </div>
+            ) : (
+              visibleTickets.map((ticket, rowIdx) => {
+                const dueDayKey = ticket.due_date ? dueDateDayKey(ticket.due_date) : '';
+                const priorityCfg = PRIORITY_CONFIG[ticket.priority];
+                const ticketId = ticket.linear_identifier || `#${ticket.number}`;
+                const isLastRow = rowIdx === visibleTickets.length - 1;
+                const cellClass = isLastRow ? 'tkt__roadmap-grid-cell tkt__roadmap-grid-cell--last' : 'tkt__roadmap-grid-cell';
+
+                return (
+                  <React.Fragment key={ticket.id}>
+                    <Tooltip
+                      content={<RoadmapTicketTooltip ticket={ticket} />}
+                      side="bottom"
+                      align="start"
+                      delayMs={200}
+                      interactive
+                      interactiveHideDelayMs={250}
+                      className="tkt__roadmap-tip-panel"
+                    >
+                      <div
+                        className={`tkt__roadmap-label-col tkt__roadmap-label-col--work ${cellClass}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onTicketClick(ticket)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onTicketClick(ticket);
+                          }
+                        }}
+                      >
+                        <p className="tkt__roadmap-work-item">
+                          <span className="tkt__roadmap-work-id">{ticketId}</span>
+                          <span className="tkt__roadmap-work-sep"> — </span>
+                          <span className="tkt__roadmap-work-title">{ticket.title}</span>
+                        </p>
+                      </div>
+                    </Tooltip>
+                    {visibleDays.map(day => (
+                      <div
+                        key={day.key}
+                        className={`tkt__roadmap-day-col tkt__roadmap-day-cell ${cellClass} ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
+                      >
+                        {dueDayKey === day.key && (
+                          <button
+                            type="button"
+                            className="tkt__roadmap-day-marker"
+                            style={{ backgroundColor: priorityCfg.color }}
+                            title={`Open ${ticketId} in Linear`}
+                            aria-label={`Open ${ticketId} in Linear`}
+                            onClick={e => {
+                              e.stopPropagation();
+                              openLinearTicket(ticket);
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </React.Fragment>
+                );
+              })
+            )}
+          </div>
+
+          {visibleTickets.length > 0 ? (
+            <div className="tkt__roadmap-footer">
+              <span className="tkt__roadmap-footer-label">
+                End of {visibleWeek?.label ?? 'this week'} · {visibleTickets.length} ticket
+                {visibleTickets.length === 1 ? '' : 's'} due
+              </span>
+              <span className="tkt__roadmap-footer-hint">Hover a row for details · click dot to open in Linear</span>
+            </div>
+          ) : (
+            <div className="tkt__roadmap-footer tkt__roadmap-footer--spacer" aria-hidden="true" />
+          )}
+        </div>
       </div>
     </div>
   );

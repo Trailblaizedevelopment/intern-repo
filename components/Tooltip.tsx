@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 
-type TooltipSide = 'top' | 'bottom';
+type TooltipSide = 'top' | 'bottom' | 'left' | 'right';
 type TooltipAlign = 'start' | 'center' | 'end';
 
 interface TooltipProps {
@@ -14,6 +14,10 @@ interface TooltipProps {
   className?: string;
   compact?: boolean;
   delayMs?: number;
+  /** Keep open while hovering tooltip content (e.g. scrollable descriptions). */
+  interactive?: boolean;
+  /** Delay before closing when pointer leaves both anchor and tooltip. */
+  interactiveHideDelayMs?: number;
 }
 
 function mergeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
@@ -34,13 +38,17 @@ export function Tooltip({
   className = '',
   compact = false,
   delayMs = 0,
+  interactive = false,
+  interactiveHideDelayMs = 200,
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [positionStyle, setPositionStyle] = useState<React.CSSProperties>({});
   const anchorRef = useRef<HTMLElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
   const tooltipId = useId();
   const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverRef = useRef({ anchor: false, tooltip: false });
 
   useEffect(() => {
     setMounted(true);
@@ -54,17 +62,43 @@ export function Tooltip({
     if (!el) return;
 
     const rect = el.getBoundingClientRect();
-    const gap = 8;
-    const top = side === 'bottom' ? rect.bottom + gap : rect.top - gap;
-    let left = rect.left;
-
-    if (align === 'center') left = rect.left + rect.width / 2;
-    if (align === 'end') left = rect.right;
-
+    const gap = interactive ? 0 : 8;
+    const overlap = interactive ? 6 : 0;
     const transform: string[] = [];
-    if (align === 'center') transform.push('translateX(-50%)');
-    if (align === 'end') transform.push('translateX(-100%)');
-    if (side === 'top') transform.push('translateY(-100%)');
+    let top = 0;
+    let left = 0;
+
+    if (side === 'right') {
+      left = rect.right + gap - overlap;
+      if (align === 'end') top = rect.bottom;
+      else if (align === 'center') {
+        top = rect.top + rect.height / 2;
+        transform.push('translateY(-50%)');
+      } else top = rect.top;
+    } else if (side === 'left') {
+      left = rect.left - gap + overlap;
+      transform.push('translateX(-100%)');
+      if (align === 'end') top = rect.bottom;
+      else if (align === 'center') {
+        top = rect.top + rect.height / 2;
+        transform.push('translateY(-50%)');
+      } else top = rect.top;
+    } else if (side === 'top') {
+      top = rect.top - gap + overlap;
+      if (align === 'end') left = rect.right;
+      else if (align === 'center') left = rect.left + rect.width / 2;
+      else left = rect.left;
+      transform.push('translateY(-100%)');
+      if (align === 'center') transform.push('translateX(-50%)');
+      if (align === 'end') transform.push('translateX(-100%)');
+    } else {
+      top = rect.bottom + gap - overlap;
+      if (align === 'end') left = rect.right;
+      else if (align === 'center') left = rect.left + rect.width / 2;
+      else left = rect.left;
+      if (align === 'center') transform.push('translateX(-50%)');
+      if (align === 'end') transform.push('translateX(-100%)');
+    }
 
     setPositionStyle({
       position: 'fixed',
@@ -73,21 +107,62 @@ export function Tooltip({
       transform: transform.length > 0 ? transform.join(' ') : undefined,
       zIndex: 10000,
     });
-  }, [side, align]);
+  }, [side, align, interactive]);
 
-  const show = () => {
+  const cancelScheduled = () => {
     if (delayRef.current) clearTimeout(delayRef.current);
+    delayRef.current = null;
+  };
+
+  const scheduleClose = useCallback(() => {
+    if (!interactive) return;
+    cancelScheduled();
+    delayRef.current = setTimeout(() => {
+      if (!hoverRef.current.anchor && !hoverRef.current.tooltip) {
+        setOpen(false);
+      }
+    }, interactiveHideDelayMs);
+  }, [interactive, interactiveHideDelayMs]);
+
+  const show = useCallback(() => {
+    cancelScheduled();
     const run = () => {
       updatePosition();
       setOpen(true);
     };
     if (delayMs > 0) delayRef.current = setTimeout(run, delayMs);
     else run();
+  }, [delayMs, updatePosition]);
+
+  const hideImmediate = useCallback(() => {
+    cancelScheduled();
+    hoverRef.current.anchor = false;
+    hoverRef.current.tooltip = false;
+    setOpen(false);
+  }, []);
+
+  const onAnchorEnter = () => {
+    hoverRef.current.anchor = true;
+    cancelScheduled();
+    show();
   };
 
-  const hide = () => {
-    if (delayRef.current) clearTimeout(delayRef.current);
-    setOpen(false);
+  const onAnchorLeave = () => {
+    hoverRef.current.anchor = false;
+    if (interactive) scheduleClose();
+    else hideImmediate();
+  };
+
+  const onTooltipEnter = () => {
+    if (!interactive) return;
+    hoverRef.current.tooltip = true;
+    cancelScheduled();
+  };
+
+  const onTooltipLeave = () => {
+    if (!interactive) return;
+    hoverRef.current.tooltip = false;
+    scheduleClose();
   };
 
   useEffect(() => {
@@ -107,22 +182,20 @@ export function Tooltip({
     ref: mergeRefs(anchorRef, childRef),
     'aria-describedby': open ? tooltipId : undefined,
     onMouseEnter: (e: React.MouseEvent) => {
-      e.stopPropagation();
       children.props.onMouseEnter?.(e);
-      show();
+      onAnchorEnter();
     },
     onMouseLeave: (e: React.MouseEvent) => {
-      e.stopPropagation();
       children.props.onMouseLeave?.(e);
-      hide();
+      onAnchorLeave();
     },
     onFocus: (e: React.FocusEvent) => {
       children.props.onFocus?.(e);
-      show();
+      onAnchorEnter();
     },
     onBlur: (e: React.FocusEvent) => {
       children.props.onBlur?.(e);
-      hide();
+      hideImmediate();
     },
   });
 
@@ -132,6 +205,8 @@ export function Tooltip({
   const tooltipClasses = [
     'ui-tooltip',
     compact ? 'ui-tooltip--compact' : '',
+    interactive ? 'ui-tooltip--interactive' : '',
+    interactive ? `ui-tooltip--side-${side}` : '',
     className,
   ]
     .filter(Boolean)
@@ -141,15 +216,19 @@ export function Tooltip({
     open && mounted
       ? createPortal(
           <div
+            ref={tooltipRef}
             id={tooltipId}
             role="tooltip"
             className={tooltipClasses}
+            data-side={side}
             style={{
               ...positionStyle,
               ...(compact
                 ? { width: 'max-content', maxWidth: 'max-content' }
                 : { width: 'max-content', maxWidth: 280 }),
             }}
+            onMouseEnter={onTooltipEnter}
+            onMouseLeave={onTooltipLeave}
           >
             {typeof tooltipContent === 'string' ? (
               <span className="ui-tooltip__label">{tooltipContent}</span>
