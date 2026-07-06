@@ -36,6 +36,8 @@ const RA = {
 // ─── Pricing ─────────────────────────────────────────────────────────────────
 
 function getPriceTier(memberCount: number): number {
+  if (memberCount < 30) return 29;
+  if (memberCount < 50) return 49;
   if (memberCount < 100) return 99;
   if (memberCount < 175) return 199;
   if (memberCount < 250) return 299;
