@@ -5,7 +5,16 @@ export type BrainTaskStatus =
   | 'blocked'
   | 'completed'
   | 'failed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'awaiting_approval';
+
+export interface PendingCursorDispatchPayload {
+  kind: 'cursor_dispatch';
+  prompt: string;
+  linear_issue_id: string | null;
+  integration_branch: string;
+  [key: string]: unknown;
+}
 
 export interface BrainTaskLogEntry {
   at: string;
@@ -41,6 +50,7 @@ export interface BrainTaskRow {
   deadline_at: string | null;
   slack_channel: string | null;
   slack_thread_ts: string | null;
+  pending_cursor_dispatch: PendingCursorDispatchPayload | null;
   created_at: string;
   updated_at: string;
 }

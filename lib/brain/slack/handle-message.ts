@@ -1,5 +1,12 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { BrainMessage, runBrainAgent } from '../agent';
+import {
+  denyPendingCursorDispatch,
+  executeApprovedCursorDispatch,
+  findPendingDispatchForSlackThread,
+  isCursorApprovalMessage,
+  isCursorDenialMessage,
+} from '../cursor-approval';
 import { checkBrainRateLimit } from '../rate-limit';
 import { sanitizeForActionLog } from '../sanitize-log';
 import { pickSlackAckPhrase } from './ack-phrases';
@@ -110,6 +117,40 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
   const convoTitle = slackConversationTitle(ctx.channel, ctx.threadTs);
   const existing = await loadSlackConversation(convoTitle);
   let conversationId = existing?.id ?? null;
+
+  const pendingDispatch = await findPendingDispatchForSlackThread(
+    supabase,
+    ctx.channel,
+    ctx.threadTs
+  );
+
+  if (pendingDispatch && isCursorApprovalMessage(message)) {
+    const placeholder = await postSlackMessageReturningTs(
+      ctx.channel,
+      pickSlackAckPhrase(),
+      ctx.threadTs
+    );
+    const result = await executeApprovedCursorDispatch(supabase, pendingDispatch.pending, {
+      channel: ctx.channel,
+      threadTs: ctx.threadTs,
+    });
+    if (placeholder.ok && placeholder.ts) {
+      await replaceSlackThreadReply(ctx.channel, placeholder.ts, ctx.threadTs, result.message);
+    } else {
+      await postSlackMessage(ctx.channel, result.message, ctx.threadTs);
+    }
+    return;
+  }
+
+  if (pendingDispatch && isCursorDenialMessage(message)) {
+    const msg = await denyPendingCursorDispatch(supabase, pendingDispatch.pending, {
+      channel: ctx.channel,
+      threadTs: ctx.threadTs,
+    });
+    await postSlackMessage(ctx.channel, msg, ctx.threadTs);
+    return;
+  }
+
   const history: BrainMessage[] = existing?.messages ? [...existing.messages] : [];
 
   history.push({ role: 'user', content: message });

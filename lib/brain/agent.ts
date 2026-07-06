@@ -98,10 +98,10 @@ function buildSystemPrompt(
   if (hasGitHub) {
     toolGuidance.push(
       '- GitHub (Trailblaize-Web) questions use github_* tools ONLY — never Linear for PRs, commits, or code.',
-      '- Open PRs → github_list_open_prs. Merged PRs / releases → github_list_merged_prs.',
-      '- Commit history by date ("last Thursday") → github_list_commits with since/until ISO (Central → UTC).',
-      '- Keyword in commits ("devtools update") → github_search_commits.',
-      '- Codebase "where is X" → github_search_code, then github_get_file if needed.',
+      '- Default branch for eng work: develop. Use main only when the user asks about production, releases, or main.',
+      '- Open PRs → github_list_open_prs. Merged PRs → github_list_merged_prs (base=develop or base=main).',
+      '- Commit history → github_list_commits with branch=develop unless production is specified.',
+      '- Keyword in commits → github_search_commits. Codebase paths → github_search_code + github_get_file.',
       '- Read-only. Answer in 1–3 sentences plus SHAs, paths, or PR links; no large dumps unless asked.'
     );
   }
@@ -120,6 +120,7 @@ function buildSystemPrompt(
   }
   if (hasCursor) {
     toolGuidance.push(
+      '- cursor_dispatch_agent pauses for Slack approval (awaiting_approval) — user must reply yes dispatch. Never pass approved=true yourself.',
       '- Use cursor_dispatch_agent for implementation. PRs target the task integration feature branch (feature/TRA-xxx-...) — NEVER develop or main.',
       '- Integration branch is created from develop automatically. Humans merge feature → develop after review.',
       '- Only one dispatch per task unless follow_up=true (after cursor PR merges into integration branch).',

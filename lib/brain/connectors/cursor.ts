@@ -5,13 +5,11 @@ import {
   isCursorConfigured,
 } from '../cursor-api';
 import {
-  deriveIntegrationBranch,
-  ensureIntegrationBranchOnGitHub,
-  isProtectedTargetBranch,
-} from '../integration-branch';
-import { delegateLinearIssueToCursor } from '../linear-delegate';
+  cursorApprovalRequired,
+  requestCursorDispatchApproval,
+} from '../cursor-approval';
+import { runCursorDispatch } from '../cursor-dispatch';
 import { getBrainTask } from '../tasks/store';
-import { isCursorDispatchLocked } from '../tasks/cursor-lock';
 import {
   BrainConnector,
   ConnectorCallResult,
@@ -25,7 +23,7 @@ const TOOLS: ConnectorTool[] = [
   {
     name: 'cursor_dispatch_agent',
     description:
-      'Launch Cursor on Trailblaize-Web. Creates/uses an integration feature branch; PRs target that branch only — never develop/main. One dispatch per task unless follow_up=true.',
+      'Launch Cursor on Trailblaize-Web. Creates/uses an integration feature branch; PRs target that branch only — never develop/main. Requires user approval in Slack before dispatch (unless approved=true).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -40,6 +38,10 @@ const TOOLS: ConnectorTool[] = [
         follow_up: {
           type: 'boolean',
           description: 'Second dispatch after cursor PR merged into integration branch',
+        },
+        approved: {
+          type: 'boolean',
+          description: 'Internal — set true only after user approved in Slack',
         },
       },
       required: ['prompt'],
@@ -57,26 +59,6 @@ const TOOLS: ConnectorTool[] = [
     },
   },
 ];
-
-async function persistCursorDispatch(
-  ctx: ConnectorContext,
-  result: Awaited<ReturnType<typeof createCursorAgent>>,
-  integrationBranch: string
-): Promise<void> {
-  if (!ctx.taskId || !result.agentId) return;
-  await ctx.supabase
-    .from('brain_tasks')
-    .update({
-      cursor_agent_id: result.agentId,
-      cursor_agent_url: result.agentUrl,
-      cursor_run_id: result.runId,
-      cursor_run_status: result.runStatus || 'CREATING',
-      cursor_pr_merged: false,
-      integration_branch: integrationBranch,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', ctx.taskId);
-}
 
 export const cursorConnector: BrainConnector = {
   id: CONNECTOR_ID,
@@ -98,78 +80,53 @@ export const cursorConnector: BrainConnector = {
         if (!implementation) return { ok: false, error: 'prompt is required' };
 
         const followUp = input.follow_up === true;
+        const approved = input.approved === true;
         let linearIssueId =
           typeof input.linear_issue_id === 'string' ? input.linear_issue_id.trim() : null;
         let taskGoal: string | null = null;
-        let task: Awaited<ReturnType<typeof getBrainTask>> = null;
 
         if (ctx.taskId) {
-          task = await getBrainTask(ctx.supabase, ctx.taskId);
+          const task = await getBrainTask(ctx.supabase, ctx.taskId);
           if (task) {
             linearIssueId = linearIssueId || task.linear_issue_id;
             taskGoal = task.goal;
-
-            if (isCursorDispatchLocked(task, followUp)) {
-              return {
-                ok: false,
-                error: `Dispatch locked — Cursor agent ${task.cursor_agent_id} is active (${task.cursor_run_status}). Wait for PR merge into ${task.integration_branch || 'integration branch'} or pass follow_up=true.`,
-              };
-            }
           }
         }
 
-        const integrationBranch =
-          task?.integration_branch ||
-          deriveIntegrationBranch(linearIssueId, taskGoal || implementation);
-
-        const startingRef =
-          typeof input.starting_ref === 'string' && input.starting_ref.trim()
-            ? input.starting_ref.trim()
-            : integrationBranch;
-
-        if (isProtectedTargetBranch(startingRef)) {
-          return {
-            ok: false,
-            error: `Cannot branch/PR to protected branch "${startingRef}". Use integration branch ${integrationBranch}. Humans merge feature → develop.`,
-          };
+        if (cursorApprovalRequired() && !approved) {
+          const pending = await requestCursorDispatchApproval(
+            {
+              prompt: implementation,
+              starting_ref:
+                typeof input.starting_ref === 'string' ? input.starting_ref : undefined,
+              auto_create_pr: input.auto_create_pr !== false,
+              mode: input.mode === 'plan' ? 'plan' : 'agent',
+              linear_issue_id: linearIssueId || undefined,
+              follow_up: followUp,
+            },
+            ctx,
+            linearIssueId,
+            taskGoal
+          );
+          return { ok: true, data: pending.data };
         }
 
-        const branchReady = await ensureIntegrationBranchOnGitHub(integrationBranch);
-        if (!branchReady.ok) {
-          return { ok: false, error: branchReady.error || 'Failed to ensure integration branch' };
-        }
-
-        const fullPrompt = await buildCursorDispatchPrompt({
-          implementation,
-          linearIssueId,
-          taskGoal,
-          integrationBranch,
-        });
-
-        const result = await createCursorAgent({
-          prompt: fullPrompt,
-          startingRef,
-          autoCreatePR: input.auto_create_pr !== false,
-          mode: input.mode === 'plan' ? 'plan' : 'agent',
-        });
-
-        await persistCursorDispatch(ctx, result, integrationBranch);
-
-        let linearDelegate: Awaited<ReturnType<typeof delegateLinearIssueToCursor>> | null = null;
-        if (linearIssueId) {
-          linearDelegate = await delegateLinearIssueToCursor(linearIssueId);
-        }
-
-        return {
-          ok: true,
-          data: {
-            ...result,
-            integration_branch: integrationBranch,
-            starting_ref: startingRef,
-            integration_branch_created: branchReady.created,
-            linear_delegate: linearDelegate,
+        const result = await runCursorDispatch(
+          {
+            prompt: implementation,
+            starting_ref:
+              typeof input.starting_ref === 'string' ? input.starting_ref : undefined,
+            auto_create_pr: input.auto_create_pr !== false,
+            mode: input.mode === 'plan' ? 'plan' : 'agent',
+            linear_issue_id: linearIssueId || undefined,
+            follow_up: followUp,
+            approved: true,
           },
-        };
+          ctx
+        );
+
+        if (!result.ok) return { ok: false, error: result.error };
+        return { ok: true, data: result.data };
       }
 
       if (toolName === 'cursor_get_agent') {

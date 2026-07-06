@@ -3,6 +3,7 @@ import { isCursorConfigured } from '../cursor-api';
 import { watchCursorAgent } from '../cursor-watch';
 import { runBrainAgent } from '../agent';
 import { postSlackMessage } from '../slack/client';
+import { formatCursorPollSlackUpdate, formatTaskIterationSlackUpdate } from '../slack/task-updates';
 import { handlePrMergeWatch } from './cursor-lock';
 import { appendTaskLog, claimNextRunnableTask, getBrainTask, updateTaskStatus } from './store';
 import { BrainTaskRow } from './types';
@@ -42,7 +43,7 @@ function buildTaskSystemAppend(task: BrainTaskRow): string {
     'TASK ORCHESTRATION MODE — you are executing one iteration of a background goal.',
     `Task id: ${task.id} (pass to tasks_* tools or rely on task context).`,
     'Brain orchestrates; Cursor implements on Trailblaize-Web. PRs target the task integration feature branch only — humans merge feature → develop.',
-    'Be action-oriented: research in Linear/GitHub, dispatch Cursor once for implementation, then complete when PR exists.',
+    'Be action-oriented: research in Linear/GitHub, request Cursor dispatch once for implementation (user must approve in Slack), then complete when PR exists.',
     'Do not ask the user questions — make reasonable assumptions and log them in the summary.',
   ].join('\n');
 }
@@ -106,6 +107,12 @@ async function handleCursorWatchTick(
       kind: 'cursor',
       message: `Cursor run ${watch.runStatus || 'RUNNING'}${watch.branch ? ` on ${watch.branch}` : ''}`,
     });
+    if (task.slack_channel && prevRunStatus !== watch.runStatus) {
+      await notifySlack(
+        task,
+        formatCursorPollSlackUpdate(task, watch.runStatus || 'RUNNING', watch.branch)
+      );
+    }
     await scheduleNextRun(supabase, task.id, CURSOR_POLL_INTERVAL_MS);
     return {
       handled: true,
@@ -240,13 +247,22 @@ export async function runOneTaskIteration(supabase: SupabaseClient): Promise<Tas
     })
     .eq('id', task.id);
 
+  const iterationNum = refreshedForPrompt.iteration_count + 1;
   await appendTaskLog(supabase, task.id, {
     kind: 'info',
-    message: `Agent iteration ${refreshedForPrompt.iteration_count + 1} started`,
+    message: `Agent iteration ${iterationNum} started`,
   });
+
+  if (refreshedForPrompt.slack_channel) {
+    await notifySlack(
+      refreshedForPrompt,
+      `*Iteration ${iterationNum} started*${refreshedForPrompt.linear_issue_id ? ` · ${refreshedForPrompt.linear_issue_id}` : ''}`
+    );
+  }
 
   let reply = '';
   let runError: string | undefined;
+  let toolEvents: Awaited<ReturnType<typeof runBrainAgent>>['toolEvents'] = [];
 
   try {
     const result = await runBrainAgent(
@@ -264,6 +280,7 @@ export async function runOneTaskIteration(supabase: SupabaseClient): Promise<Tas
       }
     );
     reply = result.reply;
+    toolEvents = result.toolEvents;
     await appendTaskLog(supabase, task.id, {
       kind: 'info',
       message: reply.slice(0, 800),
@@ -287,19 +304,33 @@ export async function runOneTaskIteration(supabase: SupabaseClient): Promise<Tas
     await scheduleNextRun(supabase, refreshed.id, delay);
   }
 
+  if (refreshed.slack_channel) {
+    const iterationUpdate = formatTaskIterationSlackUpdate(
+      refreshed,
+      iterationNum,
+      toolEvents,
+      reply
+    );
+    if (iterationUpdate) {
+      await notifySlack(refreshed, iterationUpdate);
+    }
+  }
+
   if (prevStatus !== refreshed.status || terminal) {
-    const headline = terminal ? `*Brain task ${refreshed.status}*` : `*Brain task update*`;
-    const body = [
-      headline,
-      refreshed.linear_issue_id ? `Linear: ${refreshed.linear_issue_id}` : null,
-      refreshed.goal.slice(0, 200),
-      refreshed.result_summary || refreshed.error || reply.slice(0, 300),
-      refreshed.cursor_pr_url ? `<${refreshed.cursor_pr_url}|PR>` : null,
-      refreshed.cursor_agent_url ? `<${refreshed.cursor_agent_url}|Cursor agent>` : null,
-    ]
-      .filter(Boolean)
-      .join('\n');
-    await notifySlack(refreshed, body);
+    if (terminal || refreshed.status === 'blocked') {
+      const headline = terminal ? `*Brain task ${refreshed.status}*` : `*Brain task blocked*`;
+      const body = [
+        headline,
+        refreshed.linear_issue_id ? `Linear: ${refreshed.linear_issue_id}` : null,
+        refreshed.goal.slice(0, 200),
+        refreshed.result_summary || refreshed.error || reply.slice(0, 300),
+        refreshed.cursor_pr_url ? `<${refreshed.cursor_pr_url}|PR>` : null,
+        refreshed.cursor_agent_url ? `<${refreshed.cursor_agent_url}|Cursor agent>` : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+      await notifySlack(refreshed, body);
+    }
   }
 
   return {

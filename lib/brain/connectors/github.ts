@@ -83,13 +83,13 @@ const TOOLS: ConnectorTool[] = [
   {
     name: 'github_list_commits',
     description:
-      'List git commits on Trailblaize-Web for a date range. Use for "what committed last Thursday", recent history on develop, or commits touching a path. Pass since/until as ISO 8601 (Central → UTC).',
+      `List git commits on Trailblaize-Web for a date range. Default branch is ${getDevelopBranch()} (eng work). Use ${getProductionBranch()} only when user asks about production/main.`,
     inputSchema: {
       type: 'object',
       properties: {
         since: { type: 'string', description: 'ISO 8601 start (inclusive), e.g. 2026-07-03T05:00:00Z for Jul 3 CT midnight' },
         until: { type: 'string', description: 'ISO 8601 end (exclusive)' },
-        branch: { type: 'string', description: `Branch (default ${getDevelopBranch()})` },
+        branch: { type: 'string', description: `Branch (default ${getDevelopBranch()} for eng; use ${getProductionBranch()} for production)` },
         path: { type: 'string', description: 'Only commits touching this file path' },
         limit: { type: 'number', description: 'Max commits (default 10)' },
         repo: { type: 'string', description: 'owner/repo' },

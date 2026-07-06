@@ -3,23 +3,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Activity,
   Brain,
   CheckCircle2,
   ChevronRight,
   Clock,
+  DollarSign,
   ExternalLink,
   Loader2,
   MessageSquare,
   RefreshCw,
   Wrench,
   XCircle,
-  Zap,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import type { BrainAgentRunRow } from '@/lib/brain/agent-runs';
+import type { BrainAgentRunWithCost } from '@/lib/brain/dashboard';
+import { fmtCostUsd } from '@/lib/brain/pricing';
 import type { BrainTaskRow, BrainTaskStatus } from '@/lib/brain/tasks/types';
 import { AgentRunsPanel, type AgentRunStats } from './AgentRunsPanel';
+import { InsightsPanel } from './InsightsPanel';
 
 const DEV_CONSOLE_EMAIL = 'devin@trailblaize.net';
 const REFRESH_MS = 30_000;
@@ -66,6 +67,7 @@ interface ActivityDay {
   toolCalls: number;
   tasksCompleted: number;
   agentRuns: number;
+  costUsd: number;
 }
 
 interface DashboardData {
@@ -74,7 +76,7 @@ interface DashboardData {
   activeTasks: BrainTaskRow[];
   recentTasks: BrainTaskRow[];
   recentActions: ActionRow[];
-  recentAgentRuns: BrainAgentRunRow[];
+  recentAgentRuns: BrainAgentRunWithCost[];
   automations: AutomationRow[];
   activityByDay: ActivityDay[];
   connectors: ConnectorStatus[];
@@ -87,6 +89,7 @@ const STATUS_STYLE: Record<BrainTaskStatus, { bg: string; color: string; label: 
   planning: { bg: '#EEF2FF', color: '#4338CA', label: 'Planning' },
   running: { bg: '#DBEAFE', color: '#1D4ED8', label: 'Running' },
   blocked: { bg: '#FEF3C7', color: '#B45309', label: 'Blocked' },
+  awaiting_approval: { bg: '#FDF4FF', color: '#7E22CE', label: 'Awaiting approval' },
   completed: { bg: '#ECFDF5', color: '#065F46', label: 'Completed' },
   failed: { bg: '#FEE2E2', color: '#991B1B', label: 'Failed' },
   cancelled: { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelled' },
@@ -129,39 +132,6 @@ function StatCard({ label, value, sub, icon: Icon, accent }: {
       </div>
       <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function ActivityChart({ days }: { days: ActivityDay[] }) {
-  const maxVal = Math.max(1, ...days.map(d => Math.max(d.toolCalls, d.agentRuns)));
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 80, paddingTop: 8 }}>
-      {days.map(d => (
-        <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, width: '100%', maxWidth: 36, justifyContent: 'center' }}>
-            <div
-              title={`${d.agentRuns} agent runs`}
-              style={{
-                width: '45%',
-                height: `${Math.max(4, (d.agentRuns / maxVal) * 52)}px`,
-                background: 'linear-gradient(180deg, #818CF8, #4F46E5)',
-                borderRadius: '3px 3px 0 0',
-              }}
-            />
-            <div
-              title={`${d.toolCalls} tool calls`}
-              style={{
-                width: '45%',
-                height: `${Math.max(4, (d.toolCalls / maxVal) * 52)}px`,
-                background: 'linear-gradient(180deg, #C4B5FD, #7C3AED)',
-                borderRadius: '3px 3px 0 0',
-              }}
-            />
-          </div>
-          <span style={{ fontSize: '0.625rem', color: '#9CA3AF' }}>{d.date.slice(5)}</span>
-        </div>
-      ))}
     </div>
   );
 }
@@ -366,10 +336,10 @@ export default function DevConsolePage() {
         <>
           {/* KPI row */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <StatCard label="Weekly spend" value={fmtCostUsd(data.agentRunStats.costUsd7d)} sub={`${fmtCostUsd(data.agentRunStats.costUsd24h)} today · est. API cost`} icon={DollarSign} accent="#059669" />
             <StatCard label="Agent runs (24h)" value={data.agentRunStats.runs24h} sub={`${data.agentRunStats.successRate24h}% success · ${data.agentRunStats.runningNow} live`} icon={Brain} accent="#4F46E5" />
-            <StatCard label="Avg latency" value={data.agentRunStats.avgLatencyMs24h != null ? `${(data.agentRunStats.avgLatencyMs24h / 1000).toFixed(1)}s` : '—'} sub={`${data.agentRunStats.totalTokens24h >= 1000 ? `${(data.agentRunStats.totalTokens24h / 1000).toFixed(1)}k` : data.agentRunStats.totalTokens24h} tokens 24h`} icon={Clock} accent="#2563EB" />
-            <StatCard label="Active tasks" value={stats.activeTasks} sub="orchestration queue" icon={Zap} accent="#7C3AED" />
-            <StatCard label="Tool calls (24h)" value={stats.toolCalls24h} sub={`${stats.toolSuccessRate24h}% success`} icon={Wrench} accent="#059669" />
+            <StatCard label="Avg / run (7d)" value={data.agentRunStats.avgCostPerRun7d != null ? fmtCostUsd(data.agentRunStats.avgCostPerRun7d) : '—'} sub={data.agentRunStats.pricingLabel} icon={Clock} accent="#2563EB" />
+            <StatCard label="Tool calls (24h)" value={stats.toolCalls24h} sub={`${stats.toolSuccessRate24h}% success`} icon={Wrench} accent="#7C3AED" />
           </div>
 
           {/* Agent runs panel — primary view */}
@@ -377,39 +347,11 @@ export default function DevConsolePage() {
             <AgentRunsPanel runs={data.recentAgentRuns} stats={data.agentRunStats} loading={refreshing} />
           </div>
 
-          {/* Activity + automations row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12, marginBottom: 16 }}>
-            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151' }}>Activity — 7 days</span>
-                <span style={{ fontSize: '0.625rem', color: '#9CA3AF' }}>indigo = runs · purple = tools</span>
-                <Activity size={14} style={{ color: '#9CA3AF' }} />
-              </div>
-              <ActivityChart days={data.activityByDay} />
-            </div>
-            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '14px 16px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 10 }}>Automations</span>
-              {data.automations.length === 0 ? (
-                <p style={{ margin: 0, fontSize: '0.75rem', color: '#9CA3AF' }}>None configured</p>
-              ) : (
-                data.automations.map(a => (
-                  <div key={a.id} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid #F3F4F6' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: a.enabled ? (a.last_status === 'failed' ? '#F87171' : '#34D399') : '#CBD5E1' }} />
-                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>{a.name.replace(/_/g, ' ')}</span>
-                    </div>
-                    <div style={{ fontSize: '0.6875rem', color: '#9CA3AF' }}>
-                      {a.schedule ?? 'manual'}
-                      {a.last_run_at ? ` · last ${fmtRelative(a.last_run_at)}` : ''}
-                    </div>
-                    {a.last_status === 'failed' && a.last_error && (
-                      <div style={{ fontSize: '0.6875rem', color: '#991B1B', marginTop: 2 }}>{a.last_error.slice(0, 80)}</div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <InsightsPanel
+            activityByDay={data.activityByDay}
+            automations={data.automations}
+            weekSpend={data.agentRunStats.costUsd7d}
+          />
 
           {/* Main grid: tasks + activity feed */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

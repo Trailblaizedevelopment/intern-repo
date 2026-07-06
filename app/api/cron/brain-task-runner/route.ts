@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runOneTaskIteration } from '@/lib/brain/tasks/runner';
+import { countRunnableTasks } from '@/lib/brain/tasks/store';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
@@ -32,8 +33,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const runnable = await countRunnableTasks(supabase);
+    if (runnable === 0) {
+      return NextResponse.json({ ok: true, idle: true, processed: false, runnable: 0 });
+    }
+
     const result = await runOneTaskIteration(supabase);
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, idle: false, runnable, ...result });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Task runner failed';
     console.error('[cron/brain-task-runner]', err);

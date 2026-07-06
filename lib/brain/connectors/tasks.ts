@@ -5,6 +5,7 @@ import {
   listActiveBrainTasks,
   updateTaskStatus,
 } from '../tasks/store';
+import { postSlackMessage } from '../slack/client';
 import {
   BrainConnector,
   ConnectorCallResult,
@@ -115,6 +116,21 @@ export const tasksConnector: BrainConnector = {
           slackChannel: ctx.slackChannel ?? null,
           slackThreadTs: ctx.slackThreadTs ?? null,
         });
+
+        if (ctx.slackChannel) {
+          await postSlackMessage(
+            ctx.slackChannel,
+            [
+              '*Task queued*',
+              task.linear_issue_id ? `Linear: \`${task.linear_issue_id}\`` : null,
+              task.goal.slice(0, 200),
+              `Branch: \`${task.integration_branch}\``,
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            ctx.slackThreadTs || undefined
+          );
+        }
 
         return {
           ok: true,

@@ -97,10 +97,26 @@ export async function listActiveBrainTasks(
   const { data } = await supabase
     .from('brain_tasks')
     .select('*')
-    .in('status', ['queued', 'planning', 'running', 'blocked'])
+    .in('status', ['queued', 'planning', 'running', 'blocked', 'awaiting_approval'])
     .order('created_at', { ascending: false })
     .limit(limit);
   return (data as BrainTaskRow[]) || [];
+}
+
+/** Tasks due for cron runner (excludes awaiting_approval). */
+export async function countRunnableTasks(supabase: SupabaseClient): Promise<number> {
+  const now = new Date().toISOString();
+  const { count, error } = await supabase
+    .from('brain_tasks')
+    .select('id', { count: 'exact', head: true })
+    .in('status', ['queued', 'running', 'blocked'])
+    .lte('next_run_at', now);
+
+  if (error) {
+    console.error('[brain/tasks] countRunnableTasks:', error.message);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 export async function updateTaskStatus(
