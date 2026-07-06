@@ -2,10 +2,14 @@ import {
   getDevelopBranch,
   getGitHubRepoFull,
   getGitHubToken,
+  getProductionBranch,
   getPullRequest,
   getRepoFileContents,
+  listMergedPullRequests,
   listOpenPullRequests,
+  listRepoCommits,
   searchRepoCode,
+  searchRepoCommits,
 } from '../github-repo';
 import {
   BrainConnector,
@@ -76,6 +80,56 @@ const TOOLS: ConnectorTool[] = [
       required: ['path'],
     },
   },
+  {
+    name: 'github_list_commits',
+    description:
+      'List git commits on Trailblaize-Web for a date range. Use for "what committed last Thursday", recent history on develop, or commits touching a path. Pass since/until as ISO 8601 (Central → UTC).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        since: { type: 'string', description: 'ISO 8601 start (inclusive), e.g. 2026-07-03T05:00:00Z for Jul 3 CT midnight' },
+        until: { type: 'string', description: 'ISO 8601 end (exclusive)' },
+        branch: { type: 'string', description: `Branch (default ${getDevelopBranch()})` },
+        path: { type: 'string', description: 'Only commits touching this file path' },
+        limit: { type: 'number', description: 'Max commits (default 10)' },
+        repo: { type: 'string', description: 'owner/repo' },
+      },
+    },
+  },
+  {
+    name: 'github_list_merged_prs',
+    description:
+      'List merged pull requests on Trailblaize-Web (develop or main). Use for "what merged last week", production releases, or merge history.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        base: {
+          type: 'string',
+          description: `Target branch: ${getDevelopBranch()} or ${getProductionBranch()} (default ${getDevelopBranch()})`,
+        },
+        since: { type: 'string', description: 'ISO 8601 — only merges after this time' },
+        until: { type: 'string', description: 'ISO 8601 — only merges before this time' },
+        limit: { type: 'number', description: 'Max results (default 10)' },
+        repo: { type: 'string', description: 'owner/repo' },
+      },
+    },
+  },
+  {
+    name: 'github_search_commits',
+    description:
+      'Search commit messages by keyword (e.g. "devtools", "profile card", "outreach"). Optional since/until as YYYY-MM-DD for committer-date filter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Keyword(s) in commit message' },
+        since: { type: 'string', description: 'Start date YYYY-MM-DD' },
+        until: { type: 'string', description: 'End date YYYY-MM-DD' },
+        limit: { type: 'number', description: 'Max results (default 8)' },
+        repo: { type: 'string', description: 'owner/repo' },
+      },
+      required: ['query'],
+    },
+  },
 ];
 
 function resolveRepo(input?: unknown): string | undefined {
@@ -129,6 +183,50 @@ export const githubConnector: BrainConnector = {
         if (!path) return { ok: false, error: 'path is required' };
         const ref = typeof input.ref === 'string' ? input.ref.trim() : undefined;
         const data = await getRepoFileContents(path, { repoFull: repo, ref });
+        return { ok: true, data };
+      }
+
+      if (toolName === 'github_list_commits') {
+        const since = typeof input.since === 'string' ? input.since.trim() : undefined;
+        const until = typeof input.until === 'string' ? input.until.trim() : undefined;
+        const branch = typeof input.branch === 'string' ? input.branch.trim() : undefined;
+        const path = typeof input.path === 'string' ? input.path.trim() : undefined;
+        const data = await listRepoCommits({
+          repoFull: repo,
+          branch,
+          since,
+          until,
+          path,
+          limit: Number(input.limit) || 10,
+        });
+        return { ok: true, data };
+      }
+
+      if (toolName === 'github_list_merged_prs') {
+        const base = typeof input.base === 'string' ? input.base.trim() : undefined;
+        const since = typeof input.since === 'string' ? input.since.trim() : undefined;
+        const until = typeof input.until === 'string' ? input.until.trim() : undefined;
+        const data = await listMergedPullRequests({
+          repoFull: repo,
+          base,
+          since,
+          until,
+          limit: Number(input.limit) || 10,
+        });
+        return { ok: true, data };
+      }
+
+      if (toolName === 'github_search_commits') {
+        const query = typeof input.query === 'string' ? input.query.trim() : '';
+        if (!query) return { ok: false, error: 'query is required' };
+        const since = typeof input.since === 'string' ? input.since.trim() : undefined;
+        const until = typeof input.until === 'string' ? input.until.trim() : undefined;
+        const data = await searchRepoCommits(query, {
+          repoFull: repo,
+          since,
+          until,
+          limit: Number(input.limit) || 8,
+        });
         return { ok: true, data };
       }
 

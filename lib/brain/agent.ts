@@ -97,10 +97,12 @@ function buildSystemPrompt(
   const toolGuidance: string[] = [];
   if (hasGitHub) {
     toolGuidance.push(
-      '- GitHub (Trailblaize-Web) questions use github_* tools ONLY — never Linear for PRs or code.',
-      '- Open PRs / pull requests → github_list_open_prs (or github_get_pr for one PR).',
-      '- Codebase "where is X" / "what file" → github_search_code, then github_get_file if you need contents.',
-      '- Read-only. Answer in 1–3 sentences plus file paths or PR links; no large code dumps unless asked.'
+      '- GitHub (Trailblaize-Web) questions use github_* tools ONLY — never Linear for PRs, commits, or code.',
+      '- Open PRs → github_list_open_prs. Merged PRs / releases → github_list_merged_prs.',
+      '- Commit history by date ("last Thursday") → github_list_commits with since/until ISO (Central → UTC).',
+      '- Keyword in commits ("devtools update") → github_search_commits.',
+      '- Codebase "where is X" → github_search_code, then github_get_file if needed.',
+      '- Read-only. Answer in 1–3 sentences plus SHAs, paths, or PR links; no large dumps unless asked.'
     );
   }
   if (hasLinear) {

@@ -202,6 +202,221 @@ export async function getPullRequest(
     base: (pr.base as { ref?: string })?.ref,
     created_at: pr.created_at,
     updated_at: pr.updated_at,
+    merged_at: pr.merged_at,
+  };
+}
+
+export interface CommitSummary {
+  sha: string;
+  short_sha: string;
+  message: string;
+  author: string | null;
+  date: string;
+  url: string;
+}
+
+function trimCommitMessage(msg: string, maxLen = 200): string {
+  const first = msg.split('\n')[0]?.trim() || msg;
+  return first.length <= maxLen ? first : `${first.slice(0, maxLen)}…`;
+}
+
+function inDateRange(iso: string, since?: string, until?: string): boolean {
+  const t = new Date(iso).getTime();
+  if (since && t < new Date(since).getTime()) return false;
+  if (until && t > new Date(until).getTime()) return false;
+  return true;
+}
+
+/** List commits on a branch, optionally filtered by since/until (ISO 8601) and path. */
+export async function listRepoCommits(options?: {
+  repoFull?: string;
+  branch?: string;
+  since?: string;
+  until?: string;
+  path?: string;
+  limit?: number;
+}): Promise<{ repo: string; branch: string; since: string | null; until: string | null; commits: CommitSummary[] }> {
+  const full = options?.repoFull || getGitHubRepoFull();
+  const parsed = parseRepo(full);
+  if (!parsed) throw new Error('Invalid GITHUB_REPO');
+
+  const branch = options?.branch || getDevelopBranch();
+  const since = options?.since?.trim() || undefined;
+  const until = options?.until?.trim() || undefined;
+  const path = options?.path?.trim() || undefined;
+  const limit = Math.min(Math.max(options?.limit ?? 15, 1), 50);
+
+  const params = new URLSearchParams();
+  params.set('sha', branch);
+  params.set('per_page', String(Math.min(limit * 2, 100)));
+  if (since) params.set('since', since);
+  if (until) params.set('until', until);
+  if (path) params.set('path', path);
+
+  const res = await githubApiFetch(
+    `/repos/${parsed.owner}/${parsed.repo}/commits?${params.toString()}`
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub commits ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const rows = (await res.json()) as Array<{
+    sha?: string;
+    html_url?: string;
+    commit?: { message?: string; author?: { name?: string; date?: string } };
+    author?: { login?: string } | null;
+  }>;
+
+  const commits: CommitSummary[] = [];
+  for (const row of rows) {
+    const date = row.commit?.author?.date;
+    if (!row.sha || !date) continue;
+    if (!inDateRange(date, since, until)) continue;
+    commits.push({
+      sha: row.sha,
+      short_sha: row.sha.slice(0, 7),
+      message: trimCommitMessage(row.commit?.message || ''),
+      author: row.author?.login || row.commit?.author?.name || null,
+      date,
+      url: row.html_url || `https://github.com/${full}/commit/${row.sha}`,
+    });
+    if (commits.length >= limit) break;
+  }
+
+  return { repo: full, branch, since: since ?? null, until: until ?? null, commits };
+}
+
+export interface MergedPrSummary {
+  number: number;
+  title: string;
+  url: string;
+  author: string | null;
+  merged_at: string;
+  base: string;
+  head: string | null;
+}
+
+/** List recently merged pull requests targeting a base branch (develop or main). */
+export async function listMergedPullRequests(options?: {
+  repoFull?: string;
+  base?: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+}): Promise<{ repo: string; base: string; merges: MergedPrSummary[] }> {
+  const full = options?.repoFull || getGitHubRepoFull();
+  const parsed = parseRepo(full);
+  if (!parsed) throw new Error('Invalid GITHUB_REPO');
+
+  const base = options?.base || getDevelopBranch();
+  const since = options?.since?.trim() || undefined;
+  const until = options?.until?.trim() || undefined;
+  const limit = Math.min(Math.max(options?.limit ?? 15, 1), 30);
+
+  const params = new URLSearchParams();
+  params.set('state', 'closed');
+  params.set('base', base);
+  params.set('sort', 'updated');
+  params.set('direction', 'desc');
+  params.set('per_page', '50');
+
+  const res = await githubApiFetch(
+    `/repos/${parsed.owner}/${parsed.repo}/pulls?${params.toString()}`
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub merged PRs ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const pulls = (await res.json()) as Array<{
+    number?: number;
+    title?: string;
+    html_url?: string;
+    merged_at?: string | null;
+    user?: { login?: string };
+    base?: { ref?: string };
+    head?: { ref?: string };
+  }>;
+
+  const merges: MergedPrSummary[] = [];
+  for (const pr of pulls) {
+    if (!pr.merged_at || !pr.number) continue;
+    if (!inDateRange(pr.merged_at, since, until)) continue;
+    if (/^develop$/i.test(String(pr.title || '').trim())) continue;
+    merges.push({
+      number: pr.number,
+      title: String(pr.title ?? ''),
+      url: String(pr.html_url ?? ''),
+      author: pr.user?.login ?? null,
+      merged_at: pr.merged_at,
+      base: pr.base?.ref || base,
+      head: pr.head?.ref ?? null,
+    });
+    if (merges.length >= limit) break;
+  }
+
+  return { repo: full, base, merges };
+}
+
+export interface CommitSearchHit {
+  sha: string;
+  short_sha: string;
+  message: string;
+  author: string | null;
+  date: string;
+  url: string;
+}
+
+/** Search commit messages in the repo (keyword + optional committer-date range). */
+export async function searchRepoCommits(
+  query: string,
+  options?: { repoFull?: string; since?: string; until?: string; limit?: number }
+): Promise<{ repo: string; query: string; commits: CommitSearchHit[] }> {
+  const full = options?.repoFull || getGitHubRepoFull();
+  const parsed = parseRepo(full);
+  if (!parsed) throw new Error('Invalid GITHUB_REPO');
+
+  const terms = query.trim();
+  if (!terms) throw new Error('query is required');
+
+  const limit = Math.min(Math.max(options?.limit ?? 10, 1), 30);
+  let q = `${terms} repo:${parsed.owner}/${parsed.repo}`;
+
+  const sinceDay = options?.since?.slice(0, 10);
+  const untilDay = options?.until?.slice(0, 10);
+  if (sinceDay && untilDay) q += ` committer-date:${sinceDay}..${untilDay}`;
+  else if (sinceDay) q += ` committer-date:>=${sinceDay}`;
+  else if (untilDay) q += ` committer-date:<=${untilDay}`;
+
+  const res = await githubApiFetch(`/search/commits?q=${encodeURIComponent(q)}&per_page=${limit}`, {
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub commit search ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as {
+    items?: Array<{
+      sha?: string;
+      html_url?: string;
+      commit?: { message?: string; author?: { name?: string; date?: string } };
+      author?: { login?: string } | null;
+    }>;
+  };
+
+  return {
+    repo: full,
+    query: terms,
+    commits: (data.items ?? []).map(item => ({
+      sha: item.sha || '',
+      short_sha: (item.sha || '').slice(0, 7),
+      message: trimCommitMessage(item.commit?.message || ''),
+      author: item.author?.login || item.commit?.author?.name || null,
+      date: item.commit?.author?.date || '',
+      url: item.html_url || '',
+    })),
   };
 }
 
