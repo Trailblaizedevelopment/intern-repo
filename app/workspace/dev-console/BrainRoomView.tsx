@@ -29,7 +29,7 @@ function deriveMood(runningNow: number, activeTasks: number): BrainMood {
 }
 
 const MOOD_COPY: Record<BrainMood, string[]> = {
-  idle: ['Resting… ping me in Slack!', 'Systems nominal.', 'Grabbing coffee…'],
+  idle: ['Resting… ping me in Slack!', 'Systems nominal.', 'Pacing the room…'],
   thinking: ['Processing your request…', 'Calling tools…', 'Reading the board…'],
   working: ['Orchestrating a task…', 'Cursor might be busy.', 'Long-running goal in progress.'],
   celebrating: ['Done!', 'That run finished.', 'Nice — check Ops for details.'],
@@ -47,7 +47,7 @@ export function BrainRoomView({ agentRunStats, activeTasks, connectors, runningN
     [runningNow, activeTasks, flashCelebrate]
   );
 
-  const { posX, facing, isWalking, walkFrame } = useBrainRoomMovement({ mood });
+  const { posX, facing, isWalking, walkFrame, deskZone } = useBrainRoomMovement({ mood });
 
   const copy = MOOD_COPY[mood];
   const bubble = copy[bubbleIdx % copy.length];
@@ -74,7 +74,7 @@ export function BrainRoomView({ agentRunStats, activeTasks, connectors, runningN
   }, []);
 
   return (
-    <div className="dev-console-room" style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, overflow: 'hidden' }}>
+    <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, overflow: 'hidden' }}>
       <div className="brain-room-scene">
         <BrainOfficeScene
           connectors={connectors}
@@ -98,6 +98,8 @@ export function BrainRoomView({ agentRunStats, activeTasks, connectors, runningN
                 facing={facing}
                 isWalking={isWalking}
                 walkFrame={walkFrame}
+                posX={posX}
+                deskZone={deskZone}
               />
             </button>
             <span className="brain-room-label">Trailblaize Brain</span>
@@ -105,18 +107,18 @@ export function BrainRoomView({ agentRunStats, activeTasks, connectors, runningN
         </div>
       </div>
 
-      <div className="dev-console-room-stats" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '14px 18px', borderTop: '1px solid #E5E7EB', background: '#FAFAFA' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '14px 18px', borderTop: '1px solid #E5E7EB', background: '#FAFAFA' }}>
         <StatusChip label="Live runs" value={String(runningNow)} accent={runningNow > 0 ? '#4F46E5' : '#9CA3AF'} />
         <StatusChip label="Active tasks" value={String(activeTasks)} accent={activeTasks > 0 ? '#B45309' : '#9CA3AF'} />
         <StatusChip label="24h runs" value={String(agentRunStats.runs24h)} accent="#4338CA" />
         <StatusChip label="Success" value={`${agentRunStats.successRate24h}%`} accent="#059669" />
-        <div className="dev-console-room-slack-hint" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: '#6B7280' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: '#6B7280' }}>
           <MessageSquare size={14} />
           Chat in Slack to interact
         </div>
       </div>
 
-      <p className="dev-console-room-footer" style={{ margin: 0, padding: '10px 18px 14px', fontSize: '0.6875rem', color: '#9CA3AF', lineHeight: 1.5 }}>
+      <p style={{ margin: 0, padding: '10px 18px 14px', fontSize: '0.6875rem', color: '#9CA3AF', lineHeight: 1.5 }}>
         Drag ⠿ handles to arrange the room — layout saves automatically.{' '}
         <button type="button" onClick={resetLayout} style={{ background: 'none', border: 'none', padding: 0, color: '#92400E', cursor: 'pointer', fontSize: 'inherit' }}>
           Reset layout
@@ -463,6 +465,10 @@ export function BrainRoomView({ agentRunStats, activeTasks, connectors, runningN
           z-index: 5;
         }
 
+        .brain-office-poster,
+        .brain-office-lamp {
+          position: relative;
+        }
         .brain-office-connector-rail {
           display: flex;
           gap: 4px;
@@ -628,16 +634,6 @@ export function BrainRoomView({ agentRunStats, activeTasks, connectors, runningN
           display: block;
           image-rendering: pixelated;
         }
-        .brain-char--blob .brain-char-body {
-          transform-origin: center bottom;
-        }
-        .brain-char--pulse {
-          animation: blob-pulse 1.1s ease-in-out infinite;
-        }
-        @keyframes blob-pulse {
-          0%, 100% { transform: scale(1, 1); }
-          50% { transform: scale(1.04, 0.96); }
-        }
         .brain-char--walk {
           animation: walk-bob 0.165s steps(1) infinite;
         }
@@ -770,12 +766,15 @@ export function BrainRoomView({ agentRunStats, activeTasks, connectors, runningN
           .brain-window-moon { transition: none; }
           .brain-char--walk,
           .brain-char--bob,
-          .brain-char--pulse,
           .brain-char--lean,
           .brain-char--celebrating.brain-char--bob,
           .brain-char-body--poke,
           .brain-char-thought-dot,
           .brain-char-sparkle,
+          .brain-office-monitor--on,
+          .brain-office-monitor-scan,
+          .brain-office-steam::before,
+          .brain-office-steam::after,
           .brain-pixel-cloud,
           .brain-window-star,
           .brain-window-bird,

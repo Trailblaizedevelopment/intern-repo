@@ -1,5 +1,4 @@
 export const LAYOUT_STORAGE_KEY = 'brain-room-layout-v2';
-export const FLOOR_TOP_PERCENT = 66;
 
 export interface WindowLayout {
   id: string;
@@ -7,11 +6,8 @@ export interface WindowLayout {
   width: number;
 }
 
-export interface PointLayout {
+export interface WallItemLayout {
   left: number;
-}
-
-export interface WallItemLayout extends PointLayout {
   top: number;
 }
 
@@ -45,16 +41,7 @@ export function loadBrainRoomLayout(): BrainRoomLayout {
   if (typeof window === 'undefined') return DEFAULT_LAYOUT;
   try {
     const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
-    if (!raw) {
-      const legacy = localStorage.getItem('brain-room-layout-v1');
-      if (legacy) {
-        const parsed = JSON.parse(legacy) as { windows?: WindowLayout[]; wall?: BrainRoomLayout['wall'] };
-        if (parsed.windows?.length === 3 && parsed.wall) {
-          return { version: 2, windows: parsed.windows, wall: parsed.wall };
-        }
-      }
-      return DEFAULT_LAYOUT;
-    }
+    if (!raw) return DEFAULT_LAYOUT;
     const parsed = JSON.parse(raw) as BrainRoomLayout;
     if (parsed.version !== 2 || !parsed.windows || parsed.windows.length !== 3) {
       return DEFAULT_LAYOUT;

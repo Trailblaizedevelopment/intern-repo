@@ -19,24 +19,16 @@ export function useBrainRoomLayout() {
     setHydrated(true);
   }, []);
 
-  const persist = useCallback((next: BrainRoomLayout) => {
-    setLayout(next);
-    saveBrainRoomLayout(next);
+  const updateWindow = useCallback((id: string, patch: Partial<WindowLayout>) => {
+    setLayout(prev => {
+      const next: BrainRoomLayout = {
+        ...prev,
+        windows: prev.windows.map(w => (w.id === id ? { ...w, ...patch } : w)),
+      };
+      saveBrainRoomLayout(next);
+      return next;
+    });
   }, []);
-
-  const updateWindow = useCallback(
-    (id: string, patch: Partial<WindowLayout>) => {
-      setLayout(prev => {
-        const next: BrainRoomLayout = {
-          ...prev,
-          windows: prev.windows.map(w => (w.id === id ? { ...w, ...patch } : w)),
-        };
-        saveBrainRoomLayout(next);
-        return next;
-      });
-    },
-    []
-  );
 
   const updateWallItem = useCallback(
     (key: keyof BrainRoomLayout['wall'], patch: Partial<WallItemLayout>) => {
@@ -53,14 +45,9 @@ export function useBrainRoomLayout() {
   );
 
   const resetLayout = useCallback(() => {
-    persist(DEFAULT_LAYOUT);
-  }, [persist]);
+    setLayout(DEFAULT_LAYOUT);
+    saveBrainRoomLayout(DEFAULT_LAYOUT);
+  }, []);
 
-  return {
-    layout,
-    hydrated,
-    updateWindow,
-    updateWallItem,
-    resetLayout,
-  };
+  return { layout, hydrated, updateWindow, updateWallItem, resetLayout };
 }

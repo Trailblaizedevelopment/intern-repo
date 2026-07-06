@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { BrainRoomLayout } from './brain-room-layout';
 import { BrainRoomClock } from './BrainRoomClock';
 import { BrainWindowView } from './BrainWindowView';
@@ -22,29 +22,49 @@ interface BrainOfficeSceneProps {
   onWallMove: (key: keyof BrainRoomLayout['wall'], pos: { left: number; top?: number }) => void;
 }
 
-const POSTER = (
-  <svg width={18} height={15} viewBox="0 0 6 5" aria-hidden>
-    <rect width={6} height={5} rx={0.8} fill="#78350F" />
-    <rect x={0.6} y={0.6} width={4.8} height={3.8} rx={0.4} fill="#FFFFFF" />
-    <rect x={1.2} y={1.2} width={1.4} height={2.4} rx={0.3} fill="#4338CA" />
-    <rect x={3.2} y={1.2} width={1.4} height={2.4} rx={0.3} fill="#059669" />
-  </svg>
-);
+const P: Record<string, string> = {
+  '.': '',
+  y: '#FDE68A',
+  Y: '#F59E0B',
+  f: '#78716C',
+  F: '#57534E',
+  t: '#92400E',
+  T: '#78350F',
+  u: '#EDE9FE',
+  U: '#FFFFFF',
+  p: '#C4A574',
+};
 
-const LAMP = (
-  <svg width={20} height={28} viewBox="0 0 10 14" aria-hidden>
-    <ellipse cx={5} cy={3} rx={4} ry={3} fill="#FDE68A" />
-    <rect x={4.2} y={5.5} width={1.6} height={6} rx={0.6} fill="#78716C" />
-    <ellipse cx={5} cy={12.5} rx={3.5} ry={1.2} fill="#57534E" />
-  </svg>
-);
+type Pixel = { x: number; y: number; fill: string };
 
-export function BrainOfficeScene({
-  connectors,
-  layout,
-  onWindowMove,
-  onWallMove,
-}: BrainOfficeSceneProps) {
+function parseGrid(rows: string[]): Pixel[] {
+  const out: Pixel[] = [];
+  rows.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      const fill = P[ch];
+      if (fill) out.push({ x, y, fill });
+    });
+  });
+  return out;
+}
+
+function PixelSvg({ rows, scale }: { rows: string[]; scale: number }) {
+  const w = rows[0]?.length ?? 0;
+  const h = rows.length;
+  const pixels = useMemo(() => parseGrid(rows), [rows]);
+  return (
+    <svg width={w * scale} height={h * scale} viewBox={`0 0 ${w} ${h}`} shapeRendering="crispEdges" style={{ display: 'block', imageRendering: 'pixelated' }} aria-hidden>
+      {pixels.map(({ x, y, fill }) => (
+        <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />
+      ))}
+    </svg>
+  );
+}
+
+const LAMP = ['....yy....', '...yyyy...', '..yyyyyy..', '....ff....', '....ff....', '...ffff...', '..ffffff..'];
+const POSTER = ['tttttt', 'tUUUUt', 'tUpUtU', 'tUUUUt', 'tttttt'];
+
+export function BrainOfficeScene({ connectors, layout, onWindowMove, onWallMove }: BrainOfficeSceneProps) {
   const liveConnectors = connectors.filter(c => c.available);
   const dayNight = useDayNightCycle();
   const sky = skyColorsForPhase(dayNight.phase);
@@ -61,11 +81,11 @@ export function BrainOfficeScene({
         <BrainWindowView dayNight={dayNight} windows={layout.windows} onWindowMove={onWindowMove} />
 
         <DraggableRoomItem zone="wall" left={layout.wall.poster.left} top={layout.wall.poster.top} label="Poster" onMove={p => onWallMove('poster', p)}>
-          {POSTER}
+          <PixelSvg rows={POSTER} scale={3} />
         </DraggableRoomItem>
 
         <DraggableRoomItem zone="wall" left={layout.wall.lamp.left} top={layout.wall.lamp.top} label="Lamp" onMove={p => onWallMove('lamp', p)}>
-          {LAMP}
+          <PixelSvg rows={LAMP} scale={2} />
           <div className={`brain-office-lamp-glow${dayNight.lampOn ? ' brain-office-lamp-glow--on' : ''}`} />
         </DraggableRoomItem>
 

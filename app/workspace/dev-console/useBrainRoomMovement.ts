@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ARRIVAL_THRESHOLD,
+  DESK_ZONE,
   MOOD_ANCHOR,
   MOVE_TICK_MS,
+  ROOM_ANCHORS,
   WALK_FRAME_MS,
   WALK_SPEED,
-  WANDER_CENTER,
-  WANDER_LEFT,
-  WANDER_RIGHT,
 } from './brain-room-constants';
 import type { BrainMood } from './BrainCharacterSprite';
 
@@ -20,19 +19,24 @@ interface UseBrainRoomMovementOptions {
 }
 
 export function useBrainRoomMovement({ mood }: UseBrainRoomMovementOptions) {
-  const [posX, setPosX] = useState<number>(WANDER_CENTER);
+  const [posX, setPosX] = useState<number>(ROOM_ANCHORS.center);
   const [facing, setFacing] = useState<Facing>('right');
   const [isWalking, setIsWalking] = useState(false);
   const [walkFrame, setWalkFrame] = useState<0 | 1>(0);
-  const [idleWanderTarget, setIdleWanderTarget] = useState<number>(WANDER_LEFT);
+  const [idleWanderTarget, setIdleWanderTarget] = useState<number>(ROOM_ANCHORS.center);
 
-  const moodTarget = mood === 'idle' ? idleWanderTarget : MOOD_ANCHOR[mood];
+  const moodTarget = useMemo(() => {
+    if (mood === 'idle') return idleWanderTarget;
+    return MOOD_ANCHOR[mood];
+  }, [mood, idleWanderTarget]);
 
   useEffect(() => {
     if (mood !== 'idle') return;
     const id = setInterval(() => {
-      setIdleWanderTarget(t => (t === WANDER_LEFT ? WANDER_RIGHT : WANDER_LEFT));
-    }, 10_000);
+      setIdleWanderTarget(t =>
+        t === ROOM_ANCHORS.center ? ROOM_ANCHORS.wander : ROOM_ANCHORS.center
+      );
+    }, 12_000);
     return () => clearInterval(id);
   }, [mood]);
 
@@ -58,5 +62,5 @@ export function useBrainRoomMovement({ mood }: UseBrainRoomMovementOptions) {
     return () => clearInterval(id);
   }, [isWalking]);
 
-  return { posX, facing, isWalking, walkFrame };
+  return { posX, facing, isWalking, walkFrame, deskZone: DESK_ZONE };
 }

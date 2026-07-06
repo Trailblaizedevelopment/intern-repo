@@ -5,50 +5,56 @@ import type { Facing } from './useBrainRoomMovement';
 
 export type BrainMood = 'idle' | 'thinking' | 'working' | 'celebrating';
 
-/** Violet blob-bot palette — morphic pixel entity. */
+/** Pixel palette — light brown complexion, nappy brown hair, anime-professional vibe. */
 const C: Record<string, string> = {
-  B: '#6366F1',
-  b: '#4338CA',
-  L: '#818CF8',
-  l: '#A5B4FC',
-  W: '#EEF2FF',
-  E: '#C7D2FE',
-  P: '#312E81',
-  A: '#4F46E5',
-  H: '#DDD6FE',
-  G: '#34D399',
-  g: '#059669',
-  R: '#F472B6',
-  r: '#FB7185',
-  S: '#FDE68A',
-  s: '#FBBF24',
+  S: '#D4A574',
+  s: '#B8896A',
+  T: '#E8C9A0',
+  H: '#3D2914',
+  h: '#5C4033',
+  L: '#6B5040',
+  E: '#FAF8F5',
+  e: '#A0826D',
+  p: '#2D1810',
+  g: '#DDD0C0',
+  W: '#4338CA',
+  w: '#312E81',
+  C: '#EDE9FE',
+  B: '#374151',
+  b: '#1F2937',
+  R: '#C9887E',
+  M: '#7A5C44',
+  m: '#5C4033',
+  P: '#292524',
+  O: '#2D1810',
 };
 
-const BASE_BLOB = [
+/** Front-facing body — slightly refined hair volume + outline. */
+const BASE_FRONT = [
   '....................',
-  '.........AA.........',
-  '.........bb.........',
-  '.......bbbbbb.......',
-  '.....bbbbbbbbbb.....',
-  '....bbbbbbbbbbbb....',
-  '...bbbbbbbbbbbbbb...',
-  '...bbbbLLLLLLbbbb...',
-  '..bbbbLBBBBBBLbbbb..',
-  '..bbbbbbbbbbbbbbbb..',
-  '..bbbbbbbbbbbbbbbb..',
-  '..bbbbbbbbbbbbbbbb..',
-  '..bbbbbbbbbbbbbbbb..',
-  '...bbbbbbbbbbbbbb...',
-  '...bbbbbbbbbbbbbb...',
-  '....bbbbbbbbbbbb....',
-  '.....bbbbbbbbbb.....',
-  '......bbbbbbbb......',
-  '....................',
+  '....hhhhhhhhhh......',
+  '..hhLLhLLhLLhLLhh...',
+  '.hhHHHHHHHHHHHHhh...',
+  '.hHHHssSSSSSSssHHh..',
+  '.hHHsSSSSSSSSSSsHh..',
+  '.hHHsSSSSSSSSSSsHh..',
+  '.hHHsSSSSSSSSSSsHh..',
+  '..hhssSSSSSSSSssh...',
+  '...hssSSSSSSSSssh...',
+  '...hhSSSSSSSSSShh...',
+  '..WWWWCCCCCCWWWW....',
+  '.WWWWWWWWWWWWWWWW...',
+  '.WWWWwwWWwwWWWWWW...',
+  '.WWss......ssWWWW...',
+  '..BB........BB......',
+  '..BB........BB......',
+  '..bB........Bb......',
+  '..PP........PP......',
   '....................',
 ];
 
-/** Walk morph — squash & stretch wobble. */
-const WALK_MORPH: [string[], string[]] = [
+/** Front-facing walk leg frames. */
+const WALK_FRONT: [string[], string[]] = [
   [
     '....................',
     '....................',
@@ -64,11 +70,11 @@ const WALK_MORPH: [string[], string[]] = [
     '....................',
     '....................',
     '....................',
-    '......bbbbbbbb......',
-    '.....bbbbbbbbbb.....',
-    '....bbbbbbbbbbbb....',
-    '.....bbbbbbbbbb.....',
-    '......bbbbbbbb......',
+    '....................',
+    '..BB........BB......',
+    '..bB........PP......',
+    '..PP........bB......',
+    '....................',
     '....................',
   ],
   [
@@ -86,10 +92,10 @@ const WALK_MORPH: [string[], string[]] = [
     '....................',
     '....................',
     '....................',
-    '....................',
-    '.......bbbbbb.......',
-    '......bbbbbbbb......',
-    '.......bbbbbb.......',
+    '.WWss......ssWW.....',
+    '..BB........BB......',
+    '..PP........bB......',
+    '..bB........PP......',
     '....................',
     '....................',
   ],
@@ -98,43 +104,43 @@ const WALK_MORPH: [string[], string[]] = [
 const MOOD_FACE: Record<BrainMood, string[]> = {
   idle: [
     '....................',
-    '.........HH.........',
     '....................',
     '....................',
     '....................',
     '....................',
     '....................',
+    '....EEeEg....EEeEg..',
+    '....EEeEg....EEeEg..',
+    '....OEsR......OEsR..',
+    '.....MsR......MsR...',
+    '.....RR........RR...',
     '....................',
     '....................',
-    '..bbbbWWWWWWWWbbbb..',
-    '..bbbWEP....PEWbbb..',
-    '..bbbbbbbbbbbbbbbb..',
-    '..bbb..bbbbbb..bbb..',
     '....................',
     '....................',
-    '....................',
+    '..ss........ss......',
     '....................',
     '....................',
     '....................',
     '....................',
   ],
   thinking: [
-    '.........SS.........',
-    '.........AA.........',
-    '.........HH.........',
+    '....................',
+    '.........TT.........',
+    '........TTTT........',
+    '.......TT..TT.......',
+    '....................',
+    '....................',
+    '....EeEg.....EeEg...',
+    '....EeEE.....EeEE...',
+    '.....mM.......mM....',
     '....................',
     '....................',
     '....................',
     '....................',
     '....................',
     '....................',
-    '..bbbbWWWWWWWWbbbb..',
-    '..bbbWE......EWbbb..',
-    '..bbbb..PP..bbbbbb..',
-    '..bbbbbbbbbbbbbbbb..',
-    '....................',
-    '....................',
-    '....................',
+    '..ss...ss....ss.....',
     '....................',
     '....................',
     '....................',
@@ -142,43 +148,43 @@ const MOOD_FACE: Record<BrainMood, string[]> = {
   ],
   working: [
     '....................',
-    '.........AA.........',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....EpEg.....EpEg...',
+    '....EpEg.....EpEg...',
+    '.....mM.......mM....',
     '....................',
     '....................',
     '....................',
     '....................',
     '....................',
     '....................',
-    '..bbbG........Gbbb..',
-    '..bbbbWWWWWWWWbbbb..',
-    '..bbbPP......PPbbb..',
-    '..bbbbPPPPPPPPbbbb..',
-    '..bbbbbbbbbbbbbbbb..',
-    '....................',
-    '....................',
-    '....................',
+    '...ss.........S.....',
     '....................',
     '....................',
     '....................',
     '....................',
   ],
   celebrating: [
-    '.........SS.........',
-    '.........AA.........',
     '....................',
     '....................',
     '....................',
     '....................',
     '....................',
     '....................',
-    '....................',
-    '..bbbbRRRRRRRRbbbb..',
-    '..bbbRr......rRbbb..',
-    '..bbbbrrrrrrrrbbbb..',
-    '..bbbbbbbbbbbbbbbb..',
-    '....................',
+    '....mMMm.....mMMm...',
+    '....mMMm.....mMMm...',
+    '.....MM.......MM....',
+    '.....RR......RR.....',
     '....................',
     '....................',
+    '....................',
+    '....................',
+    '....................',
+    'ssss........ssss....',
     '....................',
     '....................',
     '....................',
@@ -218,6 +224,8 @@ interface BrainCharacterSpriteProps {
   facing: Facing;
   isWalking: boolean;
   walkFrame: 0 | 1;
+  posX: number;
+  deskZone: { min: number; max: number };
 }
 
 export function BrainCharacterSprite({
@@ -226,21 +234,25 @@ export function BrainCharacterSprite({
   facing,
   isWalking,
   walkFrame,
+  posX,
+  deskZone,
 }: BrainCharacterSpriteProps) {
+  const atDesk = posX >= deskZone.min && posX <= deskZone.max && !isWalking;
+
   const pixels = useMemo(() => {
     if (isWalking) {
-      return mergeSprites(BASE_BLOB, MOOD_FACE.idle, WALK_MORPH[walkFrame]);
+      return mergeSprites(BASE_FRONT, MOOD_FACE.idle, WALK_FRONT[walkFrame]);
     }
-    return mergeSprites(BASE_BLOB, MOOD_FACE[mood]);
+    return mergeSprites(BASE_FRONT, MOOD_FACE[mood]);
   }, [isWalking, mood, walkFrame]);
 
   const bob = !isWalking && (mood === 'thinking' || mood === 'celebrating');
-  const pulse = !isWalking && mood === 'working';
+  const lean = !isWalking && mood === 'working' && atDesk;
   const walkClass = isWalking ? ` brain-char--walk brain-char--walk-${facing}` : '';
 
   return (
     <div
-      className={`brain-char brain-char--blob brain-char--${mood}${bob ? ' brain-char--bob' : ''}${pulse ? ' brain-char--pulse' : ''}${walkClass}`}
+      className={`brain-char brain-char--${mood}${bob ? ' brain-char--bob' : ''}${lean ? ' brain-char--lean' : ''}${walkClass}`}
       style={{ width: SPRITE_W * SCALE, height: SPRITE_H * SCALE }}
     >
       <div className={`brain-char-body${poke ? ' brain-char-body--poke' : ''}`}>
@@ -256,12 +268,11 @@ export function BrainCharacterSprite({
           ))}
         </svg>
       </div>
-
       {!isWalking && mood === 'thinking' && (
         <div className="brain-char-thought" aria-hidden>
           <span className="brain-char-thought-dot brain-char-thought-dot--sm" />
           <span className="brain-char-thought-dot brain-char-thought-dot--md" />
-          <span className="brain-char-thought-dot brain-char-thought-dot--lg">?</span>
+          <span className="brain-char-thought-dot brain-char-thought-dot--lg">…</span>
         </div>
       )}
       {!isWalking && mood === 'celebrating' && (
