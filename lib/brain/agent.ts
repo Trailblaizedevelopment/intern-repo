@@ -10,7 +10,8 @@ import {
  */
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+/** Override via BRAIN_MODEL env. Must be a valid Anthropic model id with tool-use support. */
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const MAX_TOOL_ITERATIONS = 8;
 const MAX_TOKENS = 2048;
 
@@ -156,7 +157,14 @@ export async function runBrainAgent(
     if (!response.ok) {
       const errText = await response.text();
       console.error('[brain] Anthropic API error:', response.status, errText);
-      throw new Error(`Anthropic API error: ${response.status}`);
+      let detail = `Anthropic API error: ${response.status}`;
+      try {
+        const parsed = JSON.parse(errText) as { error?: { message?: string } };
+        if (parsed.error?.message) detail = parsed.error.message;
+      } catch {
+        // use generic message
+      }
+      throw new Error(detail);
     }
 
     const data = (await response.json()) as AnthropicResponse;

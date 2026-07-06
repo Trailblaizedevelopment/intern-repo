@@ -80,24 +80,39 @@ export class McpHttpClient {
     const newSession = res.headers.get('mcp-session-id');
     if (newSession) this.sessionId = newSession;
 
+    const contentType = res.headers.get('content-type') || '';
+    const text = await res.text();
+    const isNotification = message.id === undefined;
+
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
       throw new Error(`MCP HTTP ${res.status}: ${text.slice(0, 300)}`);
     }
 
-    const contentType = res.headers.get('content-type') || '';
+    // MCP notifications (e.g. notifications/initialized) often return 202 with no body
+    if (!text.trim()) {
+      if (isNotification || res.status === 202) {
+        return { jsonrpc: '2.0', result: {} };
+      }
+      throw new Error('MCP HTTP returned empty body');
+    }
 
-    if (contentType.includes('text/event-stream')) {
-      const text = await res.text();
+    // Linear MCP returns SSE even for single JSON-RPC responses
+    if (contentType.includes('text/event-stream') || text.startsWith('event:')) {
       const messages = parseSseJsonRpc(text);
-      const withId = messages.find(m => m.id === message.id);
-      if (withId) return withId;
+      if (message.id !== undefined) {
+        const withId = messages.find(m => m.id === message.id);
+        if (withId) return withId;
+      }
       const last = messages[messages.length - 1];
       if (last) return last;
       throw new Error('MCP SSE stream returned no JSON-RPC response');
     }
 
-    return (await res.json()) as JsonRpcResponse;
+    try {
+      return JSON.parse(text) as JsonRpcResponse;
+    } catch {
+      throw new Error(`MCP invalid JSON response: ${text.slice(0, 200)}`);
+    }
   }
 
   async initialize(): Promise<void> {
