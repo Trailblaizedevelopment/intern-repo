@@ -1,0 +1,270 @@
+/* Roadmap view — colocated so Turbopack always bundles these rules (globals.css is ~32k lines). */
+
+.tkt__roadmap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem 1rem;
+  overflow: hidden;
+}
+
+.tkt__roadmap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+  flex-shrink: 0;
+}
+
+.tkt__roadmap-toolbar-text {
+  flex: 1;
+  min-width: 180px;
+}
+
+.tkt__roadmap-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.tkt__roadmap-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.tkt__roadmap-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tkt__roadmap-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.tkt__roadmap-nav-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.tkt__roadmap-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tkt__roadmap-nav-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #4b5563;
+  min-width: 120px;
+  text-align: center;
+}
+
+.tkt__roadmap-nav-today {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.tkt__roadmap-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.tkt__roadmap-sheet {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.tkt__roadmap-header-row {
+  display: grid;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
+.tkt__roadmap-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tkt__roadmap-label-col {
+  padding: 0.5rem 0.65rem;
+  border-right: 1px solid #f3f4f6;
+  min-width: 0;
+}
+
+.tkt__roadmap-label-col--header {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+}
+
+.tkt__roadmap-day-col {
+  padding: 0.4rem 0.25rem;
+  text-align: center;
+  border-right: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.tkt__roadmap-day-col--today {
+  background: #fef2f2;
+}
+
+.tkt__roadmap-day-name {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tkt__roadmap-day-col--today .tkt__roadmap-day-name {
+  color: #ef4444;
+}
+
+.tkt__roadmap-day-date {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.2;
+}
+
+.tkt__roadmap-day-col--today .tkt__roadmap-day-date {
+  color: #b91c1c;
+}
+
+.tkt__roadmap-row {
+  display: grid;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.tkt__roadmap-row:hover {
+  background: #fafafa;
+}
+
+.tkt__roadmap-row:last-child {
+  border-bottom: none;
+}
+
+.tkt__roadmap-ticket-ids {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.tkt__roadmap-linear-id {
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.tkt__roadmap-status {
+  font-size: 0.58rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid;
+  background: #fff;
+  white-space: nowrap;
+}
+
+.tkt__roadmap-ticket-title {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tkt__roadmap-ticket-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+  font-size: 0.65rem;
+  color: #6b7280;
+}
+
+.tkt__roadmap-assignee--none {
+  font-style: italic;
+}
+
+.tkt__roadmap-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.tkt__roadmap-day-cell {
+  min-height: 48px;
+}
+
+.tkt__roadmap-day-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.tkt__roadmap-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: #9ca3af;
+}
+
+.tkt__roadmap-empty-hint {
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+  color: #b0b7c3;
+}
+
+@media (max-width: 900px) {
+  .tkt__roadmap-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tkt__roadmap-nav-label {
+    min-width: 0;
+  }
+}
