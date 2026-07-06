@@ -6,13 +6,13 @@ import {
 
 /**
  * Trailblaize Brain agent loop — Anthropic Messages API with tool calling.
- * Tools are routed through the MCP connector router (tickets + Linear).
+ * Tools are routed through the MCP connector router (Linear).
  */
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 /** Override via BRAIN_MODEL env. Must be a valid Anthropic model id with tool-use support. */
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
-const MAX_TOOL_ITERATIONS = 8;
+const MAX_TOOL_ITERATIONS = parseInt(process.env.BRAIN_MAX_TOOL_ITERATIONS || '8', 10) || 8;
 const MAX_TOKENS = 2048;
 
 interface TextBlock {
@@ -56,7 +56,7 @@ export interface AgentRunResult {
   toolEvents: ToolEvent[];
 }
 
-function buildSystemPrompt(employeeName: string | null, toolNames: string[]): string {
+function buildSystemPrompt(employeeName: string | null, toolNames: string[], linearWriteMode: boolean): string {
   const now = new Date();
   const centralDate = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Chicago',
@@ -67,18 +67,19 @@ function buildSystemPrompt(employeeName: string | null, toolNames: string[]): st
   }).format(now);
 
   const hasLinear = toolNames.some(n => n.startsWith('linear_'));
-  const hasTickets = toolNames.some(n => n.startsWith('tickets_'));
 
   const toolGuidance: string[] = [];
-  if (hasTickets) {
-    toolGuidance.push(
-      '- Prefer tickets_* tools for fast CRM board queries (due dates, assignee, standup summaries).'
-    );
-  }
   if (hasLinear) {
     toolGuidance.push(
-      '- Use linear_* tools for live Linear workspace data (search, issue detail, projects, comments).'
+      '- Linear is the only source of truth for tickets and engineering work. Use linear_* tools exclusively — never invent ticket IDs or statuses.'
     );
+    if (linearWriteMode) {
+      toolGuidance.push(
+        '- Write mode is ON. You may create or update Linear issues when asked. Confirm title, team, and priority before creating; use create_issue (or equivalent) with minimal required fields.'
+      );
+    } else {
+      toolGuidance.push('- Linear write tools are disabled (read-only). Do not attempt creates or updates.');
+    }
   }
 
   return [
@@ -86,14 +87,13 @@ function buildSystemPrompt(employeeName: string | null, toolNames: string[]): st
     '',
     `Today is ${centralDate} (Central Time — company timezone).`,
     '',
-    'You answer questions about engineering work using connector tools — never invent ticket numbers or statuses.',
+    'Answer questions about engineering work using connector tools only.',
     'If a tool returns no results, say so plainly.',
     '',
     'Tool routing:',
     ...toolGuidance,
     '- Reference tickets by Linear identifier (e.g. TRA-238) when available.',
     '- Keep answers concise. Use markdown lists for multiple items.',
-    '- Linear write tools are disabled in read-only mode; CRM ticket updates ship in a later phase.',
   ].join('\n');
 }
 
@@ -130,9 +130,12 @@ export async function runBrainAgent(
     throw new Error('No connector tools available — check LINEAR_API_KEY and database connection');
   }
 
+  const linearWriteMode = process.env.BRAIN_LINEAR_READ_ONLY === 'false';
+
   const system = buildSystemPrompt(
     employeeName,
-    anthropicTools.map(t => t.name)
+    anthropicTools.map(t => t.name),
+    linearWriteMode
   );
   const messages: BrainMessage[] = [...history];
   const toolEvents: ToolEvent[] = [];
@@ -221,7 +224,7 @@ export async function runBrainAgent(
   }
 
   return {
-    reply: 'I hit the tool-call limit for a single message. Try narrowing the question.',
+    reply: `I hit the limit of ${MAX_TOOL_ITERATIONS} tool-call rounds for this message. Try a narrower question or split the task into steps (e.g. "list due tickets" then "rank by priority").`,
     messages,
     toolEvents,
   };

@@ -54,8 +54,24 @@ export class McpHttpClient {
     private readonly getAuthHeader: () => string
   ) {}
 
+  /** Drop MCP session state so the next call re-initializes. */
+  reset(): void {
+    this.sessionId = null;
+    this.initialized = false;
+  }
+
   getSessionId(): string | null {
     return this.sessionId;
+  }
+
+  private shouldReconnect(err: unknown): boolean {
+    const msg = err instanceof Error ? err.message : String(err);
+    return (
+      /MCP HTTP (401|404|410|502|503)/.test(msg) ||
+      /session/i.test(msg) ||
+      /empty body/i.test(msg) ||
+      /SSE stream returned no/i.test(msg)
+    );
   }
 
   private buildHeaders(): Record<string, string> {
@@ -69,7 +85,19 @@ export class McpHttpClient {
     return headers;
   }
 
-  private async post(message: Record<string, unknown>): Promise<JsonRpcResponse> {
+  private async post(message: Record<string, unknown>, retried = false): Promise<JsonRpcResponse> {
+    try {
+      return await this.postOnce(message);
+    } catch (err) {
+      if (!retried && this.shouldReconnect(err)) {
+        this.reset();
+        return this.post(message, true);
+      }
+      throw err;
+    }
+  }
+
+  private async postOnce(message: Record<string, unknown>): Promise<JsonRpcResponse> {
     const res = await fetch(this.endpoint, {
       method: 'POST',
       headers: this.buildHeaders(),
@@ -196,7 +224,11 @@ export function unprefixedToolName(connectorId: string, prefixed: string): strin
  * look read-only. Write tools ship when explicitly disabled.
  */
 export function isReadOnlyMcpTool(toolName: string): boolean {
+  return !isWriteMcpTool(toolName);
+}
+
+export function isWriteMcpTool(toolName: string): boolean {
   const n = toolName.toLowerCase();
   const writePatterns = ['create', 'update', 'delete', 'remove', 'assign', 'archive', 'move'];
-  return !writePatterns.some(p => n.includes(p));
+  return writePatterns.some(p => n.includes(p));
 }

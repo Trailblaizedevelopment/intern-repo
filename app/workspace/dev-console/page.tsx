@@ -23,11 +23,16 @@ interface ConnectorStatus {
   toolCount: number;
 }
 
+interface ConnectorsMeta {
+  linear_read_only?: boolean;
+  rate_limits?: { per_minute: number; per_hour: number };
+}
+
 const SUGGESTIONS = [
   'What tickets are due this week?',
   "What's assigned to me right now?",
   'Search Linear for open bugs',
-  'Give me a morning summary of the board',
+  'Create a Linear ticket: test Brain write mode — low priority, Trailblaize team',
 ];
 
 export default function DevConsolePage() {
@@ -41,6 +46,7 @@ export default function DevConsolePage() {
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([]);
+  const [connectorsMeta, setConnectorsMeta] = useState<ConnectorsMeta>({});
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -95,7 +101,15 @@ export default function DevConsolePage() {
     if (!session?.access_token || !isDevin) return;
     fetch('/api/brain/connectors', { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.connectors) setConnectors(data.connectors); })
+      .then(data => {
+        if (data?.connectors) setConnectors(data.connectors);
+        if (data) {
+          setConnectorsMeta({
+            linear_read_only: data.linear_read_only,
+            rate_limits: data.rate_limits,
+          });
+        }
+      })
       .catch(() => {});
   }, [session, isDevin, authHeaders]);
 
@@ -171,7 +185,10 @@ export default function DevConsolePage() {
           <div>
             <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>Trailblaize Brain</h1>
             <p style={{ margin: 0, fontSize: '0.75rem', color: '#6B7280' }}>
-              MCP connectors — CRM tickets + Linear (read-only)
+              Linear MCP — {connectorsMeta.linear_read_only === false ? 'write mode' : 'read-only'}
+              {connectorsMeta.rate_limits
+                ? ` · ${connectorsMeta.rate_limits.per_minute}/min cap`
+                : ''}
             </p>
           </div>
         </div>
@@ -260,7 +277,7 @@ export default function DevConsolePage() {
                           background: t.ok ? '#EEF2FF' : '#FEE2E2', color: t.ok ? '#4338CA' : '#991B1B',
                         }}
                       >
-                        <Wrench size={10} /> {t.connector ? `${t.connector}:` : ''}{t.name.replace(/^(tickets|linear)_/, '')}
+                        <Wrench size={10} /> {t.connector ? `${t.connector}:` : ''}{t.name.replace(/^linear_/, '')}
                       </span>
                     ))}
                   </div>

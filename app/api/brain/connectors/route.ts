@@ -28,5 +28,10 @@ export async function GET(request: NextRequest) {
     connectors,
     linear_read_only: process.env.BRAIN_LINEAR_READ_ONLY !== 'false',
     linear_mcp_url: process.env.LINEAR_MCP_URL || 'https://mcp.linear.app/mcp',
+    rate_limits: {
+      per_minute: parseInt(process.env.BRAIN_RATE_LIMIT_PER_MINUTE || '8', 10) || 8,
+      per_hour: parseInt(process.env.BRAIN_RATE_LIMIT_PER_HOUR || '40', 10) || 40,
+    },
+    max_tool_iterations: parseInt(process.env.BRAIN_MAX_TOOL_ITERATIONS || '8', 10) || 8,
   });
 }

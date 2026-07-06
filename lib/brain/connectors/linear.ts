@@ -2,6 +2,7 @@ import { getLinearApiKeyHeader } from '@/lib/linear';
 import {
   McpHttpClient,
   isReadOnlyMcpTool,
+  isWriteMcpTool,
   prefixedToolName,
   unprefixedToolName,
 } from '../mcp/http-client';
@@ -15,12 +16,22 @@ import {
 const CONNECTOR_ID = 'linear';
 const DEFAULT_ENDPOINT = 'https://mcp.linear.app/mcp';
 
+const TOOLS_CACHE_TTL_READ_MS = 5 * 60 * 1000;
+const TOOLS_CACHE_TTL_WRITE_MS = 60 * 1000;
+
 /** In-memory tool list cache (warm serverless instances). */
-let toolsCache: { tools: ConnectorTool[]; expiresAt: number } | null = null;
-const TOOLS_CACHE_TTL_MS = 5 * 60 * 1000;
+let toolsCache: { tools: ConnectorTool[]; expiresAt: number; readOnly: boolean } | null = null;
+
+export function invalidateLinearToolsCache(): void {
+  toolsCache = null;
+}
 
 function linearReadOnly(): boolean {
   return process.env.BRAIN_LINEAR_READ_ONLY !== 'false';
+}
+
+function toolsCacheTtlMs(): number {
+  return linearReadOnly() ? TOOLS_CACHE_TTL_READ_MS : TOOLS_CACHE_TTL_WRITE_MS;
 }
 
 function getEndpoint(): string {
@@ -42,6 +53,12 @@ function getClient(ctx: ConnectorContext): McpHttpClient {
   return client;
 }
 
+function dropClient(ctx: ConnectorContext): void {
+  const existing = ctx.mcpSessions.get(CONNECTOR_ID) as McpHttpClient | undefined;
+  existing?.reset();
+  ctx.mcpSessions.delete(CONNECTOR_ID);
+}
+
 function mcpResultToData(result: unknown): unknown {
   if (result && typeof result === 'object' && 'content' in result) {
     const content = (result as { content?: Array<{ type: string; text?: string }> }).content;
@@ -60,6 +77,28 @@ function mcpResultToData(result: unknown): unknown {
   return result;
 }
 
+function isReconnectError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /MCP HTTP (401|404|410|502|503)/.test(msg) || /session/i.test(msg);
+}
+
+async function callMcpTool(
+  ctx: ConnectorContext,
+  mcpName: string,
+  input: Record<string, unknown>
+): Promise<unknown> {
+  try {
+    const client = getClient(ctx);
+    return await client.callTool(mcpName, input);
+  } catch (err) {
+    if (!isReconnectError(err)) throw err;
+    dropClient(ctx);
+    invalidateLinearToolsCache();
+    const client = getClient(ctx);
+    return client.callTool(mcpName, input);
+  }
+}
+
 export const linearConnector: BrainConnector = {
   id: CONNECTOR_ID,
   label: 'Linear (remote MCP)',
@@ -72,27 +111,60 @@ export const linearConnector: BrainConnector = {
   async listTools(ctx) {
     if (!this.isAvailable()) return [];
 
-    if (toolsCache && toolsCache.expiresAt > Date.now()) {
+    const readOnly = linearReadOnly();
+    if (
+      toolsCache &&
+      toolsCache.readOnly === readOnly &&
+      toolsCache.expiresAt > Date.now()
+    ) {
       return toolsCache.tools;
     }
 
     try {
       const client = getClient(ctx);
       const mcpTools = await client.listTools();
-      const readOnly = linearReadOnly();
 
       const tools: ConnectorTool[] = mcpTools
         .filter(t => !readOnly || isReadOnlyMcpTool(t.name))
         .map(t => ({
           name: prefixedToolName(CONNECTOR_ID, t.name),
           mcpName: t.name,
-          description: `[Linear live] ${t.description || t.name}`,
+          description: `[Linear] ${t.description || t.name}`,
           inputSchema: t.inputSchema || { type: 'object', properties: {} },
         }));
 
-      toolsCache = { tools, expiresAt: Date.now() + TOOLS_CACHE_TTL_MS };
+      toolsCache = {
+        tools,
+        readOnly,
+        expiresAt: Date.now() + toolsCacheTtlMs(),
+      };
       return tools;
     } catch (err) {
+      if (isReconnectError(err)) {
+        dropClient(ctx);
+        invalidateLinearToolsCache();
+        try {
+          const client = getClient(ctx);
+          const mcpTools = await client.listTools();
+          const tools: ConnectorTool[] = mcpTools
+            .filter(t => !readOnly || isReadOnlyMcpTool(t.name))
+            .map(t => ({
+              name: prefixedToolName(CONNECTOR_ID, t.name),
+              mcpName: t.name,
+              description: `[Linear] ${t.description || t.name}`,
+              inputSchema: t.inputSchema || { type: 'object', properties: {} },
+            }));
+          toolsCache = {
+            tools,
+            readOnly,
+            expiresAt: Date.now() + toolsCacheTtlMs(),
+          };
+          return tools;
+        } catch (retryErr) {
+          console.error('[brain/linear] tools/list retry failed:', retryErr);
+          return [];
+        }
+      }
       console.error('[brain/linear] tools/list failed:', err);
       return [];
     }
@@ -109,8 +181,10 @@ export const linearConnector: BrainConnector = {
     }
 
     try {
-      const client = getClient(ctx);
-      const result = await client.callTool(mcpName, input);
+      const result = await callMcpTool(ctx, mcpName, input);
+      if (isWriteMcpTool(mcpName)) {
+        invalidateLinearToolsCache();
+      }
       return { ok: true, data: mcpResultToData(result) };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Linear MCP call failed';

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { authenticateBrainRequest } from '@/lib/brain/auth';
 import { BrainMessage, runBrainAgent, toDisplayMessages } from '@/lib/brain/agent';
+import { checkBrainRateLimit } from '@/lib/brain/rate-limit';
+import { sanitizeForActionLog } from '@/lib/brain/sanitize-log';
 
 /**
  * Trailblaize Brain chat endpoint (Devin-only).
@@ -88,6 +90,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'message too long (max 4000 chars)' }, { status: 400 });
   }
 
+  const rateLimit = checkBrainRateLimit(auth.identity.email);
+  if (!rateLimit.ok) {
+    return NextResponse.json(
+      { error: `${rateLimit.reason}. Try again in ${rateLimit.retryAfterSec}s.` },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec) } }
+    );
+  }
+
   // ── Load or create the conversation ──
   let conversationId = body.conversation_id || null;
   let history: BrainMessage[] = [];
@@ -155,10 +165,10 @@ export async function POST(request: NextRequest) {
       conversation_id: conversationId,
       skill_name: e.name,
       connector_name: e.connector || e.name.split('_')[0] || null,
-      input: e.input,
-      output: e.ok ? e.output : null,
+      input: sanitizeForActionLog(e.input),
+      output: e.ok ? sanitizeForActionLog(e.output) : null,
       status: e.ok ? 'success' : 'failed',
-      error: e.error || null,
+      error: e.error ? String(sanitizeForActionLog(e.error)) : null,
     }));
     const { error: logError } = await supabase.from('brain_action_log').insert(logRows);
     if (logError) console.error('[brain/chat] action log insert failed:', logError.message);

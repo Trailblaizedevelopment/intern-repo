@@ -1,4 +1,3 @@
-import { ticketsConnector } from './connectors/tickets';
 import { linearConnector } from './connectors/linear';
 import {
   BrainConnector,
@@ -9,7 +8,8 @@ import {
 
 export type { ConnectorContext } from './connectors/types';
 
-const CONNECTORS: BrainConnector[] = [ticketsConnector, linearConnector];
+/** Linear is the sole ticket/work-item source for Brain. */
+const CONNECTORS: BrainConnector[] = [linearConnector];
 
 /** Tool name → connector id (built on first listTools call per run). */
 const toolRouting = new Map<string, string>();
