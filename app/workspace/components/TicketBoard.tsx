@@ -1307,20 +1307,21 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
       </div>
 
       <div className="tkt__roadmap-sheet">
-        <div className="tkt__roadmap-header-row" style={gridStyle}>
-          <div className="tkt__roadmap-label-col tkt__roadmap-label-col--header">Work item</div>
-          {visibleDays.map(day => (
-            <div
-              key={day.key}
-              className={`tkt__roadmap-day-col ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
-            >
-              <span className="tkt__roadmap-day-name">{day.dayName}</span>
-              <span className="tkt__roadmap-day-date">{day.dateLabel}</span>
-            </div>
-          ))}
-        </div>
+        <div className="tkt__roadmap-scroll">
+          <div className="tkt__roadmap-header-row" style={gridStyle}>
+            <div className="tkt__roadmap-label-col tkt__roadmap-label-col--header">Work item</div>
+            {visibleDays.map(day => (
+              <div
+                key={day.key}
+                className={`tkt__roadmap-day-col ${day.isToday ? 'tkt__roadmap-day-col--today' : ''}`}
+              >
+                <span className="tkt__roadmap-day-name">{day.dayName}</span>
+                <span className="tkt__roadmap-day-date">{day.dateLabel}</span>
+              </div>
+            ))}
+          </div>
 
-        <div className="tkt__roadmap-body">
+          <div className="tkt__roadmap-body">
           {visibleTickets.length === 0 ? (
             <div className="tkt__roadmap-empty">
               {roadmapTickets.length === 0 ? (
@@ -1395,6 +1396,7 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
               );
             })
           )}
+          </div>
         </div>
       </div>
     </div>

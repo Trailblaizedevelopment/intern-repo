@@ -99,18 +99,25 @@
   overflow: hidden;
 }
 
-.tkt__roadmap-header-row {
-  display: grid;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
-  flex-shrink: 0;
-}
-
-.tkt__roadmap-body {
+.tkt__roadmap-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.tkt__roadmap-header-row {
+  display: grid;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.tkt__roadmap-body {
+  min-height: 0;
 }
 
 .tkt__roadmap-label-col {
