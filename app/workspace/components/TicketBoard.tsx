@@ -1093,7 +1093,6 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
 // ROADMAP VIEW (Linear, week-by-week)
 // ═══════════════════════════════════════════
 
-const ROADMAP_STATUSES: TicketStatus[] = ['in_progress', 'todo', 'open', 'in_review'];
 const ROADMAP_WEEKS_BACK = 2;
 const ROADMAP_MONTHS_FORWARD = 2;
 const ROADMAP_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -1311,7 +1310,6 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
     return tickets
       .filter(t => hasLinearLink(t))
       .filter(t => t.due_date)
-      .filter(t => ROADMAP_STATUSES.includes(t.status))
       .filter(t => {
         const due = parseDueDateLocal(t.due_date!).getTime();
         return due >= rangeStart && due <= rangeEnd;
@@ -1337,7 +1335,6 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
     const linear = tickets.filter(t => hasLinearLink(t));
     const withDue = linear.filter(t => t.due_date);
     const inRange = withDue
-      .filter(t => ROADMAP_STATUSES.includes(t.status))
       .filter(t => {
         const due = parseDueDateLocal(t.due_date!).getTime();
         return due >= rangeStart && due <= rangeEnd;
@@ -1353,7 +1350,7 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
         <div className="tkt__roadmap-toolbar-text">
           <h3 className="tkt__roadmap-title">Linear Roadmap</h3>
           <p className="tkt__roadmap-subtitle">
-            Active work to ship · one week at a time · due on that day · {rangeLabel}
+            Linear tickets with due dates · one week at a time · {rangeLabel}
           </p>
         </div>
         <div className="tkt__roadmap-nav">
@@ -1403,7 +1400,7 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
               <div className="tkt__roadmap-empty tkt__roadmap-grid-span">
                 {roadmapTickets.length === 0 ? (
                   <>
-                    No active Linear tickets with due dates in this range.
+                    No Linear tickets with due dates in this range.
                     <p className="tkt__roadmap-empty-hint">
                       {filterStats.linear} Linear-linked · {filterStats.withDue} with due dates ·{' '}
                       {filterStats.inRange} in range ({rangeLabel})
