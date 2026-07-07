@@ -12,7 +12,7 @@
  *   2. Skips non-alumni roles and bulk-imported Sigma Chi chapter
  *   3. Upserts into platform_members (always — this is the source of truth for signups)
  *   4. Resolves internal chapter_id via chapter_external_mappings
- *   5. If matched to an alumni_contact (by phone or email), updates outreach_status → signed_up
+ *   5. If matched to an alumni_contact **in the same chapter** (by phone or email), updates outreach_status → signed_up
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -233,19 +233,29 @@ export async function POST(request: NextRequest) {
   // --- Try to match & update alumni_contacts ---
   let matchedContactIds: string[] = [];
 
-  if (profile.phone) {
-    const variants = phoneVariants(profile.phone);
-    const orClauses = variants.flatMap(v => [
-      `phone_primary.eq.${v}`,
-      `phone_secondary.eq.${v}`,
-    ]).join(',');
-    const { data } = await db.from('alumni_contacts').select('id').or(orClauses);
-    if (data?.length) matchedContactIds = data.map((c: { id: string }) => c.id);
-  }
+  if (internalChapterId) {
+    if (profile.phone) {
+      const variants = phoneVariants(profile.phone);
+      const orClauses = variants.flatMap(v => [
+        `phone_primary.eq.${v}`,
+        `phone_secondary.eq.${v}`,
+      ]).join(',');
+      const { data } = await db
+        .from('alumni_contacts')
+        .select('id')
+        .eq('chapter_id', internalChapterId)
+        .or(orClauses);
+      if (data?.length) matchedContactIds = data.map((c: { id: string }) => c.id);
+    }
 
-  if (matchedContactIds.length === 0 && profile.email) {
-    const { data } = await db.from('alumni_contacts').select('id').eq('email', profile.email);
-    if (data?.length) matchedContactIds = data.map((c: { id: string }) => c.id);
+    if (matchedContactIds.length === 0 && profile.email) {
+      const { data } = await db
+        .from('alumni_contacts')
+        .select('id')
+        .eq('chapter_id', internalChapterId)
+        .eq('email', profile.email);
+      if (data?.length) matchedContactIds = data.map((c: { id: string }) => c.id);
+    }
   }
 
   if (matchedContactIds.length > 0) {
