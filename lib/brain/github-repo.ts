@@ -485,6 +485,103 @@ export async function fetchTrailblaizeWebRules(): Promise<TrailblaizeWebRules> {
   return payload;
 }
 
+/** Open PR from develop → main (production release). */
+export function isReleasePullRequest(pr: Pick<OpenPrSummary, 'base' | 'head' | 'draft'>): boolean {
+  return (
+    !pr.draft &&
+    pr.base === getProductionBranch() &&
+    pr.head === getDevelopBranch()
+  );
+}
+
+/** Find the open develop → main release PR, if any. */
+export async function findReleasePullRequest(
+  repoFull?: string
+): Promise<OpenPrSummary | null> {
+  const { prs } = await listOpenPullRequests({ repoFull, limit: 30 });
+  return prs.find(isReleasePullRequest) ?? null;
+}
+
+/** Full PR body (not truncated). */
+export async function getPullRequestBody(
+  number: number,
+  repoFull?: string
+): Promise<string | null> {
+  const full = repoFull || getGitHubRepoFull();
+  const parsed = parseRepo(full);
+  if (!parsed) throw new Error('Invalid GITHUB_REPO');
+  if (!number) throw new Error('number is required');
+
+  const res = await githubApiFetch(`/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub PR ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const pr = (await res.json()) as { body?: string | null };
+  return typeof pr.body === 'string' ? pr.body : null;
+}
+
+/** Commits included in a pull request. */
+export async function listPullRequestCommits(
+  number: number,
+  repoFull?: string,
+  limit = 100
+): Promise<CommitSummary[]> {
+  const full = repoFull || getGitHubRepoFull();
+  const parsed = parseRepo(full);
+  if (!parsed) throw new Error('Invalid GITHUB_REPO');
+  if (!number) throw new Error('number is required');
+
+  const perPage = Math.min(Math.max(limit, 1), 100);
+  const res = await githubApiFetch(
+    `/repos/${parsed.owner}/${parsed.repo}/pulls/${number}/commits?per_page=${perPage}`
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub PR commits ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const rows = (await res.json()) as Array<{
+    sha?: string;
+    html_url?: string;
+    commit?: { message?: string; author?: { name?: string; date?: string } };
+    author?: { login?: string } | null;
+  }>;
+
+  return rows.map(row => ({
+    sha: row.sha || '',
+    short_sha: (row.sha || '').slice(0, 7),
+    message: trimCommitMessage(row.commit?.message || ''),
+    author: row.author?.login || row.commit?.author?.name || null,
+    date: row.commit?.author?.date || '',
+    url: row.html_url || `https://github.com/${full}/commit/${row.sha}`,
+  }));
+}
+
+/** Update a pull request description (requires pull_requests: write on token). */
+export async function updatePullRequestBody(
+  number: number,
+  body: string,
+  repoFull?: string
+): Promise<void> {
+  const full = repoFull || getGitHubRepoFull();
+  const parsed = parseRepo(full);
+  if (!parsed) throw new Error('Invalid GITHUB_REPO');
+  if (!number) throw new Error('number is required');
+
+  const res = await githubApiFetch(`/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`GitHub PR update ${res.status}: ${errBody.slice(0, 300)}`);
+  }
+}
+
 export async function findOpenPrByBranch(
   headBranch: string,
   repoFull?: string

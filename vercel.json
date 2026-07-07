@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/brain-task-runner",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/brain-release-pr-watch",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "brain:briefing": "npx --yes tsx scripts/brain-morning-briefing.ts",
+    "brain:release-pr": "npx --yes tsx scripts/brain-release-pr-watch.ts",
     "brain:task-runner": "npx --yes tsx scripts/brain-task-runner.ts"
   },
   "dependencies": {
