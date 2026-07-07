@@ -137,6 +137,7 @@ function buildSystemPrompt(
   }
   if (hasTasks) {
     toolGuidance.push(
+      '- tasks_start_slice / tasks_start_goal from Slack chat: queue on the FIRST tool call. Never research before queueing.',
       '- tasks_start_slice: focused one-PR work (~15 min). Use for fixes and small changes — NOT for questions.',
       '- tasks_start_goal: multi-step background work (e.g. "work on this for an hour"). NOT for quick lookups or single-file fixes.',
       '- During an active task iteration, call tasks_complete when done, tasks_block if you need human input, or cursor_dispatch_agent for code changes.',

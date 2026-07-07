@@ -12,6 +12,10 @@ import { sanitizeForActionLog } from '../sanitize-log';
 import { pickSlackAckPhrase } from './ack-phrases';
 import { postSlackMessage, postSlackMessageReturningTs, replaceSlackThreadReply } from './client';
 import { formatAgentReplyForSlack } from './format-reply';
+import {
+  buildSlackOrchestrationAppend,
+  tryOrchestrationKickoff,
+} from './orchestration-kickoff';
 
 const MAX_STORED_MESSAGES = 40;
 
@@ -153,8 +157,6 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
 
   const history: BrainMessage[] = existing?.messages ? [...existing.messages] : [];
 
-  history.push({ role: 'user', content: message });
-
   const placeholder = await postSlackMessageReturningTs(
     ctx.channel,
     pickSlackAckPhrase(),
@@ -167,18 +169,33 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
 
   let result;
   try {
-    result = await runBrainAgent(
+    const kickoff = await tryOrchestrationKickoff({
+      message,
       history,
-      { supabase, employeeId: employee.employeeId },
-      employee.employeeName,
-      {
-        surface: 'slack',
-        conversationId,
-        slackChannel: ctx.channel,
-        slackThreadTs: ctx.threadTs,
-        slackUserId: ctx.userId,
-      }
-    );
+      ctx,
+      supabase,
+      employeeId: employee.employeeId,
+      conversationId,
+    });
+
+    if (kickoff) {
+      result = kickoff;
+    } else {
+      history.push({ role: 'user', content: message });
+      result = await runBrainAgent(
+        history,
+        { supabase, employeeId: employee.employeeId },
+        employee.employeeName,
+        {
+          surface: 'slack',
+          conversationId,
+          slackChannel: ctx.channel,
+          slackThreadTs: ctx.threadTs,
+          slackUserId: ctx.userId,
+          systemAppend: buildSlackOrchestrationAppend(message, history.slice(0, -1)),
+        }
+      );
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Agent run failed';
     console.error('[brain/slack] agent error:', err);
