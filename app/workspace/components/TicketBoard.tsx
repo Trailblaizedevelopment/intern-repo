@@ -1605,33 +1605,33 @@ function DashboardView({ tickets }: { tickets: TicketData[] }) {
   ), [tickets, weekStart]);
 
   const renderMergeList = (items: GitHubMergesSummary['develop'], emptyLabel: string) => {
+    let content: React.ReactNode;
     if (githubLoading) {
-      return <p className="tkt__dash-muted"><Loader2 size={14} className="tkt__spinner" /> Loading merges…</p>;
+      content = <p className="tkt__dash-muted"><Loader2 size={14} className="tkt__spinner" /> Loading merges…</p>;
+    } else if (!github?.configured) {
+      content = <p className="tkt__dash-muted">Add GITHUB_TOKEN to show merge activity.</p>;
+    } else if (github.error) {
+      content = <p className="tkt__dash-muted">{github.error}</p>;
+    } else if (items.length === 0) {
+      content = <p className="tkt__dash-muted">{emptyLabel}</p>;
+    } else {
+      content = (
+        <ul className="tkt__dash-merge-list">
+          {items.map(item => (
+            <li key={`${item.base}-${item.number}`}>
+              <a href={item.url} target="_blank" rel="noopener noreferrer" className="tkt__dash-merge-link">
+                <span className="tkt__dash-merge-title">#{item.number} {item.title}</span>
+                <span className="tkt__dash-merge-meta">
+                  {formatMergeDate(item.merged_at)}
+                  {item.author ? ` · ${item.author}` : ''}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      );
     }
-    if (!github?.configured) {
-      return <p className="tkt__dash-muted">Add GITHUB_TOKEN to show merge activity.</p>;
-    }
-    if (github.error) {
-      return <p className="tkt__dash-muted">{github.error}</p>;
-    }
-    if (items.length === 0) {
-      return <p className="tkt__dash-muted">{emptyLabel}</p>;
-    }
-    return (
-      <ul className="tkt__dash-merge-list">
-        {items.map(item => (
-          <li key={`${item.base}-${item.number}`}>
-            <a href={item.url} target="_blank" rel="noopener noreferrer" className="tkt__dash-merge-link">
-              <span className="tkt__dash-merge-title">#{item.number} {item.title}</span>
-              <span className="tkt__dash-merge-meta">
-                {formatMergeDate(item.merged_at)}
-                {item.author ? ` · ${item.author}` : ''}
-              </span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    );
+    return <div className="tkt__dash-merge-body">{content}</div>;
   };
 
   return (
@@ -1680,7 +1680,7 @@ function DashboardView({ tickets }: { tickets: TicketData[] }) {
           </div>
         </section>
 
-        <section className="tkt__dash-panel">
+        <section className="tkt__dash-panel tkt__dash-panel--github">
           <div className="tkt__dash-panel-head">
             <h3 className="tkt__dash-title">
               <GitMerge size={15} />
