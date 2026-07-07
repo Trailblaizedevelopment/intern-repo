@@ -1095,6 +1095,7 @@ function TicketListView({ tickets, onTicketClick }: { tickets: TicketData[]; onT
 
 const ROADMAP_WEEKS_BACK = 2;
 const ROADMAP_MONTHS_FORWARD = 2;
+const ROADMAP_EXCLUDED_STATUSES: TicketStatus[] = ['done', 'canceled'];
 const ROADMAP_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 interface RoadmapWeek {
@@ -1282,6 +1283,13 @@ function openLinearTicket(ticket: TicketData) {
   if (url) window.open(url, '_blank', 'noopener,noreferrer');
 }
 
+function isRoadmapEligibleTicket(ticket: TicketData, rangeStart: number, rangeEnd: number): boolean {
+  if (!hasLinearLink(ticket) || !ticket.due_date) return false;
+  if (ROADMAP_EXCLUDED_STATUSES.includes(ticket.status)) return false;
+  const due = parseDueDateLocal(ticket.due_date).getTime();
+  return due >= rangeStart && due <= rangeEnd;
+}
+
 function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTicketClick: (t: TicketData) => void }) {
   const today = useMemo(() => {
     const d = new Date();
@@ -1308,12 +1316,7 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
     const rangeStart = allWeeks[0].start.getTime();
     const rangeEnd = allWeeks[allWeeks.length - 1].end.getTime();
     return tickets
-      .filter(t => hasLinearLink(t))
-      .filter(t => t.due_date)
-      .filter(t => {
-        const due = parseDueDateLocal(t.due_date!).getTime();
-        return due >= rangeStart && due <= rangeEnd;
-      })
+      .filter(t => isRoadmapEligibleTicket(t, rangeStart, rangeEnd))
       .sort((a, b) => parseDueDateLocal(a.due_date!).getTime() - parseDueDateLocal(b.due_date!).getTime());
   }, [tickets, allWeeks]);
 
@@ -1333,12 +1336,8 @@ function RoadmapView({ tickets, onTicketClick }: { tickets: TicketData[]; onTick
     const rangeStart = allWeeks[0].start.getTime();
     const rangeEnd = allWeeks[allWeeks.length - 1].end.getTime();
     const linear = tickets.filter(t => hasLinearLink(t));
-    const withDue = linear.filter(t => t.due_date);
-    const inRange = withDue
-      .filter(t => {
-        const due = parseDueDateLocal(t.due_date!).getTime();
-        return due >= rangeStart && due <= rangeEnd;
-      });
+    const withDue = linear.filter(t => t.due_date && !ROADMAP_EXCLUDED_STATUSES.includes(t.status));
+    const inRange = withDue.filter(t => isRoadmapEligibleTicket(t, rangeStart, rangeEnd));
     return { linear: linear.length, withDue: withDue.length, inRange: inRange.length };
   }, [tickets, allWeeks]);
 
