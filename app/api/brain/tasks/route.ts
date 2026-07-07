@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateBrainRequest } from '@/lib/brain/auth';
 import { createBrainTask, listActiveBrainTasks } from '@/lib/brain/tasks/store';
+import { BrainTaskKind } from '@/lib/brain/tasks/types';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
  * GET  — list active brain tasks
- * POST — create a task { goal, linear_issue_id?, max_minutes? }
+ * POST — create a task { goal, task_kind?, linear_issue_id?, max_minutes? }
  */
 
 export const maxDuration = 60;
@@ -36,7 +37,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
   }
 
-  let body: { goal?: string; linear_issue_id?: string; max_minutes?: number; conversation_id?: string };
+  let body: {
+    goal?: string;
+    task_kind?: BrainTaskKind;
+    linear_issue_id?: string;
+    max_minutes?: number;
+    conversation_id?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -51,6 +58,7 @@ export async function POST(request: NextRequest) {
   try {
     const task = await createBrainTask(supabase, {
       goal,
+      taskKind: body.task_kind === 'slice' ? 'slice' : 'goal',
       linearIssueId: body.linear_issue_id,
       maxMinutes: body.max_minutes,
       employeeId: auth.identity.employeeId,

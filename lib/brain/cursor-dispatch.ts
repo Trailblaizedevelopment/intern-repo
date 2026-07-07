@@ -9,6 +9,7 @@ import {
 import { delegateLinearIssueToCursor } from './linear-delegate';
 import { getBrainTask } from './tasks/store';
 import { isCursorDispatchLocked } from './tasks/cursor-lock';
+import { isSliceTaskKind } from './intent-routing';
 import { ConnectorContext } from './connectors/types';
 
 export interface CursorDispatchInput {
@@ -62,6 +63,13 @@ export async function runCursorDispatch(
   if (task) {
     linearIssueId = linearIssueId || task.linear_issue_id;
     taskGoal = task.goal;
+
+    if (followUp && isSliceTaskKind(task.task_kind)) {
+      return {
+        ok: false,
+        error: 'Slice tasks allow only one Cursor dispatch — follow_up is not permitted.',
+      };
+    }
 
     if (isCursorDispatchLocked(task, followUp)) {
       return {

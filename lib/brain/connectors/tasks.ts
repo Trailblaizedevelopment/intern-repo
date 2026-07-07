@@ -5,6 +5,7 @@ import {
   listActiveBrainTasks,
   updateTaskStatus,
 } from '../tasks/store';
+import { SLICE_DEFAULT_MAX_MINUTES } from '../intent-routing';
 import { postSlackMessage } from '../slack/client';
 import {
   BrainConnector,
@@ -17,9 +18,23 @@ const CONNECTOR_ID = 'tasks';
 
 const TOOLS: ConnectorTool[] = [
   {
+    name: 'tasks_start_slice',
+    description:
+      'Start a focused Slice: one small PR, ~15 min budget, max one Cursor dispatch. Use for fixes and single-scope implementation — NOT for questions or multi-hour work.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        goal: { type: 'string', description: 'The focused change to make' },
+        linear_issue_id: { type: 'string', description: 'Optional Linear id e.g. TRA-465' },
+        max_minutes: { type: 'number', description: 'Time budget (default 15)' },
+      },
+      required: ['goal'],
+    },
+  },
+  {
     name: 'tasks_start_goal',
     description:
-      'Start a durable multi-step work goal. Generates an execution plan (grill) and queues background iterations. Use when asked to work on something for an extended period.',
+      'Start a durable Goal: multi-step background work for an extended period. Use only when the user wants sustained iteration — NOT for lookups or single-PR fixes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -87,6 +102,62 @@ function resolveTaskId(ctx: ConnectorContext, input: Record<string, unknown>): s
   return fromInput || ctx.taskId || null;
 }
 
+async function startTask(
+  ctx: ConnectorContext,
+  input: Record<string, unknown>,
+  taskKind: 'slice' | 'goal'
+): Promise<ConnectorCallResult> {
+  const goal = String(input.goal || '').trim();
+  if (!goal) return { ok: false, error: 'goal is required' };
+
+  const defaultMinutes = taskKind === 'slice' ? SLICE_DEFAULT_MAX_MINUTES : 60;
+  const maxMinutes = Number(input.max_minutes) || defaultMinutes;
+
+  const task = await createBrainTask(ctx.supabase, {
+    goal,
+    taskKind,
+    linearIssueId: typeof input.linear_issue_id === 'string' ? input.linear_issue_id : null,
+    maxMinutes,
+    employeeId: ctx.employeeId,
+    source: ctx.surface === 'slack' ? 'slack' : 'chat',
+    conversationId: ctx.conversationId ?? null,
+    slackChannel: ctx.slackChannel ?? null,
+    slackThreadTs: ctx.slackThreadTs ?? null,
+  });
+
+  if (ctx.slackChannel) {
+    const label = taskKind === 'slice' ? 'Slice queued' : 'Goal queued';
+    await postSlackMessage(
+      ctx.slackChannel,
+      [
+        `*${label}* (${maxMinutes} min)`,
+        task.linear_issue_id ? `Linear: \`${task.linear_issue_id}\`` : null,
+        task.goal.slice(0, 200),
+        `Branch: \`${task.integration_branch}\``,
+        taskKind === 'slice' ? '_One Cursor dispatch max._' : null,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      ctx.slackThreadTs || undefined
+    );
+  }
+
+  return {
+    ok: true,
+    data: {
+      task_id: task.id,
+      task_kind: taskKind,
+      status: task.status,
+      plan: task.plan,
+      deadline_at: task.deadline_at,
+      message:
+        taskKind === 'slice'
+          ? 'Slice queued. Background runner will research, request one Cursor dispatch, and complete when PR exists.'
+          : 'Goal queued. Background runner will iterate until complete, blocked, or deadline.',
+    },
+  };
+}
+
 export const tasksConnector: BrainConnector = {
   id: CONNECTOR_ID,
   label: 'Task Orchestration',
@@ -102,46 +173,12 @@ export const tasksConnector: BrainConnector = {
 
   async callTool(toolName: string, input: Record<string, unknown>, ctx: ConnectorContext): Promise<ConnectorCallResult> {
     try {
+      if (toolName === 'tasks_start_slice') {
+        return startTask(ctx, input, 'slice');
+      }
+
       if (toolName === 'tasks_start_goal') {
-        const goal = String(input.goal || '').trim();
-        if (!goal) return { ok: false, error: 'goal is required' };
-
-        const task = await createBrainTask(ctx.supabase, {
-          goal,
-          linearIssueId: typeof input.linear_issue_id === 'string' ? input.linear_issue_id : null,
-          maxMinutes: Number(input.max_minutes) || 60,
-          employeeId: ctx.employeeId,
-          source: ctx.surface === 'slack' ? 'slack' : 'chat',
-          conversationId: ctx.conversationId ?? null,
-          slackChannel: ctx.slackChannel ?? null,
-          slackThreadTs: ctx.slackThreadTs ?? null,
-        });
-
-        if (ctx.slackChannel) {
-          await postSlackMessage(
-            ctx.slackChannel,
-            [
-              '*Task queued*',
-              task.linear_issue_id ? `Linear: \`${task.linear_issue_id}\`` : null,
-              task.goal.slice(0, 200),
-              `Branch: \`${task.integration_branch}\``,
-            ]
-              .filter(Boolean)
-              .join('\n'),
-            ctx.slackThreadTs || undefined
-          );
-        }
-
-        return {
-          ok: true,
-          data: {
-            task_id: task.id,
-            status: task.status,
-            plan: task.plan,
-            deadline_at: task.deadline_at,
-            message: 'Task queued. Background runner will iterate until complete, blocked, or deadline.',
-          },
-        };
+        return startTask(ctx, input, 'goal');
       }
 
       if (toolName === 'tasks_list_active') {
@@ -151,6 +188,7 @@ export const tasksConnector: BrainConnector = {
           data: tasks.map(t => ({
             id: t.id,
             goal: t.goal,
+            task_kind: t.task_kind ?? 'goal',
             status: t.status,
             linear_issue_id: t.linear_issue_id,
             iteration_count: t.iteration_count,

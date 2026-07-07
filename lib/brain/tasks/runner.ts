@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { isCursorConfigured } from '../cursor-api';
 import { watchCursorAgent } from '../cursor-watch';
 import { runBrainAgent } from '../agent';
+import { isSliceTaskKind } from '../intent-routing';
 import { postSlackMessage } from '../slack/client';
 import { formatCursorPollSlackUpdate, formatTaskIterationSlackUpdate } from '../slack/task-updates';
 import { handlePrMergeWatch } from './cursor-lock';
@@ -12,10 +13,16 @@ const TICK_INTERVAL_MS = parseInt(process.env.BRAIN_TASK_TICK_MS || '120000', 10
 const CURSOR_POLL_INTERVAL_MS = parseInt(process.env.BRAIN_CURSOR_POLL_MS || '60000', 10) || 60_000;
 
 function buildTaskIterationPrompt(task: BrainTaskRow, cursorNote?: string): string {
+  const slice = isSliceTaskKind(task.task_kind);
   const parts = [
-    `Continue brain_task ${task.id}.`,
+    `Continue brain_task ${task.id} (${slice ? 'SLICE' : 'GOAL'}).`,
     `Goal: ${task.goal}`,
   ];
+  if (slice) {
+    parts.push(
+      'SLICE RULES: One Cursor dispatch only — never follow_up. Complete when PR exists or research shows no code change needed.'
+    );
+  }
   if (task.linear_issue_id) parts.push(`Linear: ${task.linear_issue_id}`);
   if (task.integration_branch) {
     parts.push(`Integration branch (PR target): ${task.integration_branch} — humans merge this → develop`);
@@ -32,18 +39,23 @@ function buildTaskIterationPrompt(task: BrainTaskRow, cursorNote?: string): stri
   parts.push(
     `Iteration ${task.iteration_count + 1}/${task.max_iterations}. Deadline: ${task.deadline_at || 'none'}.`,
     'Use tools to make progress. Call tasks_complete when done, tasks_block if stuck.',
-    'If cursor PR merged into integration branch, use cursor_dispatch_agent with follow_up=true for next slice.',
+    slice
+      ? 'Slice: dispatch Cursor once if needed, then tasks_complete when PR is open.'
+      : 'If cursor PR merged into integration branch, use cursor_dispatch_agent with follow_up=true for next slice.',
     'Never target develop or main with PRs — humans only.'
   );
   return parts.join('\n\n');
 }
 
 function buildTaskSystemAppend(task: BrainTaskRow): string {
+  const slice = isSliceTaskKind(task.task_kind);
   return [
-    'TASK ORCHESTRATION MODE — you are executing one iteration of a background goal.',
+    `TASK ORCHESTRATION MODE — executing one iteration of a background ${slice ? 'Slice' : 'Goal'}.`,
     `Task id: ${task.id} (pass to tasks_* tools or rely on task context).`,
     'Brain orchestrates; Cursor implements on Trailblaize-Web. PRs target the task integration feature branch only — humans merge feature → develop.',
-    'Be action-oriented: research in Linear/GitHub, request Cursor dispatch once for implementation (user must approve in Slack), then complete when PR exists.',
+    slice
+      ? 'Slice mode: minimal research, one Cursor dispatch max, complete as soon as PR exists. No follow-up dispatches.'
+      : 'Be action-oriented: research in Linear/GitHub, request Cursor dispatch for implementation (user must approve in Slack), then complete when PR exists.',
     'Do not ask the user questions — make reasonable assumptions and log them in the summary.',
   ].join('\n');
 }
@@ -157,6 +169,30 @@ async function handleCursorWatchTick(
       ]
         .filter(Boolean)
         .join('\n'));
+    }
+
+    if (isSliceTaskKind(task.task_kind)) {
+      const summary = [
+        'Slice complete — Cursor finished.',
+        prLine || null,
+        watch.summary?.slice(0, 300) || null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+      await updateTaskStatus(supabase, task.id, 'completed', { result_summary: summary });
+      await appendTaskLog(supabase, task.id, { kind: 'info', message: summary.slice(0, 500) });
+      if (task.slack_channel) {
+        await notifySlack(task, `*Slice complete*\n${summary}`);
+      }
+      return {
+        handled: true,
+        result: {
+          processed: true,
+          taskId: task.id,
+          status: 'completed',
+          reply: summary,
+        },
+      };
     }
 
     return { handled: false };

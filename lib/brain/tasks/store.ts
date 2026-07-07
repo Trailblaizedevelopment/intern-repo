@@ -2,6 +2,11 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { deriveIntegrationBranch } from '../integration-branch';
 import { getGitHubRepoFull } from '../github-repo';
 import { grillTaskPlan } from '../grill';
+import {
+  GOAL_DEFAULT_MAX_MINUTES,
+  SLICE_DEFAULT_MAX_ITERATIONS,
+  SLICE_DEFAULT_MAX_MINUTES,
+} from '../intent-routing';
 import { BrainTaskLogEntry, BrainTaskRow, BrainTaskStatus, CreateBrainTaskInput } from './types';
 
 function defaultRepo(): string {
@@ -26,7 +31,15 @@ export async function createBrainTask(
   supabase: SupabaseClient,
   input: CreateBrainTaskInput
 ): Promise<BrainTaskRow> {
-  const maxMinutes = input.maxMinutes ?? 60;
+  const taskKind = input.taskKind ?? 'goal';
+  const maxMinutes =
+    input.maxMinutes ??
+    (taskKind === 'slice' ? SLICE_DEFAULT_MAX_MINUTES : GOAL_DEFAULT_MAX_MINUTES);
+  const maxIterations =
+    input.maxIterations ??
+    (taskKind === 'slice'
+      ? SLICE_DEFAULT_MAX_ITERATIONS
+      : parseInt(process.env.BRAIN_TASK_MAX_ITERATIONS || '12', 10) || 12);
   const deadline = new Date(Date.now() + maxMinutes * 60_000).toISOString();
   const integrationBranch = deriveIntegrationBranch(input.linearIssueId, input.goal);
 
@@ -39,11 +52,12 @@ export async function createBrainTask(
         conversation_id: input.conversationId ?? null,
         linear_issue_id: input.linearIssueId ?? null,
         goal: input.goal.trim(),
+        task_kind: taskKind,
         status: 'planning',
         github_repo: defaultRepo(),
         integration_branch: integrationBranch,
         max_minutes: maxMinutes,
-        max_iterations: parseInt(process.env.BRAIN_TASK_MAX_ITERATIONS || '12', 10) || 12,
+        max_iterations: maxIterations,
         deadline_at: deadline,
         slack_channel: input.slackChannel ?? null,
         slack_thread_ts: input.slackThreadTs ?? null,
@@ -57,9 +71,13 @@ export async function createBrainTask(
     throw new Error(error?.message || 'Failed to create task');
   }
 
-  const plan = await grillTaskPlan(input.goal, input.linearIssueId);
+  const plan = await grillTaskPlan(input.goal, input.linearIssueId, taskKind);
   const log: BrainTaskLogEntry[] = [
-    { at: new Date().toISOString(), kind: 'grill', message: 'Execution plan generated' },
+    {
+      at: new Date().toISOString(),
+      kind: 'grill',
+      message: `${taskKind === 'slice' ? 'Slice' : 'Goal'} plan generated`,
+    },
     { at: new Date().toISOString(), kind: 'info', message: plan.slice(0, 500) },
   ];
 

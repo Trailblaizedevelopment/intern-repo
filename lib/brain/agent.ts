@@ -9,6 +9,7 @@ import {
   resolveAgentRunSurface,
   startAgentRun,
 } from './agent-runs';
+import { buildIntentRoutingPrompt } from './intent-routing';
 
 /**
  * Trailblaize Brain agent loop — Anthropic Messages API with tool calling.
@@ -93,6 +94,7 @@ function buildSystemPrompt(
   const hasGitHub = toolNames.some(n => n.startsWith('github_'));
   const hasCursor = toolNames.some(n => n.startsWith('cursor_'));
   const hasTasks = toolNames.some(n => n.startsWith('tasks_'));
+  const hasTickets = toolNames.some(n => n.startsWith('tickets_'));
 
   const toolGuidance: string[] = [];
   if (hasGitHub) {
@@ -118,19 +120,27 @@ function buildSystemPrompt(
       toolGuidance.push('- Linear write tools are disabled (read-only). Do not attempt creates or updates.');
     }
   }
+  if (hasTickets) {
+    toolGuidance.push(
+      '- tickets_* reads the CRM Supabase ticket cache (board snapshot, assignee filters). Prefer linear_* for live Linear workflow state.'
+    );
+  }
   if (hasCursor) {
     toolGuidance.push(
       '- cursor_dispatch_agent pauses for Slack approval (awaiting_approval) — user must reply yes dispatch. Never pass approved=true yourself.',
-      '- Use cursor_dispatch_agent for implementation. PRs target the task integration feature branch (feature/TRA-xxx-...) — NEVER develop or main.',
+      '- Use cursor_dispatch_agent for implementation inside an active Slice or Goal task. Do not dispatch from Lookup mode.',
+      '- PRs target the task integration feature branch (feature/TRA-xxx-...) — NEVER develop or main.',
       '- Integration branch is created from develop automatically. Humans merge feature → develop after review.',
-      '- Only one dispatch per task unless follow_up=true (after cursor PR merges into integration branch).',
+      '- Goal tasks: follow_up=true allowed after cursor PR merges into integration branch. Slice tasks: one dispatch only.',
       '- Runner polls Cursor and PR merge into integration branch automatically.'
     );
   }
   if (hasTasks) {
     toolGuidance.push(
-      '- Use tasks_start_goal when asked to work for an extended period (e.g. "work on this for an hour"). The background runner loops until tasks_complete, tasks_fail, deadline, or max iterations.',
-      '- During an active task iteration, call tasks_complete with a summary when done, tasks_block if you need human input, or cursor_dispatch_agent for code changes.'
+      '- tasks_start_slice: focused one-PR work (~15 min). Use for fixes and small changes — NOT for questions.',
+      '- tasks_start_goal: multi-step background work (e.g. "work on this for an hour"). NOT for quick lookups or single-file fixes.',
+      '- During an active task iteration, call tasks_complete when done, tasks_block if you need human input, or cursor_dispatch_agent for code changes.',
+      '- tasks_list_active / tasks_get_status: answer status questions without starting new work.'
     );
   }
 
@@ -139,12 +149,15 @@ function buildSystemPrompt(
     '',
     `Today is ${centralDate} (Central Time — company timezone).`,
     '',
+    buildIntentRoutingPrompt(surface),
+    '',
     'Answer questions about engineering work using connector tools only.',
     'If a tool returns no results, say so plainly.',
     '',
     'Tool routing:',
     ...toolGuidance,
     '- Reference tickets by Linear identifier (e.g. TRA-238) when available.',
+    '- CRM cached tickets: tickets_* tools. Linear live issues: linear_* tools. Do not mix sources for the same question.',
     surface === 'slack'
       ? '- You are replying in Slack. Be concise. Use Slack mrkdwn (*bold*, • bullets). No emojis.'
       : '- Keep answers concise. Use markdown lists for multiple items.',

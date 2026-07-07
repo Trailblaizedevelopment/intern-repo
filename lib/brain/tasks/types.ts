@@ -1,3 +1,5 @@
+export type BrainTaskKind = 'slice' | 'goal';
+
 export type BrainTaskStatus =
   | 'queued'
   | 'planning'
@@ -30,6 +32,7 @@ export interface BrainTaskRow {
   linear_issue_id: string | null;
   goal: string;
   plan: string | null;
+  task_kind: BrainTaskKind;
   status: BrainTaskStatus;
   cursor_agent_id: string | null;
   cursor_agent_url: string | null;
@@ -57,8 +60,10 @@ export interface BrainTaskRow {
 
 export interface CreateBrainTaskInput {
   goal: string;
+  taskKind?: BrainTaskKind;
   linearIssueId?: string | null;
   maxMinutes?: number;
+  maxIterations?: number;
   source?: 'chat' | 'slack' | 'automation';
   conversationId?: string | null;
   employeeId?: string | null;
