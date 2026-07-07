@@ -1531,7 +1531,7 @@ function ConnectedColumn({ entries }: { entries: ConnectedEntry[] }) {
 
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 
-function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextClick, onStatusClick, onCardClick }: {
+function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextClick, onStatusClick, onCardClick, notCalledSearch, setNotCalledSearch }: {
   status: ColumnStatus;
   contacts: MergedAlumni[];
   callLogs: Record<string, CallLog>;
@@ -1540,18 +1540,48 @@ function KanbanColumn({ status, contacts, callLogs, claims, onCallClick, onTextC
   onTextClick: (c: MergedAlumni) => void;
   onStatusClick: (c: MergedAlumni) => void;
   onCardClick: (c: MergedAlumni) => void;
+  notCalledSearch?: string;
+  setNotCalledSearch?: (v: string) => void;
 }) {
   const cfg = COLUMN_CONFIG[status];
+  const displayContacts = status === 'not_called' && notCalledSearch?.trim()
+    ? contacts.filter(c =>
+        c.full_name?.toLowerCase().includes(notCalledSearch.toLowerCase()) ||
+        c.first_name?.toLowerCase().includes(notCalledSearch.toLowerCase()) ||
+        c.last_name?.toLowerCase().includes(notCalledSearch.toLowerCase())
+      )
+    : contacts;
   return (
     <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ background: cfg.headerBg, border: `1px solid ${cfg.borderColor}`, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>{cfg.label}</span>
         <span style={{ fontSize: '0.75rem', fontWeight: 700, color: cfg.badgeColor, background: cfg.badgeBg, padding: '2px 8px', borderRadius: 9999 }}>{contacts.length}</span>
       </div>
+      {status === 'not_called' && (
+        <div style={{ padding: '0 0 8px 0' }}>
+          <input
+            type="text"
+            placeholder="Search by name..."
+            value={notCalledSearch ?? ''}
+            onChange={e => setNotCalledSearch?.(e.target.value)}
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%',
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+              fontSize: '0.8rem',
+              outline: 'none',
+              background: '#f9fafb',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', maxHeight: 'calc(100vh - 380px)', paddingBottom: 8 }}>
-        {contacts.length === 0 ? (
+        {displayContacts.length === 0 ? (
           <div style={{ padding: '24px 0', textAlign: 'center', color: '#d1d5db', fontSize: '0.8125rem' }}>No contacts</div>
-        ) : contacts.map(c => (
+        ) : displayContacts.map(c => (
           <ContactCard key={c.id} contact={c} log={callLogs[c.id]} claim={claims[c.id]} status={status} onCallClick={() => onCallClick(c)} onTextClick={() => onTextClick(c)} onStatusClick={() => onStatusClick(c)} onCardClick={() => onCardClick(c)} />
         ))}
       </div>
@@ -2142,6 +2172,7 @@ export default function ConnectsCenter() {
   const [connected, setConnected] = useState<ConnectedEntry[]>([]);
 
   // UI state
+  const [notCalledSearch, setNotCalledSearch] = useState('');
   const [callModal, setCallModal] = useState<MergedAlumni | null>(null);
   const [loggingPanel, setLoggingPanel] = useState<LoggingState | null>(null);
   const [textingContact, setTextingContact] = useState<MergedAlumni | null>(null);
@@ -2568,7 +2599,7 @@ export default function ConnectsCenter() {
               <div style={{ overflowX: 'auto', paddingBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 'max-content' }}>
                   {(['not_called', 'voicemail', 'called', 'declined'] as const).map(status => (
-                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} onTextClick={handleTextClick} onStatusClick={handleStatusClick} onCardClick={c => setProfileContact(c)} />
+                    <KanbanColumn key={status} status={status} contacts={cols[status]} callLogs={callLogs} claims={claims} onCallClick={handleCallClick} onTextClick={handleTextClick} onStatusClick={handleStatusClick} onCardClick={c => setProfileContact(c)} notCalledSearch={notCalledSearch} setNotCalledSearch={setNotCalledSearch} />
                   ))}
                   <PendingConnectColumn
                     entries={pendingConnects}

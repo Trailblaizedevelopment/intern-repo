@@ -67,7 +67,7 @@ export async function GET(_request: NextRequest) {
     const chapterIds = chapters.map((ch) => ch.id);
     const { data: allContacts, error: contactsError } = await supabase
       .from('alumni_contacts')
-      .select('chapter_id, phone_primary, outreach_status')
+      .select('chapter_id, phone_primary, outreach_status, response_text, handled_at, flagged, touch2_sent_at')
       .in('chapter_id', chapterIds);
 
     if (contactsError) {
@@ -85,10 +85,12 @@ export async function GET(_request: NextRequest) {
       contacted_with_phone: number;
       signed_up: number;
       outreach_coverage_pct: number;
+      needs_reply: number;
+      not_pitched: number;
     }> = {};
 
     for (const chId of chapterIds) {
-      statsMap[chId] = { chapter_id: chId, total: 0, have_phone: 0, contacted_with_phone: 0, signed_up: 0, outreach_coverage_pct: 0 };
+      statsMap[chId] = { chapter_id: chId, total: 0, have_phone: 0, contacted_with_phone: 0, signed_up: 0, outreach_coverage_pct: 0, needs_reply: 0, not_pitched: 0 };
     }
 
     for (const c of allContacts ?? []) {
@@ -100,6 +102,10 @@ export async function GET(_request: NextRequest) {
         if (c.outreach_status && c.outreach_status !== 'not_contacted') s.contacted_with_phone++;
       }
       if (c.outreach_status === 'signed_up') s.signed_up++;
+      // needs_reply: has a response, not yet handled, not flagged
+      if (c.response_text != null && c.handled_at == null && !c.flagged) s.needs_reply++;
+      // not_pitched: identity confirmed but signup link not yet sent
+      if (c.outreach_status === 'touch1_confirmed' && c.touch2_sent_at == null) s.not_pitched++;
     }
 
     for (const s of Object.values(statsMap)) {
@@ -113,7 +119,7 @@ export async function GET(_request: NextRequest) {
 
     // Compute health scores and triage tier
     const enriched = chapters.map((ch) => {
-      const stats = statsMap[ch.id] || { total: 0, have_phone: 0, contacted_with_phone: 0, signed_up: 0, outreach_coverage_pct: 0 };
+      const stats = statsMap[ch.id] || { total: 0, have_phone: 0, contacted_with_phone: 0, signed_up: 0, outreach_coverage_pct: 0, needs_reply: 0, not_pitched: 0 };
 
       let score = 0;
 
