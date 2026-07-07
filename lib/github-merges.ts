@@ -18,11 +18,18 @@ export interface GitHubMergesSummary {
 }
 
 const DEFAULT_REPO = 'Trailblaizedevelopment/Trailblaize-Web';
-const PRODUCTION_BRANCH = process.env.GITHUB_PRODUCTION_BRANCH || 'main';
-const DEVELOP_BRANCH = process.env.GITHUB_DEVELOP_BRANCH || 'develop';
 
 function getGitHubToken(): string | null {
-  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || null;
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || null;
+  return token?.trim() || null;
+}
+
+function getProductionBranch(): string {
+  return (process.env.GITHUB_PRODUCTION_BRANCH || 'main').trim();
+}
+
+function getDevelopBranch(): string {
+  return (process.env.GITHUB_DEVELOP_BRANCH || 'develop').trim();
 }
 
 function startOfWeek(date: Date): Date {
@@ -34,70 +41,126 @@ function startOfWeek(date: Date): Date {
   return d;
 }
 
-function countThisWeek(items: GitHubMergeItem[]): number {
-  const weekStart = startOfWeek(new Date());
-  return items.filter(item => new Date(item.merged_at) >= weekStart).length;
+function weekStartIsoDate(): string {
+  return startOfWeek(new Date()).toISOString().slice(0, 10);
 }
 
 function isNoiseMergeTitle(title: string): boolean {
   return /^develop$/i.test(title.trim());
 }
 
+async function githubApiFetch(path: string, token: string): Promise<Response> {
+  return fetch(`https://api.github.com${path}`, {
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+interface SearchIssueRow {
+  number: number;
+  title: string;
+  html_url: string;
+  user?: { login?: string } | null;
+  pull_request?: { merged_at?: string | null };
+}
+
+function mapSearchIssue(row: SearchIssueRow, base: string): GitHubMergeItem | null {
+  const mergedAt = row.pull_request?.merged_at;
+  if (!mergedAt || !row.number) return null;
+  return {
+    number: row.number,
+    title: row.title,
+    merged_at: mergedAt,
+    author: row.user?.login ?? null,
+    url: row.html_url,
+    base,
+  };
+}
+
+/** Merged PRs via search — avoids closed-but-unmerged PRs crowding list results. */
 async function fetchMergedPullRequests(
   owner: string,
   repo: string,
   base: string,
-  token: string | null,
-  perPage = 20
+  token: string,
+  limit = 6
 ): Promise<GitHubMergeItem[]> {
-  const url = new URL(`https://api.github.com/repos/${owner}/${repo}/pulls`);
-  url.searchParams.set('state', 'closed');
-  url.searchParams.set('base', base);
-  url.searchParams.set('sort', 'updated');
-  url.searchParams.set('direction', 'desc');
-  url.searchParams.set('per_page', String(perPage));
-
-  const headers: HeadersInit = {
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const res = await fetch(url.toString(), {
-    headers,
-    next: { revalidate: 300 },
+  const q = `is:pr is:merged base:${base} repo:${owner}/${repo}`;
+  const params = new URLSearchParams({
+    q,
+    sort: 'updated',
+    order: 'desc',
+    per_page: '30',
   });
+
+  const res = await githubApiFetch(`/search/issues?${params}`, token);
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200)}`);
+    throw new Error(`GitHub search ${res.status}: ${body.slice(0, 200)}`);
   }
 
-  const pulls = (await res.json()) as Array<{
-    number: number;
-    title: string;
-    merged_at: string | null;
-    html_url: string;
-    user?: { login?: string } | null;
-  }>;
+  const data = (await res.json()) as { items?: SearchIssueRow[] };
+  const items: GitHubMergeItem[] = [];
 
-  return pulls
-    .filter(pull => pull.merged_at && !isNoiseMergeTitle(pull.title))
-    .slice(0, 6)
-    .map(pull => ({
-      number: pull.number,
-      title: pull.title,
-      merged_at: pull.merged_at!,
-      author: pull.user?.login ?? null,
-      url: pull.html_url,
-      base,
-    }));
+  for (const row of data.items ?? []) {
+    const mapped = mapSearchIssue(row, base);
+    if (!mapped || isNoiseMergeTitle(mapped.title)) continue;
+    items.push(mapped);
+    if (items.length >= limit) break;
+  }
+
+  return items;
+}
+
+/** Accurate weekly count from search total_count (not limited to displayed list). */
+async function countMergedThisWeek(
+  owner: string,
+  repo: string,
+  base: string,
+  token: string,
+  excludeNoiseTitles: boolean
+): Promise<number> {
+  const mergedSince = weekStartIsoDate();
+  const q = `is:pr is:merged base:${base} repo:${owner}/${repo} merged:>=${mergedSince}`;
+  const res = await githubApiFetch(
+    `/search/issues?q=${encodeURIComponent(q)}&per_page=1`,
+    token
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub search count ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const data = (await res.json()) as { total_count?: number; items?: SearchIssueRow[] };
+  let count = data.total_count ?? 0;
+
+  if (excludeNoiseTitles && count > 0 && (data.items?.length ?? 0) > 0) {
+    const noiseQ = `is:pr is:merged base:${base} repo:${owner}/${repo} merged:>=${mergedSince} in:title develop`;
+    const noiseRes = await githubApiFetch(
+      `/search/issues?q=${encodeURIComponent(noiseQ)}&per_page=1`,
+      token
+    );
+    if (noiseRes.ok) {
+      const noiseData = (await noiseRes.json()) as { total_count?: number };
+      count = Math.max(0, count - (noiseData.total_count ?? 0));
+    }
+  }
+
+  return count;
 }
 
 export async function fetchGitHubMergesSummary(): Promise<GitHubMergesSummary> {
-  const repoFull = process.env.GITHUB_REPO || DEFAULT_REPO;
+  const repoFull = (process.env.GITHUB_REPO || DEFAULT_REPO).trim();
   const [owner, repo] = repoFull.split('/');
   const token = getGitHubToken();
+  const developBranch = getDevelopBranch();
+  const productionBranch = getProductionBranch();
 
   if (!owner || !repo) {
     return {
@@ -124,9 +187,11 @@ export async function fetchGitHubMergesSummary(): Promise<GitHubMergesSummary> {
   }
 
   try {
-    const [develop, production] = await Promise.all([
-      fetchMergedPullRequests(owner, repo, DEVELOP_BRANCH, token),
-      fetchMergedPullRequests(owner, repo, PRODUCTION_BRANCH, token),
+    const [develop, production, developThisWeek, productionThisWeek] = await Promise.all([
+      fetchMergedPullRequests(owner, repo, developBranch, token),
+      fetchMergedPullRequests(owner, repo, productionBranch, token),
+      countMergedThisWeek(owner, repo, developBranch, token, false),
+      countMergedThisWeek(owner, repo, productionBranch, token, false),
     ]);
 
     return {
@@ -134,8 +199,8 @@ export async function fetchGitHubMergesSummary(): Promise<GitHubMergesSummary> {
       configured: true,
       develop,
       production,
-      develop_this_week: countThisWeek(develop),
-      production_this_week: countThisWeek(production),
+      develop_this_week: developThisWeek,
+      production_this_week: productionThisWeek,
     };
   } catch (err) {
     return {

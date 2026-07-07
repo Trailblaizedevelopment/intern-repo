@@ -1561,7 +1561,7 @@ function DashboardView({ tickets }: { tickets: TicketData[] }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/github/merges');
+        const res = await fetch('/api/github/merges', { cache: 'no-store' });
         const json = await res.json();
         if (!cancelled && json.data) setGithub(json.data);
       } catch (err) {
