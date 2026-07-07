@@ -22,6 +22,9 @@ function buildTaskIterationPrompt(task: BrainTaskRow, cursorNote?: string): stri
     parts.push(
       'SLICE RULES: One Cursor dispatch only — never follow_up. Complete when PR exists or research shows no code change needed.'
     );
+    if (task.iteration_count >= 1 && !task.cursor_agent_id) {
+      parts.push('MANDATORY: Call cursor_dispatch_agent NOW — stop researching.');
+    }
   }
   if (task.linear_issue_id) parts.push(`Linear: ${task.linear_issue_id}`);
   if (task.integration_branch) {

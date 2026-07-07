@@ -83,11 +83,18 @@ export async function requestCursorDispatchApproval(
   const pending = buildPending(input, ctx, integrationBranch);
 
   if (ctx.taskId) {
+    const task = await getBrainTask(ctx.supabase, ctx.taskId);
+    const extendedDeadline =
+      task?.deadline_at && new Date(task.deadline_at) < new Date(Date.now() + 30 * 60_000)
+        ? new Date(Date.now() + 30 * 60_000).toISOString()
+        : task?.deadline_at ?? null;
+
     await ctx.supabase
       .from('brain_tasks')
       .update({
         pending_cursor_dispatch: pending,
         status: 'awaiting_approval',
+        ...(extendedDeadline ? { deadline_at: extendedDeadline } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', ctx.taskId);
@@ -131,7 +138,8 @@ export async function findPendingDispatchForSlackThread(
     .select('*')
     .eq('slack_channel', channel)
     .eq('slack_thread_ts', threadTs)
-    .eq('status', 'awaiting_approval')
+    .not('pending_cursor_dispatch', 'is', null)
+    .in('status', ['queued', 'planning', 'running', 'blocked', 'awaiting_approval', 'failed'])
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();

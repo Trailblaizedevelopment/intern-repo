@@ -16,6 +16,7 @@ import {
   buildSlackOrchestrationAppend,
   tryOrchestrationKickoff,
 } from './orchestration-kickoff';
+import { handleTaskStopMessage, isTaskStopMessage } from './task-control';
 
 const MAX_STORED_MESSAGES = 40;
 
@@ -152,6 +153,24 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
       threadTs: ctx.threadTs,
     });
     await postSlackMessage(ctx.channel, msg, ctx.threadTs);
+    return;
+  }
+
+  if (isTaskStopMessage(message)) {
+    await handleTaskStopMessage(supabase, ctx.channel, ctx.threadTs);
+    return;
+  }
+
+  if (isCursorApprovalMessage(message) && !pendingDispatch) {
+    await postSlackMessage(
+      ctx.channel,
+      'No pending Cursor dispatch in this thread. If a task is looping, reply *stop* to cancel it.',
+      ctx.threadTs
+    );
+    return;
+  }
+
+  if (isCursorApprovalMessage(message) || isCursorDenialMessage(message)) {
     return;
   }
 

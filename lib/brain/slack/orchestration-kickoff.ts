@@ -4,6 +4,7 @@ import { createBrainTask } from '../tasks/store';
 import { BrainTaskKind } from '../tasks/types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { postSlackMessage } from './client';
+import { findActiveTasksForSlackThread } from './task-control';
 
 export interface SlackOrchestrationContext {
   channel: string;
@@ -30,6 +31,9 @@ function messageText(msg: BrainMessage): string {
 export function detectOrchestrationKickoff(message: string): BrainTaskKind | null {
   const text = message.trim();
   if (!text || LOOKUP_ONLY.test(text) || QUESTION_ONLY.test(text)) return null;
+
+  const lower = text.toLowerCase();
+  if (/^(yes dispatch|yes|approve|cancel|stop|dispatch it)\b/.test(lower)) return null;
 
   const sliceHint = SLICE_SIGNALS.test(text) || /\bper the linear ticket\b/i.test(text);
   const goalHint = GOAL_SIGNALS.test(text);
@@ -96,6 +100,29 @@ export async function tryOrchestrationKickoff(
 ): Promise<AgentRunResult | null> {
   const kind = detectOrchestrationKickoff(input.message);
   if (!kind) return null;
+
+  const existingActive = await findActiveTasksForSlackThread(
+    input.supabase,
+    input.ctx.channel,
+    input.ctx.threadTs
+  );
+  if (existingActive.length > 0) {
+    const ids = existingActive.map(t => `\`${t.id.slice(0, 8)}…\` (${t.status})`).join(', ');
+    const reply = [
+      `*Active task already running in this thread* — not starting a duplicate.`,
+      `Task(s): ${ids}`,
+      'Reply *stop* to cancel, or wait for Cursor approval / completion.',
+    ].join('\n');
+    return {
+      reply,
+      messages: [
+        ...input.history,
+        { role: 'user', content: input.message },
+        { role: 'assistant', content: reply },
+      ],
+      toolEvents: [],
+    };
+  }
 
   const linearId = extractLinearIssueId(input.message, input.history);
   const hadLookup = threadHasLookupContext(input.history);
