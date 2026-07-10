@@ -63,11 +63,9 @@ export default function WorkspacePage() {
 
   // Founders get calendar + inbox only
   return (
-    <div className="ws-page">
-      <FounderDashboard
-        data={workspaceData}
-        teamMembers={workspaceData.teamMembers}
-      />
-    </div>
+    <FounderDashboard
+      data={workspaceData}
+      teamMembers={workspaceData.teamMembers}
+    />
   );
 }

@@ -51,6 +51,8 @@ interface ContactEmail extends GmailMessage {
   body: string;
 }
 
+export const GMAIL_FETCH_LIMIT = 50;
+
 interface UseGoogleIntegrationReturn {
   // Status
   status: GoogleStatus | null;
@@ -66,6 +68,8 @@ interface UseGoogleIntegrationReturn {
   emails: GmailMessage[];
   unreadCount: number;
   gmailLoading: boolean;
+  hasMoreEmails: boolean;
+  emailFetchLimit: number;
   fetchEmails: () => Promise<void>;
   fetchThread: (threadId: string) => Promise<ThreadMessage[] | null>;
   sendEmail: (params: SendEmailParams) => Promise<{ success: boolean; error?: string }>;
@@ -91,6 +95,7 @@ export function useGoogleIntegration(employeeId: string | undefined): UseGoogleI
   const [emails, setEmails] = useState<GmailMessage[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [gmailLoading, setGmailLoading] = useState(false);
+  const [hasMoreEmails, setHasMoreEmails] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
 
   // Check connection status
@@ -145,12 +150,19 @@ export function useGoogleIntegration(employeeId: string | undefined): UseGoogleI
 
     setGmailLoading(true);
     try {
-      const response = await fetch(`/api/google/gmail?employee_id=${employeeId}&max=50`);
+      const response = await fetch(`/api/google/gmail?employee_id=${employeeId}&max=${GMAIL_FETCH_LIMIT}`);
       const data = await response.json();
 
       if (response.ok) {
-        setEmails(data.emails || []);
+        const fetchedEmails: GmailMessage[] = data.emails || [];
+        setEmails(fetchedEmails);
         setUnreadCount(data.unreadCount || 0);
+        const totalEstimate = typeof data.totalEstimate === 'number' ? data.totalEstimate : null;
+        setHasMoreEmails(
+          fetchedEmails.length >= GMAIL_FETCH_LIMIT
+          || (totalEstimate !== null && totalEstimate > fetchedEmails.length)
+          || (data.unreadCount || 0) > fetchedEmails.length
+        );
       } else if (data.code === 'NOT_CONNECTED') {
         setStatus(prev => (prev ? { ...prev, connected: false } : null));
       } else {
@@ -207,6 +219,7 @@ export function useGoogleIntegration(employeeId: string | undefined): UseGoogleI
         setCalendarEvents([]);
         setEmails([]);
         setUnreadCount(0);
+        setHasMoreEmails(false);
       }
     } catch (err) {
       console.error('Failed to disconnect:', err);
@@ -307,6 +320,8 @@ export function useGoogleIntegration(employeeId: string | undefined): UseGoogleI
     emails,
     unreadCount,
     gmailLoading,
+    hasMoreEmails,
+    emailFetchLimit: GMAIL_FETCH_LIMIT,
     fetchEmails,
     fetchThread,
     sendEmail,

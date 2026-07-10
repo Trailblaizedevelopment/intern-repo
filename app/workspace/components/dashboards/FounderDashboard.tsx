@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Mail } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Calendar, Mail } from 'lucide-react';
 import { TrailblaizeCalendar } from '../TrailblaizeCalendar';
 import { InboxEmbed } from '../InboxEmbed';
 import { UseWorkspaceDataReturn } from '../../hooks/useWorkspaceData';
@@ -15,34 +15,37 @@ interface FounderDashboardProps {
 
 /**
  * Founder Dashboard — Calendar + Inbox only.
- * Clean, focused view: what's on the calendar and what's in the inbox.
+ * Flat, full-width layout: no nested cards or grey backdrop.
  */
 export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
   const { currentEmployee } = data;
-
   const google = useGoogleIntegration(currentEmployee?.id);
 
+  const todayEventCount = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return google.calendarEvents.filter((event) => {
+      const start = event.start.dateTime || event.start.date || '';
+      return start.startsWith(todayStr);
+    }).length;
+  }, [google.calendarEvents]);
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-        background: '#F9FAFB',
-        minHeight: '100vh',
-        padding: '24px',
-      }}
-    >
-      {/* ── Calendar ── */}
-      <section
-        style={{
-          background: '#ffffff',
-          border: '1px solid #E5E7EB',
-          borderRadius: 16,
-          padding: '24px',
-          marginBottom: 24,
-        }}
-      >
+    <div className="fd-dashboard">
+      <section className="fd-section fd-section--calendar" aria-label="Calendar">
+        <header className="fd-section-header">
+          <div className="fd-section-title">
+            <span className="fd-section-icon" aria-hidden="true">
+              <Calendar size={18} />
+            </span>
+            <h2>Calendar</h2>
+            {google.status?.connected && todayEventCount > 0 && (
+              <span className="fd-section-badge fd-section-badge--muted">
+                {todayEventCount} today
+              </span>
+            )}
+          </div>
+        </header>
+
         <TrailblaizeCalendar
           events={google.calendarEvents}
           loading={google.calendarLoading}
@@ -52,59 +55,20 @@ export function FounderDashboard({ data, teamMembers }: FounderDashboardProps) {
         />
       </section>
 
-      {/* ── Divider ── */}
-      <div
-        style={{
-          height: 1,
-          background: '#E5E7EB',
-          marginBottom: 24,
-        }}
-      />
+      <div className="fd-divider" role="separator" aria-hidden="true" />
 
-      {/* ── Inbox ── */}
-      <section
-        style={{
-          background: '#ffffff',
-          border: '1px solid #E5E7EB',
-          borderRadius: 16,
-          padding: '24px',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            marginBottom: 20,
-          }}
-        >
-          <Mail size={20} style={{ color: '#0F172A' }} />
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 18,
-              fontWeight: 600,
-              color: '#111827',
-            }}
-          >
-            Inbox
-          </h2>
-          {google.status?.connected && google.unreadCount > 0 && (
-            <span
-              style={{
-                background: '#0F172A',
-                color: '#ffffff',
-                fontSize: 11,
-                fontWeight: 600,
-                padding: '2px 7px',
-                borderRadius: 99,
-                lineHeight: 1.5,
-              }}
-            >
-              {google.unreadCount}
+      <section className="fd-section fd-section--inbox" aria-label="Inbox">
+        <header className="fd-section-header">
+          <div className="fd-section-title">
+            <span className="fd-section-icon" aria-hidden="true">
+              <Mail size={18} />
             </span>
-          )}
-        </div>
+            <h2>Inbox</h2>
+            {google.status?.connected && google.unreadCount > 0 && (
+              <span className="fd-section-badge">{google.unreadCount}</span>
+            )}
+          </div>
+        </header>
 
         <InboxEmbed google={google} currentEmployee={currentEmployee} />
       </section>

@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import GlobalSearch from '@/components/GlobalSearch';
 import { useAuth } from '@/lib/auth-context';
 import { useUserRole } from '../hooks/useUserRole';
 import { getNavigationItems } from '../utils/rolePermissions';
@@ -81,20 +80,11 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const { role, roleLabel, canAccessNucleus } = useUserRole();
   const [collapsed, setCollapsed] = useState(false);
   const [openTicketCount, setOpenTicketCount] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
 
-  // Cmd+K / Ctrl+K global shortcut
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-      e.preventDefault();
-      setSearchOpen(open => !open);
-    }
+  const openSearch = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('workspace:toggle-search'));
   }, []);
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
 
   const navItems = getNavigationItems(role, unreadCount);
 
@@ -324,7 +314,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
               {inNucleus && canAccessNucleus && !collapsed && (
                 <div className="ws-nav-nucleus-modules">
                   <button
-                    onClick={() => setSearchOpen(true)}
+                    onClick={openSearch}
                     className="ws-nav-item ws-nav-sub"
                     style={{
                       width: '100%', textAlign: 'left', background: 'none', border: 'none',
@@ -386,8 +376,6 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
             </>
           )}
         </nav>
-
-        <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
 
         <div className="ws-sidebar-divider" />
 

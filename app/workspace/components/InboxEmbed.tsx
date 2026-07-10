@@ -25,6 +25,14 @@ import { Employee } from '@/lib/supabase';
 const STORAGE_MOVED = 'inbox_moved_threads';
 const STORAGE_DISMISSED = 'inbox_dismissed_threads';
 
+function GmailMark({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" />
+    </svg>
+  );
+}
+
 function getMovedThreads(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
@@ -52,6 +60,8 @@ interface GoogleIntegration {
   emails: GmailMessage[];
   unreadCount: number;
   gmailLoading: boolean;
+  hasMoreEmails: boolean;
+  emailFetchLimit: number;
   connect: () => void;
   fetchEmails: () => void;
   fetchThread: (threadId: string) => Promise<ThreadMessage[] | null>;
@@ -144,6 +154,15 @@ export function InboxEmbed({ google, currentEmployee }: InboxEmbedProps) {
   const filteredConversations = filterBySearch(conversationThreads);
   const filteredNew = filterBySearch(newThreads);
   const filteredAutomated = filterBySearch(automatedThreads);
+
+  const activeListCount =
+    activeTab === 'conversations'
+      ? filteredConversations.length
+      : activeTab === 'new'
+        ? filteredNew.length
+        : filteredAutomated.length;
+
+  const showGmailMoreFooter = google.hasMoreEmails && !google.gmailLoading && activeListCount > 0;
 
   const selectedConversation = selectedThreadId
     ? conversationThreads.find(t => t.threadId === selectedThreadId)
@@ -251,19 +270,36 @@ export function InboxEmbed({ google, currentEmployee }: InboxEmbedProps) {
 
       <div className="ws-gmail-toolbar">
         <div className="ws-gmail-search">
-          <Search size={18} />
-          <input type="text" placeholder="Search emails..." value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)} />
+          <Search size={16} aria-hidden="true" />
+          <input
+            type="search"
+            placeholder="Search emails…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            aria-label="Search emails"
+          />
         </div>
         <div className="ws-gmail-toolbar-actions">
           <span className="ws-gmail-count-label">{google.unreadCount} unread</span>
-          <button className={`ws-gmail-refresh-btn ${google.gmailLoading ? 'loading' : ''}`}
-            onClick={google.fetchEmails} disabled={google.gmailLoading}>
-            <RefreshCw size={16} className={google.gmailLoading ? 'spin' : ''} />
-            Refresh
+          <button
+            type="button"
+            className={`ws-gmail-refresh-btn ${google.gmailLoading ? 'loading' : ''}`}
+            onClick={google.fetchEmails}
+            disabled={google.gmailLoading}
+            aria-label="Refresh emails"
+          >
+            <RefreshCw size={16} className={google.gmailLoading ? 'spin' : ''} aria-hidden="true" />
+            <span>Refresh</span>
           </button>
-          <a href="https://mail.google.com" target="_blank" rel="noopener noreferrer" className="ws-gmail-open-btn">
-            <ExternalLink size={14} /> Open Gmail
+          <a
+            href="https://mail.google.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ws-gmail-open-btn ws-gmail-open-btn--icon"
+            title="Open Gmail"
+            aria-label="Open Gmail"
+          >
+            <GmailMark size={18} />
           </a>
         </div>
       </div>
@@ -355,6 +391,22 @@ export function InboxEmbed({ google, currentEmployee }: InboxEmbedProps) {
                     {email.isUnread && <div className="ws-gmail-unread-dot" />}
                   </div>
                 ))
+              )}
+              {showGmailMoreFooter && (
+                <div className="ws-gmail-more-footer">
+                  <p>Showing the latest {google.emailFetchLimit} messages</p>
+                  <a
+                    href="https://mail.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ws-gmail-open-btn ws-gmail-open-btn--icon"
+                    title="View more in Gmail"
+                    aria-label="View more in Gmail"
+                  >
+                    <GmailMark size={18} />
+                  </a>
+                  <span className="ws-gmail-more-footer-label">View more in Gmail</span>
+                </div>
               )}
             </>
           )}
