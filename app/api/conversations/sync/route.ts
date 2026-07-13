@@ -8,6 +8,11 @@
  * - Never auto-classifies status based on message content (status is owned by the outreach pipeline)
  * - Preserves 'handled' status and clears has_unread_reply for handled conversations
  *
+ * Query params:
+ *   full=true  — paginate through ALL Linq chats per line (not just recent 150).
+ *               Also backfills alumni_contacts.linq_chat_id when a phone match is found.
+ *               Use for initial setup or to recover historically-missed conversations.
+ *
  * Requires: Authorization: Bearer <internal_token>
  */
 
@@ -69,21 +74,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const fullSync = searchParams.get('full') === 'true';
+
   const errors: string[] = [];
   let processed = 0;
   const BATCH = 50;
+  // Per-line page size: smaller for full sync to be polite to the API
+  const PAGE_SIZE = fullSync ? 100 : 150;
+  const MAX_PAGES = fullSync ? 50 : 1; // full: up to 5,000 chats/line; normal: 150
 
   try {
-    // ── Step 1: Fetch recent chats from all Linq lines ─────────────────────
+    // ── Step 1: Fetch chats from all Linq lines ────────────────────────────
+    // Normal mode: one page of 150. Full mode: paginate until exhausted.
     const allChats: Array<{ chat: LinqChat; line: typeof LINQ_LINES[number] }> = [];
 
     await Promise.allSettled(
       LINQ_LINES.map(async line => {
         try {
-          const page = await listChats(line.phone, 150);
-          for (const chat of page.chats) {
-            allChats.push({ chat, line });
-          }
+          let cursor: string | undefined;
+          let pages = 0;
+          do {
+            const page = await listChats(line.phone, PAGE_SIZE, cursor);
+            for (const chat of page.chats) {
+              allChats.push({ chat, line });
+            }
+            cursor = page.next_cursor;
+            pages++;
+          } while (fullSync && cursor && pages < MAX_PAGES);
         } catch (err) {
           errors.push(`${line.label}: ${String(err)}`);
         }
@@ -221,6 +239,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Step 4b: Backfill alumni_contacts.linq_chat_id when doing full sync ─
+    // For any phone match where the alumni_contact.linq_chat_id is still null,
+    // write it back so future normal syncs can use the faster linq_chat_id path.
+    if (fullSync && contactPhones.length > 0) {
+      // Build a reverse map: phone → linq_chat_id from upserts
+      const phoneToLinqChatId = new Map<string, string>();
+      for (const upsert of upserts) {
+        const phone = upsert.contact_phone as string | undefined;
+        const chatId = upsert.linq_chat_id as string | undefined;
+        if (phone && chatId) phoneToLinqChatId.set(phone, chatId);
+      }
+
+      // Find alumni_contacts that have a matching phone but no linq_chat_id
+      for (let i = 0; i < contactPhones.length; i += BATCH) {
+        const batch = contactPhones.slice(i, i + BATCH);
+        const { data: alumniToUpdate } = await supabase
+          .from('alumni_contacts')
+          .select('id, phone_primary')
+          .in('phone_primary', batch)
+          .is('linq_chat_id', null);
+
+        const updates = (alumniToUpdate ?? []).filter(
+          a => a.phone_primary && phoneToLinqChatId.has(a.phone_primary)
+        );
+
+        for (const alumni of updates) {
+          const chatId = phoneToLinqChatId.get(alumni.phone_primary!)!;
+          await supabase
+            .from('alumni_contacts')
+            .update({ linq_chat_id: chatId })
+            .eq('id', alumni.id);
+        }
+      }
+    }
+
     // ── Step 5: Batch upsert (no status field — preserves existing status) ─
     for (let i = 0; i < upserts.length; i += BATCH) {
       const batch = upserts.slice(i, i + BATCH);
@@ -314,6 +367,7 @@ export async function POST(req: NextRequest) {
         processed,
         total: allChats.length,
         reverse_synced: missingContacts.length,
+        full_sync: fullSync,
         errors,
       },
     });
