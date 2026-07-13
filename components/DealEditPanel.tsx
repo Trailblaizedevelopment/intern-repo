@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Trash2, Building2, Phone, Mail, Plus, Clock } from 'lucide-react';
+import { X, Trash2, Building2, Phone, Mail, Plus, Clock, CheckCircle2, User, DollarSign } from 'lucide-react';
 import { STAGE_CONFIG, DealStage } from '@/lib/supabase';
 
 /* ─── Types ─── */
@@ -27,6 +27,7 @@ interface PipelineDeal {
   notes: string | null;
   conference: string | null;
   created_at: string;
+  updated_at?: string | null;
   organization?: {
     id: string; name: string; type: string;
     school?: { id: string; name: string; conference: string } | null;
@@ -68,8 +69,248 @@ const TEMP_STYLE: Record<string, { bg: string; border: string; color: string }> 
   cold: { bg: '#6b728020', border: '#6b7280', color: '#6b7280' },
 };
 
+const CATEGORY_LABELS: Record<string, string> = {
+  greek: 'Greek Life',
+  country_clubs: 'Country Club',
+  professional_associations: 'Professional / Chamber',
+  sports: 'Sports Team',
+  alumni_associations: 'Alumni Association',
+};
+
+function formatCurrency(n: number | null | undefined): string {
+  if (!n) return '—';
+  if (n >= 1000) return `$${(n / 1000).toFixed(1)}K`;
+  return `$${n.toLocaleString('en-US')}`;
+}
+
+function formatFullDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function ClosedWonOverview({
+  deal,
+  employees,
+  dealContacts,
+  activities,
+  activitiesError,
+  timeAgo,
+  activityTypes,
+}: {
+  deal: PipelineDeal;
+  employees: Employee[];
+  dealContacts: DealContact[];
+  activities: { id: string; type: string; outcome: string | null; created_at: string; created_by: string | null }[];
+  activitiesError: string | null;
+  timeAgo: (iso: string) => string;
+  activityTypes: { key: string; emoji: string; label: string }[];
+}) {
+  const assignedName = employees.find(e => e.id === deal.assigned_to)?.name || 'Unassigned';
+  const conference = deal.conference || deal.organization?.school?.conference || '—';
+  const category = CATEGORY_LABELS[(deal as { category?: string }).category || 'greek'] || 'Greek Life';
+  const mrr = Math.round((deal.value || 0) / 12);
+  const tempStyle = TEMP_STYLE[deal.temperature] || TEMP_STYLE.warm;
+  const closedAt = deal.updated_at || deal.last_activity_at || deal.last_touched;
+
+  return (
+    <>
+      <div
+        style={{
+          margin: '0 0 20px',
+          padding: '14px 16px',
+          borderRadius: 12,
+          background: 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)',
+          border: '1px solid #6ee7b7',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '9999px',
+              background: '#d1fae5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <CheckCircle2 size={20} color="#059669" />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#047857' }}>
+              Closed Won
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: '0.875rem', fontWeight: 600, color: '#065f46' }}>
+              {closedAt ? `Closed ${formatFullDate(closedAt)}` : 'Deal successfully closed'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        {[
+          { label: 'Contract Value', value: formatCurrency(deal.value), icon: DollarSign },
+          { label: 'MRR', value: formatCurrency(mrr), icon: DollarSign },
+        ].map(stat => (
+          <div
+            key={stat.label}
+            style={{
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>
+              {stat.label}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '1.125rem', fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>
+              {stat.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="pl2__edit-section">
+        <h3 className="pl2__edit-section-title">Deal Summary</h3>
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '4px 14px' }}>
+          {[
+            { label: 'Type', value: deal.deal_type.charAt(0).toUpperCase() + deal.deal_type.slice(1) },
+            {
+              label: 'Temperature',
+              value: (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600,
+                  background: tempStyle.bg, border: `1px solid ${tempStyle.border}`, color: tempStyle.color,
+                }}>
+                  {deal.temperature.charAt(0).toUpperCase() + deal.temperature.slice(1)}
+                </span>
+              ),
+            },
+            { label: 'Conference', value: conference },
+            { label: 'Category', value: category },
+            { label: 'Assigned To', value: assignedName },
+            { label: 'Created', value: formatFullDate(deal.created_at) },
+            { label: 'Last Updated', value: formatFullDate(closedAt) },
+          ].map((row, index, arr) => (
+            <div
+              key={row.label}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '10px 0',
+                borderBottom: index < arr.length - 1 ? '1px solid #f3f4f6' : 'none',
+              }}
+            >
+              <span style={{ fontSize: '0.8125rem', color: '#6b7280' }}>{row.label}</span>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827', textAlign: 'right' }}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {(dealContacts.length > 0 || deal.contact) && (
+        <div className="pl2__edit-section">
+          <h3 className="pl2__edit-section-title">Contacts</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {(dealContacts.length > 0 ? dealContacts : deal.contact ? [{ id: '', is_primary: true, contact: deal.contact }] : []).map((dc, idx) => (
+              <div
+                key={dc.contact?.id || idx}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  background: '#f9fafb',
+                  border: `1px solid ${dc.is_primary ? '#6ee7b7' : '#e5e7eb'}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <User size={14} color="#6b7280" />
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>{dc.contact?.name || 'Unknown'}</span>
+                  {dc.is_primary && (
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 9999, background: '#ecfdf5', color: '#047857' }}>
+                      Primary
+                    </span>
+                  )}
+                </div>
+                {dc.contact?.role && (
+                  <p style={{ margin: '0 0 4px', fontSize: '0.75rem', color: '#6b7280', textTransform: 'capitalize' }}>
+                    {dc.contact.role.replace(/_/g, ' ')}
+                  </p>
+                )}
+                {dc.contact?.email && (
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Mail size={11} /> {dc.contact.email}
+                  </p>
+                )}
+                {dc.contact?.phone && (
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Phone size={11} /> {dc.contact.phone}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {deal.notes?.trim() && (
+        <div className="pl2__edit-section">
+          <h3 className="pl2__edit-section-title">Notes</h3>
+          <div style={{
+            padding: '12px 14px', borderRadius: 10, background: '#f9fafb',
+            border: '1px solid #e5e7eb', fontSize: '0.875rem', color: '#374151', lineHeight: 1.5,
+            whiteSpace: 'pre-wrap',
+          }}>
+            {deal.notes}
+          </div>
+        </div>
+      )}
+
+      <div className="pl2__edit-section">
+        <h3 className="pl2__edit-section-title">Activity History</h3>
+        {activitiesError ? (
+          <div style={{ fontSize: '0.8rem', color: '#9ca3af', padding: '8px 0' }}>{activitiesError}</div>
+        ) : activities.length === 0 ? (
+          <div style={{ fontSize: '0.8rem', color: '#9ca3af', padding: '8px 0' }}>No activity logged.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {activities.map(act => {
+              const typeInfo = activityTypes.find(t => t.key === act.type);
+              return (
+                <div
+                  key={act.id}
+                  style={{
+                    display: 'flex', gap: 10, alignItems: 'flex-start',
+                    padding: '10px 12px', borderRadius: 10,
+                    background: '#f9fafb', border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{typeInfo?.emoji || '📝'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.875rem', color: '#111827' }}>{act.outcome || '—'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Clock size={11} /> {timeAgo(act.created_at)}
+                      {act.created_by && <span>· {act.created_by}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function DealEditPanel({ deal, employees, schools, nationals, onClose, onSaved, onDeleted }: Props) {
   const isNew = !deal;
+  const isClosedWon = !isNew && deal?.stage === 'closed_won';
 
   /* ─── State ─── */
   const [stage, setStage] = useState<DealStage>(deal?.stage || 'lead');
@@ -411,12 +652,29 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
                 )}
               </span>
             )}
+            {isClosedWon && (
+              <span style={{ display: 'block', marginTop: 4, fontSize: '0.75rem', color: '#6b7280' }}>
+                Read-only overview
+              </span>
+            )}
           </div>
           <button className="pl2__edit-close" onClick={onClose}><X size={20} /></button>
         </div>
 
         {/* Body */}
         <div className="pl2__edit-body">
+          {isClosedWon && deal ? (
+            <ClosedWonOverview
+              deal={deal}
+              employees={employees}
+              dealContacts={dealContacts}
+              activities={activities}
+              activitiesError={activitiesError}
+              timeAgo={timeAgo}
+              activityTypes={ACTIVITY_TYPES}
+            />
+          ) : (
+          <>
 
           {/* ── New Deal: Org info ── */}
           {isNew && (
@@ -984,10 +1242,22 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
           )}
 
           {error && <div className="pl2__edit-error">{error}</div>}
+          </>
+          )}
         </div>
 
         {/* Footer */}
         <div className="pl2__edit-footer">
+          {isClosedWon ? (
+            <button
+              className="pl2__btn pl2__btn--primary"
+              onClick={onClose}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              Close
+            </button>
+          ) : (
+          <>
           {!isNew && (
             <button
               className={`pl2__btn pl2__btn--danger ${confirmDelete ? 'pl2__btn--confirm' : ''}`}
@@ -1006,6 +1276,8 @@ export default function DealEditPanel({ deal, employees, schools, nationals, onC
           >
             {saving ? 'Saving…' : isNew ? 'Create Deal' : 'Save Changes'}
           </button>
+          </>
+          )}
         </div>
       </div>
     </>

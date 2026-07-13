@@ -2,8 +2,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, X, RefreshCw, Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, X, RefreshCw, Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Mail, Phone, Clock, User } from 'lucide-react';
 import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
+import { getDealConference } from '@/lib/pipeline-conference';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -688,6 +689,299 @@ interface DealDrawerProps {
   onLogActivity: (dealId: string, text: string) => void;
   onPatch?: (dealId: string, patch: Partial<PipelineDealFull>) => void;
   employees?: { id: string; name: string }[];
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  greek: 'Greek Life',
+  country_clubs: 'Country Club',
+  professional_associations: 'Professional / Chamber',
+  sports: 'Sports Team',
+  alumni_associations: 'Alumni Association',
+};
+
+const TEMP_READ_STYLE: Record<string, { bg: string; border: string; color: string }> = {
+  hot:  { bg: '#fef2f2', border: '#fecaca', color: '#dc2626' },
+  warm: { bg: '#fffbeb', border: '#fde68a', color: '#d97706' },
+  cold: { bg: '#f9fafb', border: '#e5e7eb', color: '#6b7280' },
+};
+
+function formatFullDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function ClosedWonDetailDrawer({
+  deal,
+  employees,
+  granolaNotesCache,
+  onClose,
+}: {
+  deal: PipelineDealFull;
+  employees: { id: string; name: string }[];
+  granolaNotesCache: GranolaNote[] | null;
+  onClose: () => void;
+}) {
+  const isMobile = useIsMobile();
+  const orgName = deal.organization?.name ?? 'Unknown Org';
+  const schoolName = deal.organization?.school?.name ?? '';
+  const assignedName = resolveRep(deal.assigned_to, employees) || 'Unassigned';
+  const conference = deal.conference || getDealConference(deal);
+  const category = CATEGORY_LABELS[(deal as { category?: string }).category || 'greek'] || 'Greek Life';
+  const mrr = Math.round((deal.value || 0) / 12);
+  const tempStyle = TEMP_READ_STYLE[deal.temperature] || TEMP_READ_STYLE.warm;
+  const closedAt = deal.updated_at || deal.last_touched;
+  const activityLog = useMemo(() => parseDealNotes(deal.notes), [deal.notes]);
+  const dealContacts = deal.deal_contacts ?? [];
+
+  const matchedNotes = useMemo(() => {
+    if (!granolaNotesCache) return null;
+    const orgLower = orgName.toLowerCase();
+    const schoolLower = schoolName.toLowerCase();
+    return granolaNotesCache.filter(note => {
+      const titleLower = (note.title ?? '').toLowerCase();
+      return (
+        (orgLower && titleLower.includes(orgLower)) ||
+        (schoolLower && titleLower.includes(schoolLower))
+      );
+    });
+  }, [granolaNotesCache, orgName, schoolName]);
+
+  const summaryRows: { label: string; value: React.ReactNode }[] = [
+    { label: 'Type', value: deal.deal_type.charAt(0).toUpperCase() + deal.deal_type.slice(1) },
+    {
+      label: 'Temperature',
+      value: (
+        <span style={{
+          display: 'inline-flex', padding: '2px 10px', borderRadius: '9999px',
+          fontSize: '0.75rem', fontWeight: 600,
+          background: tempStyle.bg, border: `1px solid ${tempStyle.border}`, color: tempStyle.color,
+        }}>
+          {deal.temperature.charAt(0).toUpperCase() + deal.temperature.slice(1)}
+        </span>
+      ),
+    },
+    { label: 'Conference', value: conference },
+    { label: 'Category', value: category },
+    { label: 'Assigned To', value: assignedName },
+    { label: 'Created', value: formatFullDate(deal.created_at) },
+    { label: 'Closed', value: formatFullDate(closedAt) },
+  ];
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
+      alignItems: isMobile ? 'flex-end' : 'stretch',
+    }}>
+      <div
+        style={{ flex: 1, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
+        onClick={onClose}
+      />
+      <div style={isMobile ? {
+        width: '100%', height: '94vh', background: '#ffffff', display: 'flex',
+        flexDirection: 'column', borderRadius: '20px 20px 0 0',
+        overflow: 'hidden', borderTop: '1px solid #e5e7eb',
+      } : {
+        width: 480, background: '#ffffff', display: 'flex', flexDirection: 'column',
+        height: '100%', borderLeft: '1px solid #e5e7eb', overflow: 'hidden',
+      }}>
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', background: '#f9fafb' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#d1d5db' }} />
+          </div>
+        )}
+
+        <div style={{ padding: isMobile ? '12px 20px 12px' : '20px 24px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#111827' }}>{orgName}</span>
+              </div>
+              {schoolName && <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{schoolName}</div>}
+              <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 4 }}>Read-only overview</div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4, flexShrink: 0 }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '14px 20px' : '16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{
+            padding: '14px 16px', borderRadius: 12,
+            background: 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)',
+            border: '1px solid #6ee7b7',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '9999px', background: '#d1fae5',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <CheckCircle2 size={20} color="#059669" />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#047857' }}>
+                  Closed Won
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: '0.875rem', fontWeight: 600, color: '#065f46' }}>
+                  {closedAt ? `Closed ${formatFullDate(closedAt)}` : 'Deal successfully closed'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {[
+              { label: 'Contract Value', value: fmt$(deal.value) },
+              { label: 'MRR', value: fmt$(mrr) },
+            ].map(stat => (
+              <div key={stat.label} style={{ padding: '12px 14px', borderRadius: 10, background: CRM_UI.surfaceMuted, border: `1px solid ${CRM_UI.border}` }}>
+                <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CRM_UI.textMuted }}>
+                  {stat.label}
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '1.125rem', fontWeight: 700, color: CRM_UI.text, fontVariantNumeric: 'tabular-nums' }}>
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <label style={DRAWER_LABEL}>Deal Summary</label>
+            <div style={{ background: '#fff', border: `1px solid ${CRM_UI.border}`, borderRadius: 10, padding: '4px 14px' }}>
+              {summaryRows.map((row, index) => (
+                <div
+                  key={row.label}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                    padding: '10px 0',
+                    borderBottom: index < summaryRows.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  }}
+                >
+                  <span style={{ fontSize: '0.8125rem', color: CRM_UI.textSubtle }}>{row.label}</span>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: CRM_UI.text, textAlign: 'right' }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {(dealContacts.length > 0 || deal.contact) && (
+            <div>
+              <label style={DRAWER_LABEL}>Contacts</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(dealContacts.length > 0 ? dealContacts : deal.contact ? [{ id: '', contact_id: deal.contact.id, is_primary: true, contact: deal.contact }] : []).map((dc, idx) => (
+                  <div
+                    key={dc.contact?.id || dc.id || idx}
+                    style={{
+                      padding: '12px 14px', borderRadius: 10, background: CRM_UI.surfaceMuted,
+                      border: `1px solid ${dc.is_primary ? '#6ee7b7' : CRM_UI.border}`,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <User size={14} color={CRM_UI.textMuted} />
+                      <span style={{ fontWeight: 600, fontSize: '0.875rem', color: CRM_UI.text }}>{dc.contact?.name || 'Unknown'}</span>
+                      {dc.is_primary && (
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 9999, background: '#ecfdf5', color: '#047857' }}>
+                          Primary
+                        </span>
+                      )}
+                    </div>
+                    {dc.contact?.role && (
+                      <p style={{ margin: '0 0 4px', fontSize: '0.75rem', color: CRM_UI.textSubtle, textTransform: 'capitalize' }}>
+                        {dc.contact.role.replace(/_/g, ' ')}
+                      </p>
+                    )}
+                    {dc.contact?.email && (
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: CRM_UI.textSubtle, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Mail size={11} /> {dc.contact.email}
+                      </p>
+                    )}
+                    {dc.contact?.phone && (
+                      <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: CRM_UI.textSubtle, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Phone size={11} /> {dc.contact.phone}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {matchedNotes !== null && matchedNotes.length > 0 && (
+            <div>
+              <label style={DRAWER_LABEL}>Meeting Notes</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {matchedNotes.map(note => (
+                  <div key={note.id} style={{ background: CRM_UI.surfaceMuted, border: `1px solid ${CRM_UI.border}`, borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.8rem', color: CRM_UI.text, marginBottom: 4 }}>{note.title}</div>
+                    <div style={{ fontSize: '0.72rem', color: CRM_UI.textMuted, marginBottom: 6 }}>
+                      {note.created_at ? formatFullDate(note.created_at) : ''}
+                    </div>
+                    {(note.summary || note.transcript) && (
+                      <div style={{ fontSize: '0.78rem', color: CRM_UI.textSecondary, lineHeight: 1.5 }}>
+                        {(note.summary || note.transcript || '').slice(0, 300)}
+                        {((note.summary || note.transcript || '').length > 300) ? '…' : ''}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label style={DRAWER_LABEL}>Activity History</label>
+            {activityLog.length === 0 ? (
+              <div style={{ fontSize: '0.8rem', color: CRM_UI.textMuted, fontStyle: 'italic' }}>No activity logged.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {activityLog.map((note, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, background: CRM_UI.surfaceMuted, border: `1px solid ${CRM_UI.border}` }}>
+                    <Clock size={14} color={CRM_UI.textMuted} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.875rem', color: CRM_UI.text, lineHeight: 1.4 }}>{note.text}</div>
+                      {note.ts && (
+                        <div style={{ fontSize: '0.75rem', color: CRM_UI.textMuted, marginTop: 2 }}>
+                          {formatFullDate(note.ts)}
+                          {note.author && <span> · {note.author}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{
+          padding: isMobile ? '12px 20px 28px' : '12px 24px 16px',
+          background: '#f9fafb',
+          borderTop: '1px solid #e5e7eb',
+          display: 'flex',
+        }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              ...DRAWER_FOOTER_BTN,
+              flex: 1,
+              width: '100%',
+              border: 'none',
+              background: CRM_UI.ink,
+              color: '#fff',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, onLogActivity, onPatch, employees = [] }: DealDrawerProps) {
@@ -1876,7 +2170,15 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: Pi
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-export function SalesCRM() {
+interface SalesCRMProps {
+  conferenceFilter?: string | null;
+  onConferenceFilterChange?: (conference: string | null) => void;
+}
+
+export function SalesCRM({
+  conferenceFilter = null,
+  onConferenceFilterChange,
+}: SalesCRMProps) {
   const isMobile = useIsMobile();
   const [deals, setDeals] = useState<PipelineDealFull[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2008,9 +2310,12 @@ export function SalesCRM() {
     if (needsAttentionOnly) {
       visible = visible.filter(dealNeedsAttention);
     }
+    if (conferenceFilter) {
+      visible = visible.filter(d => getDealConference(d) === conferenceFilter);
+    }
 
     return { visibleDeals: visible, archivedDeals: archived, filteredDeals: visible };
-  }, [deals, search, stageFilter, ownerFilter, needsAttentionOnly, employees]);
+  }, [deals, search, stageFilter, ownerFilter, needsAttentionOnly, conferenceFilter, employees]);
 
   const sortedFilteredDeals = useMemo(() => {
     const sorted = [...filteredDeals];
@@ -2030,7 +2335,15 @@ export function SalesCRM() {
 
   useEffect(() => {
     setDealPage(1);
-  }, [search, stageFilter, ownerFilter, needsAttentionOnly, categoryFilter, idleSort]);
+  }, [search, stageFilter, ownerFilter, needsAttentionOnly, categoryFilter, idleSort, conferenceFilter]);
+
+  useEffect(() => {
+    if (!conferenceFilter) return;
+    setPipelineView('list');
+    requestAnimationFrame(() => {
+      dealsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [conferenceFilter]);
 
   useEffect(() => {
     if (dealPage > totalDealPages) setDealPage(totalDealPages);
@@ -2320,7 +2633,24 @@ export function SalesCRM() {
             Needs attention
           </button>
 
-          {(search || stageFilter !== 'all' || ownerFilter !== 'all' || needsAttentionOnly || categoryFilter !== 'all') && (
+          {conferenceFilter && (
+            <button
+              type="button"
+              onClick={() => onConferenceFilterChange?.(null)}
+              style={{
+                ...TOOLBAR_BUTTON,
+                border: `1px solid ${CRM_UI.blue}`,
+                background: CRM_UI.blueBg,
+                color: CRM_UI.blueDark,
+                fontWeight: 600,
+              }}
+            >
+              {conferenceFilter}
+              <X size={12} />
+            </button>
+          )}
+
+          {(search || stageFilter !== 'all' || ownerFilter !== 'all' || needsAttentionOnly || categoryFilter !== 'all' || conferenceFilter) && (
             <button
               type="button"
               onClick={() => {
@@ -2329,6 +2659,7 @@ export function SalesCRM() {
                 setOwnerFilter('all');
                 setNeedsAttentionOnly(false);
                 setCategoryFilter('all');
+                onConferenceFilterChange?.(null);
               }}
               style={{
                 ...TOOLBAR_BUTTON,
@@ -2436,15 +2767,24 @@ export function SalesCRM() {
 
       {/* ── Deal Detail Drawer ── */}
       {selectedDeal && (
-        <DealDetailDrawer
-          deal={selectedDeal}
-          granolaNotesCache={granolaNotes}
-          onClose={() => setSelectedDeal(null)}
-          onAdvanceStage={handleAdvanceStage}
-          onLogActivity={handleLogActivity}
-          onPatch={handlePatch}
-          employees={employees}
-        />
+        selectedDeal.stage === 'closed_won' ? (
+          <ClosedWonDetailDrawer
+            deal={selectedDeal}
+            employees={employees}
+            granolaNotesCache={granolaNotes}
+            onClose={() => setSelectedDeal(null)}
+          />
+        ) : (
+          <DealDetailDrawer
+            deal={selectedDeal}
+            granolaNotesCache={granolaNotes}
+            onClose={() => setSelectedDeal(null)}
+            onAdvanceStage={handleAdvanceStage}
+            onLogActivity={handleLogActivity}
+            onPatch={handlePatch}
+            employees={employees}
+          />
+        )
       )}
     </div>
   );

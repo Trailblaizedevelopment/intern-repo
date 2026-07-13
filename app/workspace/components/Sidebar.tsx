@@ -116,7 +116,6 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const nucleusModules = [
     { name: 'Dashboard', href: '/nucleus', icon: Zap },
     { name: 'Sales Room', href: '/nucleus/war-room', icon: Tv },
-    { name: 'Sales Room', href: '/nucleus/war-room', icon: TrendingUp },
     { name: 'Customer Success', href: '/nucleus/customer-success', icon: HeartHandshake },
     { name: 'Creative Studio', href: '/nucleus/creative-studio', icon: Sparkles },
     { name: 'Client Map', href: '/nucleus/client-map', icon: Map },
@@ -142,7 +141,6 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
       label: 'Command Center',
       items: [
         { name: 'Sales Room',         href: '/nucleus/war-room',           Icon: Tv },
-        { name: 'Sales Room',       href: '/nucleus/war-room',            Icon: TrendingUp },
         { name: 'Customer Success',  href: '/nucleus/customer-success',   Icon: HeartHandshake },
         { name: 'Creative Studio',   href: '/nucleus/creative-studio',    Icon: Sparkles },
         { name: 'Client Map',        href: '/nucleus/client-map',         Icon: Map },
@@ -209,10 +207,10 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
       ]
     : isInternRole
     ? [
-        { name: 'Home',     href: '/workspace',          icon: 'LayoutDashboard', badge: 0 },
-        { name: 'Sales Room', href: '/nucleus/war-room',  icon: 'Tv',              badge: 0 },
-        { name: 'Sales Room', href: '/nucleus/war-room',   icon: 'TrendingUp',      badge: 0 },
-        { name: 'Connects', href: '/workspace/connects', icon: 'Phone',           badge: 0 },
+        { name: 'Home',     href: '/workspace',                  icon: 'LayoutDashboard', badge: 0 },
+        { name: 'Sales Room', href: '/nucleus/war-room',        icon: 'Tv',              badge: 0 },
+        { name: 'Success',  href: '/nucleus/customer-success',  icon: 'HeartHandshake',  badge: 0 },
+        { name: 'Connects', href: '/workspace/connects',        icon: 'Phone',           badge: 0 },
       ]
     : isAmbassadorLeaderRole
     ? [
@@ -289,7 +287,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
                   )}
                   {group.items.map(item => (
                     <Link
-                      key={item.href}
+                      key={`${group.label}-${item.name}`}
                       href={item.href}
                       className={`ws-nav-item ws-nav-sub ${isActive(item.href) ? 'active' : ''}`}
                     >
@@ -330,7 +328,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
                   </button>
                   {nucleusModules.map((m) => (
                     <Link
-                      key={m.href}
+                      key={m.name}
                       href={m.href}
                       className={`ws-nav-item ws-nav-sub ${pathname === m.href || (m.href !== '/nucleus' && pathname.startsWith(m.href)) ? 'active' : ''}`}
                     >
