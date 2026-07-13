@@ -15,7 +15,6 @@ import {
   Users,
   Zap,
   LogOut,
-  ChevronLeft,
   ChevronRight,
   MessageCircle,
   MessageSquare,
@@ -41,8 +40,157 @@ import {
   Brain,
 } from 'lucide-react';
 
+const SIDEBAR_EXPANDED_WIDTH = 240;
+const SIDEBAR_COLLAPSED_WIDTH = 72;
+const SIDEBAR_SNAP_MIDPOINT = (SIDEBAR_EXPANDED_WIDTH + SIDEBAR_COLLAPSED_WIDTH) / 2;
+const SIDEBAR_LABEL_COLLAPSE_WIDTH = 120;
+const SIDEBAR_WIDTH_STORAGE_KEY = 'ws-sidebar-width';
+
+function useSidebarResize() {
+  const [width, setWidth] = useState(SIDEBAR_EXPANDED_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    if (!stored) return;
+    const parsed = Number(stored);
+    if (Number.isNaN(parsed)) return;
+    setWidth(parsed <= SIDEBAR_SNAP_MIDPOINT ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH);
+  }, []);
+
+  useEffect(() => {
+    const layout = document.querySelector('.ws-layout') as HTMLElement | null;
+    if (!layout) return;
+
+    layout.style.setProperty('--ws-sidebar-width', `${width}px`);
+    layout.classList.toggle('ws-sidebar-resizing', isResizing);
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(width));
+  }, [width, isResizing]);
+
+  const onResizeStart = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (window.matchMedia('(max-width: 1023px)').matches) return;
+
+      event.preventDefault();
+      const handle = event.currentTarget;
+      handle.setPointerCapture(event.pointerId);
+
+      const startX = event.clientX;
+      const startWidth = width;
+      setIsResizing(true);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      const onPointerMove = (moveEvent: PointerEvent) => {
+        if (moveEvent.pointerId !== event.pointerId) return;
+        const delta = moveEvent.clientX - startX;
+        const next = Math.min(
+          SIDEBAR_EXPANDED_WIDTH,
+          Math.max(SIDEBAR_COLLAPSED_WIDTH, startWidth + delta),
+        );
+        setWidth(next);
+      };
+
+      const onPointerUp = (upEvent: PointerEvent) => {
+        if (upEvent.pointerId !== event.pointerId) return;
+
+        handle.releasePointerCapture(event.pointerId);
+        handle.removeEventListener('pointermove', onPointerMove);
+        handle.removeEventListener('pointerup', onPointerUp);
+        handle.removeEventListener('pointercancel', onPointerUp);
+
+        setWidth((current) =>
+          current < SIDEBAR_SNAP_MIDPOINT ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH,
+        );
+        setIsResizing(false);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+
+      handle.addEventListener('pointermove', onPointerMove);
+      handle.addEventListener('pointerup', onPointerUp);
+      handle.addEventListener('pointercancel', onPointerUp);
+    },
+    [width],
+  );
+
+  const collapsed = width < SIDEBAR_LABEL_COLLAPSE_WIDTH;
+
+  return { width, collapsed, isResizing, onResizeStart };
+}
+
 interface SidebarProps {
   unreadCount?: number;
+}
+
+type FounderNavGroup = {
+  label: string;
+  items: { name: string; href: string; Icon: LucideIcon }[];
+};
+
+function FounderNavSection({
+  group,
+  collapsed,
+  isActive,
+}: {
+  group: FounderNavGroup;
+  collapsed: boolean;
+  isActive: (href: string) => boolean;
+}) {
+  const pathname = usePathname();
+  const hasActiveItem = group.items.some((item) => isActive(item.href));
+  const [isOpen, setIsOpen] = useState(hasActiveItem);
+
+  // Auto-expand when navigating into this section, but allow manual collapse afterward
+  useEffect(() => {
+    if (hasActiveItem) setIsOpen(true);
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (collapsed) {
+    return (
+      <>
+        {group.items.map((item) => (
+          <Link
+            key={`${item.href}-${item.name}`}
+            href={item.href}
+            title={item.name}
+            aria-label={item.name}
+            className={`ws-nav-item ws-nav-sub ${isActive(item.href) ? 'active' : ''}`}
+          >
+            <item.Icon size={18} />
+          </Link>
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <div className="ws-nav-section">
+      <button
+        type="button"
+        className="ws-nav-section-toggle"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span className="ws-nav-section-label">{group.label}</span>
+        <ChevronRight size={14} className="ws-nav-section-chevron" aria-hidden="true" />
+      </button>
+      <div className={`ws-nav-section-drawer${isOpen ? ' is-open' : ''}`}>
+        <div className="ws-nav-section-drawer-inner">
+          {group.items.map((item) => (
+            <Link
+              key={`${item.href}-${item.name}`}
+              href={item.href}
+              className={`ws-nav-item ws-nav-sub ${isActive(item.href) ? 'active' : ''}`}
+            >
+              <item.Icon size={18} />
+              <span>{item.name}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const iconMap: Record<string, LucideIcon> = {
@@ -78,7 +226,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const { role, roleLabel, canAccessNucleus } = useUserRole();
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, isResizing, onResizeStart } = useSidebarResize();
   const [openTicketCount, setOpenTicketCount] = useState(0);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
 
@@ -248,19 +396,12 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className={`ws-sidebar ${collapsed ? 'collapsed' : ''}`}>
+      <aside className={`ws-sidebar${collapsed ? ' collapsed' : ''}${isResizing ? ' is-resizing' : ''}`}>
         <div className="ws-sidebar-header">
           <Link href="/workspace" className="ws-logo">
             <img src="/logos/logo-icon-black.png" alt="Trailblaize" className="ws-logo-icon" />
             {!collapsed && <span className="ws-logo-text">Workspace</span>}
           </Link>
-          <button 
-            className="ws-collapse-btn"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
         </div>
 
         <nav className="ws-nav">
@@ -269,33 +410,24 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
               {/* Founder desktop: Home + grouped sections */}
               <Link
                 href="/workspace"
+                title={collapsed ? 'Home' : undefined}
+                aria-label={collapsed ? 'Home' : undefined}
                 className={`ws-nav-item ${pathname === '/workspace' ? 'active' : ''}`}
               >
                 <LayoutDashboard size={20} />
                 {!collapsed && <span>Home</span>}
               </Link>
-              {founderNavGroups.map(group => (
-                <div key={group.label}>
-                  {!collapsed && (
-                    <p style={{
-                      fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-                      letterSpacing: '0.08em', color: '#9CA3AF',
-                      padding: '14px 12px 4px', margin: 0,
-                    }}>
-                      {group.label}
-                    </p>
+              {founderNavGroups.map((group, groupIndex) => (
+                <React.Fragment key={group.label}>
+                  {collapsed && groupIndex > 0 && (
+                    <div className="ws-nav-collapsed-divider" aria-hidden="true" />
                   )}
-                  {group.items.map(item => (
-                    <Link
-                      key={`${group.label}-${item.name}`}
-                      href={item.href}
-                      className={`ws-nav-item ws-nav-sub ${isActive(item.href) ? 'active' : ''}`}
-                    >
-                      <item.Icon size={18} />
-                      {!collapsed && <span>{item.name}</span>}
-                    </Link>
-                  ))}
-                </div>
+                  <FounderNavSection
+                    group={group}
+                    collapsed={collapsed}
+                    isActive={isActive}
+                  />
+                </React.Fragment>
               ))}
             </>
           ) : (
@@ -303,37 +435,43 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
               {canAccessNucleus && (
                 <Link
                   href="/nucleus"
+                  title={collapsed ? 'Nucleus Admin' : undefined}
+                  aria-label={collapsed ? 'Nucleus Admin' : undefined}
                   className={`ws-nav-item ${pathname.startsWith('/nucleus') ? 'active' : ''}`}
                 >
                   <Zap size={20} />
                   {!collapsed && <span>Nucleus Admin</span>}
                 </Link>
               )}
-              {inNucleus && canAccessNucleus && !collapsed && (
-                <div className="ws-nav-nucleus-modules">
-                  <button
-                    onClick={openSearch}
-                    className="ws-nav-item ws-nav-sub"
-                    style={{
-                      width: '100%', textAlign: 'left', background: 'none', border: 'none',
-                      cursor: 'pointer', color: '#6b7280',
-                    }}
-                  >
-                    <Search size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
-                    <span style={{ flex: 1, color: '#9ca3af', fontSize: '0.8125rem' }}>Search…</span>
-                    <kbd style={{
-                      fontSize: '0.6rem', background: '#f3f4f6', border: '1px solid #e5e7eb',
-                      borderRadius: 4, padding: '1px 4px', fontFamily: 'monospace', color: '#9ca3af',
-                    }}>⌘K</kbd>
-                  </button>
+              {inNucleus && canAccessNucleus && (
+                <div className={`ws-nav-nucleus-modules${collapsed ? ' collapsed' : ''}`}>
+                  {!collapsed && (
+                    <button
+                      onClick={openSearch}
+                      className="ws-nav-item ws-nav-sub"
+                      style={{
+                        width: '100%', textAlign: 'left', background: 'none', border: 'none',
+                        cursor: 'pointer', color: '#6b7280',
+                      }}
+                    >
+                      <Search size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+                      <span style={{ flex: 1, color: '#9ca3af', fontSize: '0.8125rem' }}>Search…</span>
+                      <kbd style={{
+                        fontSize: '0.6rem', background: '#f3f4f6', border: '1px solid #e5e7eb',
+                        borderRadius: 4, padding: '1px 4px', fontFamily: 'monospace', color: '#9ca3af',
+                      }}>⌘K</kbd>
+                    </button>
+                  )}
                   {nucleusModules.map((m) => (
                     <Link
                       key={m.name}
                       href={m.href}
+                      title={collapsed ? m.name : undefined}
+                      aria-label={collapsed ? m.name : undefined}
                       className={`ws-nav-item ws-nav-sub ${pathname === m.href || (m.href !== '/nucleus' && pathname.startsWith(m.href)) ? 'active' : ''}`}
                     >
-                      <m.icon size={18} />
-                      <span>{m.name}</span>
+                      <m.icon size={collapsed ? 18 : 18} />
+                      {!collapsed && <span>{m.name}</span>}
                     </Link>
                   ))}
                 </div>
@@ -344,6 +482,8 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
                   <Link
                     key={item.name}
                     href={item.href}
+                    title={collapsed ? item.name : undefined}
+                    aria-label={collapsed ? item.name : undefined}
                     className={`ws-nav-item ${isActive(item.href) ? 'active' : ''} ${item.emphasized ? 'emphasized' : ''}`}
                   >
                     <Icon size={20} />
@@ -365,6 +505,8 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
               {profile?.email?.toLowerCase() === 'devin@trailblaize.net' && (
                 <Link
                   href="/workspace/dev-console"
+                  title={collapsed ? 'Dev Console' : undefined}
+                  aria-label={collapsed ? 'Dev Console' : undefined}
                   className={`ws-nav-item ${isActive('/workspace/dev-console') ? 'active' : ''}`}
                 >
                   <Brain size={20} />
@@ -380,7 +522,10 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
         {/* User Section */}
         <div className="ws-sidebar-footer">
           <div className={`ws-user ${collapsed ? 'collapsed' : ''}`}>
-            <div className="ws-user-avatar">
+            <div
+              className="ws-user-avatar"
+              title={collapsed ? profile?.name ?? 'User' : undefined}
+            >
               {profile?.name?.charAt(0) || 'U'}
             </div>
             {!collapsed && (
@@ -393,11 +538,20 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
               className="ws-logout-btn"
               onClick={signOut}
               title="Sign out"
+              aria-label="Sign out"
             >
               <LogOut size={16} />
             </button>
           </div>
         </div>
+
+        <div
+          className="ws-sidebar-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Drag to resize sidebar"
+          onPointerDown={onResizeStart}
+        />
       </aside>
 
       {/* Bottom Tab Bar — Mobile only, role-specific (max 4 tabs) */}
