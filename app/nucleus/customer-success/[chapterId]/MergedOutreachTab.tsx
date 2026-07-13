@@ -54,7 +54,7 @@ const C = {
   primary: '#0F172A',
   heading: '#111827',
   body: '#6B7280',
-  success: '#10B981',
+  success: '#059669',
   warning: '#F59E0B',
   danger: '#EF4444',
   radius: '12px',

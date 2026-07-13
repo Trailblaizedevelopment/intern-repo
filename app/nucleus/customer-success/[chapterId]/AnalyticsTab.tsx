@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { TrendingUp, Users, MessageSquare, BarChart3, Loader2, RefreshCw } from 'lucide-react';
 import { ChapterWithOnboarding } from '@/lib/supabase';
+import { CS_UI, TOOLBAR_BUTTON, CS_CARD } from '../cs-ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,34 +29,31 @@ interface AnalyticsTabProps {
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
 function StatCard({
-  label, value, sub, icon, color,
+  label, value, sub, icon,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   icon: React.ReactNode;
-  color: string;
+  color?: string;
 }) {
   return (
-    <div style={{
-      background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12,
-      padding: '16px 20px', display: 'flex', alignItems: 'flex-start', gap: 14,
-    }}>
+    <div style={{ ...CS_CARD, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
       <div style={{
-        width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-        background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color,
+        width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+        background: CS_UI.surfaceMuted, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: CS_UI.textMuted,
       }}>
         {icon}
       </div>
       <div>
-        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>
+        <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: CS_UI.textSubtle, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
           {label}
         </div>
-        <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#111827', lineHeight: 1 }}>
+        <div style={{ fontSize: '1.25rem', fontWeight: 700, color: CS_UI.text, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
           {value}
         </div>
-        {sub && <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 3 }}>{sub}</div>}
+        {sub && <div style={{ fontSize: '0.75rem', color: CS_UI.textSubtle, marginTop: 3 }}>{sub}</div>}
       </div>
     </div>
   );
@@ -65,10 +63,10 @@ function StatCard({
 
 function ChartSection({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '20px 24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-        <span style={{ color: '#9ca3af' }}>{icon}</span>
-        <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#111827' }}>{title}</h3>
+    <div style={{ ...CS_CARD, padding: '16px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <span style={{ color: CS_UI.textSubtle }}>{icon}</span>
+        <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: CS_UI.text }}>{title}</h3>
       </div>
       {children}
     </div>
@@ -82,7 +80,7 @@ const tooltipStyle = {
     background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 10,
     fontSize: '0.8rem', boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
   },
-  cursor: { fill: 'rgba(16,185,129,0.06)' },
+  cursor: { fill: 'rgba(37,99,235,0.06)' },
 };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -125,11 +123,8 @@ export default function AnalyticsTab({ chapter, showToast }: AnalyticsTabProps) 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 280, gap: 12, color: '#9ca3af' }}>
         <BarChart3 size={40} style={{ opacity: 0.3 }} />
         <p style={{ margin: 0, fontSize: '0.88rem' }}>No analytics data available.</p>
-        <button
-          onClick={fetchAnalytics}
-          style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', cursor: 'pointer', fontSize: '0.8rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          <RefreshCw size={13} /> Retry
+        <button type="button" onClick={fetchAnalytics} style={TOOLBAR_BUTTON}>
+          <RefreshCw size={12} /> Retry
         </button>
       </div>
     );
@@ -158,13 +153,10 @@ export default function AnalyticsTab({ chapter, showToast }: AnalyticsTabProps) 
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Chapter Analytics</h2>
-          <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#9ca3af' }}>Last 12 weeks · {chapter.chapter_name}</p>
+          <h2 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: CS_UI.text }}>Chapter Analytics</h2>
+          <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: CS_UI.textSubtle }}>Last 12 weeks · {chapter.chapter_name}</p>
         </div>
-        <button
-          onClick={fetchAnalytics}
-          style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', cursor: 'pointer', fontSize: '0.78rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
-        >
+        <button type="button" onClick={fetchAnalytics} style={TOOLBAR_BUTTON}>
           <RefreshCw size={12} /> Refresh
         </button>
       </div>
@@ -176,28 +168,24 @@ export default function AnalyticsTab({ chapter, showToast }: AnalyticsTabProps) 
           value={totalSignups12w}
           sub={`Peak: ${peakSignupWeek.week} (${peakSignupWeek.signups})`}
           icon={<Users size={18} />}
-          color="#10b981"
         />
         <StatCard
           label="Conversion Rate"
           value={`${conversionRate}%`}
           sub={`${funnelSignedUp} of ${funnelTotal} alumni`}
           icon={<TrendingUp size={18} />}
-          color="#60a5fa"
         />
         <StatCard
           label="Avg Response Rate"
           value={`${avgResponseRate}%`}
           sub="Across active weeks"
           icon={<MessageSquare size={18} />}
-          color="#a78bfa"
         />
         <StatCard
           label="Messages Sent (12w)"
           value={totalSent12w.toLocaleString()}
           sub="All touches combined"
           icon={<BarChart3 size={18} />}
-          color="#f59e0b"
         />
       </div>
 
@@ -212,8 +200,8 @@ export default function AnalyticsTab({ chapter, showToast }: AnalyticsTabProps) 
             <AreaChart data={data.weekly_signups} margin={{ top: 4, right: 12, left: -10, bottom: 0 }}>
               <defs>
                 <linearGradient id="signupGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -237,10 +225,10 @@ export default function AnalyticsTab({ chapter, showToast }: AnalyticsTabProps) 
               <Area
                 type="monotone"
                 dataKey="signups"
-                stroke="#10b981"
+                stroke="#2563eb"
                 strokeWidth={2}
                 fill="url(#signupGrad)"
-                dot={{ fill: '#10b981', r: 3, strokeWidth: 0 }}
+                dot={{ fill: '#2563eb', r: 3, strokeWidth: 0 }}
                 activeDot={{ r: 5 }}
               />
             </AreaChart>

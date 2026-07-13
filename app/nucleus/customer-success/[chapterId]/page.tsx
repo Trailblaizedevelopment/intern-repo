@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ArrowLeft, HeartHandshake, Edit2, Copy, X, Loader2,
-  CreditCard, Eye, AlertTriangle, CheckCircle2, Clock,
-  Activity, Instagram, TrendingUp, Users, ChevronRight,
-  Zap, BadgeCheck, FileText,
+  ArrowLeft, Edit2, Copy, X, Loader2,
+  CreditCard, Eye, AlertTriangle, Clock,
+  Instagram, BadgeCheck, FileText,
 } from 'lucide-react';
 import OnboardingWizard from '../OnboardingWizard';
 import { useRouter, useParams } from 'next/navigation';
@@ -24,6 +23,10 @@ import SuccessTab from './SuccessTab';
 import AnalyticsTab from './AnalyticsTab';
 import ActivityLogTab from './ActivityLogTab';
 import EmailOutreachTab from '../EmailOutreachTab';
+import {
+  CS_UI, TIER_CONFIG, NEUTRAL_BADGE,
+  TOOLBAR_BUTTON, TOOLBAR_BUTTON_PRIMARY, DETAIL_PILL, CS_CARD,
+} from '../cs-ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,11 +138,7 @@ function computeHealthScore(chapter: ChapterWithOnboarding, stats?: AlumniStats)
   return { score, tier };
 }
 
-const TIER_CONFIG = {
-  red:    { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  label: 'Needs Attention' },
-  yellow: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', label: 'Monitoring'      },
-  green:  { color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)', label: 'Healthy'         },
-};
+// TIER_CONFIG imported from cs-ui
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -310,20 +309,20 @@ export default function ChapterDashboardPage() {
     ? Math.round((ONBOARDING_STEPS.filter(s => chapter[s.key as keyof ChapterWithOnboarding]).length / ONBOARDING_STEPS.length) * 100)
     : 0;
 
-  const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-    onboarding: { label: 'Onboarding', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-    active:     { label: 'Active',     color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
-    at_risk:    { label: 'At Risk',    color: '#ef4444', bg: 'rgba(239,68,68,0.12)'  },
-    churned:    { label: 'Churned',    color: '#6b7280', bg: 'rgba(107,114,128,0.12)' },
+  const statusConfig: Record<string, { label: string }> = {
+    onboarding: { label: 'Onboarding' },
+    active: { label: 'Active' },
+    at_risk: { label: 'At Risk' },
+    churned: { label: 'Churned' },
   };
 
   // ─── Loading / Error States ───────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#6b7280' }}>
+      <div style={{ minHeight: '100vh', background: CS_UI.pageBg, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: CS_UI.textMuted }}>
         <Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} />
-        <span style={{ fontSize: '0.9rem' }}>Loading chapter…</span>
+        <span style={{ fontSize: '0.875rem' }}>Loading chapter…</span>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -331,12 +330,13 @@ export default function ChapterDashboardPage() {
 
   if (!chapter) {
     return (
-      <div style={{ minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: '#111827' }}>
-        <AlertTriangle size={40} style={{ color: '#ef4444' }} />
+      <div style={{ minHeight: '100vh', background: CS_UI.pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: CS_UI.text }}>
+        <AlertTriangle size={40} style={{ color: CS_UI.danger }} />
         <h2 style={{ margin: 0 }}>Chapter not found</h2>
         <button
+          type="button"
           onClick={() => router.push('/nucleus/customer-success')}
-          style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#111827', cursor: 'pointer' }}
+          style={TOOLBAR_BUTTON}
         >
           Back to Customer Success
         </button>
@@ -356,7 +356,7 @@ export default function ChapterDashboardPage() {
   })();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#ffffff', color: '#111827', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: CS_UI.pageBg, color: CS_UI.text, fontFamily: 'inherit' }}>
       {/* ── Payment Alert Banner ── */}
       {paymentAlertInfo && (
         <div style={{
@@ -379,170 +379,130 @@ export default function ChapterDashboardPage() {
           ) : null}
         </div>
       )}
-      {/* ── Header ── */}
-      <header style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '0' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 24px' }}>
-          {/* Back nav */}
+      <header style={{ background: 'rgba(249,250,251,0.95)', borderBottom: `1px solid ${CS_UI.border}`, backdropFilter: 'blur(8px)' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '14px 24px' }}>
           <button
+            type="button"
             onClick={() => router.push('/nucleus/customer-success')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6b7280', fontSize: '0.78rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 12px', transition: 'color 0.15s' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#9ca3af')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#6b7280')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, color: CS_UI.textMuted, fontSize: '0.8125rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 12px', fontFamily: 'inherit' }}
           >
             <ArrowLeft size={13} /> Customer Success
           </button>
 
-          {/* Chapter identity row */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-              {/* Health score orb */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
               <div style={{
-                width: 48, height: 48, borderRadius: 12, flexShrink: 0,
-                background: tierCfg.bg, border: `2px solid ${tierCfg.border}`,
+                width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                background: tierCfg.bg, border: `1px solid ${tierCfg.border}`,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: tierCfg.color, lineHeight: 1 }}>{healthScore}</span>
-                <span style={{ fontSize: '0.5rem', color: tierCfg.color, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>score</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 800, color: tierCfg.color, lineHeight: 1 }}>{healthScore}</span>
+                <span style={{ fontSize: '0.45rem', color: tierCfg.color, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>score</span>
               </div>
 
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <h1 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600, color: CS_UI.text, lineHeight: 1.2 }}>
                     {chapter.chapter_name}
                   </h1>
-                  {/* Tier badge */}
-                  <span style={{
-                    fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                    background: tierCfg.bg, color: tierCfg.color, border: `1px solid ${tierCfg.border}`,
-                    display: 'flex', alignItems: 'center', gap: 4,
-                  }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: tierCfg.color, display: 'inline-block' }} />
+                  <span style={{ ...DETAIL_PILL, color: tierCfg.color, background: tierCfg.bg, border: `1px solid ${tierCfg.border}` }}>
                     {tierCfg.label}
                   </span>
-                  {/* Status badge */}
-                  <span style={{
-                    fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                    background: sc.bg, color: sc.color,
-                  }}>
+                  <span style={{ ...DETAIL_PILL, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}` }}>
                     {sc.label}
                   </span>
-                  {/* Contract status badge */}
                   {chapter.contract_status && chapter.contract_status !== 'not_sent' && (() => {
                     const CONTRACT_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-                      sent:     { label: 'Contract Sent',    color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)'  },
-                      signed:   { label: 'Contract Signed',  color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
-                      declined: { label: 'Contract Declined',color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)'  },
-                      voided:   { label: 'Contract Voided',  color: '#6b7280', bg: 'rgba(107,114,128,0.1)',border: 'rgba(107,114,128,0.25)' },
+                      sent: { label: 'Contract Sent', color: CS_UI.warning, bg: '#fffbeb', border: '#fde68a' },
+                      signed: { label: 'Contract Signed', color: CS_UI.success, bg: '#ecfdf5', border: '#6ee7b7' },
+                      declined: { label: 'Contract Declined', color: CS_UI.danger, bg: '#fef2f2', border: '#fecaca' },
+                      voided: { label: 'Contract Voided', color: CS_UI.textMuted, bg: NEUTRAL_BADGE.bg, border: NEUTRAL_BADGE.border },
                     };
                     const cfg = CONTRACT_STATUS_CONFIG[chapter.contract_status];
                     if (!cfg) return null;
                     return (
-                      <span style={{
-                        fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                        background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
-                        display: 'flex', alignItems: 'center', gap: 4,
-                      }}>
+                      <span style={{ ...DETAIL_PILL, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
                         <FileText size={10} />
                         {cfg.label}
                       </span>
                     );
                   })()}
-                  {/* Setup Complete badge */}
                   {chapter.onboarding_completed && (
-                    <span style={{
-                      fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                      background: 'rgba(16,185,129,0.12)', color: '#10b981',
-                      border: '1px solid rgba(16,185,129,0.25)',
-                      display: 'flex', alignItems: 'center', gap: 4,
-                    }}>
+                    <span style={{ ...DETAIL_PILL, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}` }}>
                       <BadgeCheck size={11} />
                       Setup Complete
                     </span>
                   )}
                 </div>
-                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '0.82rem' }}>
+                <p style={{ margin: '4px 0 0', color: CS_UI.textMuted, fontSize: '0.8125rem' }}>
                   {[chapter.fraternity, chapter.school].filter(Boolean).join(' · ')}
                 </p>
 
-                {/* Quick stat chips */}
-                <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: '0.75rem', color: CS_UI.textMuted }}>
                   {alumniStats && alumniStats.total > 0 && (
                     <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
-                        <Users size={12} style={{ color: '#60a5fa' }} />
-                        <span><strong style={{ color: '#60a5fa' }}>{alumniStats.total}</strong> alumni</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
-                        <Zap size={12} style={{ color: '#10b981' }} />
-                        <span><strong style={{ color: '#10b981' }}>{alumniStats.signed_up}</strong> signed up</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
-                        <TrendingUp size={12} style={{ color: alumniStats.outreach_coverage_pct >= 50 ? '#10b981' : alumniStats.outreach_coverage_pct >= 25 ? '#f59e0b' : '#ef4444' }} />
-                        <span style={{ color: alumniStats.outreach_coverage_pct >= 50 ? '#10b981' : alumniStats.outreach_coverage_pct >= 25 ? '#f59e0b' : '#ef4444' }}>
-                          <strong>{alumniStats.outreach_coverage_pct}%</strong> outreach
-                        </span>
-                      </div>
+                      <span><strong style={{ color: CS_UI.textSecondary }}>{alumniStats.total}</strong> alumni</span>
+                      <span><strong style={{ color: CS_UI.textSecondary }}>{alumniStats.signed_up}</strong> signed up</span>
+                      <span style={{ color: alumniStats.outreach_coverage_pct >= 50 ? CS_UI.success : alumniStats.outreach_coverage_pct >= 25 ? CS_UI.warning : CS_UI.danger }}>
+                        <strong>{alumniStats.outreach_coverage_pct}%</strong> outreach
+                      </span>
                     </>
                   )}
                   {chapter.last_check_in_date && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
-                      <Clock size={12} />
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Clock size={11} />
                       Last check-in: {new Date(chapter.last_check_in_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
+                    </span>
                   )}
                   {chapter.mrr ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#9ca3af' }}>
-                      <CreditCard size={12} style={{ color: '#a78bfa' }} />
-                      <span><strong style={{ color: '#a78bfa' }}>${chapter.mrr}/mo</strong></span>
-                    </div>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <CreditCard size={11} />
+                      <strong style={{ color: CS_UI.textSecondary }}>${chapter.mrr}/mo</strong>
+                    </span>
                   ) : null}
                   {chapter.instagram_flyer_posted && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#f472b6' }}>
-                      <Instagram size={12} />
-                      <span>Flyer posted</span>
-                    </div>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Instagram size={11} />
+                      Flyer posted
+                    </span>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Action buttons */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <button
+                type="button"
                 onClick={viewSubmission}
-                style={chapter?.onboarding_submitted_at
-                  ? { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #10b981', background: 'rgba(16,185,129,0.08)', color: '#10b981', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, transition: 'all 0.15s' }
-                  : { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem', transition: 'all 0.15s' }}
+                style={{
+                  ...TOOLBAR_BUTTON,
+                  ...(chapter?.onboarding_submitted_at
+                    ? { border: `1px solid ${CS_UI.blue}`, background: CS_UI.blueBg, color: CS_UI.blueDark, fontWeight: 600 }
+                    : {}),
+                }}
               >
-                <Eye size={13} /> {chapter?.onboarding_submitted_at ? '✓ View Submission' : 'Submission'}
+                <Eye size={13} /> {chapter?.onboarding_submitted_at ? 'View Submission' : 'Submission'}
               </button>
-              <button
-                onClick={() => setShowEditModal(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', color: '#9ca3af', cursor: 'pointer', fontSize: '0.78rem' }}
-              >
+              <button type="button" onClick={() => setShowEditModal(true)} style={TOOLBAR_BUTTON}>
                 <Edit2 size={13} /> Edit
               </button>
-              <button
-                onClick={generateOnboardingLink}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}
-              >
+              <button type="button" onClick={generateOnboardingLink} style={TOOLBAR_BUTTON_PRIMARY}>
                 <Copy size={13} /> Onboarding Link
               </button>
             </div>
           </div>
 
-          {/* Setup progress bar */}
           {!chapter.onboarding_completed && (
-            <div style={{ marginTop: 16, padding: '10px 14px', background: '#ffffff', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+            <div style={{ ...CS_CARD, marginTop: 14, padding: '10px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Setup Progress</span>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: onboardingPct >= 75 ? '#10b981' : '#f59e0b' }}>{onboardingPct}%</span>
+                <span style={{ fontSize: '0.6875rem', color: CS_UI.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Setup Progress</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: CS_UI.textSecondary }}>{onboardingPct}%</span>
               </div>
-              <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: 4, background: CS_UI.border, borderRadius: 9999, overflow: 'hidden' }}>
                 <div style={{
-                  height: '100%', borderRadius: 2,
+                  height: '100%', borderRadius: 9999,
                   width: `${onboardingPct}%`,
-                  background: onboardingPct >= 75 ? '#10b981' : onboardingPct >= 40 ? '#f59e0b' : '#ef4444',
+                  background: onboardingPct >= 75 ? CS_UI.success : onboardingPct >= 40 ? CS_UI.warning : CS_UI.danger,
                   transition: 'width 0.3s ease',
                 }} />
               </div>
@@ -550,26 +510,26 @@ export default function ChapterDashboardPage() {
           )}
         </div>
 
-        {/* ── Tab Navigation ── */}
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderTop: '1px solid #e5e7eb', scrollbarWidth: 'none' }}>
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', borderTop: `1px solid ${CS_UI.border}`, scrollbarWidth: 'none', paddingTop: 2 }}>
             {TABS.map(tab => (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: '12px 18px',
+                  padding: '10px 14px',
                   border: 'none',
-                  borderBottom: activeTab === tab.id ? '2px solid #10b981' : '2px solid transparent',
+                  borderBottom: activeTab === tab.id ? `2px solid ${CS_UI.blue}` : '2px solid transparent',
                   background: 'none',
                   cursor: 'pointer',
-                  fontSize: '0.82rem',
-                  fontWeight: activeTab === tab.id ? 700 : 400,
-                  color: activeTab === tab.id ? '#10b981' : '#6b7280',
+                  fontSize: '0.8125rem',
+                  fontWeight: activeTab === tab.id ? 600 : 500,
+                  color: activeTab === tab.id ? CS_UI.blueDark : CS_UI.textMuted,
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
-                  transition: 'all 0.15s',
-                  letterSpacing: activeTab === tab.id ? '0.01em' : '0',
+                  fontFamily: 'inherit',
+                  marginBottom: -1,
                 }}
               >
                 {tab.label}
@@ -580,21 +540,22 @@ export default function ChapterDashboardPage() {
       </header>
 
       {/* ── Tab Content ── */}
-      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '24px' }}>
+      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px 32px' }}>
         {activeTab === 'setup' && (
           <>
             <SetUpTab chapter={chapter} onUpdate={fetchChapter} showToast={showToast} onOpenWizard={() => setShowWizard(true)} />
             {chapter.onboarding_submitted_at && submission && (
               <div style={{ maxWidth: 720, marginTop: 24 }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 12 }}>📋 Onboarding Submission</div>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CS_UI.textSubtle, marginBottom: 12 }}>Onboarding Submission</div>
                 <SubmissionView submission={submission} />
               </div>
             )}
             {chapter.onboarding_submitted_at && !submission && (
               <div style={{ maxWidth: 720, marginTop: 24 }}>
                 <button
+                  type="button"
                   onClick={viewSubmission}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', borderRadius: 10, border: '1.5px solid #10b981', background: 'rgba(16,185,129,0.06)', color: '#10b981', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, width: '100%' }}
+                  style={{ ...TOOLBAR_BUTTON, width: '100%', border: `1px solid ${CS_UI.blue}`, background: CS_UI.blueBg, color: CS_UI.blueDark, fontWeight: 600, height: 40, borderRadius: 12 }}
                 >
                   <Eye size={16} /> Load Onboarding Submission (received {new Date(chapter.onboarding_submitted_at).toLocaleDateString()})
                 </button>
@@ -677,7 +638,7 @@ export default function ChapterDashboardPage() {
             <div className="module-modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
               <button className="module-cancel-btn" onClick={() => setShowEditModal(false)}>Cancel</button>
               <button
-                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                style={{ ...TOOLBAR_BUTTON_PRIMARY, padding: '8px 20px', height: 'auto', borderRadius: 9999 }}
                 onClick={updateChapter} disabled={!formData.chapter_name}
               >
                 Update
@@ -851,7 +812,7 @@ function SubmissionView({ submission }: { submission: SubmissionData }) {
         </div>
         {submission.chapter.alumni_list_url && (
           <div style={{ marginTop: 10 }}>
-            <a href={submission.chapter.alumni_list_url} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>
+            <a href={submission.chapter.alumni_list_url} target="_blank" rel="noopener noreferrer" style={{ color: CS_UI.blueDark, fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>
               📎 Download Alumni List
             </a>
           </div>

@@ -6,6 +6,7 @@ import {
   Activity, CheckCircle2, Clock,
 } from 'lucide-react';
 import { ChapterWithOnboarding } from '@/lib/supabase';
+import { CS_UI, TOOLBAR_BUTTON, CS_CARD } from '../cs-ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,9 +51,9 @@ const EVENT_CONFIG: Record<
   },
   batch_executed: {
     icon: <Send size={14} />,
-    color: '#10b981',
-    bg: 'rgba(16,185,129,0.1)',
-    border: 'rgba(16,185,129,0.2)',
+    color: CS_UI.success,
+    bg: '#ecfdf5',
+    border: '#6ee7b7',
   },
   payment_received: {
     icon: <CreditCard size={14} />,
@@ -198,10 +199,7 @@ export default function ActivityLogTab({ chapter, showToast }: ActivityLogTabPro
         <p style={{ margin: 0, fontSize: '0.78rem', opacity: 0.7 }}>
           Activity appears as batches are compiled, payments are received, and check-ins are logged.
         </p>
-        <button
-          onClick={fetchActivity}
-          style={{ marginTop: 4, padding: '7px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', cursor: 'pointer', fontSize: '0.8rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
+        <button type="button" onClick={fetchActivity} style={{ marginTop: 4, ...TOOLBAR_BUTTON }}>
           <RefreshCw size={13} /> Retry
         </button>
       </div>
@@ -216,27 +214,18 @@ export default function ActivityLogTab({ chapter, showToast }: ActivityLogTabPro
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Activity Log</h2>
-          <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#9ca3af' }}>
+          <h2 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: CS_UI.text }}>Activity Log</h2>
+          <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: CS_UI.textSubtle }}>
             {events.length} event{events.length !== 1 ? 's' : ''} · {chapter.chapter_name}
           </p>
         </div>
-        <button
-          onClick={fetchActivity}
-          style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#ffffff', cursor: 'pointer', fontSize: '0.78rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
+        <button type="button" onClick={fetchActivity} style={TOOLBAR_BUTTON}>
           <RefreshCw size={12} /> Refresh
         </button>
       </div>
 
       {/* Legend */}
-      <div style={{
-        display: 'flex', gap: 16, flexWrap: 'wrap',
-        padding: '10px 14px',
-        background: '#f9fafb',
-        border: '1px solid #e5e7eb',
-        borderRadius: 10,
-      }}>
+      <div style={{ ...CS_CARD, padding: '10px 14px', background: CS_UI.surfaceMuted }}>
         {(Object.entries(EVENT_CONFIG) as [ActivityEventKind, typeof EVENT_CONFIG[ActivityEventKind]][]).map(([kind, cfg]) => {
           const label: Record<ActivityEventKind, string> = {
             batch_compiled: 'Batch compiled',
@@ -257,7 +246,7 @@ export default function ActivityLogTab({ chapter, showToast }: ActivityLogTabPro
       </div>
 
       {/* Timeline */}
-      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '20px 24px' }}>
+      <div style={{ ...CS_CARD, padding: '16px 20px' }}>
         {groups.map((group) => (
           <div key={group.label} style={{ marginBottom: 24 }}>
             {/* Date header */}

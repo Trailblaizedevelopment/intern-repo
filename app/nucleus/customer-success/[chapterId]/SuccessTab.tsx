@@ -1,5 +1,7 @@
 'use client';
 
+import { CS_UI, TOOLBAR_BUTTON_PRIMARY } from '../cs-ui';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plus, X, Calendar, GraduationCap, Edit2, Trash2, Briefcase, BookOpen, MapPin,
@@ -630,7 +632,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                   href={flyerPostUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: '0.8rem', color: '#C4874A', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                  style={{ fontSize: '0.8rem', color: CS_UI.blueDark, fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
                 >
                   <Instagram size={13} /> View Post →
                 </a>
@@ -698,7 +700,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                       company: (m.member_type || 'active') === 'alumni' ? (memberForm.company || null) : null,
                       is_hiring: memberForm.is_hiring,
                       status: memberForm.status,
-                    })} style={{ padding: '4px 12px', borderRadius: 6, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>Save</button>
+                    })} style={{ ...TOOLBAR_BUTTON_PRIMARY, padding: '4px 12px', height: 30, fontSize: '0.8rem' }}>Save</button>
                     <button onClick={() => setEditingMember(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={14} /></button>
                   </div>
                 ) : (

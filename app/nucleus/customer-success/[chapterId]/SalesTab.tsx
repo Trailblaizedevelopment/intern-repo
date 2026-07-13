@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Check, AlertTriangle } from 'lucide-react';
 import { ChapterWithOnboarding } from '@/lib/supabase';
+import { CS_UI, CS_CARD, TOOLBAR_BUTTON_PRIMARY } from '../cs-ui';
 
 interface SalesTabProps {
   chapter: ChapterWithOnboarding;
@@ -136,9 +137,9 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
 
   return (
     <div style={{ maxWidth: 700 }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.25rem', marginBottom: 6, color: '#1B2A4A' }}>Post-Close Cycle Tracker</h2>
-        <p style={{ color: '#5C5449', fontSize: '0.875rem' }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontWeight: 600, fontSize: '0.9375rem', marginBottom: 6, color: CS_UI.text }}>Post-Close Cycle Tracker</h2>
+        <p style={{ color: CS_UI.textMuted, fontSize: '0.8125rem' }}>
           Track the three critical milestones after a chapter signs up.
         </p>
       </div>
@@ -172,32 +173,27 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
               )}
             <div
               style={{
-                background: isChecked ? 'rgba(234,240,232,0.5)' : '#fff',
-                border: `1px solid ${isChecked ? '#4A7060' : '#D9D4CC'}`,
-                borderLeft: `3px solid ${isChecked ? '#C4874A' : '#D9D4CC'}`,
-                borderRadius: 2,
-                padding: '18px 20px',
-                transition: 'border-color 0.15s ease-out',
-                boxShadow: isChecked ? '0 1px 6px rgba(196,135,74,0.1)' : '0 1px 3px rgba(27,42,74,0.04)',
-                opacity: isChecked ? 0.8 : 1,
+                ...CS_CARD,
+                background: isChecked ? CS_UI.surfaceMuted : CS_UI.surface,
+                borderLeft: `3px solid ${isChecked ? CS_UI.ink : CS_UI.border}`,
+                padding: '14px 16px',
+                opacity: isChecked ? 0.85 : 1,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-                {/* Step number + checkbox */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <div style={{
-                    width: 32, height: 32, borderRadius: 2,
-                    background: isChecked ? '#C4874A' : '#F7F5F1',
-                    border: `2px solid ${isChecked ? '#C4874A' : '#1B2A4A'}`,
+                    width: 32, height: 32, borderRadius: 8,
+                    background: isChecked ? CS_UI.ink : CS_UI.surfaceMuted,
+                    border: `2px solid ${isChecked ? CS_UI.ink : CS_UI.border}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '0.85rem',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease-out',
                     flexShrink: 0,
                   }}
                     onClick={() => updateEdit(step.key, 'checked', !isChecked)}
                   >
-                    {isChecked ? <Check size={16} color="#fff" strokeWidth={3} /> : <span style={{ opacity: 0.6, color: '#1B2A4A', fontWeight: 600 }}>{originalIdx + 1}</span>}
+                    {isChecked ? <Check size={16} color="#fff" strokeWidth={3} /> : <span style={{ color: CS_UI.textMuted, fontWeight: 600 }}>{originalIdx + 1}</span>}
                   </div>
                   {idx < sortedSteps.length - 1 && (
                     <div style={{ width: 2, height: 20, background: '#e5e7eb', margin: '0 auto' }} />
@@ -208,63 +204,55 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                     <span style={{ fontSize: '1rem' }}>{step.icon}</span>
-                    <span style={{
-                      fontFamily: "'Instrument Serif', Georgia, serif",
-                      fontSize: '1rem', fontWeight: 400,
-                      color: isChecked ? '#2A4229' : '#1B2A4A',
-                    }}>
+                    <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: isChecked ? CS_UI.textMuted : CS_UI.text }}>
                       {step.label}
                     </span>
                     {isChecked && (
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 2, background: '#EAF0E8', color: '#2A4229' }}>
-                        ✓ Complete
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, background: '#ecfdf5', color: CS_UI.success }}>
+                        Complete
                       </span>
                     )}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: step.fields.amountKey ? '1fr 1fr 1fr' : '1fr 2fr', gap: 10, marginBottom: 10 }}>
                     <div className="module-form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '0.75rem', color: '#5C5449' }}>Date</label>
+                      <label style={{ fontSize: '0.75rem', color: CS_UI.textMuted }}>Date</label>
                       <input
                         type="date"
                         value={edit.date}
                         onChange={e => updateEdit(step.key, 'date', e.target.value)}
-                        style={{ fontSize: '0.8rem', padding: '5px 8px', border: '1px solid #D9D4CC', borderRadius: 2 }}
+                        style={{ fontSize: '0.8rem', padding: '6px 8px', border: `1px solid ${CS_UI.border}`, borderRadius: 8 }}
                       />
                     </div>
                     {step.fields.amountKey && (
                       <div className="module-form-group" style={{ margin: 0 }}>
-                        <label style={{ fontSize: '0.75rem', color: '#5C5449' }}>Amount ($)</label>
+                        <label style={{ fontSize: '0.75rem', color: CS_UI.textMuted }}>Amount ($)</label>
                         <input
                           type="number"
                           value={edit.amount ?? ''}
                           onChange={e => updateEdit(step.key, 'amount', e.target.value)}
                           placeholder="299"
-                          style={{ fontSize: '0.8rem', padding: '5px 8px', border: '1px solid #D9D4CC', borderRadius: 2 }}
+                          style={{ fontSize: '0.8rem', padding: '6px 8px', border: `1px solid ${CS_UI.border}`, borderRadius: 8 }}
                         />
                       </div>
                     )}
                     <div className="module-form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '0.75rem', color: '#5C5449' }}>Notes</label>
+                      <label style={{ fontSize: '0.75rem', color: CS_UI.textMuted }}>Notes</label>
                       <input
                         type="text"
                         value={edit.notes}
                         onChange={e => updateEdit(step.key, 'notes', e.target.value)}
                         placeholder="Any notes…"
-                        style={{ fontSize: '0.8rem', padding: '5px 8px', border: '1px solid #D9D4CC', borderRadius: 2 }}
+                        style={{ fontSize: '0.8rem', padding: '6px 8px', border: `1px solid ${CS_UI.border}`, borderRadius: 8 }}
                       />
                     </div>
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => saveStep(step.key, step)}
                     disabled={isSaving}
-                    style={{
-                      padding: '5px 14px', borderRadius: 2, fontSize: '0.8rem', fontWeight: 600,
-                      background: '#1B2A4A', color: '#F7F5F1',
-                      border: 'none', cursor: 'pointer', opacity: isSaving ? 0.7 : 1,
-                      transition: 'background 0.15s ease-out',
-                    }}
+                    style={{ ...TOOLBAR_BUTTON_PRIMARY, padding: '0 14px', height: 32, opacity: isSaving ? 0.7 : 1 }}
                   >
                     {isSaving ? 'Saving…' : 'Save'}
                   </button>

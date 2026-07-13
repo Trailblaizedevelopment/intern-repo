@@ -2,10 +2,13 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Search, X, Users, TrendingUp, UserCheck, UserX, Linkedin,
+  Search, X, Users, Linkedin,
   ChevronDown, Loader2, MapPin, Calendar, Clock,
 } from 'lucide-react';
 import { ChapterWithOnboarding } from '@/lib/supabase';
+import {
+  CS_UI, NEUTRAL_BADGE, TOOLBAR_BUTTON, TOOLBAR_SEARCH, CS_CARD, LIST_PILL,
+} from '../cs-ui';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,7 +65,19 @@ const SORT_OPTIONS = [
   { value: 'last_active', label: 'Last Active' },
 ] as const;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+const FILTER_SELECT: React.CSSProperties = {
+  height: 34,
+  padding: '0 28px 0 12px',
+  border: `1px solid ${CS_UI.border}`,
+  borderRadius: 9999,
+  fontSize: '0.8125rem',
+  color: CS_UI.textSecondary,
+  background: '#fff',
+  cursor: 'pointer',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  fontFamily: 'inherit',
+};
 
 function timeAgo(iso: string | null): string | null {
   if (!iso) return null;
@@ -83,8 +98,8 @@ function getInitials(firstName: string, lastName: string): string {
 }
 
 function getEngagementColor(score: number): string {
-  if (score >= 70) return '#10b981'; // emerald
-  if (score >= 40) return '#C4874A'; // amber
+  if (score >= 70) return '#059669';
+  if (score >= 40) return '#d97706';
   return '#9ca3af'; // slate
 }
 
@@ -115,14 +130,14 @@ function Avatar({
           borderRadius: '50%',
           objectFit: 'cover',
           flexShrink: 0,
-          border: '2px solid #E8EDF5',
+          border: `1px solid ${CS_UI.border}`,
         }}
       />
     );
   }
 
   const initials = getInitials(firstName, lastName);
-  const bgColors = ['#1B2A4A', '#3A5A7A', '#C4874A', '#5C5449', '#2A4229'];
+  const bgColors = ['#0F172A', '#374151', '#2563eb', '#6b7280', '#059669'];
   const colorIndex =
     ((firstName.charCodeAt(0) || 0) + (lastName.charCodeAt(0) || 0)) %
     bgColors.length;
@@ -141,9 +156,8 @@ function Avatar({
         color: '#fff',
         fontWeight: 600,
         fontSize: size * 0.35,
-        fontFamily: "'Instrument Serif', Georgia, serif",
         letterSpacing: '0.02em',
-        border: '2px solid #E8EDF5',
+        border: `1px solid ${CS_UI.border}`,
       }}
     >
       {initials || '?'}
@@ -154,58 +168,32 @@ function Avatar({
 function StatusBadge({ member }: { member: MergedAlumni }) {
   if (member.platform_joined) {
     return (
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '3px 10px',
-          borderRadius: 2,
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          color: '#065f46',
-          background: '#d1fae5',
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-        }}
-      >
-        ✅ On Platform
+      <span style={{ ...LIST_PILL, color: CS_UI.success, background: '#ecfdf5', border: `1px solid #6ee7b7` }}>
+        On Platform
       </span>
     );
   }
 
-  const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }> = {
-    not_contacted:  { label: 'Not Contacted',   color: '#6b7280', bg: '#f3f4f6' },
-    touch1_sent:    { label: 'Touch 1 Sent',    color: '#92400e', bg: '#fef3c7' },
-    touch1_confirmed: { label: 'Touch 1 ✓',    color: '#78350f', bg: '#FDF0E0' },
-    touch2_sent:    { label: 'Touch 2 Sent',    color: '#b45309', bg: '#fef3c7' },
-    touch3_sent:    { label: 'Touch 3 Sent',    color: '#d97706', bg: '#fffbeb' },
-    signed_up:      { label: 'Signed Up',       color: '#065f46', bg: '#d1fae5' },
-    declined:       { label: 'Declined',        color: '#4b5563', bg: '#e5e7eb' },
-    no_response:    { label: 'No Response',     color: '#6b7280', bg: '#f9fafb' },
+  const STATUS_STYLES: Record<string, { label: string; color: string; bg: string; border: string }> = {
+    not_contacted: { label: 'Not Contacted', color: NEUTRAL_BADGE.color, bg: NEUTRAL_BADGE.bg, border: NEUTRAL_BADGE.border },
+    touch1_sent: { label: 'Touch 1 Sent', color: CS_UI.warning, bg: '#fffbeb', border: '#fde68a' },
+    touch1_confirmed: { label: 'Touch 1 ✓', color: CS_UI.warning, bg: '#fffbeb', border: '#fde68a' },
+    touch2_sent: { label: 'Touch 2 Sent', color: CS_UI.warning, bg: '#fffbeb', border: '#fde68a' },
+    touch3_sent: { label: 'Touch 3 Sent', color: CS_UI.warning, bg: '#fffbeb', border: '#fde68a' },
+    signed_up: { label: 'Signed Up', color: CS_UI.success, bg: '#ecfdf5', border: '#6ee7b7' },
+    declined: { label: 'Declined', color: CS_UI.textMuted, bg: NEUTRAL_BADGE.bg, border: NEUTRAL_BADGE.border },
+    no_response: { label: 'No Response', color: CS_UI.textMuted, bg: NEUTRAL_BADGE.bg, border: NEUTRAL_BADGE.border },
   };
 
   const cfg = STATUS_STYLES[member.outreach_status] ?? {
     label: member.outreach_status,
-    color: '#6b7280',
-    bg: '#f3f4f6',
+    color: NEUTRAL_BADGE.color,
+    bg: NEUTRAL_BADGE.bg,
+    border: NEUTRAL_BADGE.border,
   };
 
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '3px 10px',
-        borderRadius: 2,
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        color: cfg.color,
-        background: cfg.bg,
-        whiteSpace: 'nowrap',
-        flexShrink: 0,
-      }}
-    >
+    <span style={{ ...LIST_PILL, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
       {cfg.label}
     </span>
   );
@@ -226,8 +214,8 @@ function EngagementBar({ score }: { score: number }) {
         style={{
           flex: 1,
           height: 4,
-          background: '#E8EDF5',
-          borderRadius: 2,
+          background: CS_UI.border,
+          borderRadius: 9999,
           overflow: 'hidden',
         }}
       >
@@ -256,61 +244,34 @@ function EngagementBar({ score }: { score: number }) {
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  sub?: string;
-  accent?: string;
-}) {
+function KpiRow({ items }: { items: { label: string; value: string | number; sub?: string }[] }) {
   return (
-    <div
-      style={{
-        background: '#F7F5F1',
-        border: '1px solid #D9D4CC',
-        borderRadius: 2,
-        padding: '14px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        flex: '1 1 0',
-        minWidth: 110,
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          color: accent || '#5C5449',
-          marginBottom: 2,
-        }}
-      >
-        {icon}
-        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#5C5449', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {label}
-        </span>
-      </div>
-      <div
-        style={{
-          fontSize: '1.6rem',
-          fontFamily: "'Instrument Serif', Georgia, serif",
-          fontWeight: 400,
-          color: accent || '#1B2A4A',
-          lineHeight: 1.1,
-        }}
-      >
-        {value}
-      </div>
-      {sub && (
-        <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: 1 }}>{sub}</div>
-      )}
+    <div style={{
+      display: 'flex',
+      alignItems: 'stretch',
+      width: '100%',
+      paddingBottom: 16,
+      marginBottom: 4,
+      borderBottom: `1px solid ${CS_UI.border}`,
+    }}>
+      {items.map((stat, index) => (
+        <React.Fragment key={stat.label}>
+          {index > 0 && (
+            <div aria-hidden style={{ width: 1, alignSelf: 'stretch', margin: '4px 0', background: CS_UI.border, flexShrink: 0 }} />
+          )}
+          <div style={{ flex: '1 1 0', padding: '0 12px', minWidth: 0, textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CS_UI.textSubtle }}>
+              {stat.label}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '1.25rem', fontWeight: 700, color: CS_UI.text, fontVariantNumeric: 'tabular-nums' }}>
+              {stat.value}
+            </p>
+            {stat.sub && (
+              <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: CS_UI.textSubtle }}>{stat.sub}</p>
+            )}
+          </div>
+        </React.Fragment>
+      ))}
     </div>
   );
 }
@@ -380,57 +341,20 @@ export default function AlumniTab({ chapter, showToast }: AlumniTabProps) {
       : 0;
 
   return (
-    <div style={{ maxWidth: 820, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* ── Header Stats ── */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <StatCard
-          icon={<Users size={14} />}
-          label="Total Alumni"
-          value={total}
-          sub="from contact list"
-          accent="#1B2A4A"
-        />
-        <StatCard
-          icon={<UserCheck size={14} />}
-          label="On Platform"
-          value={joined}
-          sub="signed up"
-          accent="#065f46"
-        />
-        <StatCard
-          icon={<UserX size={14} />}
-          label="Not Yet Joined"
-          value={notJoined}
-          sub="yet to sign up"
-          accent="#C4874A"
-        />
-        <StatCard
-          icon={<TrendingUp size={14} />}
-          label="Avg Engagement"
-          value={joinedMembers.length > 0 ? `${avgEngagement}` : '—'}
-          sub="of platform members"
-          accent="#3A5A7A"
-        />
-      </div>
+      <KpiRow
+        items={[
+          { label: 'Total Alumni', value: total, sub: 'from contact list' },
+          { label: 'On Platform', value: joined, sub: 'signed up' },
+          { label: 'Not Yet Joined', value: notJoined, sub: 'yet to sign up' },
+          { label: 'Avg Engagement', value: joinedMembers.length > 0 ? avgEngagement : '—', sub: 'platform members' },
+        ]}
+      />
 
-      {/* ── Search + Filters ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-        {/* Search */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            flex: '1 1 200px',
-            minWidth: 180,
-            background: '#fff',
-            border: '1px solid #D9D4CC',
-            borderRadius: 2,
-            padding: '7px 12px',
-          }}
-        >
-          <Search size={15} color="#9ca3af" />
+        <div style={{ ...TOOLBAR_SEARCH, flex: '1 1 220px' }}>
+          <Search size={15} color={CS_UI.textSubtle} />
           <input
             type="text"
             placeholder="Search by name, email, phone…"
@@ -440,145 +364,62 @@ export default function AlumniTab({ chapter, showToast }: AlumniTabProps) {
               flex: 1,
               border: 'none',
               outline: 'none',
-              fontSize: '0.85rem',
-              color: '#1B2A4A',
+              fontSize: '0.8125rem',
+              color: CS_UI.text,
               background: 'transparent',
+              fontFamily: 'inherit',
+              minWidth: 0,
             }}
           />
           {search && (
-            <button
-              onClick={() => setSearch('')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
-            >
-              <X size={14} color="#9ca3af" />
+            <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              <X size={14} color={CS_UI.textSubtle} />
             </button>
           )}
         </div>
 
-        {/* Status filter */}
         <div style={{ position: 'relative' }}>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            style={{
-              padding: '7px 28px 7px 10px',
-              border: '1px solid #D9D4CC',
-              borderRadius: 2,
-              fontSize: '0.82rem',
-              color: '#1B2A4A',
-              background: '#fff',
-              cursor: 'pointer',
-              appearance: 'none',
-              WebkitAppearance: 'none',
-            }}
-          >
+          <select value={status} onChange={(e) => setStatus(e.target.value)} style={FILTER_SELECT}>
             {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          <ChevronDown
-            size={13}
-            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }}
-          />
+          <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: CS_UI.textSubtle }} />
         </div>
 
-        {/* Sort */}
         <div style={{ position: 'relative' }}>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            style={{
-              padding: '7px 28px 7px 10px',
-              border: '1px solid #D9D4CC',
-              borderRadius: 2,
-              fontSize: '0.82rem',
-              color: '#1B2A4A',
-              background: '#fff',
-              cursor: 'pointer',
-              appearance: 'none',
-              WebkitAppearance: 'none',
-            }}
-          >
+          <select value={sort} onChange={(e) => setSort(e.target.value)} style={FILTER_SELECT}>
             {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                Sort: {o.label}
-              </option>
+              <option key={o.value} value={o.value}>Sort: {o.label}</option>
             ))}
           </select>
-          <ChevronDown
-            size={13}
-            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }}
-          />
+          <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: CS_UI.textSubtle }} />
         </div>
 
-        {/* Refresh */}
-        <button
-          onClick={fetchMembers}
-          disabled={loading}
-          style={{
-            padding: '7px 14px',
-            border: '1px solid #D9D4CC',
-            borderRadius: 2,
-            fontSize: '0.82rem',
-            color: '#5C5449',
-            background: '#F7F5F1',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
-          {loading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : '↻'} Refresh
+        <button type="button" onClick={fetchMembers} disabled={loading} style={{ ...TOOLBAR_BUTTON, opacity: loading ? 0.7 : 1 }}>
+          {loading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+          Refresh
         </button>
       </div>
 
       {/* ── Member List ── */}
       {loading && members.length === 0 ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '48px 0',
-            color: '#6b7280',
-            justifyContent: 'center',
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '40px 0', color: CS_UI.textMuted, justifyContent: 'center' }}>
           <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
           Loading alumni data…
         </div>
       ) : members.length === 0 ? (
-        <div
-          style={{
-            padding: '48px 24px',
-            textAlign: 'center',
-            color: '#9ca3af',
-            background: '#F7F5F1',
-            border: '1px solid #D9D4CC',
-            borderRadius: 2,
-          }}
-        >
-          <Users size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <p style={{ fontWeight: 600, color: '#5C5449' }}>No alumni found</p>
-          <p style={{ fontSize: '0.8rem', marginTop: 4 }}>
+        <div style={{ ...CS_CARD, padding: '40px 24px', textAlign: 'center', color: CS_UI.textSubtle, background: CS_UI.surfaceMuted }}>
+          <Users size={32} style={{ marginBottom: 12, opacity: 0.35 }} />
+          <p style={{ fontWeight: 600, color: CS_UI.textSecondary, margin: 0 }}>No alumni found</p>
+          <p style={{ fontSize: '0.8125rem', marginTop: 4 }}>
             {debouncedSearch || status !== 'all'
               ? 'Try adjusting your search or filters.'
               : 'Import alumni contacts to get started.'}
           </p>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            border: '1px solid #D9D4CC',
-            borderRadius: 2,
-            overflow: 'hidden',
-            background: '#fff',
-          }}
-        >
+        <div style={{ ...CS_CARD, overflow: 'hidden', padding: 0 }}>
           {members.map((member, idx) => (
             <AlumniRow
               key={member.id}
@@ -591,49 +432,14 @@ export default function AlumniTab({ chapter, showToast }: AlumniTabProps) {
 
       {/* ── Pagination ── */}
       {total > 50 && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '0.82rem',
-            color: '#6b7280',
-            padding: '8px 0',
-          }}
-        >
-          <span>
-            Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, total)} of {total}
-          </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8125rem', color: CS_UI.textMuted, paddingTop: 4 }}>
+          <span>Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, total)} of {total}</span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              style={{
-                padding: '5px 14px',
-                border: '1px solid #D9D4CC',
-                borderRadius: 2,
-                fontSize: '0.82rem',
-                background: page === 1 ? '#F7F5F1' : '#fff',
-                cursor: page === 1 ? 'not-allowed' : 'pointer',
-                color: '#1B2A4A',
-              }}
-            >
-              ← Prev
+            <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ ...TOOLBAR_BUTTON, opacity: page === 1 ? 0.6 : 1, cursor: page === 1 ? 'not-allowed' : 'pointer' }}>
+              Previous
             </button>
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page * 50 >= total}
-              style={{
-                padding: '5px 14px',
-                border: '1px solid #D9D4CC',
-                borderRadius: 2,
-                fontSize: '0.82rem',
-                background: page * 50 >= total ? '#F7F5F1' : '#fff',
-                cursor: page * 50 >= total ? 'not-allowed' : 'pointer',
-                color: '#1B2A4A',
-              }}
-            >
-              Next →
+            <button type="button" onClick={() => setPage((p) => p + 1)} disabled={page * 50 >= total} style={{ ...TOOLBAR_BUTTON, opacity: page * 50 >= total ? 0.6 : 1, cursor: page * 50 >= total ? 'not-allowed' : 'pointer' }}>
+              Next
             </button>
           </div>
         </div>
@@ -658,13 +464,13 @@ function AlumniRow({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 14,
-        padding: '12px 16px',
-        borderBottom: isLast ? 'none' : '1px solid #EAE8E3',
+        gap: 12,
+        padding: '10px 16px',
+        borderBottom: isLast ? 'none' : `1px solid ${CS_UI.border}`,
         transition: 'background 0.1s',
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.background = '#FAFAF8';
+        (e.currentTarget as HTMLDivElement).style.background = CS_UI.surfaceMuted;
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLDivElement).style.background = 'transparent';
@@ -691,8 +497,8 @@ function AlumniRow({
           <span
             style={{
               fontWeight: 600,
-              fontSize: '0.9rem',
-              color: '#1B2A4A',
+              fontSize: '0.875rem',
+              color: CS_UI.text,
               whiteSpace: 'nowrap',
             }}
           >
