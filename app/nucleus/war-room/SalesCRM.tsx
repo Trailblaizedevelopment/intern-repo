@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, X, RefreshCw, Plus, ChevronRight, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Search, X, RefreshCw, Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -150,6 +150,43 @@ const CATEGORY_FILTERS: { value: CategoryFilter; label: string }[] = [
   { value: 'professional_associations', label: 'Professional Assoc.' },
 ];
 
+const DEALS_PAGE_SIZE = 25;
+const NEEDS_ATTENTION_PREVIEW = 5;
+
+const TOOLBAR_CONTROL_HEIGHT = 34;
+
+const TOOLBAR_BUTTON: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  height: TOOLBAR_CONTROL_HEIGHT,
+  padding: '0 12px',
+  fontSize: '0.8125rem',
+  lineHeight: 1,
+  borderRadius: '9999px',
+  boxSizing: 'border-box',
+  fontFamily: 'inherit',
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  cursor: 'pointer',
+};
+
+const TOOLBAR_SELECT: React.CSSProperties = {
+  height: TOOLBAR_CONTROL_HEIGHT,
+  padding: '0 28px 0 12px',
+  borderRadius: '9999px',
+  border: '1px solid #e5e7eb',
+  background: '#fff',
+  color: '#374151',
+  fontSize: '0.8125rem',
+  fontFamily: 'inherit',
+  cursor: 'pointer',
+  boxSizing: 'border-box',
+  lineHeight: 1,
+  flexShrink: 0,
+};
+
 // Map known auth UUIDs → display names
 const UUID_TO_REP: Record<string, string> = {
   '33ab5810-4d9f-485e-babb-a99b650a09e1': 'Owen',
@@ -198,6 +235,60 @@ function useIsMobile() {
 }
 
 // ─── Create Deal Drawer ────────────────────────────────────────────────────────
+
+const DRAWER_CONTROL_HEIGHT = 38;
+const DRAWER_FIELD_GAP = 12;
+
+const DRAWER_LABEL: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.6875rem',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  color: '#6b7280',
+  marginBottom: 5,
+};
+
+const DRAWER_INPUT: React.CSSProperties = {
+  width: '100%',
+  height: DRAWER_CONTROL_HEIGHT,
+  border: '1px solid #e5e7eb',
+  borderRadius: 10,
+  padding: '0 12px',
+  fontSize: '0.875rem',
+  outline: 'none',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+  background: '#fff',
+  color: '#111827',
+};
+
+const DRAWER_SELECT: React.CSSProperties = {
+  ...DRAWER_INPUT,
+  padding: '0 32px 0 12px',
+  cursor: 'pointer',
+};
+
+const DRAWER_FOOTER_BTN: React.CSSProperties = {
+  flex: 1,
+  height: 44,
+  borderRadius: '9999px',
+  fontSize: '0.875rem',
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  boxSizing: 'border-box',
+};
+
+const TEMP_OPTIONS = [
+  { value: 'hot' as const, label: '🔥 Hot' },
+  { value: 'warm' as const, label: '🌡 Warm' },
+  { value: 'cold' as const, label: '🧊 Cold' },
+];
 
 interface CreateDealDrawerProps {
   onClose: () => void;
@@ -261,12 +352,6 @@ function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDraw
     }
   }
 
-  const TEMP_CFG = {
-    hot:  { label: '🔥 Hot',   bg: '#fee2e2', color: '#dc2626', border: '#fca5a5' },
-    warm: { label: '🌡 Warm',  bg: '#fef3c7', color: '#d97706', border: '#fcd34d' },
-    cold: { label: '🧊 Cold',  bg: '#e0f2fe', color: '#0284c7', border: '#7dd3fc' },
-  } as const;
-
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 50,
@@ -304,168 +389,117 @@ function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDraw
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 20px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '14px 20px' : '16px 24px', display: 'flex', flexDirection: 'column', gap: DRAWER_FIELD_GAP }}>
 
-          {/* Org name */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>
+            <label style={DRAWER_LABEL}>
               Chapter / Org Name <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <input
-              type="text" value={orgName} onChange={e => setOrgName(e.target.value)}
+              type="text"
+              value={orgName}
+              onChange={e => setOrgName(e.target.value)}
               placeholder="e.g. Sigma Chi, IFC, Theta Xi Nationals"
               autoFocus
-              style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '9px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              style={DRAWER_INPUT}
             />
           </div>
 
-          {/* School */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>
-              School
-            </label>
+            <label style={DRAWER_LABEL}>School</label>
             <input
-              type="text" value={schoolName} onChange={e => setSchoolName(e.target.value)}
+              type="text"
+              value={schoolName}
+              onChange={e => setSchoolName(e.target.value)}
               placeholder="e.g. University of Alabama, TCU"
-              style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '9px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              style={DRAWER_INPUT}
             />
           </div>
 
-          {/* Org type */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Type</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {ORG_TYPES.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setOrgType(opt.value)}
-                  style={{
-                    padding: '5px 12px', borderRadius: 8, fontSize: '0.8rem', fontFamily: 'inherit',
-                    cursor: 'pointer', fontWeight: orgType === opt.value ? 700 : 400,
-                    border: `1px solid ${orgType === opt.value ? '#0F172A' : '#e5e7eb'}`,
-                    background: orgType === opt.value ? '#0F172A' : '#fff',
-                    color: orgType === opt.value ? '#fff' : '#374151',
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: DRAWER_FIELD_GAP }}>
+            <div>
+              <label style={DRAWER_LABEL}>Type</label>
+              <select value={orgType} onChange={e => setOrgType(e.target.value)} style={DRAWER_SELECT}>
+                {ORG_TYPES.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={DRAWER_LABEL}>Stage</label>
+              <select value={stage} onChange={e => setStage(e.target.value as DealStage)} style={DRAWER_SELECT}>
+                {PIPELINE_STAGES.map(s => (
+                  <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Stage */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Stage</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {PIPELINE_STAGES.map(s => {
-                const cfg = STAGE_COLORS[s];
-                const isActive = stage === s;
-                return (
-                  <button
-                    key={s}
-                    onClick={() => setStage(s)}
-                    style={{
-                      padding: '5px 12px', borderRadius: 8, fontSize: '0.8rem', fontFamily: 'inherit',
-                      cursor: 'pointer', fontWeight: isActive ? 700 : 400,
-                      border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
-                      background: isActive ? cfg.bg : '#fff',
-                      color: isActive ? cfg.color : '#9ca3af',
-                    }}
-                  >
-                    {STAGE_LABELS[s]}
-                  </button>
-                );
-              })}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: DRAWER_FIELD_GAP }}>
+            <div>
+              <label style={DRAWER_LABEL}>Temp</label>
+              <select
+                value={temperature}
+                onChange={e => setTemperature(e.target.value as 'hot' | 'warm' | 'cold')}
+                style={DRAWER_SELECT}
+              >
+                {TEMP_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
-          </div>
-
-          {/* Temperature + Value */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Temp</label>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {(['hot', 'warm', 'cold'] as const).map(t => {
-                  const cfg = TEMP_CFG[t];
-                  const isActive = temperature === t;
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => setTemperature(t)}
-                      style={{
-                        flex: 1, padding: '5px 6px', borderRadius: 8, fontSize: '0.78rem',
-                        fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
-                        border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
-                        background: isActive ? cfg.bg : '#fff',
-                        color: isActive ? cfg.color : '#9ca3af',
-                      }}
-                    >
-                      {cfg.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div style={{ width: 110 }}>
-              <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Value ($)</label>
+            <div>
+              <label style={DRAWER_LABEL}>Value ($)</label>
               <input
-                type="number" value={value} onChange={e => setValue(e.target.value)}
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                type="number"
+                value={value}
+                onChange={e => setValue(e.target.value)}
+                style={DRAWER_INPUT}
               />
             </div>
           </div>
 
-          {/* Assigned to */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>Assigned To</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {repList.map(emp => {
-                const firstName = emp.name.split(' ')[0];
-                const color = REP_COLORS[firstName] ?? '#6b7280';
-                const isActive = assignedTo === emp.id;
-                return (
-                  <button
-                    key={emp.id}
-                    onClick={() => setAssignedTo(emp.id)}
-                    style={{
-                      padding: '5px 14px', borderRadius: 8, fontSize: '0.8rem',
-                      fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
-                      border: `1px solid ${isActive ? color : '#e5e7eb'}`,
-                      background: isActive ? color : '#fff',
-                      color: isActive ? '#fff' : '#374151',
-                    }}
-                  >
-                    {firstName}
-                  </button>
-                );
-              })}
-            </div>
+            <label style={DRAWER_LABEL}>Assigned To</label>
+            <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} style={DRAWER_SELECT}>
+              <option value="">Unassigned</option>
+              {repList.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.name.split(' ')[0]}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Contact (optional) */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#6b7280', marginBottom: 6 }}>
+            <label style={DRAWER_LABEL}>
               Contact <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <input
-                type="text" value={contactName} onChange={e => setContactName(e.target.value)}
-                placeholder="Contact name"
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                type="text"
+                value={contactName}
+                onChange={e => setContactName(e.target.value)}
+                placeholder="Name"
+                style={DRAWER_INPUT}
               />
-              <input
-                type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)}
-                placeholder="Email address"
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-              />
-              <input
-                type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)}
-                placeholder="Phone number"
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={e => setContactEmail(e.target.value)}
+                  placeholder="Email"
+                  style={DRAWER_INPUT}
+                />
+                <input
+                  type="tel"
+                  value={contactPhone}
+                  onChange={e => setContactPhone(e.target.value)}
+                  placeholder="Phone"
+                  style={DRAWER_INPUT}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Error */}
           {error && (
             <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 14px', fontSize: '0.8rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
               <AlertCircle size={14} /> {error}
@@ -474,23 +508,29 @@ function CreateDealDrawer({ onClose, onCreated, employees = [] }: CreateDealDraw
         </div>
 
         {/* Footer */}
-        <div style={{ padding: isMobile ? '12px 20px 28px' : '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 10 }}>
+        <div style={{ padding: isMobile ? '12px 20px 28px' : '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 12 }}>
           <button
+            type="button"
             onClick={onClose}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit' }}
+            style={{
+              ...DRAWER_FOOTER_BTN,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              color: '#374151',
+            }}
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleCreate}
             disabled={!orgName.trim() || creating}
             style={{
-              flex: 2, padding: '10px', borderRadius: 10, border: 'none',
+              ...DRAWER_FOOTER_BTN,
+              border: 'none',
               background: orgName.trim() && !creating ? '#0F172A' : '#e5e7eb',
               color: orgName.trim() && !creating ? '#fff' : '#9ca3af',
-              fontSize: '0.875rem', fontWeight: 700,
               cursor: orgName.trim() && !creating ? 'pointer' : 'not-allowed',
-              fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
             {creating
@@ -521,6 +561,10 @@ function daysSince(dateStr: string | null | undefined): number | null {
   return Math.floor((now - then) / (1000 * 60 * 60 * 24));
 }
 
+function dealIdleDays(deal: PipelineDealFull): number {
+  return daysSince(deal.last_touched ?? deal.updated_at) ?? 999;
+}
+
 function relativeTime(dateStr: string | null | undefined): string {
   if (!dateStr) return 'Never';
   const days = daysSince(dateStr);
@@ -528,6 +572,12 @@ function relativeTime(dateStr: string | null | undefined): string {
   if (days === 0) return 'Today';
   if (days === 1) return '1d ago';
   return `${days}d ago`;
+}
+
+function dealNeedsAttention(deal: PipelineDealFull): boolean {
+  if (!SLIPPING_STAGES.includes(deal.stage)) return false;
+  const days = daysSince(deal.last_touched ?? deal.updated_at);
+  return days === null || days >= 3;
 }
 
 function activityColor(dateStr: string | null | undefined): string {
@@ -593,42 +643,6 @@ function StageBadge({ stage }: { stage: DealStage }) {
     }}>
       {STAGE_LABELS[stage]}
     </span>
-  );
-}
-
-// ─── Stage Stepper ─────────────────────────────────────────────────────────────
-
-function StageStepper({ currentStage, onAdvance }: { currentStage: DealStage; onAdvance: (stage: DealStage) => void }) {
-  const currentIdx = PIPELINE_STAGES.indexOf(currentStage);
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
-      {PIPELINE_STAGES.map((stage, idx) => {
-        const isActive = stage === currentStage;
-        const isPast = idx < currentIdx;
-        const cfg = STAGE_COLORS[stage];
-        return (
-          <React.Fragment key={stage}>
-            <button
-              onClick={() => onAdvance(stage)}
-              style={{
-                padding: '5px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600,
-                border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
-                background: isActive ? cfg.bg : isPast ? '#f0fdf4' : '#f9fafb',
-                color: isActive ? cfg.color : isPast ? '#059669' : '#9ca3af',
-                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.1s',
-                textDecoration: isPast ? 'line-through' : 'none',
-              }}
-              title={`Move to ${STAGE_LABELS[stage]}`}
-            >
-              {STAGE_LABELS[stage]}
-            </button>
-            {idx < PIPELINE_STAGES.length - 1 && (
-              <ChevronRight size={12} color="#d1d5db" style={{ flexShrink: 0 }} />
-            )}
-          </React.Fragment>
-        );
-      })}
-    </div>
   );
 }
 
@@ -746,12 +760,6 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
     onClose();
   }
 
-  const TEMP_CFG = {
-    hot:  { label: '🔥 Hot',   bg: '#fee2e2', color: '#dc2626', border: '#fca5a5' },
-    warm: { label: '🌡 Warm',  bg: '#fef3c7', color: '#d97706', border: '#fcd34d' },
-    cold: { label: '🧊 Cold',  bg: '#e0f2fe', color: '#0284c7', border: '#7dd3fc' },
-  } as const;
-
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 50,
@@ -796,115 +804,91 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 20px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Stage Stepper */}
-          <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
-              Stage Progression
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '14px 20px' : '16px 24px', display: 'flex', flexDirection: 'column', gap: DRAWER_FIELD_GAP }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: DRAWER_FIELD_GAP }}>
+            <div>
+              <label style={DRAWER_LABEL}>Stage</label>
+              <select
+                value={deal.stage}
+                onChange={e => onAdvanceStage(deal.id, e.target.value as DealStage)}
+                style={DRAWER_SELECT}
+              >
+                {PIPELINE_STAGES.map(s => (
+                  <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                ))}
+              </select>
             </div>
-            <StageStepper currentStage={deal.stage} onAdvance={(stage) => onAdvanceStage(deal.id, stage)} />
-          </div>
-
-          {/* Temperature */}
-          <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Temperature</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {(['hot', 'warm', 'cold'] as const).map(t => {
-                const cfg = TEMP_CFG[t];
-                const isActive = editTemp === t;
-                return (
-                  <button
-                    key={t}
-                    onClick={() => setEditTemp(t)}
-                    style={{
-                      flex: 1, padding: '6px 8px', borderRadius: 8, fontSize: '0.8rem',
-                      fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
-                      border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
-                      background: isActive ? cfg.bg : '#fff',
-                      color: isActive ? cfg.color : '#9ca3af',
-                    }}
-                  >
-                    {cfg.label}
-                  </button>
-                );
-              })}
+            <div>
+              <label style={DRAWER_LABEL}>Temperature</label>
+              <select
+                value={editTemp}
+                onChange={e => setEditTemp(e.target.value as 'hot' | 'warm' | 'cold')}
+                style={DRAWER_SELECT}
+              >
+                {TEMP_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Value + Follow-up */}
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Value ($)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: DRAWER_FIELD_GAP }}>
+            <div>
+              <label style={DRAWER_LABEL}>Value ($)</label>
               <input
                 type="number"
                 value={editValue}
                 onChange={e => setEditValue(e.target.value)}
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                style={DRAWER_INPUT}
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Next Follow-up</div>
+            <div>
+              <label style={DRAWER_LABEL}>Next Follow-up</label>
               <input
                 type="date"
                 value={editFollowup}
                 onChange={e => setEditFollowup(e.target.value)}
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                style={DRAWER_INPUT}
               />
             </div>
           </div>
 
-          {/* Assigned To */}
           <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Assigned To</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {employees.map(emp => {
-                const firstName = emp.name.split(' ')[0];
-                const color = REP_COLORS[firstName] ?? '#6b7280';
-                const isActive = editRep === emp.id;
-                return (
-                  <button
-                    key={emp.id}
-                    onClick={() => setEditRep(emp.id)}
-                    style={{
-                      padding: '5px 12px', borderRadius: 8, fontSize: '0.78rem',
-                      fontFamily: 'inherit', cursor: 'pointer', fontWeight: isActive ? 700 : 400,
-                      border: `1px solid ${isActive ? color : '#e5e7eb'}`,
-                      background: isActive ? color : '#fff',
-                      color: isActive ? '#fff' : '#374151',
-                    }}
-                  >
-                    {firstName}
-                  </button>
-                );
-              })}
-            </div>
+            <label style={DRAWER_LABEL}>Assigned To</label>
+            <select value={editRep} onChange={e => setEditRep(e.target.value)} style={DRAWER_SELECT}>
+              <option value="">Unassigned</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.name.split(' ')[0]}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Contact Info */}
           <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>Primary Contact</div>
+            <label style={DRAWER_LABEL}>Primary Contact</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <input
                 type="text"
                 value={editContactName}
                 onChange={e => setEditContactName(e.target.value)}
-                placeholder="Contact name"
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                placeholder="Name"
+                style={DRAWER_INPUT}
               />
-              <input
-                type="email"
-                value={editContactEmail}
-                onChange={e => setEditContactEmail(e.target.value)}
-                placeholder="Email address"
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-              />
-              <input
-                type="tel"
-                value={editContactPhone}
-                onChange={e => setEditContactPhone(e.target.value)}
-                placeholder="Phone number"
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 10px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <input
+                  type="email"
+                  value={editContactEmail}
+                  onChange={e => setEditContactEmail(e.target.value)}
+                  placeholder="Email"
+                  style={DRAWER_INPUT}
+                />
+                <input
+                  type="tel"
+                  value={editContactPhone}
+                  onChange={e => setEditContactPhone(e.target.value)}
+                  placeholder="Phone"
+                  style={DRAWER_INPUT}
+                />
+              </div>
             </div>
           </div>
 
@@ -913,9 +897,7 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
             const extras = (deal as any).deal_contacts?.filter((dc: any) => !dc.is_primary) ?? [];
             return (
               <div>
-                <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>
-                  Additional Contacts
-                </div>
+                <label style={DRAWER_LABEL}>Additional Contacts</label>
                 {extras.length === 0 && (
                   <div style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic', marginBottom: 8 }}>No additional contacts</div>
                 )}
@@ -946,33 +928,31 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
 
           {/* Advisor */}
           <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
-              Advisor
-            </div>
+            <label style={DRAWER_LABEL}>Advisor</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <input
                 value={editAdvisorName}
                 onChange={e => setEditAdvisorName(e.target.value)}
                 placeholder="Advisor name"
-                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                style={DRAWER_INPUT}
               />
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <input
                   value={editAdvisorPhone}
                   onChange={e => setEditAdvisorPhone(e.target.value)}
                   placeholder="Phone"
                   type="tel"
-                  style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem' }}
+                  style={DRAWER_INPUT}
                 />
                 <input
                   value={editAdvisorEmail}
                   onChange={e => setEditAdvisorEmail(e.target.value)}
                   placeholder="Email"
                   type="email"
-                  style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: '0.85rem' }}
+                  style={DRAWER_INPUT}
                 />
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#374151' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.8125rem', color: '#374151' }}>
                 <input
                   type="checkbox"
                   checked={editAdvisorMet}
@@ -984,11 +964,8 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
             </div>
           </div>
 
-          {/* Granola Notes */}
           <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
-              Meeting Notes (Granola)
-            </div>
+            <label style={DRAWER_LABEL}>Meeting Notes (Granola)</label>
             {matchedNotes === null ? (
               <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic' }}>Loading notes…</div>
             ) : matchedNotes.length === 0 ? (
@@ -1015,11 +992,8 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
             )}
           </div>
 
-          {/* Activity Log */}
           <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 10 }}>
-              Activity Log
-            </div>
+            <label style={DRAWER_LABEL}>Activity Log</label>
             {activityLog.length === 0 ? (
               <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic' }}>No activity logged yet.</div>
             ) : (
@@ -1042,32 +1016,31 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
           </div>
         </div>
 
-        {/* Log Activity Input */}
         <div style={{ padding: isMobile ? '12px 20px 0' : '12px 24px 0', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
-          <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 8 }}>
-            Log Activity
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <label style={DRAWER_LABEL}>Log Activity</label>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input
               type="text"
               value={activityInput}
               onChange={e => setActivityInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleLogActivity(); }}
               placeholder="Add a note or follow-up…"
-              style={{
-                flex: 1, border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px',
-                fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', color: '#374151',
-              }}
+              style={{ ...DRAWER_INPUT, flex: 1, width: 'auto' }}
             />
             <button
+              type="button"
               onClick={handleLogActivity}
               disabled={!activityInput.trim()}
               style={{
-                padding: '8px 16px', borderRadius: 10, border: 'none',
+                ...DRAWER_FOOTER_BTN,
+                flex: '0 0 auto',
+                height: DRAWER_CONTROL_HEIGHT,
+                padding: '0 18px',
+                border: 'none',
                 background: activityInput.trim() ? '#0F172A' : '#e5e7eb',
                 color: activityInput.trim() ? '#fff' : '#9ca3af',
-                fontSize: '0.8rem', fontWeight: 700, cursor: activityInput.trim() ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit', transition: 'all 0.1s', whiteSpace: 'nowrap',
+                cursor: activityInput.trim() ? 'pointer' : 'not-allowed',
+                fontSize: '0.8125rem',
               }}
             >
               Log
@@ -1075,34 +1048,39 @@ function DealDetailDrawer({ deal, granolaNotesCache, onClose, onAdvanceStage, on
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ padding: isMobile ? '12px 20px 28px' : '12px 24px 16px', background: '#f9fafb', display: 'flex', gap: 8 }}>
+        <div style={{ padding: isMobile ? '0 20px 28px' : '0 24px 16px', background: '#f9fafb', display: 'flex', gap: 12 }}>
           <button
+            type="button"
             onClick={handleClosedLost}
             style={{
-              flex: 1, padding: '9px 8px', borderRadius: 10, border: 'none',
-              background: '#fee2e2', color: '#dc2626',
-              fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              ...DRAWER_FOOTER_BTN,
+              border: 'none',
+              background: '#fee2e2',
+              color: '#dc2626',
             }}
           >
             Closed Lost
           </button>
           <button
+            type="button"
             onClick={handleHoldOff}
             style={{
-              flex: 1, padding: '9px 8px', borderRadius: 10, border: '1px solid #e5e7eb',
-              background: '#f9fafb', color: '#6b7280',
-              fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              ...DRAWER_FOOTER_BTN,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              color: '#6b7280',
             }}
           >
             Hold Off
           </button>
           <button
+            type="button"
             onClick={handleSaveChanges}
             style={{
-              flex: 2, padding: '9px 8px', borderRadius: 10, border: 'none',
-              background: '#0F172A', color: '#fff',
-              fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              ...DRAWER_FOOTER_BTN,
+              border: 'none',
+              background: '#0F172A',
+              color: '#fff',
             }}
           >
             Save Changes
@@ -1237,11 +1215,21 @@ interface NeedsAttentionProps {
   onOpenDeal: (deal: PipelineDealFull) => void;
   onLogFollowup: (dealId: string, text: string) => void;
   employees?: { id: string; name: string }[];
+  previewLimit?: number;
+  onViewAll?: () => void;
 }
 
-function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup, employees = [] }: NeedsAttentionProps) {
+function NeedsAttentionSection({
+  deals,
+  onOpenDeal,
+  onLogFollowup,
+  employees = [],
+  previewLimit = NEEDS_ATTENTION_PREVIEW,
+  onViewAll,
+}: NeedsAttentionProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [showAll, setShowAll] = useState(false);
 
   const slipping = useMemo(() => {
     return deals.filter(d => {
@@ -1249,12 +1237,10 @@ function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup, employees = [
       const lastActivity = d.last_touched ?? d.updated_at;
       const days = daysSince(lastActivity);
       return days === null || days >= 3;
-    }).sort((a, b) => {
-      const daysA = daysSince(a.last_touched ?? a.updated_at) ?? 999;
-      const daysB = daysSince(b.last_touched ?? b.updated_at) ?? 999;
-      return daysB - daysA;
-    });
+    }).sort((a, b) => dealIdleDays(b) - dealIdleDays(a));
   }, [deals]);
+
+  const visibleSlipping = showAll ? slipping : slipping.slice(0, previewLimit);
 
   if (slipping.length === 0) {
     return (
@@ -1285,7 +1271,7 @@ function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup, employees = [
         <span style={{ fontSize: '0.75rem', color: '#c2410c' }}>No follow-up in 3+ days at key stages</span>
       </div>
       <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {slipping.map(deal => {
+        {visibleSlipping.map(deal => {
           const orgName = deal.organization?.name ?? 'Unknown';
           const schoolName = deal.organization?.school?.name ?? '';
           const lastActivity = deal.last_touched ?? deal.updated_at;
@@ -1376,7 +1362,223 @@ function NeedsAttentionSection({ deals, onOpenDeal, onLogFollowup, employees = [
             </div>
           );
         })}
+        {slipping.length > previewLimit && !showAll && (
+          <button
+            type="button"
+            onClick={() => {
+              if (onViewAll) onViewAll();
+              else setShowAll(true);
+            }}
+            style={{
+              alignSelf: 'flex-start',
+              padding: '6px 12px',
+              borderRadius: '9999px',
+              border: '1px solid #fed7aa',
+              background: '#fff',
+              color: '#9a3412',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            View all {slipping.length} deals needing attention
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+// ─── All Deals List ─────────────────────────────────────────────────────────────
+
+const DEALS_LIST_GRID_COLUMNS = 'minmax(0, 1fr) auto auto 56px 80px';
+
+const DEALS_LIST_HEADER_CELL: React.CSSProperties = {
+  fontSize: '0.6875rem',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: '#9CA3AF',
+};
+
+type IdleSort = 'desc' | 'asc';
+
+interface AllDealsListProps {
+  deals: PipelineDealFull[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  idleSort: IdleSort;
+  onIdleSortChange: (sort: IdleSort) => void;
+  onPageChange: (page: number) => void;
+  onOpenDeal: (deal: PipelineDealFull) => void;
+  employees?: { id: string; name: string }[];
+}
+
+function AllDealsList({
+  deals,
+  totalCount,
+  page,
+  pageSize,
+  idleSort,
+  onIdleSortChange,
+  onPageChange,
+  onOpenDeal,
+  employees = [],
+}: AllDealsListProps) {
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalCount);
+
+  if (totalCount === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '48px 20px', color: '#9ca3af', fontSize: '0.875rem' }}>
+        No deals match your filters
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ borderTop: '1px solid #E5E7EB' }}>
+        <div
+          role="row"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: DEALS_LIST_GRID_COLUMNS,
+            gap: '12px',
+            alignItems: 'center',
+            padding: '10px 0 8px',
+            borderBottom: '1px solid #E5E7EB',
+          }}
+        >
+          <span role="columnheader" style={DEALS_LIST_HEADER_CELL}>Deal</span>
+          <span role="columnheader" style={DEALS_LIST_HEADER_CELL}>Stage</span>
+          <span role="columnheader" style={DEALS_LIST_HEADER_CELL}>Owner</span>
+          <button
+            type="button"
+            role="columnheader"
+            aria-sort={idleSort === 'desc' ? 'descending' : 'ascending'}
+            onClick={() => onIdleSortChange(idleSort === 'desc' ? 'asc' : 'desc')}
+            style={{
+              ...DEALS_LIST_HEADER_CELL,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 4,
+              textAlign: 'right',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              color: '#6B7280',
+            }}
+          >
+            Idle
+            {idleSort === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+          </button>
+          <span role="columnheader" style={{ ...DEALS_LIST_HEADER_CELL, textAlign: 'right' }}>Value</span>
+        </div>
+
+        {deals.map(deal => {
+          const orgName = deal.organization?.name ?? 'Unknown';
+          const schoolName = deal.organization?.school?.name ?? '';
+          const lastActivity = deal.last_touched ?? deal.updated_at;
+          const days = daysSince(lastActivity);
+
+          return (
+            <button
+              key={deal.id}
+              type="button"
+              onClick={() => onOpenDeal(deal)}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: DEALS_LIST_GRID_COLUMNS,
+                gap: '12px',
+                alignItems: 'center',
+                width: '100%',
+                padding: '12px 0',
+                border: 'none',
+                borderBottom: '1px solid #F3F4F6',
+                background: 'transparent',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {orgName}
+                </div>
+                {schoolName && (
+                  <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {schoolName}
+                  </div>
+                )}
+              </div>
+              <StageBadge stage={deal.stage} />
+              <RepBadge rep={deal.assigned_to} employees={employees} />
+              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: activityColor(lastActivity), textAlign: 'right' }}>
+                {days === null ? '—' : `${days}d`}
+              </span>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: deal.value > 0 ? '#374151' : '#9CA3AF', textAlign: 'right' }}>
+                {deal.value > 0 ? fmt$(deal.value) : '—'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', paddingTop: '16px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+            Showing {start}–{end} of {totalCount}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '9999px',
+                border: '1px solid #E5E7EB',
+                background: '#fff',
+                color: page <= 1 ? '#D1D5DB' : '#374151',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                cursor: page <= 1 ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Previous
+            </button>
+            <span style={{ fontSize: '0.8125rem', color: '#6B7280', minWidth: '88px', textAlign: 'center' }}>
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '9999px',
+                border: '1px solid #E5E7EB',
+                background: '#fff',
+                color: page >= totalPages ? '#D1D5DB' : '#374151',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1635,6 +1837,13 @@ export function SalesCRM() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [stageFilter, setStageFilter] = useState<DealStage | 'all'>('all');
+  const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
+  const [dealPage, setDealPage] = useState(1);
+  const [idleSort, setIdleSort] = useState<IdleSort>('desc');
+  const [pipelineView, setPipelineView] = useState<'list' | 'board'>('list');
+  const dealsSectionRef = useRef<HTMLDivElement>(null);
   const [selectedDeal, setSelectedDeal]     = useState<PipelineDealFull | null>(null);
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [granolaNotes, setGranolaNotes]     = useState<GranolaNote[] | null>(null);
@@ -1732,7 +1941,7 @@ export function SalesCRM() {
   }
 
   // ── Filters ──
-  const { visibleDeals, archivedDeals } = useMemo(() => {
+  const { visibleDeals, archivedDeals, filteredDeals } = useMemo(() => {
     let list = deals;
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -1743,9 +1952,53 @@ export function SalesCRM() {
       );
     }
     const archived = list.filter(d => d.stage === 'closed_lost' || d.stage === 'hold_off');
-    const visible = list.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
-    return { visibleDeals: visible, archivedDeals: archived };
-  }, [deals, search]);
+    let visible = list.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off');
+
+    if (stageFilter !== 'all') {
+      visible = visible.filter(d => d.stage === stageFilter);
+    }
+    if (ownerFilter !== 'all') {
+      visible = visible.filter(d => resolveRep(d.assigned_to, employees) === ownerFilter);
+    }
+    if (needsAttentionOnly) {
+      visible = visible.filter(dealNeedsAttention);
+    }
+
+    return { visibleDeals: visible, archivedDeals: archived, filteredDeals: visible };
+  }, [deals, search, stageFilter, ownerFilter, needsAttentionOnly, employees]);
+
+  const sortedFilteredDeals = useMemo(() => {
+    const sorted = [...filteredDeals];
+    sorted.sort((a, b) => {
+      const diff = dealIdleDays(b) - dealIdleDays(a);
+      return idleSort === 'desc' ? diff : -diff;
+    });
+    return sorted;
+  }, [filteredDeals, idleSort]);
+
+  const totalDealPages = Math.max(1, Math.ceil(sortedFilteredDeals.length / DEALS_PAGE_SIZE));
+  const safeDealPage = Math.min(dealPage, totalDealPages);
+  const paginatedDeals = sortedFilteredDeals.slice(
+    (safeDealPage - 1) * DEALS_PAGE_SIZE,
+    safeDealPage * DEALS_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setDealPage(1);
+  }, [search, stageFilter, ownerFilter, needsAttentionOnly, categoryFilter, idleSort]);
+
+  useEffect(() => {
+    if (dealPage > totalDealPages) setDealPage(totalDealPages);
+  }, [dealPage, totalDealPages]);
+
+  const focusDealsSection = useCallback(() => {
+    setNeedsAttentionOnly(true);
+    setDealPage(1);
+    setPipelineView('list');
+    requestAnimationFrame(() => {
+      dealsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
 
   // ── Stats ──
   const stats = useMemo(() => {
@@ -1771,138 +2024,361 @@ export function SalesCRM() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* ── Stats Row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? '8px' : '12px' }}>
-        {[
-          { label: 'Active Deals',   value: stats.total,          color: '#1e40af', bg: '#dbeafe' },
-          { label: 'Hot (Demo+)',    value: stats.hot,            color: '#92400e', bg: '#fef3c7' },
-          { label: 'Closed Won',     value: stats.closed,         color: '#065f46', bg: '#d1fae5' },
-          { label: 'Pipeline Value', value: fmt$(stats.pipeline), color: '#5b21b6', bg: '#f5f3ff' },
-        ].map(stat => (
-          <div key={stat.label} style={{
-            background: stat.bg, border: `1px solid ${stat.color}30`,
-            borderRadius: '12px', padding: isMobile ? '12px' : '16px',
-          }}>
-            <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: stat.color + 'aa', margin: '0 0 4px 0' }}>{stat.label}</p>
-            <p style={{ fontSize: isMobile ? '1.4rem' : '1.75rem', fontWeight: 800, color: stat.color, margin: 0, lineHeight: 1 }}>{stat.value}</p>
+      {(() => {
+        const kpiStats = [
+          { label: 'Active Deals', value: stats.total },
+          { label: 'Hot (Demo+)', value: stats.hot },
+          { label: 'Closed Won', value: stats.closed },
+          { label: 'Pipeline Value', value: fmt$(stats.pipeline) },
+        ];
+
+        const statBlock = (stat: { label: string; value: string | number }) => (
+          <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
+            <p
+              style={{
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#9CA3AF',
+                margin: '0 0 6px 0',
+              }}
+            >
+              {stat.label}
+            </p>
+            <p
+              style={{
+                fontSize: isMobile ? '1.375rem' : '1.625rem',
+                fontWeight: 600,
+                color: '#111827',
+                margin: 0,
+                lineHeight: 1.1,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {stat.value}
+            </p>
           </div>
-        ))}
-      </div>
+        );
 
-      {/* ── Needs Attention (pinned top) ── */}
-      <NeedsAttentionSection
-        deals={deals}
-        onOpenDeal={setSelectedDeal}
-        onLogFollowup={handleLogActivity}
-        employees={employees}
-      />
+        const dividerStyle: React.CSSProperties = {
+          background: '#E5E7EB',
+          flexShrink: 0,
+        };
 
-      {/* ── Filter Bar ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        if (isMobile) {
+          return (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1px 1fr',
+                alignItems: 'center',
+                justifyItems: 'stretch',
+                rowGap: '20px',
+                width: '100%',
+                paddingBottom: '16px',
+                borderBottom: '1px solid #E5E7EB',
+              }}
+            >
+              <div style={{ padding: '0 12px' }}>{statBlock(kpiStats[0])}</div>
+              <div style={{ ...dividerStyle, width: '1px', height: '100%', minHeight: '44px', justifySelf: 'center' }} aria-hidden />
+              <div style={{ padding: '0 12px' }}>{statBlock(kpiStats[1])}</div>
+
+              <div style={{ ...dividerStyle, gridColumn: '1 / -1', height: '1px', width: '100%' }} aria-hidden />
+
+              <div style={{ padding: '0 12px' }}>{statBlock(kpiStats[2])}</div>
+              <div style={{ ...dividerStyle, width: '1px', height: '100%', minHeight: '44px', justifySelf: 'center' }} aria-hidden />
+              <div style={{ padding: '0 12px' }}>{statBlock(kpiStats[3])}</div>
+            </div>
+          );
+        }
+
+        return (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              width: '100%',
+              paddingBottom: '16px',
+              borderBottom: '1px solid #E5E7EB',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'stretch',
+                justifyContent: 'center',
+                width: '100%',
+                maxWidth: '960px',
+              }}
+            >
+              {kpiStats.map((stat, index) => (
+                <React.Fragment key={stat.label}>
+                  {index > 0 && (
+                    <div
+                      aria-hidden
+                      style={{
+                        ...dividerStyle,
+                        width: '1px',
+                        alignSelf: 'stretch',
+                        margin: '4px 0',
+                      }}
+                    />
+                  )}
+                  <div style={{ flex: '1 1 0', padding: '0 24px', minWidth: 0 }}>
+                    {statBlock(stat)}
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Search & Filters ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            flex: 1,
-            background: '#ffffff', border: '1px solid #e5e7eb',
-            borderRadius: '10px', padding: '9px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flex: '1 1 auto',
+            minWidth: isMobile ? '100%' : 240,
+            height: TOOLBAR_CONTROL_HEIGHT,
+            padding: '0 12px',
+            boxSizing: 'border-box',
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '9999px',
           }}>
-            <Search size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+            <Search size={14} color="#9ca3af" style={{ flexShrink: 0 }} />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search org, school, contact…"
-              style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontFamily: 'inherit', flex: 1, color: '#374151', background: 'transparent' }}
+              style={{
+                border: 'none',
+                outline: 'none',
+                fontSize: '0.8125rem',
+                lineHeight: 1,
+                height: '100%',
+                padding: 0,
+                margin: 0,
+                fontFamily: 'inherit',
+                flex: 1,
+                color: '#374151',
+                background: 'transparent',
+                minWidth: 0,
+              }}
             />
             {search && (
-              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex' }}>
+              <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                 <X size={13} />
               </button>
             )}
           </div>
           {!isMobile && (
-            <button
-              onClick={fetchDeals}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
-            >
-              <RefreshCw size={13} /> Refresh
-            </button>
-          )}
-          {!isMobile && (
-            <button
-              onClick={() => setShowCreateDrawer(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                padding: '8px 14px', borderRadius: 8, border: 'none',
-                background: '#0F172A', color: '#fff',
-                fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <Plus size={13} /> New Deal
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={fetchDeals}
+                style={{
+                  ...TOOLBAR_BUTTON,
+                  border: '1px solid #e5e7eb',
+                  background: '#fff',
+                  color: '#6b7280',
+                }}
+              >
+                <RefreshCw size={13} /> Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreateDrawer(true)}
+                style={{
+                  ...TOOLBAR_BUTTON,
+                  padding: '0 14px',
+                  border: 'none',
+                  background: '#0F172A',
+                  color: '#fff',
+                  fontWeight: 600,
+                }}
+              >
+                <Plus size={13} /> New Deal
+              </button>
+            </>
           )}
         </div>
-        {/* Mobile action row */}
+
         {isMobile && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={fetchDeals}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
-            >
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button type="button" onClick={fetchDeals} style={{ ...TOOLBAR_BUTTON, width: TOOLBAR_CONTROL_HEIGHT, padding: 0, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280' }}>
               <RefreshCw size={13} />
             </button>
-            <button
-              onClick={() => setShowCreateDrawer(true)}
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '9px 14px', borderRadius: 8, border: 'none',
-                background: '#0F172A', color: '#fff',
-                fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
+            <button type="button" onClick={() => setShowCreateDrawer(true)} style={{ ...TOOLBAR_BUTTON, flex: 1, border: 'none', background: '#0F172A', color: '#fff', fontWeight: 600 }}>
               <Plus size={14} /> New Deal
             </button>
           </div>
         )}
-      </div>
 
-      {/* Category Filter */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-        {CATEGORY_FILTERS.map(opt => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value as CategoryFilter)}
+            aria-label="Filter by category"
+            style={TOOLBAR_SELECT}
+          >
+            {CATEGORY_FILTERS.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.value === 'all' ? 'All categories' : opt.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={stageFilter}
+            onChange={e => setStageFilter(e.target.value as DealStage | 'all')}
+            aria-label="Filter by stage"
+            style={TOOLBAR_SELECT}
+          >
+            <option value="all">All stages</option>
+            {PIPELINE_STAGES.map(stage => (
+              <option key={stage} value={stage}>
+                {STAGE_LABELS[stage]}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={ownerFilter}
+            onChange={e => setOwnerFilter(e.target.value)}
+            aria-label="Filter by owner"
+            style={TOOLBAR_SELECT}
+          >
+            <option value="all">All owners</option>
+            {REP_OPTIONS.map(rep => (
+              <option key={rep} value={rep}>{rep}</option>
+            ))}
+          </select>
+
           <button
-            key={opt.value}
-            onClick={() => setCategoryFilter(opt.value)}
+            type="button"
+            onClick={() => setNeedsAttentionOnly(v => !v)}
             style={{
-              padding: '5px 12px',
-              borderRadius: 20,
-              fontSize: '0.8rem',
-              fontWeight: categoryFilter === opt.value ? 700 : 500,
-              cursor: 'pointer',
-              border: `1px solid ${categoryFilter === opt.value ? '#0F172A' : '#e5e7eb'}`,
-              background: categoryFilter === opt.value ? '#0F172A' : '#ffffff',
-              color: categoryFilter === opt.value ? '#ffffff' : '#374151',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
+              ...TOOLBAR_BUTTON,
+              border: `1px solid ${needsAttentionOnly ? '#ea580c' : '#e5e7eb'}`,
+              background: needsAttentionOnly ? '#fff7ed' : '#fff',
+              color: needsAttentionOnly ? '#9a3412' : '#374151',
+              fontWeight: needsAttentionOnly ? 600 : 500,
             }}
           >
-            {opt.label}
+            Needs attention
           </button>
-        ))}
+
+          {(search || stageFilter !== 'all' || ownerFilter !== 'all' || needsAttentionOnly || categoryFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setStageFilter('all');
+                setOwnerFilter('all');
+                setNeedsAttentionOnly(false);
+                setCategoryFilter('all');
+              }}
+              style={{
+                ...TOOLBAR_BUTTON,
+                border: '1px solid #e5e7eb',
+                background: '#fff',
+                color: '#6b7280',
+              }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── Pipeline Kanban ── */}
-      {deals.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af', fontSize: '0.875rem' }}>
-          No deals in pipeline yet
+      {/* ── Needs Attention (preview) ── */}
+      <NeedsAttentionSection
+        deals={deals}
+        onOpenDeal={setSelectedDeal}
+        onLogFollowup={handleLogActivity}
+        employees={employees}
+        onViewAll={focusDealsSection}
+      />
+
+      {/* ── All Deals ── */}
+      <div ref={dealsSectionRef} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: '#111827' }}>All Deals</h2>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: '#6B7280' }}>
+              {filteredDeals.length} deal{filteredDeals.length !== 1 ? 's' : ''} matching your filters
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setPipelineView('list')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '9999px',
+                border: `1px solid ${pipelineView === 'list' ? '#0F172A' : '#e5e7eb'}`,
+                background: pipelineView === 'list' ? '#0F172A' : '#fff',
+                color: pipelineView === 'list' ? '#fff' : '#374151',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              onClick={() => setPipelineView('board')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '9999px',
+                border: `1px solid ${pipelineView === 'board' ? '#0F172A' : '#e5e7eb'}`,
+                background: pipelineView === 'board' ? '#0F172A' : '#fff',
+                color: pipelineView === 'board' ? '#fff' : '#374151',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Board
+            </button>
+          </div>
         </div>
-      ) : (
-        <PipelineKanban
-          deals={visibleDeals}
-          archivedDeals={archivedDeals}
-          onOpenDeal={setSelectedDeal}
-          employees={employees}
-        />
-      )}
+
+        {deals.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af', fontSize: '0.875rem' }}>
+            No deals in pipeline yet
+          </div>
+        ) : pipelineView === 'list' ? (
+          <AllDealsList
+            deals={paginatedDeals}
+            totalCount={sortedFilteredDeals.length}
+            page={safeDealPage}
+            pageSize={DEALS_PAGE_SIZE}
+            idleSort={idleSort}
+            onIdleSortChange={setIdleSort}
+            onPageChange={setDealPage}
+            onOpenDeal={setSelectedDeal}
+            employees={employees}
+          />
+        ) : (
+          <PipelineKanban
+            deals={filteredDeals}
+            archivedDeals={archivedDeals}
+            onOpenDeal={setSelectedDeal}
+            employees={employees}
+          />
+        )}
+      </div>
 
       {/* ── Create Deal Drawer ── */}
       {showCreateDrawer && (

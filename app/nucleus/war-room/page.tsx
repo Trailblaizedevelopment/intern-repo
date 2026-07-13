@@ -2017,6 +2017,45 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'campaigns', label: 'Campaigns' },
 ];
 
+const WAR_ROOM_PAGE_SHELL: React.CSSProperties = {
+  width: '100%',
+  maxWidth: '1400px',
+  margin: '0 auto',
+  boxSizing: 'border-box',
+};
+
+const WAR_ROOM_HEADER_SHELL: React.CSSProperties = {
+  ...WAR_ROOM_PAGE_SHELL,
+  padding: '0 33px',
+  minWidth: 0,
+};
+
+const WAR_ROOM_CONTENT_SHELL: React.CSSProperties = {
+  maxWidth: '1400px',
+  margin: '0 33px',
+  padding: '24px 0',
+  boxSizing: 'border-box',
+  minWidth: 0,
+};
+
+const WAR_ROOM_PILL_BTN: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '5px',
+  padding: '6px 12px',
+  fontSize: '0.8125rem',
+  fontWeight: 500,
+  lineHeight: 1,
+  borderRadius: '9999px',
+  border: '1px solid #d1d5db',
+  background: '#ffffff',
+  color: '#374151',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  whiteSpace: 'nowrap',
+  transition: 'background 0.15s ease, border-color 0.15s ease',
+};
+
 export default function WarRoomPage() {
   const [tab, setTab] = useState<Tab>('crm');
   const [stats, setStats] = useState<PipelineStats | null>(null);
@@ -2105,59 +2144,81 @@ export default function WarRoomPage() {
   }, [syncCalendar]);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB' }}>
+    <div style={{ minHeight: '100vh', width: '100%', maxWidth: '100%', overflowX: 'hidden', background: '#F9FAFB', boxSizing: 'border-box' }}>
       {/* Sticky Header */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(249,250,251,0.95)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #E5E7EB' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: 0 }}>Sales Room</h1>
-              <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Live sales intelligence</span>
-              {statsLoading && <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, width: '100%', maxWidth: '100%', overflowX: 'hidden', background: 'rgba(249,250,251,0.95)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #E5E7EB' }}>
+        <div style={WAR_ROOM_HEADER_SHELL}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '44px', paddingTop: 0, paddingBottom: 0 }}>
+            <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: 0 }}>Sales Room</h1>
+            <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Live sales intelligence</span>
+            {statsLoading && <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', width: '100%', minWidth: 0, paddingTop: 0, paddingBottom: 0 }}>
+            <div style={{ display: 'flex', gap: '2px', overflowX: 'auto', minWidth: 0, flex: 1, scrollbarWidth: 'none' }}>
+              {TABS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '8px 14px',
+                    fontSize: '0.8125rem',
+                    fontWeight: tab === t.id ? 600 : 500,
+                    color: tab === t.id ? '#111827' : '#6B7280',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: tab === t.id ? '2px solid #0F172A' : '2px solid transparent',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    marginBottom: '-1px',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {lastRefreshed && <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Updated {lastRefreshed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', minWidth: 0, maxWidth: '100%', flexWrap: 'wrap', paddingBottom: '6px' }}>
+              {lastRefreshed && (
+                <span style={{ fontSize: '0.75rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                  Updated {lastRefreshed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              )}
               {syncResult && (
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065f46', background: '#d1fae5', padding: '3px 10px', borderRadius: '9999px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065f46', background: '#d1fae5', padding: '4px 10px', borderRadius: '9999px', whiteSpace: 'nowrap' }}>
                   ✓ {syncResult.synced} synced, {syncResult.skipped} skipped
                 </span>
               )}
               {syncError && (
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '3px 10px', borderRadius: '9999px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '4px 10px', borderRadius: '9999px', whiteSpace: 'nowrap' }}>
                   ✗ {syncError}
                 </span>
               )}
               <button
                 onClick={syncCalendar}
                 disabled={syncLoading}
-                className="module-filter-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: syncLoading ? 0.7 : 1 }}
+                style={{ ...WAR_ROOM_PILL_BTN, opacity: syncLoading ? 0.7 : 1 }}
               >
                 {syncLoading
-                  ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Syncing…</>
-                  : <><CalendarCheck size={14} /> Sync Calendar</>
+                  ? <><RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> Syncing…</>
+                  : <><CalendarCheck size={13} /> Sync Calendar</>
                 }
               </button>
-              <button onClick={() => { setStatsLoading(true); fetchStats(); }}
-                className="module-filter-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <RefreshCw size={14} /> Refresh
+              <button
+                onClick={() => { setStatsLoading(true); fetchStats(); }}
+                style={WAR_ROOM_PILL_BTN}
+              >
+                <RefreshCw size={13} /> Refresh
               </button>
             </div>
-          </div>
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }}>
-            {TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                style={{ flexShrink: 0, padding: '10px 20px', fontSize: '0.875rem', fontWeight: tab === t.id ? 600 : 500, color: tab === t.id ? '#111827' : '#6B7280', background: 'none', border: 'none', borderBottom: tab === t.id ? '2px solid #0F172A' : '2px solid transparent', cursor: 'pointer', fontFamily: 'inherit', marginBottom: '-1px', transition: 'all 0.15s' }}>
-                {t.label}
-              </button>
-            ))}
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
+      <div style={WAR_ROOM_CONTENT_SHELL}>
         {tab === 'crm'        && <SalesCRM />}
         {tab === 'dashboard'  && <DashboardTab stats={stats} onOpenDeal={openDeal} />}
         {tab === 'campaigns'  && <CampaignCRM stats={stats} openDeal={openDeal} />}
