@@ -153,6 +153,30 @@ const CATEGORY_FILTERS: { value: CategoryFilter; label: string }[] = [
 const DEALS_PAGE_SIZE = 25;
 const NEEDS_ATTENTION_PREVIEW = 5;
 
+const CRM_UI = {
+  surface: '#f9fafb',
+  surfaceMuted: '#f3f4f6',
+  border: '#e5e7eb',
+  borderSubtle: '#f3f4f6',
+  text: '#111827',
+  textSecondary: '#374151',
+  textMuted: '#6b7280',
+  textSubtle: '#9ca3af',
+  blue: '#2563eb',
+  blueDark: '#1d4ed8',
+  blueBg: '#eff6ff',
+  blueBorder: '#bfdbfe',
+  ink: '#0F172A',
+} as const;
+
+const NEUTRAL_BADGE = {
+  color: '#4b5563',
+  bg: '#f3f4f6',
+  border: '#e5e7eb',
+} as const;
+
+const BOARD_MAX_HEIGHT = 'min(70vh, 680px)';
+
 const TOOLBAR_CONTROL_HEIGHT = 34;
 
 const TOOLBAR_BUTTON: React.CSSProperties = {
@@ -582,10 +606,9 @@ function dealNeedsAttention(deal: PipelineDealFull): boolean {
 
 function activityColor(dateStr: string | null | undefined): string {
   const days = daysSince(dateStr);
-  if (days === null) return '#dc2626';
-  if (days < 3) return '#059669';
-  if (days <= 7) return '#d97706';
-  return '#dc2626';
+  if (days === null || days > 7) return CRM_UI.blueDark;
+  if (days >= 3) return CRM_UI.textMuted;
+  return CRM_UI.textSubtle;
 }
 
 function parseDealNotes(notesJson: string | null | undefined): DealNote[] {
@@ -609,19 +632,21 @@ function serializeDealNotes(notes: DealNote[]): string {
 
 function RepBadge({ rep: repRaw, employees = [] }: { rep: string | null | undefined; employees?: { id: string; name: string }[] }) {
   const rep = resolveRep(repRaw, employees);
-  if (!rep) return <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>—</span>;
-  const color = REP_COLORS[rep] ?? '#6b7280';
+  if (!rep) return <span style={{ color: CRM_UI.textSubtle, fontSize: '0.75rem' }}>—</span>;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '4px',
       padding: '2px 8px 2px 3px', borderRadius: '9999px',
-      background: color, color: '#fff', fontSize: '0.7rem', fontWeight: 700,
+      background: NEUTRAL_BADGE.bg, color: NEUTRAL_BADGE.color,
+      border: `1px solid ${NEUTRAL_BADGE.border}`,
+      fontSize: '0.7rem', fontWeight: 600,
       whiteSpace: 'nowrap',
     }}>
       <span style={{
         width: '16px', height: '16px', borderRadius: '9999px',
-        background: 'rgba(255,255,255,0.25)', display: 'inline-flex',
-        alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 800,
+        background: '#e5e7eb', color: CRM_UI.textMuted,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '9px', fontWeight: 700,
       }}>
         {rep[0]}
       </span>
@@ -633,13 +658,12 @@ function RepBadge({ rep: repRaw, employees = [] }: { rep: string | null | undefi
 // ─── Stage Badge ───────────────────────────────────────────────────────────────
 
 function StageBadge({ stage }: { stage: DealStage }) {
-  const cfg = STAGE_COLORS[stage];
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
       padding: '3px 10px', borderRadius: '9999px', fontSize: '0.7rem',
-      fontWeight: 600, color: cfg.color, background: cfg.bg,
-      border: `1px solid ${cfg.border}`, whiteSpace: 'nowrap',
+      fontWeight: 600, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg,
+      border: `1px solid ${NEUTRAL_BADGE.border}`, whiteSpace: 'nowrap',
     }}>
       {STAGE_LABELS[stage]}
     </span>
@@ -1246,29 +1270,29 @@ function NeedsAttentionSection({
     return (
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        background: '#f0fdf4', border: '1px solid #6ee7b7', borderRadius: 12,
+        background: CRM_UI.surface, border: `1px solid ${CRM_UI.border}`, borderRadius: 12,
         padding: '12px 18px',
       }}>
-        <CheckCircle2 size={16} color="#059669" />
-        <span style={{ fontSize: '0.875rem', color: '#065f46', fontWeight: 600 }}>All deals on track ✓</span>
+        <CheckCircle2 size={16} color={CRM_UI.blue} />
+        <span style={{ fontSize: '0.875rem', color: CRM_UI.textSecondary, fontWeight: 600 }}>All deals on track</span>
       </div>
     );
   }
 
   return (
     <div style={{
-      background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14,
+      background: CRM_UI.surface, border: `1px solid ${CRM_UI.border}`, borderRadius: 14,
       overflow: 'hidden',
     }}>
       <div style={{
-        padding: '12px 18px', background: '#fff7ed', borderBottom: '1px solid #fed7aa',
-        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '12px 18px', background: CRM_UI.surfaceMuted, borderBottom: `1px solid ${CRM_UI.border}`,
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
       }}>
-        <AlertCircle size={16} color="#ea580c" />
-        <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#9a3412' }}>
+        <AlertCircle size={16} color={CRM_UI.blue} />
+        <span style={{ fontWeight: 600, fontSize: '0.875rem', color: CRM_UI.text }}>
           {slipping.length} deal{slipping.length !== 1 ? 's' : ''} need{slipping.length === 1 ? 's' : ''} attention
         </span>
-        <span style={{ fontSize: '0.75rem', color: '#c2410c' }}>No follow-up in 3+ days at key stages</span>
+        <span style={{ fontSize: '0.75rem', color: CRM_UI.textMuted }}>No follow-up in 3+ days at key stages</span>
       </div>
       <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {visibleSlipping.map(deal => {
@@ -1276,37 +1300,39 @@ function NeedsAttentionSection({
           const schoolName = deal.organization?.school?.name ?? '';
           const lastActivity = deal.last_touched ?? deal.updated_at;
           const days = daysSince(lastActivity);
-          const isRed = days === null || days > 7;
           const isOpen = expandedId === deal.id;
 
           return (
-            <div key={deal.id} style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: 10, overflow: 'hidden' }}>
+            <div key={deal.id} style={{ background: '#fff', border: `1px solid ${CRM_UI.border}`, borderRadius: 10, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span
-                      style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', cursor: 'pointer' }}
+                      style={{ fontWeight: 600, fontSize: '0.875rem', color: CRM_UI.text, cursor: 'pointer' }}
                       onClick={() => onOpenDeal(deal)}
                     >
                       {orgName}
                     </span>
-                    {schoolName && <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{schoolName}</span>}
+                    {schoolName && <span style={{ fontSize: '0.72rem', color: CRM_UI.textSubtle }}>{schoolName}</span>}
                     <StageBadge stage={deal.stage} />
                     <RepBadge rep={deal.assigned_to} employees={employees} />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                   <span style={{
-                    fontSize: '1rem', fontWeight: 800,
-                    color: isRed ? '#dc2626' : '#d97706',
+                    fontSize: '0.875rem', fontWeight: 700,
+                    color: days === null || (days ?? 0) > 7 ? CRM_UI.blueDark : CRM_UI.textMuted,
                   }}>
-                    {days === null ? '∞' : days}d
+                    {days === null ? '—' : `${days}d`}
                   </span>
                   <button
+                    type="button"
                     onClick={() => setExpandedId(isOpen ? null : deal.id)}
                     style={{
-                      padding: '5px 12px', borderRadius: 8, border: '1px solid #fed7aa',
-                      background: '#fff7ed', color: '#9a3412', fontSize: '0.75rem', fontWeight: 600,
+                      padding: '6px 14px', borderRadius: '9999px',
+                      border: `1px solid ${CRM_UI.border}`,
+                      background: '#fff', color: CRM_UI.textSecondary,
+                      fontSize: '0.75rem', fontWeight: 600,
                       cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
                     }}
                   >
@@ -1332,12 +1358,14 @@ function NeedsAttentionSection({
                       }
                     }}
                     style={{
-                      flex: 1, border: '1px solid #e5e7eb', borderRadius: 8, padding: '7px 10px',
-                      fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', color: '#374151',
+                      flex: 1, border: `1px solid ${CRM_UI.border}`, borderRadius: '9999px',
+                      padding: '8px 14px', height: DRAWER_CONTROL_HEIGHT, boxSizing: 'border-box',
+                      fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', color: CRM_UI.textSecondary,
                     }}
                     autoFocus
                   />
                   <button
+                    type="button"
                     onClick={() => {
                       const text = (inputs[deal.id] ?? '').trim();
                       if (text) {
@@ -1348,9 +1376,10 @@ function NeedsAttentionSection({
                     }}
                     disabled={!(inputs[deal.id] ?? '').trim()}
                     style={{
-                      padding: '7px 14px', borderRadius: 8, border: 'none',
-                      background: (inputs[deal.id] ?? '').trim() ? '#9a3412' : '#e5e7eb',
-                      color: '#fff', fontSize: '0.8rem', fontWeight: 700,
+                      padding: '0 18px', borderRadius: '9999px', border: 'none',
+                      height: DRAWER_CONTROL_HEIGHT,
+                      background: (inputs[deal.id] ?? '').trim() ? CRM_UI.ink : CRM_UI.border,
+                      color: '#fff', fontSize: '0.8125rem', fontWeight: 600,
                       cursor: (inputs[deal.id] ?? '').trim() ? 'pointer' : 'not-allowed',
                       fontFamily: 'inherit',
                     }}
@@ -1371,11 +1400,11 @@ function NeedsAttentionSection({
             }}
             style={{
               alignSelf: 'flex-start',
-              padding: '6px 12px',
+              padding: '6px 14px',
               borderRadius: '9999px',
-              border: '1px solid #fed7aa',
+              border: `1px solid ${CRM_UI.border}`,
               background: '#fff',
-              color: '#9a3412',
+              color: CRM_UI.blueDark,
               fontSize: '0.8125rem',
               fontWeight: 600,
               cursor: 'pointer',
@@ -1609,7 +1638,7 @@ function MobilePipelineView({ deals, archivedDeals, onOpenDeal, employees = [] }
     [deals, activeStage]
   );
 
-  const activeStageColor = activeStage !== 'all' ? STAGE_COLORS[activeStage as DealStage] : null;
+  const activeStageColor = activeStage !== 'all';
 
   return (
     <div>
@@ -1620,14 +1649,13 @@ function MobilePipelineView({ deals, archivedDeals, onOpenDeal, employees = [] }
           style={{
             padding: '6px 14px', borderRadius: 20, fontSize: '0.8rem',
             fontWeight: activeStage === 'all' ? 700 : 500, cursor: 'pointer',
-            border: `1px solid ${activeStage === 'all' ? '#0F172A' : '#e5e7eb'}`,
-            background: activeStage === 'all' ? '#0F172A' : '#fff',
-            color: activeStage === 'all' ? '#fff' : '#374151',
+            border: `1px solid ${activeStage === 'all' ? CRM_UI.ink : CRM_UI.border}`,
+            background: activeStage === 'all' ? CRM_UI.ink : '#fff',
+            color: activeStage === 'all' ? '#fff' : CRM_UI.textSecondary,
             whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit',
           }}
         >All ({countByStage.all})</button>
         {PIPELINE_STAGES.map(stage => {
-          const cfg = STAGE_COLORS[stage];
           const isActive = activeStage === stage;
           return (
             <button
@@ -1636,17 +1664,17 @@ function MobilePipelineView({ deals, archivedDeals, onOpenDeal, employees = [] }
               style={{
                 padding: '6px 12px', borderRadius: 20, fontSize: '0.8rem',
                 fontWeight: isActive ? 700 : 500, cursor: 'pointer',
-                border: `1px solid ${isActive ? cfg.border : '#e5e7eb'}`,
-                background: isActive ? cfg.bg : '#fff',
-                color: isActive ? cfg.color : '#6b7280',
+                border: `1px solid ${isActive ? CRM_UI.blue : CRM_UI.border}`,
+                background: isActive ? CRM_UI.blueBg : '#fff',
+                color: isActive ? CRM_UI.blueDark : CRM_UI.textMuted,
                 whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit',
               }}
             >
               {STAGE_LABELS[stage]}
               {countByStage[stage] > 0 && (
                 <span style={{
-                  marginLeft: 5, background: isActive ? cfg.color : '#e5e7eb',
-                  color: isActive ? '#fff' : '#6b7280',
+                  marginLeft: 5, background: isActive ? CRM_UI.blue : CRM_UI.border,
+                  color: isActive ? '#fff' : CRM_UI.textMuted,
                   borderRadius: '9999px', padding: '0 5px', fontSize: '0.7rem', fontWeight: 700,
                 }}>{countByStage[stage]}</span>
               )}
@@ -1658,8 +1686,8 @@ function MobilePipelineView({ deals, archivedDeals, onOpenDeal, employees = [] }
       {activeStageColor && (
         <div style={{
           padding: '8px 14px', borderRadius: 10, marginBottom: 10,
-          background: activeStageColor.bg, border: `1px solid ${activeStageColor.border}`,
-          fontSize: '0.8rem', fontWeight: 700, color: activeStageColor.color,
+          background: CRM_UI.surfaceMuted, border: `1px solid ${CRM_UI.border}`,
+          fontSize: '0.8rem', fontWeight: 600, color: CRM_UI.textSecondary,
         }}>
           {STAGE_LABELS[activeStage as DealStage]} — {filteredDeals.length} deal{filteredDeals.length !== 1 ? 's' : ''}
         </div>
@@ -1727,39 +1755,55 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: Pi
 
   return (
     <div>
-      {/* Horizontal columns */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${PIPELINE_STAGES.length}, minmax(180px, 1fr))`,
-        gap: 12,
-        overflowX: 'auto',
-        paddingBottom: 8,
-      }}>
+      <div
+        style={{
+          maxHeight: BOARD_MAX_HEIGHT,
+          overflow: 'auto',
+          border: `1px solid ${CRM_UI.border}`,
+          borderRadius: 12,
+          background: '#fff',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${PIPELINE_STAGES.length}, minmax(180px, 1fr))`,
+            gap: 12,
+            padding: 12,
+            minWidth: PIPELINE_STAGES.length * 192,
+            alignItems: 'start',
+          }}
+        >
         {PIPELINE_STAGES.map(stage => {
-          const stageCfg = STAGE_COLORS[stage];
           const stageDeals = byStage[stage];
           return (
-            <div key={stage} style={{ minWidth: 0 }}>
+            <div key={stage} style={{ minWidth: 180, display: 'flex', flexDirection: 'column', maxHeight: 'calc(70vh - 160px)' }}>
               {/* Column header */}
               <div style={{
                 padding: '8px 12px', borderRadius: '10px 10px 0 0',
-                background: stageCfg.bg, border: `1px solid ${stageCfg.border}`,
+                background: CRM_UI.surfaceMuted, border: `1px solid ${CRM_UI.border}`,
                 borderBottom: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                flexShrink: 0,
+                position: 'sticky',
+                top: 0,
+                zIndex: 1,
               }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: stageCfg.color }}>{STAGE_LABELS[stage]}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: CRM_UI.textSecondary }}>{STAGE_LABELS[stage]}</span>
                 <span style={{
-                  fontSize: '0.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px',
-                  background: stageCfg.color + '22', color: stageCfg.color,
+                  fontSize: '0.68rem', fontWeight: 600, padding: '1px 7px', borderRadius: '9999px',
+                  background: CRM_UI.border, color: CRM_UI.textMuted,
                 }}>
                   {stageDeals.length}
                 </span>
               </div>
               {/* Cards */}
               <div style={{
-                border: `1px solid ${stageCfg.border}`, borderRadius: '0 0 10px 10px',
-                background: '#fafafa', padding: '8px', display: 'flex',
+                border: `1px solid ${CRM_UI.border}`, borderRadius: '0 0 10px 10px',
+                background: CRM_UI.surface, padding: '8px', display: 'flex',
                 flexDirection: 'column', gap: 8, minHeight: 80,
+                flex: 1,
+                overflowY: 'auto',
               }}>
                 {stageDeals.length === 0 ? (
                   <div style={{ fontSize: '0.75rem', color: '#d1d5db', textAlign: 'center', padding: '16px 0', fontStyle: 'italic' }}>
@@ -1774,6 +1818,7 @@ function PipelineKanban({ deals, archivedDeals, onOpenDeal, employees = [] }: Pi
             </div>
           );
         })}
+        </div>
       </div>
 
       {/* Archived deals */}
@@ -2266,9 +2311,9 @@ export function SalesCRM() {
             onClick={() => setNeedsAttentionOnly(v => !v)}
             style={{
               ...TOOLBAR_BUTTON,
-              border: `1px solid ${needsAttentionOnly ? '#ea580c' : '#e5e7eb'}`,
-              background: needsAttentionOnly ? '#fff7ed' : '#fff',
-              color: needsAttentionOnly ? '#9a3412' : '#374151',
+              border: `1px solid ${needsAttentionOnly ? CRM_UI.blue : CRM_UI.border}`,
+              background: needsAttentionOnly ? CRM_UI.blueBg : '#fff',
+              color: needsAttentionOnly ? CRM_UI.blueDark : CRM_UI.textSecondary,
               fontWeight: needsAttentionOnly ? 600 : 500,
             }}
           >
