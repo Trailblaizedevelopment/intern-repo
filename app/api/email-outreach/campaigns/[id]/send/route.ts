@@ -60,8 +60,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     );
 
     if (eligible.length === 0) {
-      await supabase.from('email_campaigns').update({ status: 'sent', sent_at: new Date().toISOString(), sent_count: 0 }).eq('id', id);
-      return NextResponse.json({ data: { sent: 0, failed: 0, message: 'No eligible contacts' }, error: null });
+      const alreadyCount = alreadySentEmails.size;
+      await supabase.from('email_campaigns').update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        sent_count: alreadyCount,
+        total_contacts: Math.max(campaign.total_contacts || 0, alreadyCount),
+      }).eq('id', id);
+      return NextResponse.json({ data: { sent: alreadyCount, failed: 0, message: alreadyCount > 0 ? 'All eligible contacts already sent' : 'No eligible contacts' }, error: null });
     }
 
     // Create pending send records

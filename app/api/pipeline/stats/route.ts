@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { normalizeConference } from '@/lib/pipeline-conference';
 
 export async function GET() {
   const admin = getSupabaseAdmin();
@@ -39,6 +40,22 @@ export async function GET() {
   const closedChapters = closedWon
     .map((d) => d.organization?.name || '')
     .filter(Boolean) as string[];
+  const closedDeals = closedWon
+    .map((d) => ({
+      id: d.id,
+      chapterName: d.organization?.name || 'Unknown chapter',
+      schoolName: d.organization?.school?.name || 'Unknown school',
+      value: d.value ?? null,
+      closedAt: d.updated_at ?? null,
+      conference: normalizeConference(
+        d.organization?.school?.conference || d.conference || 'Unknown',
+      ),
+    }))
+    .sort((a, b) => {
+      const aTime = a.closedAt ? new Date(a.closedAt).getTime() : 0;
+      const bTime = b.closedAt ? new Date(b.closedAt).getTime() : 0;
+      return bTime - aTime;
+    });
 
   // Schools in Conversation: distinct schools where stage != 'closed_lost' AND stage != 'lost'
   // (includes hold_off and all active stages)
@@ -90,10 +107,11 @@ export async function GET() {
   // By conference: group active deals by conference
   const confMap = new Map<string, { dealCount: number; pipelineValue: number }>();
   for (const d of activeDeals) {
-    const conf =
+    const conf = normalizeConference(
       d.organization?.school?.conference ||
       d.conference ||
-      'Unknown';
+      'Unknown',
+    );
     const existing = confMap.get(conf) || { dealCount: 0, pipelineValue: 0 };
     confMap.set(conf, {
       dealCount: existing.dealCount + 1,
@@ -109,6 +127,7 @@ export async function GET() {
     mrrGoal: 10000,
     closedDealCount,
     closedChapters,
+    closedDeals,
     schoolsInConversation,
     demosLast7,
     demosLast14,

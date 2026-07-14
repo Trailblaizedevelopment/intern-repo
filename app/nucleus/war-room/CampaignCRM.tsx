@@ -133,6 +133,166 @@ const CAMPAIGN_TYPE_BADGE: Record<CampaignType, { color: string; bg: string }> =
 
 const REPS = ['Owen', 'Ford', 'Adam', 'Katie', 'Hyatt'];
 
+const CAMPAIGN_UI = {
+  border: '#e5e7eb',
+  surface: '#ffffff',
+  surfaceMuted: '#f9fafb',
+  text: '#111827',
+  textSecondary: '#374151',
+  textMuted: '#6b7280',
+  textSubtle: '#9ca3af',
+  blue: '#2563eb',
+  blueDark: '#1d4ed8',
+  blueBg: '#eff6ff',
+  ink: '#0F172A',
+};
+
+const NEUTRAL_BADGE = { color: '#374151', bg: '#f9fafb', border: '#e5e7eb' };
+
+const TOOLBAR_CONTROL_HEIGHT = 34;
+
+const TOOLBAR_BUTTON: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  height: TOOLBAR_CONTROL_HEIGHT,
+  padding: '0 12px',
+  fontSize: '0.8125rem',
+  fontWeight: 500,
+  borderRadius: '9999px',
+  border: `1px solid ${CAMPAIGN_UI.border}`,
+  background: '#fff',
+  color: CAMPAIGN_UI.textSecondary,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  whiteSpace: 'nowrap',
+};
+
+const TOOLBAR_SELECT: React.CSSProperties = {
+  height: TOOLBAR_CONTROL_HEIGHT,
+  padding: '0 28px 0 12px',
+  fontSize: '0.8125rem',
+  fontWeight: 500,
+  borderRadius: '9999px',
+  border: `1px solid ${CAMPAIGN_UI.border}`,
+  background: '#fff',
+  color: CAMPAIGN_UI.textSecondary,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  outline: 'none',
+};
+
+const TOOLBAR_SEARCH: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  height: TOOLBAR_CONTROL_HEIGHT,
+  padding: '0 12px',
+  borderRadius: '9999px',
+  border: `1px solid ${CAMPAIGN_UI.border}`,
+  background: '#fff',
+  flex: 1,
+  minWidth: 0,
+};
+
+const CAMPAIGN_LIST_COLUMNS = 'minmax(0, 1.4fr) 88px 80px repeat(5, 52px) 72px 36px';
+
+const CAMPAIGN_CARDS_PAGE_SIZE = 12;
+
+function CampaignPaginationFooter({
+  page,
+  pageSize,
+  totalCount,
+  onPageChange,
+}: {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  onPageChange: (page: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  if (totalPages <= 1) return null;
+
+  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalCount);
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+      paddingTop: 12, flexWrap: 'wrap',
+    }}>
+      <span style={{ fontSize: '0.8125rem', color: CAMPAIGN_UI.textMuted }}>
+        Showing {start}–{end} of {totalCount}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+          style={{
+            ...TOOLBAR_BUTTON,
+            color: page <= 1 ? CAMPAIGN_UI.textSubtle : CAMPAIGN_UI.textSecondary,
+            cursor: page <= 1 ? 'not-allowed' : 'pointer',
+            opacity: page <= 1 ? 0.6 : 1,
+          }}
+        >
+          Previous
+        </button>
+        <span style={{ fontSize: '0.8125rem', color: CAMPAIGN_UI.textMuted, minWidth: 88, textAlign: 'center' }}>
+          Page {page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(page + 1)}
+          style={{
+            ...TOOLBAR_BUTTON,
+            color: page >= totalPages ? CAMPAIGN_UI.textSubtle : CAMPAIGN_UI.textSecondary,
+            cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+            opacity: page >= totalPages ? 0.6 : 1,
+          }}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function campaignStatusLabel(status: CampaignStatus): string {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function CampaignStatsInline({ stats }: { stats: ProspectStats }) {
+  const items = [
+    { label: 'Pros', value: stats.total },
+    { label: 'Out', value: stats.contacted },
+    { label: 'Rep', value: stats.replied },
+    { label: 'Demo', value: stats.demos },
+    { label: 'Won', value: stats.closed },
+  ];
+
+  return (
+    <>
+      {items.map(item => (
+        <span
+          key={item.label}
+          style={{
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            color: CAMPAIGN_UI.textSecondary,
+            textAlign: 'right',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {item.value}
+        </span>
+      ))}
+    </>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function uid(): string {
@@ -202,37 +362,53 @@ function FunnelBar({ total, contacted, replied, demos, closed }: ProspectStats) 
 
 function StatsDashboard({ prospects }: { prospects: CampaignProspect[] }) {
   const stats = computeStats(prospects);
-  const { total, contacted, replied, demos, closed } = stats;
-  const pct = (n: number) => total > 0 ? ` (${Math.round((n / total) * 100)}%)` : '';
+  const items = [
+    { label: 'Prospects', value: stats.total },
+    { label: 'Contacted', value: stats.contacted },
+    { label: 'Replied', value: stats.replied },
+    { label: 'Demos', value: stats.demos },
+    { label: 'Closed Won', value: stats.closed },
+  ];
 
   return (
-    <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: 14, padding: '20px', marginBottom: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
-        {[
-          { label: 'Total',      value: String(total),               color: '#111827' },
-          { label: 'Contacted',  value: `${contacted}${pct(contacted)}`, color: '#1d4ed8' },
-          { label: 'Replied',    value: `${replied}${pct(replied)}`,   color: '#059669' },
-          { label: 'Demos',      value: `${demos}${pct(demos)}`,       color: '#d97706' },
-          { label: 'Closed Won', value: `${closed}${pct(closed)}`,     color: '#065f46' },
-        ].map(s => (
-          <div key={s.label} style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '1.5rem', fontWeight: 700, color: s.color, margin: 0 }}>{s.value}</p>
-            <p style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6B7280', margin: '4px 0 0' }}>{s.label}</p>
-          </div>
+    <div style={{ paddingBottom: 4 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'stretch',
+          justifyContent: 'center',
+          width: '100%',
+          paddingBottom: 12,
+          borderBottom: `1px solid ${CAMPAIGN_UI.border}`,
+        }}
+      >
+        {items.map((item, index) => (
+          <React.Fragment key={item.label}>
+            {index > 0 && (
+              <div
+                aria-hidden
+                style={{
+                  width: 1,
+                  alignSelf: 'stretch',
+                  margin: '4px 0',
+                  background: CAMPAIGN_UI.border,
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            <div style={{ flex: '1 1 0', padding: '0 12px', minWidth: 0, textAlign: 'center' }}>
+              <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CAMPAIGN_UI.textSubtle }}>
+                {item.label}
+              </p>
+              <p style={{ margin: '4px 0 0', fontSize: '1.25rem', fontWeight: 700, color: CAMPAIGN_UI.text, fontVariantNumeric: 'tabular-nums' }}>
+                {item.value}
+              </p>
+            </div>
+          </React.Fragment>
         ))}
       </div>
-      <FunnelBar {...stats} />
-      <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Contacted', color: '#93c5fd' },
-          { label: 'Replied',   color: '#6ee7b7' },
-          { label: 'Demo',      color: '#fcd34d' },
-          { label: 'Closed',    color: '#10b981' },
-        ].map(l => (
-          <span key={l.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', color: '#9CA3AF' }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: l.color }} />{l.label}
-          </span>
-        ))}
+      <div style={{ paddingTop: 12 }}>
+        <FunnelBar {...stats} />
       </div>
     </div>
   );
@@ -698,8 +874,6 @@ function CampaignDetailView({
   const [assignedFilter, setAssignedFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
-  const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type] ?? { color: '#6b7280', bg: '#f3f4f6' };
-
   const filtered = useMemo(() => {
     let list = prospects;
     if (statusFilter !== 'all') list = list.filter(p => p.status === statusFilter);
@@ -717,42 +891,50 @@ function CampaignDetailView({
   }, [prospects, statusFilter, channelFilter, assignedFilter, search]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button
+          type="button"
           onClick={onBack}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.875rem', fontWeight: 500, color: '#6B7280', background: 'none', border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, marginTop: 2 }}
+          style={{
+            ...TOOLBAR_BUTTON,
+            flexShrink: 0,
+          }}
         >
           <ArrowLeft size={14} /> Campaigns
         </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', margin: 0 }}>{campaign.name}</h2>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 9px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: CAMPAIGN_UI.text, margin: 0 }}>{campaign.name}</h2>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}` }}>
               {CAMPAIGN_TYPE_LABELS[campaign.type]}
             </span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 9px', borderRadius: 9999,
-              color: campaign.status === 'active' ? '#065f46' : campaign.status === 'paused' ? '#b45309' : '#6b7280',
-              background: campaign.status === 'active' ? '#d1fae5' : campaign.status === 'paused' ? '#fef3c7' : '#f3f4f6',
-            }}>
-              {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}` }}>
+              {campaignStatusLabel(campaign.status)}
             </span>
           </div>
-          {campaign.school && <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: '4px 0 0' }}>{campaign.school}</p>}
+          {campaign.school && campaign.school !== campaign.name && (
+            <p style={{ fontSize: '0.8125rem', color: CAMPAIGN_UI.textMuted, margin: '4px 0 0' }}>{campaign.school}</p>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
           <button
+            type="button"
             onClick={() => setShowImportModal(true)}
-            className="module-filter-btn"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.875rem' }}
+            style={TOOLBAR_BUTTON}
           >
-            <Upload size={14} /> Import Prospects
+            <Upload size={14} /> Import
           </button>
           <button
+            type="button"
             onClick={() => setShowAddDrawer(true)}
-            className="module-primary-btn"
-            style={{ borderRadius: 10 }}
+            style={{
+              ...TOOLBAR_BUTTON,
+              border: 'none',
+              background: CAMPAIGN_UI.ink,
+              color: '#fff',
+            }}
           >
             <Plus size={14} /> Add Prospect
           </button>
@@ -763,24 +945,27 @@ function CampaignDetailView({
       <StatsDashboard prospects={prospects} />
 
       {/* Filter bar */}
-      <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div className="module-search" style={{ flex: '1 1 180px', minWidth: 140 }}>
-          <Search size={15} />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ ...TOOLBAR_SEARCH, flex: '1 1 180px' }}>
+          <Search size={15} color={CAMPAIGN_UI.textSubtle} />
           <input
             type="text"
             placeholder="Search prospects…"
             value={search}
             onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: '0.8125rem', fontFamily: 'inherit', color: CAMPAIGN_UI.text, minWidth: 0 }}
           />
-          {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0 }}><X size={12} /></button>}
+          {search && (
+            <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: CAMPAIGN_UI.textSubtle, padding: 0 }}>
+              <X size={12} />
+            </button>
+          )}
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={TOOLBAR_SELECT}>
           <option value="all">All Statuses</option>
           {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
         </select>
-        <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)}
-          style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
+        <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} style={TOOLBAR_SELECT}>
           <option value="all">All Channels</option>
           <option value="email">Email</option>
           <option value="ig_dm">IG DM</option>
@@ -788,12 +973,11 @@ function CampaignDetailView({
           <option value="call">Call</option>
           <option value="text">Text</option>
         </select>
-        <select value={assignedFilter} onChange={e => setAssignedFilter(e.target.value)}
-          style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
+        <select value={assignedFilter} onChange={e => setAssignedFilter(e.target.value)} style={TOOLBAR_SELECT}>
           <option value="all">All Reps</option>
           {REPS.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: 'auto' }}>
+        <span style={{ fontSize: '0.75rem', color: CAMPAIGN_UI.textSubtle, marginLeft: 'auto' }}>
           {filtered.length} of {prospects.length}
         </span>
       </div>
@@ -870,85 +1054,87 @@ interface CampaignListCardProps {
 
 function CampaignListCard({ campaign, prospects, onClick, onDelete }: CampaignListCardProps) {
   const stats = useMemo(() => computeStats(prospects), [prospects]);
-  const { total, contacted, replied, demos, closed } = stats;
-  const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type] ?? { color: '#6b7280', bg: '#f3f4f6' };
-
-  const statusBadge = ({
-    active:    { label: 'Active',    color: '#065f46', bg: '#d1fae5' },
-    paused:    { label: 'Paused',    color: '#b45309', bg: '#fef3c7' },
-    completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' },
-  } as Record<string, { label: string; color: string; bg: string }>)[campaign.status] ?? { label: campaign.status ?? 'Unknown', color: '#6b7280', bg: '#f3f4f6' };
 
   return (
-    <div
-      className="module-table-container"
-      style={{ borderRadius: 14, cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+    <button
+      type="button"
       onClick={onClick}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}
+      style={{
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        padding: '12px 16px',
+        border: `1px solid ${CAMPAIGN_UI.border}`,
+        borderRadius: 12,
+        background: CAMPAIGN_UI.surface,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        transition: 'box-shadow 0.15s, border-color 0.15s',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)';
+        e.currentTarget.style.borderColor = '#d1d5db';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.boxShadow = 'none';
+        e.currentTarget.style.borderColor = CAMPAIGN_UI.border;
+      }}
     >
-      <div style={{ padding: '16px 20px' }}>
-        {/* Top row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-          <div style={{ width: 10, height: 10, borderRadius: 9999, background: typeBadge.color, flexShrink: 0, marginTop: 4 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{campaign.name}</span>
-              {campaign.school && campaign.school !== campaign.name && (
-                <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>{campaign.school}</span>
-              )}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg }}>
-                {CAMPAIGN_TYPE_LABELS[campaign.type]}
-              </span>
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: statusBadge.color, background: statusBadge.bg }}>
-                {statusBadge.label}
-              </span>
-            </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 12, alignItems: 'center' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: CAMPAIGN_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {campaign.name}
           </div>
-          <button
-            onClick={e => { e.stopPropagation(); onDelete(campaign.id); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4, flexShrink: 0 }}
-            title="Delete campaign"
-          >
-            <Trash2 size={14} />
-          </button>
+          {campaign.school && campaign.school !== campaign.name && (
+            <div style={{ fontSize: '0.75rem', color: CAMPAIGN_UI.textSubtle, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {campaign.school}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}` }}>
+              {CAMPAIGN_TYPE_LABELS[campaign.type]}
+            </span>
+            <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}` }}>
+              {campaignStatusLabel(campaign.status)}
+            </span>
+          </div>
         </div>
 
-        {/* Stats row */}
-        {total > 0 && (
-          <>
-            <div style={{ display: 'flex', gap: 20, marginBottom: 10 }}>
-              {[
-                { label: 'Prospects', value: total,     color: '#374151' },
-                { label: 'Contacted', value: contacted, color: '#1d4ed8' },
-                { label: 'Replied',   value: replied,   color: '#059669' },
-                { label: 'Demos',     value: demos,     color: '#d97706' },
-                { label: 'Closed',    value: closed,    color: '#065f46' },
-              ].map(s => (
-                <div key={s.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.125rem', fontWeight: 700, color: s.color }}>{s.value}</div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9ca3af', marginTop: 1 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-            <FunnelBar {...stats} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-              <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
-                {total > 0 && contacted > 0 ? `${Math.round((contacted / total) * 100)}% contacted` : 'No outreach yet'}
-              </span>
-            </div>
-          </>
+        {stats.total > 0 ? (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {[
+              { label: 'Pros', value: stats.total },
+              { label: 'Out', value: stats.contacted },
+              { label: 'Rep', value: stats.replied },
+              { label: 'Demo', value: stats.demos },
+              { label: 'Won', value: stats.closed },
+            ].map(item => (
+              <div key={item.label} style={{ textAlign: 'center', minWidth: 34 }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: CAMPAIGN_UI.text, fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
+                <div style={{ fontSize: '0.58rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: CAMPAIGN_UI.textSubtle }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span style={{ fontSize: '0.75rem', color: CAMPAIGN_UI.textSubtle }}>No prospects</span>
         )}
 
-        {total === 0 && (
-          <div style={{ padding: '8px 0', fontSize: '0.8125rem', color: '#9ca3af' }}>
-            Click to add prospects →
-          </div>
-        )}
+        <div
+          role="presentation"
+          onClick={e => { e.stopPropagation(); onDelete(campaign.id); }}
+          style={{ color: CAMPAIGN_UI.textSubtle, padding: 4, cursor: 'pointer' }}
+          title="Delete campaign"
+        >
+          <Trash2 size={14} />
+        </div>
       </div>
-    </div>
+
+      {stats.total > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <FunnelBar {...stats} />
+        </div>
+      )}
+    </button>
   );
 }
 
@@ -1113,7 +1299,8 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
   const [search, setSearch] = useState('');
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'recent' | 'alpha' | 'prospects' | 'deals'>('recent');
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('list');
+  const [campaignCardPage, setCampaignCardPage] = useState(1);
   const seededRef = useRef(false);
 
   // Fetch all prospects from Supabase on mount (shared across all users)
@@ -1401,6 +1588,24 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
     });
   }, [campaigns, typeFilter, statusFilter, search, sortBy, prospects]);
 
+  const totalCardPages = Math.max(1, Math.ceil(filteredCampaigns.length / CAMPAIGN_CARDS_PAGE_SIZE));
+  const safeCardPage = Math.min(campaignCardPage, totalCardPages);
+  const paginatedCardCampaigns = useMemo(
+    () => filteredCampaigns.slice(
+      (safeCardPage - 1) * CAMPAIGN_CARDS_PAGE_SIZE,
+      safeCardPage * CAMPAIGN_CARDS_PAGE_SIZE,
+    ),
+    [filteredCampaigns, safeCardPage],
+  );
+
+  useEffect(() => {
+    setCampaignCardPage(1);
+  }, [search, statusFilter, typeFilter, sortBy]);
+
+  useEffect(() => {
+    if (campaignCardPage > totalCardPages) setCampaignCardPage(totalCardPages);
+  }, [campaignCardPage, totalCardPages]);
+
   const selectedCampaign = useMemo(
     () => campaigns.find(c => c.id === selectedCampaignId) ?? null,
     [campaigns, selectedCampaignId]
@@ -1469,54 +1674,59 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
 
   // ── Campaign List View ──
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Search bar — prominent at top */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <div className="module-search" style={{ flex: 1 }}>
-          <Search size={18} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ ...TOOLBAR_SEARCH, flex: '1 1 220px' }}>
+          <Search size={15} color={CAMPAIGN_UI.textSubtle} />
           <input
             type="text"
-            placeholder="Search campaigns by name or school…"
+            placeholder="Search campaigns…"
             value={search}
-            onChange={e => { setSearch(e.target.value); }}
-            autoFocus={false}
+            onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: '0.8125rem', fontFamily: 'inherit', color: CAMPAIGN_UI.text, minWidth: 0 }}
           />
           {search && (
-            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0 }}>
+            <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: CAMPAIGN_UI.textSubtle, padding: 0 }}>
               <X size={13} />
             </button>
           )}
         </div>
-        <button onClick={() => setShowCreateDrawer(true)} className="module-primary-btn" style={{ flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => setShowCreateDrawer(true)}
+          style={{
+            ...TOOLBAR_BUTTON,
+            border: 'none',
+            background: CAMPAIGN_UI.ink,
+            color: '#fff',
+            flexShrink: 0,
+          }}
+        >
           <Plus size={15} /> New Campaign
         </button>
       </div>
 
-      {/* Filter + sort + view mode bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {/* Status filter pills */}
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['all', 'active', 'paused', 'completed'] as const).map(s => (
-            <button key={s} onClick={() => { setStatusFilter(s); }}
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStatusFilter(s)}
               style={{
-                padding: '5px 12px', fontSize: '0.8rem', borderRadius: 9999, fontWeight: 600,
-                border: '1px solid',
-                borderColor: statusFilter === s ? '#0F172A' : '#E5E7EB',
-                background: statusFilter === s ? '#0F172A' : '#ffffff',
-                color: statusFilter === s ? '#ffffff' : '#6B7280',
-                cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                ...TOOLBAR_BUTTON,
+                border: `1px solid ${statusFilter === s ? CAMPAIGN_UI.blue : CAMPAIGN_UI.border}`,
+                background: statusFilter === s ? CAMPAIGN_UI.blueBg : '#fff',
+                color: statusFilter === s ? CAMPAIGN_UI.blueDark : CAMPAIGN_UI.textSecondary,
+                fontWeight: statusFilter === s ? 600 : 500,
               }}
             >
-              {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+              {s === 'all' ? 'All' : campaignStatusLabel(s)}
             </button>
           ))}
         </div>
 
-        <div style={{ width: 1, height: 20, background: '#E5E7EB', flexShrink: 0 }} />
-
-        {/* Type filter */}
-        <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); }}
-          style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '5px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
+        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={TOOLBAR_SELECT}>
           <option value="all">All Types</option>
           <option value="founder_led">Founder-Led</option>
           <option value="intern_led">Intern-Led</option>
@@ -1525,35 +1735,39 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
           <option value="marketing">Marketing</option>
         </select>
 
-        {/* Sort */}
-        <select value={sortBy} onChange={e => { setSortBy(e.target.value as typeof sortBy); }}
-          style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '5px 10px', fontSize: '0.8rem', background: '#ffffff', outline: 'none', fontFamily: 'inherit', color: '#374151', cursor: 'pointer' }}>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} style={TOOLBAR_SELECT}>
           <option value="recent">Most Recent</option>
           <option value="alpha">A → Z</option>
           <option value="prospects">Most Prospects</option>
           <option value="deals">Most Deals</option>
         </select>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: '0.75rem', color: CAMPAIGN_UI.textSubtle }}>
             {filteredCampaigns.length} campaign{filteredCampaigns.length !== 1 ? 's' : ''}
           </span>
-          {/* Card / List toggle */}
-          <div style={{ display: 'flex', background: '#F3F4F6', borderRadius: 8, padding: 2 }}>
-            <button
-              onClick={() => setViewMode('cards')}
-              title="Card view"
-              style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: viewMode === 'cards' ? '#ffffff' : 'transparent', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: viewMode === 'cards' ? '#111827' : '#6B7280', fontFamily: 'inherit', boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.1s' }}
-            >
-              Cards
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              title="List view"
-              style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: viewMode === 'list' ? '#ffffff' : 'transparent', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: viewMode === 'list' ? '#111827' : '#6B7280', fontFamily: 'inherit', boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.1s' }}
-            >
-              List
-            </button>
+          <div style={{ display: 'flex', background: CAMPAIGN_UI.surfaceMuted, borderRadius: 9999, padding: 2, border: `1px solid ${CAMPAIGN_UI.border}` }}>
+            {(['list', 'cards'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 9999,
+                  border: 'none',
+                  background: viewMode === mode ? '#fff' : 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: viewMode === mode ? CAMPAIGN_UI.text : CAMPAIGN_UI.textMuted,
+                  fontFamily: 'inherit',
+                  boxShadow: viewMode === mode ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                }}
+              >
+                {mode === 'list' ? 'List' : 'Cards'}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -1564,93 +1778,144 @@ export function CampaignCRM({ stats, openDeal: _openDeal }: CampaignCRMProps) {
           <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading campaigns…
         </div>
       ) : filteredCampaigns.length === 0 ? (
-        <div className="module-table-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 20px', gap: 16 }}>
-          <Target size={32} color="#e5e7eb" />
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '56px 20px', gap: 14, border: `1px solid ${CAMPAIGN_UI.border}`, borderRadius: 12, background: CAMPAIGN_UI.surface,
+        }}>
+          <Target size={28} color={CAMPAIGN_UI.border} />
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontWeight: 600, color: '#6B7280', margin: 0 }}>No campaigns yet</p>
-            <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginTop: 4 }}>Create your first campaign to start tracking outreach</p>
+            <p style={{ fontWeight: 600, color: CAMPAIGN_UI.textMuted, margin: 0 }}>No campaigns yet</p>
+            <p style={{ fontSize: '0.8125rem', color: CAMPAIGN_UI.textSubtle, marginTop: 4 }}>Create your first campaign to start tracking outreach</p>
           </div>
-          <button onClick={() => setShowCreateDrawer(true)} className="module-primary-btn">
+          <button
+            type="button"
+            onClick={() => setShowCreateDrawer(true)}
+            style={{ ...TOOLBAR_BUTTON, border: 'none', background: CAMPAIGN_UI.ink, color: '#fff' }}
+          >
             <Plus size={15} /> New Campaign
           </button>
         </div>
       ) : viewMode === 'list' ? (
-        /* ── Compact list view ── */
-        <div className="module-table-container" style={{ borderRadius: 14, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                {['Campaign', 'Type', 'Status', 'Deals', 'Prospects', 'Last Activity', ''].map(h => (
-                  <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCampaigns.map(campaign => {
-                const typeBadge = CAMPAIGN_TYPE_BADGE[campaign.type] ?? { color: '#6b7280', bg: '#f3f4f6' };
-                const statusBadge = ({ active: { label: 'Active', color: '#065f46', bg: '#d1fae5' }, paused: { label: 'Paused', color: '#b45309', bg: '#fef3c7' }, completed: { label: 'Completed', color: '#6b7280', bg: '#f3f4f6' } } as Record<string, {label:string;color:string;bg:string}>)[campaign.status] ?? { label: campaign.status ?? '', color: '#6b7280', bg: '#f3f4f6' };
-                const dealCount = (campaign.rows ?? []).filter(r => r.dealId).length;
-                const prospectCount = safeProspects.filter(p => p.campaignId === campaign.id).length + (campaign.rows?.length ?? 0);
-                const updatedDate = new Date(campaign.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                return (
-                  <tr key={campaign.id}
-                    style={{ borderBottom: '1px solid #F3F4F6', cursor: 'pointer', background: '#ffffff', transition: 'background 0.1s' }}
-                    onClick={() => setSelectedCampaignId(campaign.id)}
-                    onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#F9FAFB'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#ffffff'; }}
-                  >
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: 9999, background: typeBadge.color, flexShrink: 0 }} />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>{campaign.name}</div>
-                          {campaign.school && campaign.school !== campaign.name && (
-                            <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{campaign.school}</div>
-                          )}
-                        </div>
+        <div style={{ border: `1px solid ${CAMPAIGN_UI.border}`, borderRadius: 12, background: CAMPAIGN_UI.surface, overflow: 'hidden' }}>
+          <div
+            role="row"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: CAMPAIGN_LIST_COLUMNS,
+              gap: 10,
+              alignItems: 'center',
+              padding: '10px 16px',
+              borderBottom: `1px solid ${CAMPAIGN_UI.border}`,
+              background: CAMPAIGN_UI.surfaceMuted,
+            }}
+          >
+            {['Campaign', 'Type', 'Status', 'Pros', 'Out', 'Rep', 'Demo', 'Won', 'Updated', ''].map(label => (
+              <span
+                key={label || 'actions'}
+                role="columnheader"
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: CAMPAIGN_UI.textSubtle,
+                  textAlign: label && !['Campaign', 'Type', 'Status', ''].includes(label) ? 'right' : 'left',
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+
+          <div style={{ maxHeight: 'min(68vh, 720px)', overflowY: 'auto' }}>
+            {filteredCampaigns.map((campaign, index) => {
+              const campaignProspects = [
+                ...safeProspects.filter(p => p.campaignId === campaign.id),
+                ...((campaign.rows ?? []).filter(r => r.chapterName).map(r => ({
+                  id: r.id,
+                  campaignId: campaign.id,
+                  orgName: r.chapterName,
+                  status: r.meetingBooked ? 'demo_booked' : r.method ? 'contacted' : 'not_contacted',
+                })) as CampaignProspect[]),
+              ];
+              const stats = computeStats(campaignProspects);
+              const updatedDate = new Date(campaign.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+              return (
+                <button
+                  key={campaign.id}
+                  type="button"
+                  onClick={() => setSelectedCampaignId(campaign.id)}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: CAMPAIGN_LIST_COLUMNS,
+                    gap: 10,
+                    alignItems: 'center',
+                    width: '100%',
+                    padding: '10px 16px',
+                    border: 'none',
+                    borderBottom: index < filteredCampaigns.length - 1 ? `1px solid ${CAMPAIGN_UI.border}` : 'none',
+                    background: CAMPAIGN_UI.surface,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem', color: CAMPAIGN_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {campaign.name}
+                    </div>
+                    {campaign.school && campaign.school !== campaign.name && (
+                      <div style={{ fontSize: '0.72rem', color: CAMPAIGN_UI.textSubtle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {campaign.school}
                       </div>
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: typeBadge.color, background: typeBadge.bg }}>{CAMPAIGN_TYPE_LABELS[campaign.type]}</span>
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: statusBadge.color, background: statusBadge.bg }}>{statusBadge.label}</span>
-                    </td>
-                    <td style={{ padding: '10px 14px', fontSize: '0.875rem', fontWeight: 700, color: dealCount > 0 ? '#1d4ed8' : '#9ca3af' }}>{dealCount || '—'}</td>
-                    <td style={{ padding: '10px 14px', fontSize: '0.875rem', color: '#374151' }}>{prospectCount || '—'}</td>
-                    <td style={{ padding: '10px 14px', fontSize: '0.8rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>{updatedDate}</td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <button
-                        onClick={e => { e.stopPropagation(); handleDeleteCampaign(campaign.id); }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4 }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}`, justifySelf: 'start' }}>
+                    {CAMPAIGN_TYPE_LABELS[campaign.type]}
+                  </span>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, color: NEUTRAL_BADGE.color, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}`, justifySelf: 'start' }}>
+                    {campaignStatusLabel(campaign.status)}
+                  </span>
+                  <CampaignStatsInline stats={stats} />
+                  <span style={{ fontSize: '0.75rem', color: CAMPAIGN_UI.textSubtle, textAlign: 'right', whiteSpace: 'nowrap' }}>{updatedDate}</span>
+                  <span
+                    role="presentation"
+                    onClick={e => { e.stopPropagation(); handleDeleteCampaign(campaign.id); }}
+                    style={{ color: CAMPAIGN_UI.textSubtle, padding: 4, cursor: 'pointer', justifySelf: 'end' }}
+                  >
+                    <Trash2 size={13} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : (
-        /* ── Card view ── */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {filteredCampaigns.map(campaign => (
-            <CampaignListCard
-              key={campaign.id}
-              campaign={campaign}
-              prospects={[
-                ...safeProspects.filter(p => p.campaignId === campaign.id),
-                ...((campaign as any)?.rows ?? []).filter((r: any) => r.chapterName).map((r: any) => ({
-                  id: r.id, campaignId: campaign.id, orgName: r.chapterName,
-                  status: r.meetingBooked ? 'demo_booked' : r.method ? 'contacted' : 'not_contacted',
-                } as CampaignProspect))
-              ]}
-              onClick={() => setSelectedCampaignId(campaign.id)}
-              onDelete={handleDeleteCampaign}
-            />
-          ))}
+        <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {paginatedCardCampaigns.map(campaign => (
+              <CampaignListCard
+                key={campaign.id}
+                campaign={campaign}
+                prospects={[
+                  ...safeProspects.filter(p => p.campaignId === campaign.id),
+                  ...((campaign as any)?.rows ?? []).filter((r: any) => r.chapterName).map((r: any) => ({
+                    id: r.id, campaignId: campaign.id, orgName: r.chapterName,
+                    status: r.meetingBooked ? 'demo_booked' : r.method ? 'contacted' : 'not_contacted',
+                  } as CampaignProspect))
+                ]}
+                onClick={() => setSelectedCampaignId(campaign.id)}
+                onDelete={handleDeleteCampaign}
+              />
+            ))}
+          </div>
+          <CampaignPaginationFooter
+            page={safeCardPage}
+            pageSize={CAMPAIGN_CARDS_PAGE_SIZE}
+            totalCount={filteredCampaigns.length}
+            onPageChange={setCampaignCardPage}
+          />
         </div>
       )}
 

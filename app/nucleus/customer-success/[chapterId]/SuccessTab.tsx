@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Plus, X, Calendar, GraduationCap, Edit2, Trash2, Briefcase, BookOpen, MapPin,
-  Linkedin, Loader2, CheckSquare, Square, ClipboardList, Instagram,
+  Plus, X, Calendar, Edit2, Trash2, Briefcase, ClipboardList, Instagram, Loader2,
+  CheckSquare, Square,
 } from 'lucide-react';
 import {
   ChapterWithOnboarding, ChapterCheckIn, CheckInFrequency,
@@ -11,6 +11,23 @@ import {
   ChapterMember, MemberStatus, MEMBER_STATUS_CONFIG,
 } from '@/lib/supabase';
 import ModalOverlay from '@/components/ModalOverlay';
+import {
+  CS_UI, CS_CARD, SECTION_TITLE, TOOLBAR_BUTTON, TOOLBAR_BUTTON_PRIMARY,
+  NEUTRAL_BADGE, LIST_PILL,
+} from '../cs-ui';
+
+const INPUT: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  fontSize: '0.8125rem',
+  padding: '7px 10px',
+  border: `1px solid ${CS_UI.border}`,
+  borderRadius: 8,
+  outline: 'none',
+  fontFamily: 'inherit',
+  color: CS_UI.text,
+  background: '#fff',
+};
 
 interface SuccessTabProps {
   chapter: ChapterWithOnboarding;
@@ -67,22 +84,22 @@ function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '8px 10px', borderRadius: 2,
-      background: isComplete ? 'rgba(0,0,0,0.02)' : '#F7F5F1',
-      border: '1px solid #E8E4DF',
-      opacity: isComplete ? 0.65 : 1,
-      transition: 'opacity 0.15s',
+      padding: '8px 10px', borderRadius: 8,
+      background: isComplete ? CS_UI.surfaceMuted : CS_UI.surface,
+      border: `1px solid ${CS_UI.border}`,
+      opacity: isComplete ? 0.7 : 1,
     }}>
       <button
+        type="button"
         onClick={onToggle}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: isComplete ? '#059669' : '#9ca3af', flexShrink: 0, display: 'flex' }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: isComplete ? CS_UI.success : CS_UI.textSubtle, flexShrink: 0, display: 'flex' }}
         title={isComplete ? 'Mark open' : 'Mark complete'}
       >
         {isComplete ? <CheckSquare size={16} /> : <Square size={16} />}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{
-          fontSize: '0.85rem', color: '#1B2A4A',
+          fontSize: '0.8125rem', color: CS_UI.text,
           textDecoration: isComplete ? 'line-through' : 'none',
         }}>
           {task.title}
@@ -91,24 +108,23 @@ function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
           {task.due_date && (
             <span style={{
               fontSize: '0.72rem', fontWeight: 600,
-              color: isOverdue ? '#dc2626' : '#6b7280',
+              color: isOverdue ? CS_UI.danger : CS_UI.textMuted,
             }}>
-              {isOverdue ? '⚠ ' : ''}Due {new Date(task.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {isOverdue ? 'Overdue · ' : ''}Due {new Date(task.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           )}
           {task.assigned_to && (
-            <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+            <span style={{ fontSize: '0.72rem', color: CS_UI.textSubtle }}>
               → {task.assigned_to}
             </span>
           )}
         </div>
       </div>
       <button
+        type="button"
         onClick={onDelete}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 2, display: 'flex', flexShrink: 0, transition: 'color 0.1s' }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: CS_UI.textSubtle, padding: 2, display: 'flex', flexShrink: 0 }}
         title="Delete task"
-        onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
-        onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}
       >
         <Trash2 size={13} />
       </button>
@@ -451,109 +467,105 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
     : null;
 
   return (
-    <div style={{ maxWidth: 760, display: 'flex', flexDirection: 'column', gap: 32 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* ─── 1. Check-ins ─── */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: '#1B2A4A' }}>
-          📅 Check-ins
+        <h3 style={{ ...SECTION_TITLE, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Calendar size={15} color={CS_UI.textMuted} /> Check-ins
         </h3>
-        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '18px 20px' }}>
+        <div style={{ ...CS_CARD, padding: '14px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>Frequency:</label>
+              <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: CS_UI.textSecondary }}>Frequency:</label>
               <select
                 value={chapter.check_in_frequency || 'biweekly'}
                 onChange={e => updateCheckInFrequency(e.target.value as CheckInFrequency)}
-                style={{ fontSize: '0.8rem', padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}
+                style={{ ...INPUT, width: 'auto', height: 34, padding: '0 10px' }}
               >
                 {Object.entries(CHECK_IN_FREQUENCY_LABELS).map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
                 ))}
               </select>
             </div>
-            <button
-              onClick={() => setShowCheckInModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}
-            >
+            <button type="button" onClick={() => setShowCheckInModal(true)} style={TOOLBAR_BUTTON_PRIMARY}>
               <Plus size={13} /> Log Check-in
             </button>
           </div>
 
-          {/* Next check-in */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem', color: '#4b5563', marginBottom: 12 }}>
-            <Calendar size={15} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: CS_UI.textMuted, marginBottom: 12 }}>
+            <Calendar size={14} />
             {chapter.next_check_in_date ? (
               <>
-                Next: <strong>{new Date(chapter.next_check_in_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
+                Next: <strong style={{ color: CS_UI.text }}>{new Date(chapter.next_check_in_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
                 {daysUntilCheckIn !== null && (
                   <span style={{
-                    fontSize: '0.78rem', fontWeight: 600, padding: '2px 8px', borderRadius: 99,
-                    background: daysUntilCheckIn < 0 ? '#fee2e2' : daysUntilCheckIn <= 3 ? '#fef3c7' : '#f3f4f6',
-                    color: daysUntilCheckIn < 0 ? '#991b1b' : daysUntilCheckIn <= 3 ? '#92400e' : '#6b7280',
+                    ...LIST_PILL,
+                    background: daysUntilCheckIn < 0 ? '#fef2f2' : daysUntilCheckIn <= 3 ? '#fffbeb' : NEUTRAL_BADGE.bg,
+                    color: daysUntilCheckIn < 0 ? CS_UI.danger : daysUntilCheckIn <= 3 ? CS_UI.warning : CS_UI.textMuted,
+                    border: `1px solid ${daysUntilCheckIn < 0 ? '#fecaca' : daysUntilCheckIn <= 3 ? '#fde68a' : NEUTRAL_BADGE.border}`,
                   }}>
                     {daysUntilCheckIn < 0 ? `${Math.abs(daysUntilCheckIn)}d overdue` : daysUntilCheckIn === 0 ? 'Today' : `in ${daysUntilCheckIn}d`}
                   </span>
                 )}
               </>
-            ) : <span style={{ color: '#9ca3af' }}>No check-ins scheduled</span>}
+            ) : <span style={{ color: CS_UI.textSubtle }}>No check-ins scheduled</span>}
           </div>
 
-          {/* Recent check-ins */}
           {loadingCheckIns ? (
-            <div style={{ color: '#9ca3af', fontSize: '0.8rem' }}>Loading…</div>
+            <div style={{ color: CS_UI.textSubtle, fontSize: '0.8125rem' }}>Loading…</div>
           ) : checkIns.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <h5 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Recent</h5>
+              <h5 style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, color: CS_UI.textSubtle, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recent</h5>
               {checkIns.slice(0, 3).map(ci => (
-                <div key={ci.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', background: '#F7F5F1', borderRadius: 2, border: '1px solid #E8E4DF' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', flexShrink: 0 }}>
+                <div key={ci.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', background: CS_UI.surfaceMuted, borderRadius: 8, border: `1px solid ${CS_UI.border}` }}>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: CS_UI.textSecondary, flexShrink: 0 }}>
                     {new Date(ci.check_in_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                   {ci.health_score && (
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '1px 8px', borderRadius: 99, background: HEALTH_SCORE_COLORS[ci.health_score].bg, color: HEALTH_SCORE_COLORS[ci.health_score].text, flexShrink: 0 }}>
+                    <span style={{ ...LIST_PILL, background: HEALTH_SCORE_COLORS[ci.health_score].bg, color: HEALTH_SCORE_COLORS[ci.health_score].text, border: '1px solid transparent' }}>
                       {HEALTH_SCORE_LABELS[ci.health_score]}
                     </span>
                   )}
-                  {ci.notes && <span style={{ fontSize: '0.8rem', color: '#4b5563' }}>{ci.notes.slice(0, 80)}{ci.notes.length > 80 ? '…' : ''}</span>}
+                  {ci.notes && <span style={{ fontSize: '0.8125rem', color: CS_UI.textMuted }}>{ci.notes.slice(0, 80)}{ci.notes.length > 80 ? '…' : ''}</span>}
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ fontSize: '0.8rem', color: '#9ca3af' }}>No check-ins logged yet.</p>
+            <p style={{ margin: 0, fontSize: '0.8125rem', color: CS_UI.textSubtle }}>No check-ins logged yet.</p>
           )}
         </div>
       </section>
 
       {/* ─── Instagram Flyer Tracker ─── */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: '#1B2A4A' }}>
-          <Instagram size={16} /> Instagram Story Flyer
+        <h3 style={{ ...SECTION_TITLE, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Instagram size={15} color={CS_UI.textMuted} /> Instagram Story Flyer
         </h3>
-        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '18px 20px' }}>
-          {/* Status badge + toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ ...CS_CARD, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{
-                fontSize: '0.75rem', fontWeight: 700, padding: '3px 12px', borderRadius: 99,
-                background: flyerPosted ? '#EAF0E8' : '#F5EFE0',
-                color: flyerPosted ? '#2A4229' : '#6B4A1E',
-                display: 'flex', alignItems: 'center', gap: 6,
+                ...LIST_PILL,
+                background: flyerPosted ? '#ecfdf5' : NEUTRAL_BADGE.bg,
+                color: flyerPosted ? CS_UI.success : CS_UI.textSecondary,
+                border: `1px solid ${flyerPosted ? '#6ee7b7' : NEUTRAL_BADGE.border}`,
               }}>
-                {flyerPosted ? '✓ Posted' : '⏳ Not Posted'}
+                {flyerPosted ? 'Posted' : 'Not Posted'}
               </span>
               {!flyerPosted && chapter.status === 'active' && (() => {
                 const daysSinceActive = chapter.payment_start_date
                   ? Math.floor((Date.now() - new Date(chapter.payment_start_date).getTime()) / 86400000)
                   : null;
                 return daysSinceActive !== null && daysSinceActive > 14 ? (
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: '#fef3c7', color: '#92400e' }}>
-                    ⚠ {daysSinceActive}d since activation — no flyer yet
+                  <span style={{ ...LIST_PILL, background: '#fffbeb', color: CS_UI.warning, border: '1px solid #fde68a' }}>
+                    {daysSinceActive}d since activation — no flyer yet
                   </span>
                 ) : null;
               })()}
             </div>
             <button
+              type="button"
               onClick={() => {
                 const next = !flyerPosted;
                 setFlyerPosted(next);
@@ -566,79 +578,42 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                 }
               }}
               disabled={savingFlyer}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 14px', borderRadius: 2,
-                background: flyerPosted ? '#F5E8E0' : '#1B2A4A',
-                color: flyerPosted ? '#6B2A1E' : '#F7F5F1',
-                border: flyerPosted ? '1px solid #F5C5B5' : 'none',
-                cursor: savingFlyer ? 'not-allowed' : 'pointer',
-                fontSize: '0.8rem', fontWeight: 600,
-                transition: 'all 0.15s ease-out',
-              }}
+              style={flyerPosted
+                ? { ...TOOLBAR_BUTTON, opacity: savingFlyer ? 0.7 : 1 }
+                : { ...TOOLBAR_BUTTON_PRIMARY, opacity: savingFlyer ? 0.7 : 1 }}
             >
               {savingFlyer ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-              {flyerPosted ? 'Mark Not Posted' : 'Mark as Posted ✓'}
+              {flyerPosted ? 'Mark Not Posted' : 'Mark as Posted'}
             </button>
           </div>
 
-          {/* Details form — only shown when posted */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="module-form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
-                  Post Date
-                </label>
-                <input
-                  type="date"
-                  value={flyerPostDate}
-                  onChange={e => setFlyerPostDate(e.target.value)}
-                  onBlur={() => saveFlyer()}
-                  style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.85rem', padding: '6px 10px', border: '1px solid #D9D4CC', borderRadius: 2, outline: 'none', fontFamily: 'inherit' }}
-                />
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Post Date</label>
+                <input type="date" value={flyerPostDate} onChange={e => setFlyerPostDate(e.target.value)} onBlur={() => saveFlyer()} style={INPUT} />
               </div>
-              <div className="module-form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
-                  Post URL <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>
+                  Post URL <span style={{ fontWeight: 400, color: CS_UI.textSubtle }}>(optional)</span>
                 </label>
-                <input
-                  type="url"
-                  value={flyerPostUrl}
-                  onChange={e => setFlyerPostUrl(e.target.value)}
-                  onBlur={() => saveFlyer()}
-                  placeholder="https://instagram.com/p/..."
-                  style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.85rem', padding: '6px 10px', border: '1px solid #D9D4CC', borderRadius: 2, outline: 'none', fontFamily: 'inherit' }}
-                />
+                <input type="url" value={flyerPostUrl} onChange={e => setFlyerPostUrl(e.target.value)} onBlur={() => saveFlyer()} placeholder="https://instagram.com/p/..." style={INPUT} />
               </div>
             </div>
-            <div className="module-form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
-                Notes <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
+            <div>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>
+                Notes <span style={{ fontWeight: 400, color: CS_UI.textSubtle }}>(optional)</span>
               </label>
-              <input
-                type="text"
-                value={flyerNotes}
-                onChange={e => setFlyerNotes(e.target.value)}
-                onBlur={() => saveFlyer()}
-                placeholder="e.g. Posted to story + feed, tagged Trailblaize"
-                style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.85rem', padding: '6px 10px', border: '1px solid #D9D4CC', borderRadius: 2, outline: 'none', fontFamily: 'inherit' }}
-              />
+              <input type="text" value={flyerNotes} onChange={e => setFlyerNotes(e.target.value)} onBlur={() => saveFlyer()} placeholder="e.g. Posted to story + feed, tagged Trailblaize" style={INPUT} />
             </div>
             {flyerPosted && flyerPostUrl && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <a
-                  href={flyerPostUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: '0.8rem', color: '#C4874A', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  <Instagram size={13} /> View Post →
-                </a>
-              </div>
+              <a href={flyerPostUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8125rem', color: CS_UI.blueDark, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Instagram size={13} /> View Post →
+              </a>
             )}
           </div>
 
-          <p style={{ marginTop: 14, fontSize: '0.75rem', color: '#9ca3af', lineHeight: 1.5 }}>
+          <p style={{ marginTop: 14, marginBottom: 0, fontSize: '0.75rem', color: CS_UI.textSubtle, lineHeight: 1.5 }}>
             Social proof milestone — chapters that post flyers drive organic inbound from other schools. No post after 14 days active = health warning.
           </p>
         </div>
@@ -646,24 +621,25 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
       {/* ─── 2. Headhunting / Matchmaking ─── */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: '#1B2A4A' }}>
-          <Briefcase size={16} /> Headhunting / Matchmaking
+        <h3 style={{ ...SECTION_TITLE, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Briefcase size={15} color={CS_UI.textMuted} /> Headhunting / Matchmaking
         </h3>
-        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '18px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Track actives and alumni for career connections</span>
+        <div style={{ ...CS_CARD, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <span style={{ fontSize: '0.8125rem', color: CS_UI.textMuted }}>Track actives and alumni for career connections</span>
             <button
+              type="button"
               onClick={() => { setShowAddMember(true); setEditingMember(null); setAddMemberType('active'); setMemberForm({ name: '', grad_year: '', major: '', career_interest: '', status: 'looking', notes: '', member_type: 'active', job_role: '', company: '', is_hiring: false }); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}
+              style={TOOLBAR_BUTTON_PRIMARY}
             >
               <Plus size={13} /> Add Member
             </button>
           </div>
 
           {loadingMembers ? (
-            <div style={{ color: '#9ca3af', fontSize: '0.8rem' }}>Loading…</div>
+            <div style={{ color: CS_UI.textSubtle, fontSize: '0.8125rem' }}>Loading…</div>
           ) : members.length === 0 ? (
-            <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>No members tracked yet.</p>
+            <p style={{ margin: 0, fontSize: '0.8125rem', color: CS_UI.textSubtle }}>No members tracked yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[...members].sort((a, b) => {
@@ -674,23 +650,23 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                 return 0;
               }).map(m => (
                 editingMember?.id === m.id ? (
-                  <div key={m.id} style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 12px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <input className="cs-member-input" placeholder="Name" value={memberForm.name} onChange={e => setMemberForm(p => ({ ...p, name: e.target.value }))} style={{ flex: '1 1 120px' }} />
-                    <input className="cs-member-input" placeholder="Grad Year" value={memberForm.grad_year} onChange={e => setMemberForm(p => ({ ...p, grad_year: e.target.value }))} style={{ width: 90 }} />
+                  <div key={m.id} style={{ background: CS_UI.surfaceMuted, borderRadius: 8, padding: '10px 12px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', border: `1px solid ${CS_UI.border}` }}>
+                    <input className="cs-member-input" placeholder="Name" value={memberForm.name} onChange={e => setMemberForm(p => ({ ...p, name: e.target.value }))} style={{ ...INPUT, flex: '1 1 120px', width: 'auto' }} />
+                    <input className="cs-member-input" placeholder="Grad Year" value={memberForm.grad_year} onChange={e => setMemberForm(p => ({ ...p, grad_year: e.target.value }))} style={{ ...INPUT, width: 90 }} />
                     {(m.member_type || 'active') === 'active' ? (
-                      <input className="cs-member-input" placeholder="Major" value={memberForm.major} onChange={e => setMemberForm(p => ({ ...p, major: e.target.value }))} style={{ flex: '1 1 100px' }} />
+                      <input className="cs-member-input" placeholder="Major" value={memberForm.major} onChange={e => setMemberForm(p => ({ ...p, major: e.target.value }))} style={{ ...INPUT, flex: '1 1 100px', width: 'auto' }} />
                     ) : (
                       <>
-                        <input className="cs-member-input" placeholder="Job Role" value={memberForm.job_role} onChange={e => setMemberForm(p => ({ ...p, job_role: e.target.value }))} style={{ flex: '1 1 120px' }} />
-                        <input className="cs-member-input" placeholder="Company" value={memberForm.company} onChange={e => setMemberForm(p => ({ ...p, company: e.target.value }))} style={{ flex: '1 1 120px' }} />
+                        <input className="cs-member-input" placeholder="Job Role" value={memberForm.job_role} onChange={e => setMemberForm(p => ({ ...p, job_role: e.target.value }))} style={{ ...INPUT, flex: '1 1 120px', width: 'auto' }} />
+                        <input className="cs-member-input" placeholder="Company" value={memberForm.company} onChange={e => setMemberForm(p => ({ ...p, company: e.target.value }))} style={{ ...INPUT, flex: '1 1 120px', width: 'auto' }} />
                       </>
                     )}
-                    <select className="cs-member-select" value={memberForm.status} onChange={e => setMemberForm(p => ({ ...p, status: e.target.value as MemberStatus }))}>
+                    <select className="cs-member-select" value={memberForm.status} onChange={e => setMemberForm(p => ({ ...p, status: e.target.value as MemberStatus }))} style={{ ...INPUT, width: 'auto' }}>
                       {(Object.keys(MEMBER_STATUS_CONFIG) as MemberStatus[]).map(s => (
                         <option key={s} value={s}>{MEMBER_STATUS_CONFIG[s].label}</option>
                       ))}
                     </select>
-                    <button onClick={() => updateMember(m.id, {
+                    <button type="button" onClick={() => updateMember(m.id, {
                       name: memberForm.name,
                       grad_year: memberForm.grad_year ? parseInt(memberForm.grad_year) : null,
                       major: (m.member_type || 'active') === 'active' ? (memberForm.major || null) : null,
@@ -698,15 +674,20 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                       company: (m.member_type || 'active') === 'alumni' ? (memberForm.company || null) : null,
                       is_hiring: memberForm.is_hiring,
                       status: memberForm.status,
-                    })} style={{ padding: '4px 12px', borderRadius: 6, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>Save</button>
-                    <button onClick={() => setEditingMember(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={14} /></button>
+                    })} style={{ ...TOOLBAR_BUTTON_PRIMARY, padding: '0 12px', height: 30, fontSize: '0.8rem' }}>Save</button>
+                    <button type="button" onClick={() => setEditingMember(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: CS_UI.textMuted }}><X size={14} /></button>
                   </div>
                 ) : (
                   <div key={m.id} className="cs-member-row">
                     <div className="cs-member-name" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         {m.name}
-                        <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 7px', borderRadius: 2, background: (m.member_type || 'active') === 'alumni' ? '#F5EFE0' : '#E8EDF5', color: (m.member_type || 'active') === 'alumni' ? '#6B4A1E' : '#1B2A4A' }}>
+                        <span style={{
+                          ...LIST_PILL,
+                          background: (m.member_type || 'active') === 'alumni' ? NEUTRAL_BADGE.bg : '#eff6ff',
+                          color: (m.member_type || 'active') === 'alumni' ? CS_UI.textSecondary : CS_UI.blueDark,
+                          border: `1px solid ${(m.member_type || 'active') === 'alumni' ? NEUTRAL_BADGE.border : '#bfdbfe'}`,
+                        }}>
                           {(m.member_type || 'active') === 'alumni' ? 'Alumni' : 'Active'}
                         </span>
                         {m.platform_member_id && (
@@ -717,20 +698,14 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                             style={{ textDecoration: 'none' }}
                             title="View on Trailblaize platform"
                           >
-                            <span style={{
-                              fontSize: '0.68rem', fontWeight: 700,
-                              padding: '1px 7px', borderRadius: 99,
-                              background: '#d1fae5', color: '#065f46',
-                              display: 'inline-flex', alignItems: 'center', gap: 3,
-                              whiteSpace: 'nowrap',
-                            }}>
-                              ✓ On Platform
+                            <span style={{ ...LIST_PILL, background: '#ecfdf5', color: CS_UI.success, border: '1px solid #6ee7b7' }}>
+                              On Platform
                             </span>
                           </a>
                         )}
                       </div>
                       {m.platform_joined_at && (
-                        <span style={{ fontSize: '0.68rem', color: '#9ca3af', marginLeft: 0 }}>
+                        <span style={{ fontSize: '0.68rem', color: CS_UI.textSubtle }}>
                           Joined {formatRelativeDate(m.platform_joined_at)}
                         </span>
                       )}
@@ -740,7 +715,7 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                       <>
                         {m.job_role && <div className="cs-member-meta">{m.job_role}</div>}
                         {m.company && <div className="cs-member-meta cs-member-meta--muted">{m.company}</div>}
-                        {m.is_hiring && <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '1px 8px', borderRadius: 2, background: '#EAF0E8', color: '#2A4229' }}>Hiring ✓</span>}
+                        {m.is_hiring && <span style={{ ...LIST_PILL, background: '#ecfdf5', color: CS_UI.success, border: '1px solid #6ee7b7' }}>Hiring</span>}
                       </>
                     ) : (
                       m.major && <div className="cs-member-meta cs-member-meta--muted">{m.major}</div>
@@ -750,10 +725,10 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
                       {MEMBER_STATUS_CONFIG[m.status].label}
                     </span>
                     <div className="cs-member-row-actions">
-                      <button className="module-table-action" onClick={() => { setEditingMember(m); setMemberForm({ name: m.name, grad_year: m.grad_year ? String(m.grad_year) : '', major: m.major || '', career_interest: m.career_interest || '', status: m.status, notes: m.notes || '', member_type: m.member_type || 'active', job_role: m.job_role || '', company: m.company || '', is_hiring: m.is_hiring || false }); }}>
+                      <button type="button" className="module-table-action" onClick={() => { setEditingMember(m); setMemberForm({ name: m.name, grad_year: m.grad_year ? String(m.grad_year) : '', major: m.major || '', career_interest: m.career_interest || '', status: m.status, notes: m.notes || '', member_type: m.member_type || 'active', job_role: m.job_role || '', company: m.company || '', is_hiring: m.is_hiring || false }); }}>
                         <Edit2 size={13} />
                       </button>
-                      <button className="module-table-action delete" disabled={deletingMemberId === m.id} onClick={() => deleteMember(m.id)}>
+                      <button type="button" className="module-table-action delete" disabled={deletingMemberId === m.id} onClick={() => deleteMember(m.id)}>
                         <Trash2 size={13} />
                       </button>
                     </div>
@@ -763,60 +738,104 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
             </div>
           )}
 
-          {/* Add member form */}
           {showAddMember && (
-            <div style={{ marginTop: 16, background: '#F7F5F1', borderRadius: 2, padding: '16px', border: '1px solid #D9D4CC' }}>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <div style={{ marginTop: 16, background: CS_UI.surfaceMuted, borderRadius: 8, padding: 16, border: `1px solid ${CS_UI.border}` }}>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
                 {(['active', 'alumni'] as const).map(type => (
-                  <button key={type} onClick={() => { setAddMemberType(type); setMemberForm(p => ({ ...p, member_type: type })); }}
-                    style={{ padding: '4px 14px', borderRadius: 2, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: addMemberType === type ? '2px solid #1B2A4A' : '1px solid #D9D4CC', background: addMemberType === type ? '#E8EDF5' : '#fff', color: addMemberType === type ? '#1B2A4A' : '#5C5449', transition: 'all 0.15s ease-out' }}>
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => { setAddMemberType(type); setMemberForm(p => ({ ...p, member_type: type })); }}
+                    style={addMemberType === type ? TOOLBAR_BUTTON_PRIMARY : TOOLBAR_BUTTON}
+                  >
                     {type === 'active' ? 'Active Member' : 'Alumni'}
                   </button>
                 ))}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div className="module-form-group"><label>Name *</label><input value={memberForm.name} onChange={e => setMemberForm(p => ({ ...p, name: e.target.value }))} placeholder="Full name" /></div>
-                <div className="module-form-group"><label>Grad Year</label><input type="number" value={memberForm.grad_year} onChange={e => setMemberForm(p => ({ ...p, grad_year: e.target.value }))} placeholder="2025" /></div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Name *</label>
+                  <input value={memberForm.name} onChange={e => setMemberForm(p => ({ ...p, name: e.target.value }))} placeholder="Full name" style={INPUT} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Grad Year</label>
+                  <input type="number" value={memberForm.grad_year} onChange={e => setMemberForm(p => ({ ...p, grad_year: e.target.value }))} placeholder="2025" style={INPUT} />
+                </div>
                 {addMemberType === 'active' ? (
-                  <div className="module-form-group"><label>Major</label><input value={memberForm.major} onChange={e => setMemberForm(p => ({ ...p, major: e.target.value }))} /></div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Major</label>
+                    <input value={memberForm.major} onChange={e => setMemberForm(p => ({ ...p, major: e.target.value }))} style={INPUT} />
+                  </div>
                 ) : (
                   <>
-                    <div className="module-form-group"><label>Job Role</label><input value={memberForm.job_role} onChange={e => setMemberForm(p => ({ ...p, job_role: e.target.value }))} placeholder="VP at Goldman Sachs" /></div>
-                    <div className="module-form-group"><label>Company</label><input value={memberForm.company} onChange={e => setMemberForm(p => ({ ...p, company: e.target.value }))} /></div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Job Role</label>
+                      <input value={memberForm.job_role} onChange={e => setMemberForm(p => ({ ...p, job_role: e.target.value }))} placeholder="VP at Goldman Sachs" style={INPUT} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Company</label>
+                      <input value={memberForm.company} onChange={e => setMemberForm(p => ({ ...p, company: e.target.value }))} style={INPUT} />
+                    </div>
                   </>
                 )}
-                <div className="module-form-group"><label>Career Interest</label><input value={memberForm.career_interest} onChange={e => setMemberForm(p => ({ ...p, career_interest: e.target.value }))} /></div>
-                <div className="module-form-group"><label>Status</label><select value={memberForm.status} onChange={e => setMemberForm(p => ({ ...p, status: e.target.value as MemberStatus }))}>{(Object.keys(MEMBER_STATUS_CONFIG) as MemberStatus[]).map(s => <option key={s} value={s}>{MEMBER_STATUS_CONFIG[s].label}</option>)}</select></div>
-                <div className="module-form-group" style={{ gridColumn: '1 / -1' }}><label>Notes</label><input value={memberForm.notes} onChange={e => setMemberForm(p => ({ ...p, notes: e.target.value }))} /></div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Career Interest</label>
+                  <input value={memberForm.career_interest} onChange={e => setMemberForm(p => ({ ...p, career_interest: e.target.value }))} style={INPUT} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Status</label>
+                  <select value={memberForm.status} onChange={e => setMemberForm(p => ({ ...p, status: e.target.value as MemberStatus }))} style={INPUT}>
+                    {(Object.keys(MEMBER_STATUS_CONFIG) as MemberStatus[]).map(s => <option key={s} value={s}>{MEMBER_STATUS_CONFIG[s].label}</option>)}
+                  </select>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Notes</label>
+                  <input value={memberForm.notes} onChange={e => setMemberForm(p => ({ ...p, notes: e.target.value }))} style={INPUT} />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button onClick={addMember} style={{ padding: '6px 16px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}>Add Member</button>
-                <button onClick={() => setShowAddMember(false)} style={{ padding: '6px 16px', borderRadius: 8, background: '#f3f4f6', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>Cancel</button>
+                <button type="button" onClick={addMember} style={TOOLBAR_BUTTON_PRIMARY}>Add Member</button>
+                <button type="button" onClick={() => setShowAddMember(false)} style={TOOLBAR_BUTTON}>Cancel</button>
               </div>
             </div>
           )}
 
-          {/* Log Match */}
-          <div style={{ marginTop: 20, borderTop: '1px solid #f3f4f6', paddingTop: 16 }}>
-            <h5 style={{ fontSize: '0.875rem', fontWeight: 700, marginBottom: 12 }}>Log Match</h5>
+          <div style={{ marginTop: 20, borderTop: `1px solid ${CS_UI.border}`, paddingTop: 16 }}>
+            <h5 style={{ margin: '0 0 12px', fontSize: '0.8125rem', fontWeight: 700, color: CS_UI.text }}>Log Match</h5>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
-              <div className="module-form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.75rem' }}>Active Member</label><input value={matchForm.active_member} onChange={e => setMatchForm(p => ({ ...p, active_member: e.target.value }))} placeholder="Name" style={{ fontSize: '0.8rem', padding: '5px 8px' }} /></div>
-              <div className="module-form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.75rem' }}>Alumni</label><input value={matchForm.alumni_name} onChange={e => setMatchForm(p => ({ ...p, alumni_name: e.target.value }))} placeholder="Name" style={{ fontSize: '0.8rem', padding: '5px 8px' }} /></div>
-              <div className="module-form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.75rem' }}>Date</label><input type="date" value={matchForm.date} onChange={e => setMatchForm(p => ({ ...p, date: e.target.value }))} style={{ fontSize: '0.8rem', padding: '5px 8px' }} /></div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Active Member</label>
+                <input value={matchForm.active_member} onChange={e => setMatchForm(p => ({ ...p, active_member: e.target.value }))} placeholder="Name" style={INPUT} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Alumni</label>
+                <input value={matchForm.alumni_name} onChange={e => setMatchForm(p => ({ ...p, alumni_name: e.target.value }))} placeholder="Name" style={INPUT} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Date</label>
+                <input type="date" value={matchForm.date} onChange={e => setMatchForm(p => ({ ...p, date: e.target.value }))} style={INPUT} />
+              </div>
             </div>
-            <div className="module-form-group" style={{ margin: '0 0 10px' }}><label style={{ fontSize: '0.75rem' }}>Outcome Notes</label><input value={matchForm.notes} onChange={e => setMatchForm(p => ({ ...p, notes: e.target.value }))} placeholder="How did the intro go?" style={{ fontSize: '0.8rem', padding: '5px 8px' }} /></div>
-            <button onClick={addMatch} disabled={savingMatch} style={{ padding: '5px 14px', borderRadius: 2, background: savingMatch ? '#9ca3af' : '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: savingMatch ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 600, transition: 'background 0.15s ease-out' }}>{savingMatch ? 'Saving…' : 'Log Match'}</button>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Outcome Notes</label>
+              <input value={matchForm.notes} onChange={e => setMatchForm(p => ({ ...p, notes: e.target.value }))} placeholder="How did the intro go?" style={INPUT} />
+            </div>
+            <button type="button" onClick={addMatch} disabled={savingMatch} style={{ ...TOOLBAR_BUTTON_PRIMARY, opacity: savingMatch ? 0.7 : 1 }}>
+              {savingMatch ? 'Saving…' : 'Log Match'}
+            </button>
 
             {matches.length > 0 && (
               <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <h5 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Logged Matches ({matches.length})</h5>
+                <h5 style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, color: CS_UI.textSubtle, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Logged Matches ({matches.length})
+                </h5>
                 {matches.map(m => (
-                  <div key={m.id} style={{ display: 'flex', gap: 10, fontSize: '0.8rem', background: '#f9fafb', padding: '6px 10px', borderRadius: 6, alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600 }}>{m.active_member}</span>
-                    <span style={{ color: '#9ca3af' }}>↔</span>
-                    <span style={{ fontWeight: 600 }}>{m.alumni_name}</span>
-                    <span style={{ color: '#9ca3af' }}>{m.date}</span>
-                    {m.notes && <span style={{ color: '#6b7280', flex: 1 }}>{m.notes}</span>}
+                  <div key={m.id} style={{ display: 'flex', gap: 10, fontSize: '0.8125rem', background: CS_UI.surfaceMuted, padding: '8px 10px', borderRadius: 8, alignItems: 'center', border: `1px solid ${CS_UI.border}`, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, color: CS_UI.text }}>{m.active_member}</span>
+                    <span style={{ color: CS_UI.textSubtle }}>↔</span>
+                    <span style={{ fontWeight: 600, color: CS_UI.text }}>{m.alumni_name}</span>
+                    <span style={{ color: CS_UI.textSubtle }}>{m.date}</span>
+                    {m.notes && <span style={{ color: CS_UI.textMuted, flex: 1 }}>{m.notes}</span>}
                   </div>
                 ))}
               </div>
@@ -825,90 +844,84 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
         </div>
       </section>
 
-      {/* ─── NEW: Tasks ─── */}
+      {/* ─── Tasks ─── */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: '#1B2A4A' }}>
-          <ClipboardList size={16} /> Tasks
+        <h3 style={{ ...SECTION_TITLE, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ClipboardList size={15} color={CS_UI.textMuted} /> Tasks
         </h3>
-        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '18px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+        <div style={{ ...CS_CARD, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <span style={{ fontSize: '0.8125rem', color: CS_UI.textMuted }}>
               {tasks.filter(t => t.status === 'open').length} open · {tasks.filter(t => t.status === 'complete').length} complete
             </span>
-            <button
-              onClick={() => setShowAddTask(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
-            >
+            <button type="button" onClick={() => setShowAddTask(v => !v)} style={TOOLBAR_BUTTON_PRIMARY}>
               <Plus size={13} /> Add Task
             </button>
           </div>
 
-          {/* Add task form */}
           {showAddTask && (
-            <div style={{ background: '#F7F5F1', borderRadius: 2, padding: '14px 16px', border: '1px solid #D9D4CC', marginBottom: 14 }}>
+            <div style={{ background: CS_UI.surfaceMuted, borderRadius: 8, padding: '14px 16px', border: `1px solid ${CS_UI.border}`, marginBottom: 14 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px', gap: 10, marginBottom: 10 }}>
-                <div className="module-form-group" style={{ margin: 0 }}>
-                  <label style={{ fontSize: '0.75rem' }}>Task *</label>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Task *</label>
                   <input
                     value={taskForm.title}
                     onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))}
                     placeholder="e.g. Follow up on alumni list"
                     onKeyDown={e => { if (e.key === 'Enter') addTask(); }}
-                    style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                    style={INPUT}
                   />
                 </div>
-                <div className="module-form-group" style={{ margin: 0 }}>
-                  <label style={{ fontSize: '0.75rem' }}>Due Date</label>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Due Date</label>
                   <input
                     type="date"
                     value={taskForm.due_date}
                     onChange={e => setTaskForm(p => ({ ...p, due_date: e.target.value }))}
-                    style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                    style={INPUT}
                   />
                 </div>
-                <div className="module-form-group" style={{ margin: 0 }}>
-                  <label style={{ fontSize: '0.75rem' }}>Assigned To</label>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Assigned To</label>
                   <input
                     value={taskForm.assigned_to}
                     onChange={e => setTaskForm(p => ({ ...p, assigned_to: e.target.value }))}
                     placeholder="Owen, Ford…"
-                    style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                    style={INPUT}
                   />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
+                  type="button"
                   onClick={addTask}
                   disabled={savingTask || !taskForm.title.trim()}
-                  style={{ padding: '6px 16px', borderRadius: 2, background: savingTask ? '#9ca3af' : '#1B2A4A', color: '#F7F5F1', border: 'none', cursor: savingTask ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                  style={{ ...TOOLBAR_BUTTON_PRIMARY, opacity: savingTask || !taskForm.title.trim() ? 0.7 : 1 }}
                 >
                   {savingTask ? 'Adding…' : 'Add Task'}
                 </button>
-                <button onClick={() => setShowAddTask(false)} style={{ padding: '6px 14px', borderRadius: 2, background: '#f3f4f6', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>
+                <button type="button" onClick={() => setShowAddTask(false)} style={TOOLBAR_BUTTON}>
                   Cancel
                 </button>
               </div>
             </div>
           )}
 
-          {/* Task list */}
           {loadingTasks ? (
-            <div style={{ color: '#9ca3af', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ color: CS_UI.textSubtle, fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Loading tasks…
             </div>
           ) : tasks.length === 0 ? (
-            <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: 0 }}>No tasks yet. Add one above.</p>
+            <p style={{ fontSize: '0.8125rem', color: CS_UI.textSubtle, margin: 0 }}>No tasks yet. Add one above.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {/* Open tasks first */}
               {tasks.filter(t => t.status === 'open').map(task => (
                 <TaskRow key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onDelete={() => deleteTask(task.id)} />
               ))}
-              {/* Completed tasks */}
               {tasks.filter(t => t.status === 'complete').length > 0 && (
                 <>
                   {tasks.filter(t => t.status === 'open').length > 0 && (
-                    <div style={{ borderTop: '1px dashed #E8E4DF', margin: '6px 0' }} />
+                    <div style={{ borderTop: `1px dashed ${CS_UI.border}`, margin: '6px 0' }} />
                   )}
                   {tasks.filter(t => t.status === 'complete').map(task => (
                     <TaskRow key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onDelete={() => deleteTask(task.id)} />
@@ -922,20 +935,19 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
       {/* ─── 3. Exec Meeting Notes ─── */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 12, color: '#1B2A4A' }}>📝 Exec Meeting Notes</h3>
-        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 20px' }}>
+        <h3 style={SECTION_TITLE}>Exec Meeting Notes</h3>
+        <div style={{ ...CS_CARD, padding: '14px 16px' }}>
           <textarea
             value={execNotes}
             onChange={e => setExecNotes(e.target.value)}
             onBlur={() => saveNotes('exec')}
             placeholder="Notes from exec team meetings…"
             rows={5}
-            style={{ width: '100%', fontSize: '0.875rem', lineHeight: 1.6, border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', resize: 'vertical', outline: 'none', fontFamily: 'inherit' }}
+            style={{ ...INPUT, minHeight: 120, resize: 'vertical', height: 'auto', padding: '10px 12px', lineHeight: 1.6 }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Auto-saves on blur</span>
-            <button onClick={() => saveNotes('exec')} disabled={savingNotes === 'exec'}
-              style={{ padding: '4px 12px', borderRadius: 6, fontSize: '0.8rem', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+            <span style={{ fontSize: '0.75rem', color: CS_UI.textSubtle }}>Auto-saves on blur</span>
+            <button type="button" onClick={() => saveNotes('exec')} disabled={savingNotes === 'exec'} style={TOOLBAR_BUTTON}>
               {savingNotes === 'exec' ? 'Saving…' : 'Save'}
             </button>
           </div>
@@ -944,20 +956,22 @@ export default function SuccessTab({ chapter, onUpdate, showToast }: SuccessTabP
 
       {/* ─── 4. Bonus Notes ─── */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1.1rem', marginBottom: 12, color: '#1B2A4A' }}>🎁 Bonus Notes <span style={{ fontSize: '0.8rem', color: '#5C5449', fontWeight: 400, fontFamily: 'inherit' }}>(care packages, extras)</span></h3>
-        <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 20px' }}>
+        <h3 style={SECTION_TITLE}>
+          Bonus Notes{' '}
+          <span style={{ fontSize: '0.8125rem', color: CS_UI.textMuted, fontWeight: 400 }}>(care packages, extras)</span>
+        </h3>
+        <div style={{ ...CS_CARD, padding: '14px 16px' }}>
           <textarea
             value={bonusNotes}
             onChange={e => setBonusNotes(e.target.value)}
             onBlur={() => saveNotes('bonus')}
             placeholder="Care packages, swag, extras, special requests…"
             rows={4}
-            style={{ width: '100%', fontSize: '0.875rem', lineHeight: 1.6, border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', resize: 'vertical', outline: 'none', fontFamily: 'inherit' }}
+            style={{ ...INPUT, minHeight: 96, resize: 'vertical', height: 'auto', padding: '10px 12px', lineHeight: 1.6 }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Auto-saves on blur</span>
-            <button onClick={() => saveNotes('bonus')} disabled={savingNotes === 'bonus'}
-              style={{ padding: '4px 12px', borderRadius: 6, fontSize: '0.8rem', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+            <span style={{ fontSize: '0.75rem', color: CS_UI.textSubtle }}>Auto-saves on blur</span>
+            <button type="button" onClick={() => saveNotes('bonus')} disabled={savingNotes === 'bonus'} style={TOOLBAR_BUTTON}>
               {savingNotes === 'bonus' ? 'Saving…' : 'Save'}
             </button>
           </div>

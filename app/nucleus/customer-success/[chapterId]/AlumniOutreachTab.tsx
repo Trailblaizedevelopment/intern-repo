@@ -4,6 +4,20 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ExternalLink, Loader2, Users, Phone, Mail, Smartphone, Copy, Check, Upload, X } from 'lucide-react';
 import { ChapterWithOnboarding } from '@/lib/supabase';
 import Link from 'next/link';
+import {
+  CS_UI, NEUTRAL_BADGE, TOOLBAR_BUTTON, TOOLBAR_BUTTON_PRIMARY,
+  CS_CARD, SECTION_TITLE, LIST_PILL, DETAIL_PILL,
+} from '../cs-ui';
+
+const INPUT_STYLE: React.CSSProperties = {
+  flex: 1,
+  padding: '7px 12px',
+  border: `1px solid ${CS_UI.border}`,
+  borderRadius: 8,
+  fontSize: '0.8125rem',
+  fontFamily: 'inherit',
+  color: CS_UI.text,
+};
 
 interface AlumniOutreachTabProps {
   chapter: ChapterWithOnboarding;
@@ -194,7 +208,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '40px 0', color: '#6b7280' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '40px 0', color: CS_UI.textMuted }}>
         <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
         Loading alumni stats…
       </div>
@@ -206,18 +220,13 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
     : 0;
 
   return (
-    <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Import Alumni List */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
-          Import Alumni List
-        </h3>
+        <h3 style={SECTION_TITLE}>Import Alumni List</h3>
 
-        {/* Step 1: File drop zone */}
         {!importResult && (
-          <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 18px' }}>
-            {/* Drag & drop zone */}
+          <div style={{ ...CS_CARD, padding: '14px 16px' }}>
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -230,21 +239,21 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
                 else if (f) showToast('Please drop a CSV file', 'error');
               }}
               style={{
-                border: `2px dashed ${dragOver ? '#C4874A' : '#D9D4CC'}`,
-                borderRadius: 2,
-                padding: '28px 20px',
+                border: `2px dashed ${dragOver ? CS_UI.blue : CS_UI.border}`,
+                borderRadius: 12,
+                padding: '24px 20px',
                 textAlign: 'center',
                 cursor: 'pointer',
-                background: dragOver ? '#FDF0E0' : '#fff',
+                background: dragOver ? CS_UI.blueBg : CS_UI.surfaceMuted,
                 transition: 'all 0.15s ease',
                 marginBottom: 12,
               }}
             >
-              <Upload size={24} style={{ color: '#9ca3af', marginBottom: 8 }} />
-              <div style={{ fontSize: '0.9rem', color: '#5C5449', fontWeight: 500, marginBottom: 4 }}>
+              <Upload size={22} style={{ color: CS_UI.textSubtle, marginBottom: 8 }} />
+              <div style={{ fontSize: '0.875rem', color: CS_UI.textSecondary, fontWeight: 500, marginBottom: 4 }}>
                 Drop your alumni list here or click to browse
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>
+              <div style={{ fontSize: '0.75rem', color: CS_UI.textSubtle }}>
                 Supports any CSV format — first_name, last_name, phone, email, year
               </div>
             </div>
@@ -260,8 +269,8 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
             {importFile && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontSize: '0.85rem', color: '#1B2A4A', fontWeight: 500 }}>
-                    📄 {importFile.name}
+                  <div style={{ fontSize: '0.8125rem', color: CS_UI.text, fontWeight: 500 }}>
+                    {importFile.name}
                   </div>
                   <button
                     onClick={resetImport}
@@ -272,10 +281,10 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
                   </button>
                 </div>
                 <button
-                  className="module-primary-btn"
+                  type="button"
                   onClick={handlePreview}
                   disabled={previewing}
-                  style={{ padding: '7px 18px', fontSize: '0.85rem', flexShrink: 0 }}
+                  style={{ ...TOOLBAR_BUTTON_PRIMARY, padding: '0 16px', flexShrink: 0 }}
                 >
                   {previewing
                     ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: 6 }} />Analyzing…</>
@@ -289,8 +298,8 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
 
         {/* Import success result */}
         {importResult && (
-          <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 18px' }}>
-            <div style={{ padding: '10px 14px', background: '#d1fae5', borderRadius: 2, fontSize: '0.85rem', color: '#065f46', marginBottom: 10 }}>
+          <div style={{ ...CS_CARD, padding: '14px 16px' }}>
+            <div style={{ padding: '10px 14px', background: '#ecfdf5', borderRadius: 8, border: '1px solid #6ee7b7', fontSize: '0.8125rem', color: CS_UI.success, marginBottom: 10 }}>
               ✓ Imported <strong>{importResult.imported}</strong>, skipped <strong>{importResult.skipped}</strong>, duplicates <strong>{importResult.duplicates}</strong>
               {importResult.errors && importResult.errors.length > 0 && (
                 <div style={{ marginTop: 4, color: '#92400e' }}>
@@ -298,11 +307,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
                 </div>
               )}
             </div>
-            <button
-              className="module-cancel-btn"
-              onClick={resetImport}
-              style={{ padding: '4px 12px', fontSize: '0.78rem' }}
-            >
+            <button type="button" onClick={resetImport} style={TOOLBAR_BUTTON}>
               Import Another File
             </button>
           </div>
@@ -315,17 +320,12 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000, padding: 24,
           }}>
-            <div style={{
-              background: '#fff', borderRadius: 2, maxWidth: 600, width: '100%',
-              maxHeight: '90vh', overflowY: 'auto',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-            }}>
-              {/* Modal header */}
-              <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #D9D4CC' }}>
-                <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '1.2rem', color: '#1B2A4A', marginBottom: 2 }}>
+            <div style={{ ...CS_CARD, maxWidth: 600, width: '100%', maxHeight: '90vh', overflowY: 'auto', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+              <div style={{ padding: '16px 20px', borderBottom: `1px solid ${CS_UI.border}` }}>
+                <div style={{ fontSize: '1rem', fontWeight: 600, color: CS_UI.text, marginBottom: 2 }}>
                   Smart Import Preview
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{importFile?.name}</div>
+                <div style={{ fontSize: '0.75rem', color: CS_UI.textSubtle }}>{importFile?.name}</div>
               </div>
 
               <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -341,11 +341,11 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
                         <span style={{ color: col.mapped_to ? '#059669' : '#9ca3af', fontWeight: 700, fontSize: '0.9rem', width: 16 }}>
                           {col.mapped_to ? '✓' : '✗'}
                         </span>
-                        <span style={{ color: '#1B2A4A', fontFamily: 'monospace', background: '#F7F5F1', padding: '1px 6px', borderRadius: 2, fontSize: '0.8rem' }}>
+                        <span style={{ color: CS_UI.text, fontFamily: 'monospace', background: CS_UI.surfaceMuted, padding: '1px 6px', borderRadius: 4, fontSize: '0.8rem' }}>
                           &ldquo;{col.raw_header}&rdquo;
                         </span>
                         <span style={{ color: '#9ca3af' }}>→</span>
-                        <span style={{ color: col.mapped_to ? '#1B2A4A' : '#D9D4CC', fontSize: '0.82rem' }}>
+                        <span style={{ color: col.mapped_to ? CS_UI.text : CS_UI.textSubtle, fontSize: '0.8125rem' }}>
                           {col.mapped_to || '(ignored)'}
                         </span>
                       </div>
@@ -361,7 +361,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {previewData.sample_rows.map((row, i) => (
-                        <div key={i} style={{ fontSize: '0.84rem', color: '#1B2A4A', background: '#F7F5F1', padding: '8px 12px', borderRadius: 2 }}>
+                        <div key={i} style={{ fontSize: '0.8125rem', color: CS_UI.text, background: CS_UI.surfaceMuted, padding: '8px 12px', borderRadius: 8 }}>
                           <strong>{row.first_name} {row.last_name}</strong>
                           {row.year && <span style={{ color: '#9ca3af', marginLeft: 8 }}>&lsquo;{String(row.year).slice(-2)}</span>}
                           {row.phone_primary && <span style={{ color: '#5C5449', marginLeft: 8 }}>• {row.phone_primary}</span>}
@@ -408,7 +408,7 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
                         <span>{previewData.counts.skip_invalid_phone.toLocaleString()} contacts</span>
                       </div>
                     )}
-                    <div style={{ borderTop: '1px solid #D9D4CC', paddingTop: 6, display: 'flex', justifyContent: 'space-between', color: '#9ca3af' }}>
+                    <div style={{ borderTop: `1px solid ${CS_UI.border}`, paddingTop: 6, display: 'flex', justifyContent: 'space-between', color: CS_UI.textSubtle }}>
                       <span>Total rows</span>
                       <span>{previewData.counts.total_rows.toLocaleString()}</span>
                     </div>
@@ -435,19 +435,13 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
               </div>
 
               {/* Modal footer */}
-              <div style={{ padding: '16px 24px', borderTop: '1px solid #D9D4CC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '14px 20px', borderTop: `1px solid ${CS_UI.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button type="button" onClick={() => setPreviewData(null)} style={TOOLBAR_BUTTON}>Cancel</button>
                 <button
-                  className="module-cancel-btn"
-                  onClick={() => setPreviewData(null)}
-                  style={{ padding: '7px 18px', fontSize: '0.85rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="module-primary-btn"
+                  type="button"
                   onClick={handleImport}
                   disabled={importing || !previewData.has_required_fields || previewData.counts.will_import === 0}
-                  style={{ padding: '7px 22px', fontSize: '0.85rem' }}
+                  style={{ ...TOOLBAR_BUTTON_PRIMARY, padding: '0 18px' }}
                 >
                   {importing
                     ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: 6 }} />Importing…</>
@@ -460,171 +454,134 @@ export default function AlumniOutreachTab({ chapter, showToast, onUpdate }: Alum
         )}
       </section>
 
-      {/* Import Stats */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
-          Import Stats
-        </h3>
+        <h3 style={SECTION_TITLE}>Import Stats</h3>
         {stats ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            width: '100%',
+            paddingBottom: 4,
+            borderBottom: `1px solid ${CS_UI.border}`,
+          }}>
             {[
-              { label: 'Total Alumni', value: stats.total, icon: <Users size={18} />, color: '#1B2A4A', bg: '#F7F5F1' },
-              { label: 'Have Email', value: stats.have_email ?? '—', icon: <Mail size={18} />, color: '#3A5A7A', bg: '#E8EDF5' },
-              { label: 'Have Phone', value: stats.have_phone, icon: <Phone size={18} />, color: '#5C5449', bg: '#F0EDEA' },
-              { label: 'Mobile (iMsg)', value: stats.imessage, icon: <Smartphone size={18} />, color: '#2A4229', bg: '#EAF0E8' },
-            ].map(s => (
-              <div key={s.label} style={{ background: s.bg, borderRadius: 2, padding: '14px 16px', textAlign: 'center', border: '1px solid #D9D4CC' }}>
-                <div style={{ color: s.color, marginBottom: 6, display: 'flex', justifyContent: 'center' }}>{s.icon}</div>
-                <div style={{ fontSize: '1.4rem', fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: '0.75rem', color: '#5C5449', marginTop: 2 }}>{s.label}</div>
-              </div>
+              { label: 'Total Alumni', value: stats.total, icon: <Users size={14} /> },
+              { label: 'Have Email', value: stats.have_email ?? '—', icon: <Mail size={14} /> },
+              { label: 'Have Phone', value: stats.have_phone, icon: <Phone size={14} /> },
+              { label: 'Mobile (iMsg)', value: stats.imessage, icon: <Smartphone size={14} /> },
+            ].map((s, index) => (
+              <React.Fragment key={s.label}>
+                {index > 0 && (
+                  <div aria-hidden style={{ width: 1, alignSelf: 'stretch', margin: '4px 0', background: CS_UI.border, flexShrink: 0 }} />
+                )}
+                <div style={{ flex: '1 1 0', padding: '0 12px', minWidth: 0, textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', color: CS_UI.textSubtle, marginBottom: 4 }}>{s.icon}</div>
+                  <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CS_UI.textSubtle }}>{s.label}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: '1.25rem', fontWeight: 700, color: CS_UI.text, fontVariantNumeric: 'tabular-nums' }}>{s.value}</p>
+                </div>
+              </React.Fragment>
             ))}
           </div>
         ) : (
-          <div style={{ color: '#9ca3af', fontSize: '0.875rem' }}>No import data yet.</div>
+          <div style={{ color: CS_UI.textSubtle, fontSize: '0.8125rem' }}>No import data yet.</div>
         )}
       </section>
 
-      {/* Linq Pipeline */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
-          Linq Pipeline
-        </h3>
+        <h3 style={SECTION_TITLE}>Linq Pipeline</h3>
         {stats ? (
           <div>
-            {/* Funnel — navy → amber progression */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               {[
-                { label: 'Contacted', value: stats.contacted, color: '#1B2A4A', bg: '#E8EDF5' },
-                { label: '→', value: null, color: '#D9D4CC', bg: 'transparent' },
-                { label: 'Responded', value: stats.responded, color: '#3A5A7A', bg: '#EDF0F5' },
-                { label: '→', value: null, color: '#D9D4CC', bg: 'transparent' },
-                { label: 'Signed Up', value: stats.signed_up, color: '#C4874A', bg: '#FDF0E0' },
-              ].map((item, i) => (
-                item.value === null ? (
-                  <span key={i} style={{ fontSize: '1.2rem', color: '#D9D4CC' }}>→</span>
-                ) : (
-                  <div key={item.label} style={{ background: item.bg, borderRadius: 2, padding: '10px 18px', textAlign: 'center', minWidth: 100, border: '1px solid #D9D4CC' }}>
-                    <div style={{ fontSize: '1.4rem', fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, color: item.color }}>{item.value}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#5C5449' }}>{item.label}</div>
+                { label: 'Contacted', value: stats.contacted },
+                { label: 'Responded', value: stats.responded },
+                { label: 'Signed Up', value: stats.signed_up },
+              ].map((item, i, arr) => (
+                <React.Fragment key={item.label}>
+                  <div style={{ ...CS_CARD, padding: '10px 14px', minWidth: 88, textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: CS_UI.text, fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
+                    <div style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CS_UI.textSubtle, marginTop: 2 }}>{item.label}</div>
                   </div>
-                )
+                  {i < arr.length - 1 && <span style={{ color: CS_UI.textSubtle, fontSize: '0.875rem' }}>→</span>}
+                </React.Fragment>
               ))}
-              <div style={{ marginLeft: 12, background: '#F7F5F1', borderRadius: 2, padding: '10px 18px', border: '1px solid #D9D4CC' }}>
-                <div style={{ fontSize: '1.4rem', fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, color: '#1B2A4A' }}>{responseRate}%</div>
-                <div style={{ fontSize: '0.75rem', color: '#5C5449' }}>Response Rate</div>
+              <div style={{ ...CS_CARD, padding: '10px 14px', marginLeft: 4 }}>
+                <div style={{ fontSize: '1.125rem', fontWeight: 700, color: CS_UI.text }}>{responseRate}%</div>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CS_UI.textSubtle, marginTop: 2 }}>Response Rate</div>
               </div>
             </div>
 
             {/* Touch queue badges */}
             {(stats.touch1_ready > 0 || stats.touch2_due > 0 || stats.touch3_due > 0) && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                 {stats.touch1_ready > 0 && (
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 2, background: '#FDF0E0', color: '#6B4A1E' }}>
+                  <span style={{ ...LIST_PILL, color: CS_UI.warning, background: '#fffbeb', border: '1px solid #fde68a' }}>
                     {stats.touch1_ready} ready for Touch 1
                   </span>
                 )}
                 {stats.touch2_due > 0 && (
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 2, background: '#F5EFE0', color: '#8A5A20' }}>
+                  <span style={{ ...LIST_PILL, color: CS_UI.warning, background: '#fffbeb', border: '1px solid #fde68a' }}>
                     {stats.touch2_due} due Touch 2
                   </span>
                 )}
                 {stats.touch3_due > 0 && (
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 2, background: '#E8EDF5', color: '#1B2A4A' }}>
+                  <span style={{ ...LIST_PILL, color: CS_UI.textSecondary, background: NEUTRAL_BADGE.bg, border: `1px solid ${NEUTRAL_BADGE.border}` }}>
                     {stats.touch3_due} due Touch 3
                   </span>
                 )}
               </div>
             )}
 
-            {/* Link to full alumni list */}
             <Link
               href={`/dashboard/clients/${chapter.id}/alumni`}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#C4874A', fontWeight: 600, textDecoration: 'none' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8125rem', color: CS_UI.blueDark, fontWeight: 600, textDecoration: 'none' }}
             >
               View Full Alumni List <ExternalLink size={13} />
             </Link>
           </div>
         ) : (
-          <div style={{ color: '#9ca3af', fontSize: '0.875rem' }}>No pipeline data yet.</div>
+          <div style={{ color: CS_UI.textSubtle, fontSize: '0.8125rem' }}>No pipeline data yet.</div>
         )}
       </section>
 
-      {/* Signup Links */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
-          Signup Links
-        </h3>
-        <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 18px' }}>
-          <div className="cs-links-grid" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <h3 style={SECTION_TITLE}>Signup Links</h3>
+        <div style={{ ...CS_CARD, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>Alumni Join Link</label>
-              <div className="cs-link-input-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="url"
-                  value={alumniJoinLink}
-                  onChange={e => setAlumniJoinLink(e.target.value)}
-                  placeholder="https://trailblaize.net/join/..."
-                  style={{ flex: 1, padding: '7px 10px', border: '1px solid #D9D4CC', borderRadius: 2, fontSize: '0.85rem' }}
-                />
-                <button
-                  className="cs-copy-link-btn"
-                  onClick={() => alumniJoinLink && copyToClipboard(alumniJoinLink, 'alumni')}
-                  disabled={!alumniJoinLink}
-                  title="Copy link"
-                  style={{ padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', cursor: alumniJoinLink ? 'pointer' : 'default', opacity: alumniJoinLink ? 1 : 0.4 }}
-                >
-                  {copiedAlumni ? <Check size={15} color="#10b981" /> : <Copy size={15} />}
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Alumni Join Link</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input type="url" value={alumniJoinLink} onChange={e => setAlumniJoinLink(e.target.value)} placeholder="https://trailblaize.net/join/..." style={INPUT_STYLE} />
+                <button type="button" onClick={() => alumniJoinLink && copyToClipboard(alumniJoinLink, 'alumni')} disabled={!alumniJoinLink} title="Copy link" style={{ ...TOOLBAR_BUTTON, padding: '0 10px', opacity: alumniJoinLink ? 1 : 0.5 }}>
+                  {copiedAlumni ? <Check size={15} color={CS_UI.success} /> : <Copy size={15} />}
                 </button>
               </div>
             </div>
             <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>Actives Join Link</label>
-              <div className="cs-link-input-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="url"
-                  value={activesJoinLink}
-                  onChange={e => setActivesJoinLink(e.target.value)}
-                  placeholder="https://trailblaize.net/join/..."
-                  style={{ flex: 1, padding: '7px 10px', border: '1px solid #D9D4CC', borderRadius: 2, fontSize: '0.85rem' }}
-                />
-                <button
-                  className="cs-copy-link-btn"
-                  onClick={() => activesJoinLink && copyToClipboard(activesJoinLink, 'actives')}
-                  disabled={!activesJoinLink}
-                  title="Copy link"
-                  style={{ padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', cursor: activesJoinLink ? 'pointer' : 'default', opacity: activesJoinLink ? 1 : 0.4 }}
-                >
-                  {copiedActives ? <Check size={15} color="#10b981" /> : <Copy size={15} />}
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: CS_UI.textMuted, display: 'block', marginBottom: 4 }}>Actives Join Link</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input type="url" value={activesJoinLink} onChange={e => setActivesJoinLink(e.target.value)} placeholder="https://trailblaize.net/join/..." style={INPUT_STYLE} />
+                <button type="button" onClick={() => activesJoinLink && copyToClipboard(activesJoinLink, 'actives')} disabled={!activesJoinLink} title="Copy link" style={{ ...TOOLBAR_BUTTON, padding: '0 10px', opacity: activesJoinLink ? 1 : 0.5 }}>
+                  {copiedActives ? <Check size={15} color={CS_UI.success} /> : <Copy size={15} />}
                 </button>
               </div>
             </div>
           </div>
-          <button
-            className="module-primary-btn"
-            onClick={saveLinks}
-            disabled={savingLinks}
-            style={{ marginTop: 12, padding: '7px 18px', fontSize: '0.85rem' }}
-          >
+          <button type="button" onClick={saveLinks} disabled={savingLinks} style={{ ...TOOLBAR_BUTTON_PRIMARY, marginTop: 12 }}>
             {savingLinks ? 'Saving…' : 'Save Links'}
           </button>
         </div>
       </section>
 
-      {/* Email Status */}
       <section>
-        <h3 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A', marginBottom: 12 }}>
-          Email Status
-        </h3>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 10, background: emailSequenceLive ? '#d1fae5' : '#f3f4f6' }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: emailSequenceLive ? '#10b981' : '#9ca3af' }} />
-          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: emailSequenceLive ? '#065f46' : '#6b7280' }}>
-            SendGrid Sequence: {emailSequenceLive ? 'Live ✓' : 'Not set up'}
-          </span>
+        <h3 style={SECTION_TITLE}>Email Status</h3>
+        <div style={{ ...DETAIL_PILL, padding: '6px 12px', color: emailSequenceLive ? CS_UI.success : CS_UI.textMuted, background: emailSequenceLive ? '#ecfdf5' : NEUTRAL_BADGE.bg, border: `1px solid ${emailSequenceLive ? '#6ee7b7' : NEUTRAL_BADGE.border}` }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: emailSequenceLive ? CS_UI.success : CS_UI.textSubtle }} />
+          SendGrid Sequence: {emailSequenceLive ? 'Live' : 'Not set up'}
         </div>
         {!emailSequenceLive && (
-          <p style={{ marginTop: 8, fontSize: '0.8rem', color: '#9ca3af' }}>
-            Mark "SendGrid sequence live" in Set Up to track this.
+          <p style={{ marginTop: 8, fontSize: '0.75rem', color: CS_UI.textSubtle }}>
+            Mark &quot;SendGrid sequence live&quot; in Set Up to track this.
           </p>
         )}
       </section>

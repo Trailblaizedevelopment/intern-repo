@@ -66,11 +66,21 @@ interface ConferenceStats {
   pipelineValue: number;
 }
 
+interface ClosedDealSummary {
+  id: string;
+  chapterName: string;
+  schoolName: string;
+  value: number | null;
+  closedAt: string | null;
+  conference: string;
+}
+
 interface PipelineStats {
   mrr: number;
   mrrGoal: number;
   closedDealCount?: number;
   closedChapters?: string[];
+  closedDeals?: ClosedDealSummary[];
   schoolsInConversation: number;
   demosLast7: number;
   demosLast14: number;
@@ -380,45 +390,28 @@ function getRowType(row: CampaignRow, dealStageMap: Record<string, string>): Row
 
 // ─── Shared Components ────────────────────────────────────────────────────────
 
+const WAR_ROOM_UI = {
+  surface: '#f9fafb',
+  surfaceMuted: '#f3f4f6',
+  border: '#e5e7eb',
+  text: '#111827',
+  textSecondary: '#374151',
+  textMuted: '#6b7280',
+  textSubtle: '#9ca3af',
+  blue: '#2563eb',
+  blueDark: '#1d4ed8',
+  blueBg: '#eff6ff',
+  ink: '#0F172A',
+} as const;
+
+const NEUTRAL_PILL = {
+  color: '#4b5563',
+  bg: '#f3f4f6',
+  border: '#e5e7eb',
+} as const;
+
 function StageBadge({ stage }: { stage: string }) {
-  const sc = STAGE_CONFIG[stage as DealStage];
-  if (sc) {
-    return (
-      <span
-        style={{
-          display: 'inline-block',
-          padding: '2px 10px',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          color: sc.color,
-          backgroundColor: sc.color + '22',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {sc.label}
-      </span>
-    );
-  }
-  const conf = STAGE_CONF[stage];
-  if (conf) {
-    return (
-      <span
-        style={{
-          display: 'inline-block',
-          padding: '2px 10px',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          color: conf.color,
-          backgroundColor: conf.bg,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {conf.label}
-      </span>
-    );
-  }
+  const label = STAGE_CONFIG[stage as DealStage]?.label ?? STAGE_CONF[stage]?.label ?? STAGE_LABELS[stage] ?? stage;
   return (
     <span
       style={{
@@ -427,19 +420,20 @@ function StageBadge({ stage }: { stage: string }) {
         borderRadius: '9999px',
         fontSize: '0.75rem',
         fontWeight: 600,
-        color: '#6b7280',
-        backgroundColor: '#f3f4f6',
+        color: NEUTRAL_PILL.color,
+        backgroundColor: NEUTRAL_PILL.bg,
+        border: `1px solid ${NEUTRAL_PILL.border}`,
         whiteSpace: 'nowrap',
       }}
     >
-      {STAGE_LABELS[stage] || stage}
+      {label}
     </span>
   );
 }
 
 function TempBadge({ temp }: { temp?: string | null }) {
   if (!temp) return null;
-  const cfg = TEMP_BADGE[temp] ?? { label: temp, color: '#6b7280', bg: '#f3f4f6' };
+  const label = TEMP_BADGE[temp]?.label ?? temp;
   return (
     <span
       style={{
@@ -448,11 +442,12 @@ function TempBadge({ temp }: { temp?: string | null }) {
         borderRadius: '9999px',
         fontSize: '0.7rem',
         fontWeight: 500,
-        color: cfg.color,
-        backgroundColor: cfg.bg,
+        color: NEUTRAL_PILL.color,
+        backgroundColor: NEUTRAL_PILL.bg,
+        border: `1px solid ${NEUTRAL_PILL.border}`,
       }}
     >
-      {cfg.label}
+      {label}
     </span>
   );
 }
@@ -460,29 +455,27 @@ function TempBadge({ temp }: { temp?: string | null }) {
 function RepChip({ name }: { name?: string | null }) {
   if (!name) return null;
   const displayName = resolveRep(name) ?? name;
-  const color = getRepColor(displayName);
   return (
     <span
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: '4px',
-        paddingLeft: '2px',
-        paddingRight: '8px',
-        paddingTop: '2px',
-        paddingBottom: '2px',
+        padding: '2px 8px 2px 3px',
         borderRadius: '9999px',
-        backgroundColor: color,
-        color: '#fff',
+        backgroundColor: NEUTRAL_PILL.bg,
+        color: NEUTRAL_PILL.color,
+        border: `1px solid ${NEUTRAL_PILL.border}`,
         fontSize: '0.75rem',
         fontWeight: 600,
         flexShrink: 0,
       }}
     >
       <span style={{
-        width: '20px', height: '20px', borderRadius: '9999px',
-        background: 'rgba(255,255,255,0.2)', display: 'inline-flex',
-        alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700,
+        width: '18px', height: '18px', borderRadius: '9999px',
+        background: '#e5e7eb', color: WAR_ROOM_UI.textMuted,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '9px', fontWeight: 700,
       }}>
         {getRepInitials(displayName)}
       </span>
@@ -510,9 +503,444 @@ function MethodPill({ method }: { method: OutreachMethod }) {
 
 // ─── Tab 1: Dashboard ─────────────────────────────────────────────────────────
 
+function DashboardStatBlock({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
+      <p
+        style={{
+          fontSize: '0.6875rem',
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          color: WAR_ROOM_UI.textSubtle,
+          margin: '0 0 6px 0',
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          fontSize: '1.625rem',
+          fontWeight: 600,
+          color: WAR_ROOM_UI.text,
+          margin: 0,
+          lineHeight: 1.1,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
 
+const CONFERENCE_TABLE_PREVIEW = 8;
 
-function DashboardTab({ stats, onOpenDeal: _onOpenDeal }: { stats: PipelineStats | null; onOpenDeal: (deal: Deal) => void }) {
+const CONFERENCE_TABLE_COLUMNS = 'minmax(0, 1fr) 72px 96px minmax(80px, 1fr)';
+
+const CONFERENCE_TABLE_HEADER: React.CSSProperties = {
+  fontSize: '0.6875rem',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: WAR_ROOM_UI.textSubtle,
+};
+
+const CLOSED_DEALS_TABLE_COLUMNS = 'minmax(0, 1.15fr) minmax(0, 1fr) 88px 72px 88px';
+
+function ClosedDealsSection({
+  deals,
+  onOpenDeal,
+}: {
+  deals: ClosedDealSummary[];
+  onOpenDeal?: (dealId: string) => void;
+}) {
+  if (deals.length === 0) {
+    return (
+      <section
+        style={{
+          border: `1px solid ${WAR_ROOM_UI.border}`,
+          borderRadius: 12,
+          background: '#fff',
+          padding: '14px 18px',
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: '0.6875rem',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: WAR_ROOM_UI.textMuted,
+          }}
+        >
+          Closed Deals
+        </p>
+        <p style={{ fontSize: '0.875rem', color: WAR_ROOM_UI.textSubtle, margin: '8px 0 0' }}>
+          No closed deals yet
+        </p>
+      </section>
+    );
+  }
+
+  const totalValue = deals.reduce((sum, d) => sum + (d.value || 0), 0);
+
+  return (
+    <section
+      style={{
+        border: `1px solid ${WAR_ROOM_UI.border}`,
+        borderRadius: 12,
+        background: '#fff',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '12px 18px',
+          borderBottom: `1px solid ${WAR_ROOM_UI.border}`,
+          background: WAR_ROOM_UI.surfaceMuted,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: WAR_ROOM_UI.textMuted,
+              }}
+            >
+              Closed Deals
+            </p>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '2px 10px',
+                borderRadius: '9999px',
+                background: '#fff',
+                color: WAR_ROOM_UI.textSecondary,
+                border: `1px solid ${WAR_ROOM_UI.border}`,
+              }}
+            >
+              {deals.length}
+            </span>
+          </div>
+          <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSubtle }}>
+            {fmt$(totalValue)} total contract value · sorted by most recent
+          </p>
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 18px 14px' }}>
+        <div
+          role="row"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: CLOSED_DEALS_TABLE_COLUMNS,
+            gap: 12,
+            alignItems: 'center',
+            padding: '0 0 8px',
+            borderBottom: `1px solid ${WAR_ROOM_UI.border}`,
+          }}
+        >
+          <span role="columnheader" style={CONFERENCE_TABLE_HEADER}>Chapter</span>
+          <span role="columnheader" style={CONFERENCE_TABLE_HEADER}>School</span>
+          <span role="columnheader" style={{ ...CONFERENCE_TABLE_HEADER, textAlign: 'right' }}>Value</span>
+          <span role="columnheader" style={CONFERENCE_TABLE_HEADER}>Conf.</span>
+          <span role="columnheader" style={{ ...CONFERENCE_TABLE_HEADER, textAlign: 'right' }}>Closed</span>
+        </div>
+
+        <div style={{ maxHeight: 'min(42vh, 320px)', overflowY: 'auto' }}>
+          {deals.map((deal, index) => (
+            <button
+              key={deal.id}
+              type="button"
+              onClick={() => onOpenDeal?.(deal.id)}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: CLOSED_DEALS_TABLE_COLUMNS,
+                gap: 12,
+                alignItems: 'center',
+                width: '100%',
+                padding: '10px 0',
+                border: 'none',
+                borderBottom: index < deals.length - 1 ? `1px solid ${WAR_ROOM_UI.border}` : 'none',
+                background: 'transparent',
+                cursor: onOpenDeal ? 'pointer' : 'default',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: WAR_ROOM_UI.text,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {deal.chapterName}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.8125rem',
+                  color: WAR_ROOM_UI.textSecondary,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {deal.schoolName}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: WAR_ROOM_UI.text,
+                  textAlign: 'right',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {deal.value ? fmt$(deal.value) : '—'}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: WAR_ROOM_UI.textMuted,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {deal.conference}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.8125rem',
+                  color: WAR_ROOM_UI.textSubtle,
+                  textAlign: 'right',
+                  fontVariantNumeric: 'tabular-nums',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {fmtDate(deal.closedAt)}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {onOpenDeal && (
+          <p style={{ margin: '10px 0 0', fontSize: '0.75rem', color: WAR_ROOM_UI.textSubtle }}>
+            Click a row to open deal details.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ConferenceTrackerSection({
+  conferences,
+  onViewInCrm,
+}: {
+  conferences: ConferenceStats[];
+  onViewInCrm?: (conference: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  if (conferences.length === 0) return null;
+
+  const totalPipeline = conferences.reduce((sum, c) => sum + c.pipelineValue, 0);
+  const topConference = conferences[0];
+  const visibleRows = showAll ? conferences : conferences.slice(0, CONFERENCE_TABLE_PREVIEW);
+  const maxDeals = topConference?.dealCount ?? 1;
+
+  const collapsedSummary = topConference
+    ? `${topConference.conference} leads · ${conferences.length} conferences · ${fmt$(totalPipeline)} active pipeline`
+    : `${conferences.length} conferences`;
+
+  return (
+    <section
+      style={{
+        border: `1px solid ${WAR_ROOM_UI.border}`,
+        borderRadius: 12,
+        background: '#fff',
+        overflow: 'hidden',
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '12px 18px',
+          border: 'none',
+          background: WAR_ROOM_UI.surfaceMuted,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          textAlign: 'left',
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.6875rem',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: WAR_ROOM_UI.textMuted,
+            }}
+          >
+            Pipeline by conference
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSubtle }}>
+            {open ? 'Active deals grouped by athletic conference' : collapsedSummary}
+          </p>
+        </div>
+        <ChevronDown
+          size={16}
+          color={WAR_ROOM_UI.textMuted}
+          style={{
+            flexShrink: 0,
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.15s ease',
+          }}
+        />
+      </button>
+
+      {open && (
+        <div style={{ padding: '12px 18px 14px' }}>
+          <div
+            role="row"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: CONFERENCE_TABLE_COLUMNS,
+              gap: 12,
+              alignItems: 'center',
+              padding: '0 0 8px',
+              borderBottom: `1px solid ${WAR_ROOM_UI.border}`,
+            }}
+          >
+            <span role="columnheader" style={CONFERENCE_TABLE_HEADER}>Conference</span>
+            <span role="columnheader" style={{ ...CONFERENCE_TABLE_HEADER, textAlign: 'right' }}>Deals</span>
+            <span role="columnheader" style={{ ...CONFERENCE_TABLE_HEADER, textAlign: 'right' }}>Pipeline</span>
+            <span role="columnheader" style={CONFERENCE_TABLE_HEADER}>Share</span>
+          </div>
+
+          <div style={{ maxHeight: 'min(40vh, 320px)', overflowY: 'auto' }}>
+            {visibleRows.map((row, index) => {
+              const sharePct = Math.round((row.dealCount / maxDeals) * 100);
+              return (
+                <button
+                  key={row.conference}
+                  type="button"
+                  onClick={() => onViewInCrm?.(row.conference)}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: CONFERENCE_TABLE_COLUMNS,
+                    gap: 12,
+                    alignItems: 'center',
+                    width: '100%',
+                    padding: '10px 0',
+                    border: 'none',
+                    borderBottom: index < visibleRows.length - 1 ? `1px solid ${WAR_ROOM_UI.border}` : 'none',
+                    background: 'transparent',
+                    cursor: onViewInCrm ? 'pointer' : 'default',
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: WAR_ROOM_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {row.conference}
+                  </span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: WAR_ROOM_UI.textSecondary, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {row.dealCount}
+                  </span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: WAR_ROOM_UI.textMuted, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {fmt$(row.pipelineValue)}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <div style={{ flex: 1, height: 6, borderRadius: 9999, background: WAR_ROOM_UI.surfaceMuted, overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${sharePct}%`,
+                          height: '100%',
+                          borderRadius: 9999,
+                          background: index === 0 ? WAR_ROOM_UI.blue : '#cbd5e1',
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: WAR_ROOM_UI.textSubtle, width: 32, textAlign: 'right', flexShrink: 0 }}>
+                      {sharePct}%
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {conferences.length > CONFERENCE_TABLE_PREVIEW && (
+            <button
+              type="button"
+              onClick={() => setShowAll(v => !v)}
+              style={{
+                marginTop: 10,
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                border: `1px solid ${WAR_ROOM_UI.border}`,
+                background: '#fff',
+                color: WAR_ROOM_UI.blueDark,
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {showAll
+                ? 'Show fewer'
+                : `View all ${conferences.length} conferences`}
+            </button>
+          )}
+
+          {onViewInCrm && (
+            <p style={{ margin: '10px 0 0', fontSize: '0.75rem', color: WAR_ROOM_UI.textSubtle }}>
+              Click a row to view matching deals in CRM.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DashboardTab({
+  stats,
+  onOpenDeal,
+  onConferenceSelect,
+}: {
+  stats: PipelineStats | null;
+  onOpenDeal: (deal: Deal) => void;
+  onConferenceSelect?: (conference: string) => void;
+}) {
   const [mapSchools, setMapSchools] = useState<MapSchool[]>([]);
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [stateDeals, setStateDeals] = useState<Deal[]>([]);
@@ -542,114 +970,80 @@ function DashboardTab({ stats, onOpenDeal: _onOpenDeal }: { stats: PipelineStats
     );
   }
 
-  const closedCount = stats.closedDealCount ?? 0;
-  const closedChapters = stats.closedChapters ?? [];
+  const closedDeals = stats.closedDeals ?? [];
+
+  const dashboardStats = [
+    { label: 'Schools in Conversation', value: stats.schoolsInConversation },
+    { label: 'Demos · Last 7 Days', value: stats.demosLast7 },
+    { label: 'Demos · Last 14 Days', value: stats.demosLast14 },
+    { label: 'Decision Calls', value: stats.decisionCalls },
+  ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-      {/* 1. Stats Row — most prominent */}
-      <div className="module-stats-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        {/* Schools in Conversation */}
-        <div className="module-stat">
-          <span className="module-stat-value" style={{ fontSize: '2.25rem' }}>{stats.schoolsInConversation}</span>
-          <span className="module-stat-label">Schools in Conversation</span>
-        </div>
-
-        {/* Demos Last 7 Days — blue badge */}
-        <div className="module-stat" style={{ position: 'relative' }}>
-          <span style={{
-            position: 'absolute', top: '10px', right: '10px',
-            fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px',
-            borderRadius: '9999px', background: '#dbeafe', color: '#1d4ed8',
-            textTransform: 'uppercase', letterSpacing: '0.04em',
-          }}>Demo</span>
-          <span className="module-stat-value" style={{ fontSize: '2.25rem' }}>{stats.demosLast7}</span>
-          <span className="module-stat-label">Demos · Last 7 Days</span>
-        </div>
-
-        {/* Demos Last 14 Days — blue badge */}
-        <div className="module-stat" style={{ position: 'relative' }}>
-          <span style={{
-            position: 'absolute', top: '10px', right: '10px',
-            fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px',
-            borderRadius: '9999px', background: '#dbeafe', color: '#1d4ed8',
-            textTransform: 'uppercase', letterSpacing: '0.04em',
-          }}>Demo</span>
-          <span className="module-stat-value" style={{ fontSize: '2.25rem' }}>{stats.demosLast14}</span>
-          <span className="module-stat-label">Demos · Last 14 Days</span>
-        </div>
-
-        {/* Decision Calls — amber badge */}
-        <div className="module-stat" style={{ position: 'relative' }}>
-          <span style={{
-            position: 'absolute', top: '10px', right: '10px',
-            fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px',
-            borderRadius: '9999px', background: '#fef3c7', color: '#d97706',
-            textTransform: 'uppercase', letterSpacing: '0.04em',
-          }}>Decision</span>
-          <span className="module-stat-value" style={{ fontSize: '2.25rem' }}>{stats.decisionCalls}</span>
-          <span className="module-stat-label">Decision Calls</span>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          width: '100%',
+          paddingBottom: '16px',
+          borderBottom: `1px solid ${WAR_ROOM_UI.border}`,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            justifyContent: 'center',
+            width: '100%',
+            maxWidth: '960px',
+          }}
+        >
+          {dashboardStats.map((stat, index) => (
+            <React.Fragment key={stat.label}>
+              {index > 0 && (
+                <div
+                  aria-hidden
+                  style={{
+                    width: '1px',
+                    alignSelf: 'stretch',
+                    margin: '4px 0',
+                    background: WAR_ROOM_UI.border,
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              <div style={{ flex: '1 1 0', padding: '0 20px', minWidth: 0 }}>
+                <DashboardStatBlock label={stat.label} value={stat.value} />
+              </div>
+            </React.Fragment>
+          ))}
         </div>
       </div>
 
-      {/* 2. Conference Tracker */}
       {stats.byConference.length > 0 && (
-        <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '20px' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280', marginBottom: '16px' }}>
-            Conference Tracker
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
-            {stats.byConference.map(c => (
-              <div key={c.conference} className="module-stat">
-                <span className="module-stat-label">{c.conference}</span>
-                <span className="module-stat-value" style={{ fontSize: '1.5rem', marginTop: '4px' }}>{c.dealCount}</span>
-                <span className="module-stat-label">{fmt$(c.pipelineValue)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ConferenceTrackerSection
+          conferences={stats.byConference}
+          onViewInCrm={onConferenceSelect}
+        />
       )}
 
-      {/* 3. US Pipeline Map */}
       <USPipelineMap schools={mapSchools} selectedState={selectedState} onStateClick={handleStateClick} />
 
-      {/* State Deal Slide-out Panel */}
       {showStatePanel && selectedState && (
         <StateDealPanel
           stateAbbr={selectedState}
           deals={stateDeals}
           onClose={() => { setShowStatePanel(false); setSelectedState(null); }}
+          onOpenDeal={onOpenDeal}
         />
       )}
 
-      {/* 4. Closed Deals — small box below map */}
-      <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '16px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: closedChapters.length > 0 ? '12px' : 0 }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7280', margin: 0 }}>
-            Closed Deals
-          </p>
-          <span style={{
-            fontSize: '0.75rem', fontWeight: 700, padding: '2px 10px',
-            borderRadius: '9999px', background: '#d1fae5', color: '#065f46',
-          }}>{closedCount}</span>
-        </div>
-        {closedChapters.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {closedChapters.map((name, i) => (
-              <span key={i} style={{
-                fontSize: '0.8125rem', fontWeight: 500,
-                color: '#374151', background: '#F9FAFB',
-                border: '1px solid #E5E7EB', borderRadius: '8px',
-                padding: '4px 10px',
-              }}>{name}</span>
-            ))}
-          </div>
-        )}
-        {closedCount === 0 && (
-          <p style={{ fontSize: '0.875rem', color: '#9ca3af', margin: 0 }}>No closed deals yet</p>
-        )}
-      </div>
+      <ClosedDealsSection
+        deals={closedDeals}
+        onOpenDeal={(dealId) => onOpenDeal({ id: dealId } as Deal)}
+      />
     </div>
   );
 }
@@ -1862,42 +2256,58 @@ function USPipelineMap({ schools, selectedState, onStateClick }: {
   }, [schools]);
 
   function getStateFill(stateAbbr: string): string {
-    if (selectedState === stateAbbr) return '#0F172A';
+    if (selectedState === stateAbbr) return WAR_ROOM_UI.ink;
     const data = stateDataMap[stateAbbr];
     if (!data) return '#e5e7eb';
     switch (data.status) {
-      case 'active_client': return 'rgba(16, 185, 129, 0.8)';
-      case 'in_pipeline':   return 'rgba(15, 23, 42, 0.4)';
+      case 'active_client': return '#94a3b8';
+      case 'in_pipeline':   return '#bfdbfe';
       default:              return '#e5e7eb';
     }
   }
 
   return (
-    <div style={{ background: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+    <div style={{ background: '#ffffff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: `1px solid ${WAR_ROOM_UI.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', background: WAR_ROOM_UI.surfaceMuted }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <MapPin size={15} color="#059669" />
+          <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: WAR_ROOM_UI.surface, border: `1px solid ${WAR_ROOM_UI.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <MapPin size={15} color={WAR_ROOM_UI.textMuted} />
           </div>
           <div>
-            <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280', margin: 0 }}>US Pipeline Map</p>
-            <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0 }}>{selectedState ? `${selectedState} selected · click to clear` : 'Click a state to filter'}</p>
+            <p style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: WAR_ROOM_UI.textMuted, margin: 0 }}>US Pipeline Map</p>
+            <p style={{ fontSize: '0.75rem', color: WAR_ROOM_UI.textSubtle, margin: '2px 0 0' }}>{selectedState ? `${selectedState} selected · click to clear` : 'Click a state to filter'}</p>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px', borderRadius: '9999px', background: '#d1fae5', color: '#065f46' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: '#10b981' }} /> Active Client
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 500, padding: '4px 10px', borderRadius: '9999px', background: WAR_ROOM_UI.surface, color: WAR_ROOM_UI.textSecondary, border: `1px solid ${WAR_ROOM_UI.border}` }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: '#94a3b8' }} /> Active Client
             </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px', borderRadius: '9999px', background: '#f1f5f9', color: '#475569' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: '#94a3b8' }} /> In Pipeline
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 500, padding: '4px 10px', borderRadius: '9999px', background: WAR_ROOM_UI.blueBg, color: WAR_ROOM_UI.blueDark, border: `1px solid ${WAR_ROOM_UI.border}` }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: WAR_ROOM_UI.blue }} /> In Pipeline
             </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px', borderRadius: '9999px', background: '#F3F4F6', color: '#6B7280' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 500, padding: '4px 10px', borderRadius: '9999px', background: WAR_ROOM_UI.surface, color: WAR_ROOM_UI.textMuted, border: `1px solid ${WAR_ROOM_UI.border}` }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: '#d1d5db' }} /> Not Contacted
             </span>
           </div>
           {selectedState && (
-            <button onClick={() => onStateClick(null)} className="module-filter-btn" style={{ fontSize: '0.75rem', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <button
+              type="button"
+              onClick={() => onStateClick(null)}
+              style={{
+                fontSize: '0.75rem',
+                padding: '4px 12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                borderRadius: '9999px',
+                border: `1px solid ${WAR_ROOM_UI.border}`,
+                background: '#fff',
+                color: WAR_ROOM_UI.textSecondary,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
               <X size={10} /> Clear
             </button>
           )}
@@ -1919,7 +2329,7 @@ function USPipelineMap({ schools, selectedState, onStateClick }: {
                     <Geography key={geo.rsmKey} geography={geo} fill={fill} stroke="#fff" strokeWidth={0.5}
                       style={{
                         default: { outline: 'none', cursor: stateAbbr ? 'pointer' : 'default' } as React.CSSProperties,
-                        hover:   { fill: isSelected ? '#1e293b' : '#0F172A', outline: 'none', opacity: 0.85, cursor: 'pointer' } as React.CSSProperties,
+                        hover:   { fill: isSelected ? WAR_ROOM_UI.ink : '#64748b', outline: 'none', opacity: 0.9, cursor: 'pointer' } as React.CSSProperties,
                         pressed: { outline: 'none' } as React.CSSProperties,
                       }}
                       onClick={() => { if (stateAbbr) onStateClick(isSelected ? null : stateAbbr); }}
@@ -1943,10 +2353,11 @@ function USPipelineMap({ schools, selectedState, onStateClick }: {
   );
 }
 
-function StateDealPanel({ stateAbbr, deals, onClose }: {
+function StateDealPanel({ stateAbbr, deals, onClose, onOpenDeal }: {
   stateAbbr: string;
   deals: Deal[];
   onClose: () => void;
+  onOpenDeal?: (deal: Deal) => void;
 }) {
   const stateDeals = useMemo(
     () => deals.filter(d => d.organization?.school?.state?.toUpperCase() === stateAbbr),
@@ -1975,9 +2386,28 @@ function StateDealPanel({ stateAbbr, deals, onClose }: {
                     <p style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{deal.organization?.name || '—'}</p>
                     <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '2px 0 0 0' }}>{deal.organization?.school?.name || '—'}</p>
                   </div>
-                  <Link href={`/nucleus/war-room`} style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 600, padding: '6px 12px', borderRadius: '8px', background: '#0F172A', color: '#ffffff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenDeal?.(deal);
+                      onClose();
+                    }}
+                    style={{
+                      flexShrink: 0,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      padding: '6px 14px',
+                      borderRadius: '9999px',
+                      background: WAR_ROOM_UI.ink,
+                      color: '#ffffff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'inherit',
+                    }}
+                  >
                     View Deal
-                  </Link>
+                  </button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <StageBadge stage={deal.stage} />
@@ -2017,8 +2447,48 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'campaigns', label: 'Campaigns' },
 ];
 
+const WAR_ROOM_PAGE_SHELL: React.CSSProperties = {
+  width: '100%',
+  maxWidth: '1400px',
+  margin: '0 auto',
+  boxSizing: 'border-box',
+};
+
+const WAR_ROOM_HEADER_SHELL: React.CSSProperties = {
+  ...WAR_ROOM_PAGE_SHELL,
+  padding: '0 33px',
+  minWidth: 0,
+};
+
+const WAR_ROOM_CONTENT_SHELL: React.CSSProperties = {
+  maxWidth: '1400px',
+  margin: '0 33px',
+  padding: '24px 0',
+  boxSizing: 'border-box',
+  minWidth: 0,
+};
+
+const WAR_ROOM_PILL_BTN: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '5px',
+  padding: '6px 12px',
+  fontSize: '0.8125rem',
+  fontWeight: 500,
+  lineHeight: 1,
+  borderRadius: '9999px',
+  border: '1px solid #d1d5db',
+  background: '#ffffff',
+  color: '#374151',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  whiteSpace: 'nowrap',
+  transition: 'background 0.15s ease, border-color 0.15s ease',
+};
+
 export default function WarRoomPage() {
   const [tab, setTab] = useState<Tab>('crm');
+  const [crmConferenceFilter, setCrmConferenceFilter] = useState<string | null>(null);
   const [stats, setStats] = useState<PipelineStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -2105,61 +2575,97 @@ export default function WarRoomPage() {
   }, [syncCalendar]);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB' }}>
+    <div style={{ minHeight: '100vh', width: '100%', maxWidth: '100%', overflowX: 'hidden', background: '#F9FAFB', boxSizing: 'border-box' }}>
       {/* Sticky Header */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(249,250,251,0.95)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #E5E7EB' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: 0 }}>Sales Room</h1>
-              <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Live sales intelligence</span>
-              {statsLoading && <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, width: '100%', maxWidth: '100%', overflowX: 'hidden', background: 'rgba(249,250,251,0.95)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #E5E7EB' }}>
+        <div style={WAR_ROOM_HEADER_SHELL}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '44px', paddingTop: 0, paddingBottom: 0 }}>
+            <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: 0 }}>Sales Room</h1>
+            <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Live sales intelligence</span>
+            {statsLoading && <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', width: '100%', minWidth: 0, paddingTop: 0, paddingBottom: 0 }}>
+            <div style={{ display: 'flex', gap: '2px', overflowX: 'auto', minWidth: 0, flex: 1, scrollbarWidth: 'none' }}>
+              {TABS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '8px 14px',
+                    fontSize: '0.8125rem',
+                    fontWeight: tab === t.id ? 600 : 500,
+                    color: tab === t.id ? '#111827' : '#6B7280',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: tab === t.id ? '2px solid #0F172A' : '2px solid transparent',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    marginBottom: '-1px',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {lastRefreshed && <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Updated {lastRefreshed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', minWidth: 0, maxWidth: '100%', flexWrap: 'wrap', paddingBottom: '6px' }}>
+              {lastRefreshed && (
+                <span style={{ fontSize: '0.75rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                  Updated {lastRefreshed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              )}
               {syncResult && (
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065f46', background: '#d1fae5', padding: '3px 10px', borderRadius: '9999px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065f46', background: '#d1fae5', padding: '4px 10px', borderRadius: '9999px', whiteSpace: 'nowrap' }}>
                   ✓ {syncResult.synced} synced, {syncResult.skipped} skipped
                 </span>
               )}
               {syncError && (
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '3px 10px', borderRadius: '9999px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '4px 10px', borderRadius: '9999px', whiteSpace: 'nowrap' }}>
                   ✗ {syncError}
                 </span>
               )}
               <button
                 onClick={syncCalendar}
                 disabled={syncLoading}
-                className="module-filter-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: syncLoading ? 0.7 : 1 }}
+                style={{ ...WAR_ROOM_PILL_BTN, opacity: syncLoading ? 0.7 : 1 }}
               >
                 {syncLoading
-                  ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Syncing…</>
-                  : <><CalendarCheck size={14} /> Sync Calendar</>
+                  ? <><RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> Syncing…</>
+                  : <><CalendarCheck size={13} /> Sync Calendar</>
                 }
               </button>
-              <button onClick={() => { setStatsLoading(true); fetchStats(); }}
-                className="module-filter-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <RefreshCw size={14} /> Refresh
+              <button
+                onClick={() => { setStatsLoading(true); fetchStats(); }}
+                style={WAR_ROOM_PILL_BTN}
+              >
+                <RefreshCw size={13} /> Refresh
               </button>
             </div>
-          </div>
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }}>
-            {TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                style={{ flexShrink: 0, padding: '10px 20px', fontSize: '0.875rem', fontWeight: tab === t.id ? 600 : 500, color: tab === t.id ? '#111827' : '#6B7280', background: 'none', border: 'none', borderBottom: tab === t.id ? '2px solid #0F172A' : '2px solid transparent', cursor: 'pointer', fontFamily: 'inherit', marginBottom: '-1px', transition: 'all 0.15s' }}>
-                {t.label}
-              </button>
-            ))}
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
-        {tab === 'crm'        && <SalesCRM />}
-        {tab === 'dashboard'  && <DashboardTab stats={stats} onOpenDeal={openDeal} />}
+      <div style={WAR_ROOM_CONTENT_SHELL}>
+        {tab === 'crm'        && (
+          <SalesCRM
+            conferenceFilter={crmConferenceFilter}
+            onConferenceFilterChange={setCrmConferenceFilter}
+          />
+        )}
+        {tab === 'dashboard'  && (
+          <DashboardTab
+            stats={stats}
+            onOpenDeal={openDeal}
+            onConferenceSelect={(conference) => {
+              setCrmConferenceFilter(conference);
+              setTab('crm');
+            }}
+          />
+        )}
         {tab === 'campaigns'  && <CampaignCRM stats={stats} openDeal={openDeal} />}
       </div>
 

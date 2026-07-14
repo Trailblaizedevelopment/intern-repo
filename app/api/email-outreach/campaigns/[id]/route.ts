@@ -36,13 +36,51 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { data: sends, count: totalSends } = await sendsQuery;
 
+  // Live counts from email_sends — campaign denormalized counters can lag mid-send
+  const { data: statusRows } = await supabase
+    .from('email_sends')
+    .select('status, opened_at, first_clicked_at, bounced_at, unsubscribed_at')
+    .eq('campaign_id', id);
+
+  let liveSent = 0;
+  let liveOpened = 0;
+  let liveClicked = 0;
+  let liveBounced = 0;
+  let liveUnsub = 0;
+  for (const row of statusRows || []) {
+    const status = row.status as string;
+    if (status === 'pending' || status === 'failed') continue;
+    if (status === 'bounced' || row.bounced_at) {
+      liveBounced += 1;
+      continue;
+    }
+    liveSent += 1;
+    if (row.opened_at || status === 'opened' || status === 'clicked') liveOpened += 1;
+    if (row.first_clicked_at || status === 'clicked') liveClicked += 1;
+    if (row.unsubscribed_at || status === 'unsubscribed') liveUnsub += 1;
+  }
+
+  // Prefer higher of denormalized counters vs live rows (covers mid-send lag / wipe bugs)
+  const sentCount = Math.max(campaign.sent_count ?? 0, liveSent);
+  const deliveredCount = Math.max(campaign.delivered_count ?? 0, liveSent - liveBounced);
+  const openedCount = Math.max(campaign.opened_count ?? 0, liveOpened);
+  const clickedCount = Math.max(campaign.clicked_count ?? 0, liveClicked);
+  const bouncedCount = Math.max(campaign.bounced_count ?? 0, liveBounced);
+  const unsubCount = Math.max(campaign.unsubscribed_count ?? 0, liveUnsub);
+
   return NextResponse.json({
     data: {
       campaign: {
         ...campaign,
-        open_rate:   campaign.sent_count > 0 ? Math.round((campaign.opened_count  / campaign.sent_count) * 100) : 0,
-        click_rate:  campaign.sent_count > 0 ? Math.round((campaign.clicked_count / campaign.sent_count) * 100) : 0,
-        bounce_rate: campaign.sent_count > 0 ? Math.round((campaign.bounced_count / campaign.sent_count) * 100) : 0,
+        sent_count: sentCount,
+        delivered_count: deliveredCount,
+        opened_count: openedCount,
+        clicked_count: clickedCount,
+        bounced_count: bouncedCount,
+        unsubscribed_count: unsubCount,
+        open_rate:   sentCount > 0 ? Math.round((openedCount / sentCount) * 100) : 0,
+        click_rate:  sentCount > 0 ? Math.round((clickedCount / sentCount) * 100) : 0,
+        bounce_rate: sentCount > 0 ? Math.round((bouncedCount / sentCount) * 100) : 0,
       },
       sends: sends || [],
       total_sends: totalSends || 0,

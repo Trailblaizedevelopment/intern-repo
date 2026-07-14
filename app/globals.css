@@ -751,6 +751,9 @@ input:focus {
 .ws-content.nucleus-content {
   padding: 0;
   max-width: none;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .nucleus {
@@ -12046,6 +12049,7 @@ input:focus {
   height: 100dvh;
   background: var(--color-cream);
   overflow: hidden;
+  overflow-x: hidden;
   position: relative;
   --ws-sidebar-width: 240px;
 }

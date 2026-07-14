@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Check, CheckCircle2, Clock, Sparkles, Wand2 } from 'lucide-react';
 import { ChapterWithOnboarding, ONBOARDING_STEPS } from '@/lib/supabase';
+import { CS_UI, CS_CARD, NEUTRAL_BADGE, TOOLBAR_BUTTON_PRIMARY } from '../cs-ui';
 
 interface SetUpTabProps {
   chapter: ChapterWithOnboarding;
@@ -27,7 +28,7 @@ interface ConfettiParticle {
 }
 
 function generateConfetti(): ConfettiParticle[] {
-  const colors = ['#C4874A', '#A8703C', '#4A7060', '#1B2A4A', '#5C7A5A', '#8A6A3A'];
+  const colors = ['#2563eb', '#1d4ed8', '#059669', '#0F172A', '#6b7280', '#d97706'];
   return Array.from({ length: 50 }, (_, i) => ({
     id: i, x: Math.random() * 100, y: Math.random() * 100,
     color: colors[Math.floor(Math.random() * colors.length)],
@@ -88,9 +89,9 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
   }, [chapter.id, showToast, onUpdate]);
 
   function getProgressGradient(pct: number): string {
-    if (pct < 50) return '#C4874A';
-    if (pct < 100) return '#A8703C';
-    return '#2A4229';
+    if (pct < 50) return CS_UI.warning;
+    if (pct < 100) return CS_UI.blue;
+    return CS_UI.success;
   }
 
   async function toggleStep(stepKey: string, categoryKey: string) {
@@ -162,23 +163,21 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
       {/* ── Continue Setup banner — shown if wizard not yet completed ── */}
       {!chapter.wizard_completed_at && onOpenWizard && (
         <div style={{
-          background: 'linear-gradient(135deg, #1B2A4A 0%, #243860 100%)',
-          border: '1px solid #1B2A4A',
-          borderRadius: 10,
-          padding: '16px 20px',
-          marginBottom: 20,
+          ...CS_CARD,
+          padding: '14px 16px',
+          marginBottom: 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 16,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Wand2 size={20} color="#C4874A" />
+            <Wand2 size={18} color={CS_UI.blue} />
             <div>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#FDFAF5' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.875rem', color: CS_UI.text }}>
                 Onboarding wizard not completed
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+              <div style={{ fontSize: '0.75rem', color: CS_UI.textMuted, marginTop: 2 }}>
                 {chapter.wizard_step
                   ? `Paused at step ${chapter.wizard_step} of 5 — pick up where you left off`
                   : 'Use the guided wizard to track contract, invoice, and submission'}
@@ -186,15 +185,9 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
             </div>
           </div>
           <button
+            type="button"
             onClick={onOpenWizard}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '9px 18px', borderRadius: 8, border: 'none',
-              background: '#C4874A', color: '#fff',
-              fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
-              whiteSpace: 'nowrap', flexShrink: 0,
-              transition: 'background 0.15s',
-            }}
+            style={{ ...TOOLBAR_BUTTON_PRIMARY, padding: '0 16px' }}
           >
             Continue Setup →
           </button>
@@ -202,14 +195,14 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
       )}
 
       {/* Step skip toggles — mark entire setup sections as N/A */}
-      <div style={{ background: '#F7F5F1', border: '1px solid #D9D4CC', borderRadius: 2, padding: '12px 16px', marginBottom: 16 }}>
-        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#5C5449', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>
+      <div style={{ ...CS_CARD, padding: '12px 16px', marginBottom: 16, background: CS_UI.surfaceMuted }}>
+        <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: CS_UI.textSubtle, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
           Skip Setup Sections (mark as N/A)
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
           <label
             title="Check this if Email Outreach is not applicable to this chapter — hides those setup steps from the checklist."
-            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#5C5449' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.8125rem', color: CS_UI.textSecondary }}
           >
             <input
               type="checkbox"
@@ -219,13 +212,13 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
                 setEmailOutreachEnabled(!skipping);
                 saveOptOut('email_outreach_enabled', !skipping);
               }}
-              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B2A4A' }}
+              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: CS_UI.ink }}
             />
             Email Outreach steps — not applicable to this chapter
           </label>
           <label
             title="Check this if Linq Outreach is not applicable to this chapter — hides those setup steps from the checklist."
-            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: '#5C5449' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.8125rem', color: CS_UI.textSecondary }}
           >
             <input
               type="checkbox"
@@ -235,23 +228,23 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
                 setConversationsEnabled(!skipping);
                 saveOptOut('conversations_enabled', !skipping);
               }}
-              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1B2A4A' }}
+              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: CS_UI.ink }}
             />
             Linq Outreach steps — not applicable to this chapter
           </label>
         </div>
-        <div style={{ fontSize: '0.73rem', color: '#9ca3af', marginTop: 6 }}>
+        <div style={{ fontSize: '0.75rem', color: CS_UI.textSubtle, marginTop: 6 }}>
           Checking a box marks that entire setup section as N/A and bypasses it in the onboarding flow.
         </div>
       </div>
 
       {/* Overall progress */}
-      <div style={{ background: '#fff', border: '1px solid #D9D4CC', borderRadius: 2, padding: '16px 20px', marginBottom: 24 }}>
+      <div style={{ ...CS_CARD, padding: '14px 16px', marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '1rem', color: '#1B2A4A' }}>Overall Setup Progress</span>
-          <span style={{ fontWeight: 600, color: overallPct >= 100 ? '#2A4229' : '#5C5449', fontSize: '0.875rem' }}>{doneSteps}/{totalSteps} ({overallPct}%)</span>
+          <span style={{ fontWeight: 600, fontSize: '0.875rem', color: CS_UI.text }}>Overall Setup Progress</span>
+          <span style={{ fontWeight: 600, color: overallPct >= 100 ? CS_UI.success : CS_UI.textSecondary, fontSize: '0.8125rem' }}>{doneSteps}/{totalSteps} ({overallPct}%)</span>
         </div>
-        <div style={{ height: 6, background: '#F0EDEA', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ height: 6, background: CS_UI.border, borderRadius: 9999, overflow: 'hidden' }}>
           <div style={{
             height: '100%', borderRadius: 2,
             width: `${overallPct}%`,
@@ -273,9 +266,9 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
           const isOptedOut = (category === 'email' && !emailOutreachEnabled) || (category === 'linq' && !conversationsEnabled);
           if (isOptedOut) {
             return (
-              <div key={category} style={{ background: '#F7F5F1', border: '1px dashed #D9D4CC', borderRadius: 2, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '0.95rem', color: '#9ca3af' }}>{CATEGORY_LABELS[category] || category}</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: 2, background: '#E8E4DF', color: '#5C5449' }}>Skipped (N/A)</span>
+              <div key={category} style={{ ...CS_CARD, padding: '12px 16px', background: CS_UI.surfaceMuted, borderStyle: 'dashed', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: CS_UI.textSubtle }}>{CATEGORY_LABELS[category] || category}</span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 9999, background: NEUTRAL_BADGE.bg, color: NEUTRAL_BADGE.color, border: `1px solid ${NEUTRAL_BADGE.border}` }}>Skipped (N/A)</span>
               </div>
             );
           }
@@ -284,12 +277,11 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
             <div
               key={category}
               style={{
-                background: '#fff',
-                border: `1px solid ${isCelebrating ? '#4A7060' : '#D9D4CC'}`,
-                borderRadius: 2,
-                padding: '16px 20px',
+                ...CS_CARD,
+                padding: '14px 16px',
+                border: `1px solid ${isCelebrating ? CS_UI.success : CS_UI.border}`,
                 transition: 'border-color 0.15s ease-out',
-                boxShadow: isCelebrating ? '0 0 0 3px rgba(74,112,96,0.12)' : 'none',
+                boxShadow: isCelebrating ? '0 0 0 3px rgba(5,150,105,0.1)' : 'none',
                 position: 'relative',
                 overflow: 'hidden',
               }}
@@ -310,22 +302,22 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '0.95rem', color: '#1B2A4A' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: CS_UI.text }}>
                   {CATEGORY_LABELS[category] || category}
                   {isCelebrating && <span style={{ marginLeft: 8, fontSize: '0.9rem' }}>🎉</span>}
                 </span>
                 <span style={{
-                  fontSize: '0.75rem', fontWeight: 600,
-                  color: catPct === 100 ? '#2A4229' : '#5C5449',
-                  background: catPct === 100 ? '#EAF0E8' : '#F0EDEA',
-                  padding: '2px 8px', borderRadius: 2,
+                  fontSize: '0.68rem', fontWeight: 600,
+                  color: catPct === 100 ? CS_UI.success : CS_UI.textSecondary,
+                  background: catPct === 100 ? '#ecfdf5' : CS_UI.surfaceMuted,
+                  padding: '2px 8px', borderRadius: 9999,
                 }}>
                   {catDone}/{steps.length}
                 </span>
               </div>
 
               {/* Category progress bar */}
-              <div style={{ height: 4, background: '#F0EDEA', borderRadius: 2, overflow: 'hidden', marginBottom: 14 }}>
+              <div style={{ height: 4, background: CS_UI.border, borderRadius: 9999, overflow: 'hidden', marginBottom: 14 }}>
                 <div style={{
                   height: '100%', borderRadius: 2,
                   width: `${catPct}%`,
@@ -343,8 +335,8 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
                       key={step.key}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 10,
-                        cursor: 'pointer', padding: '5px 6px', borderRadius: 2,
-                        background: checked ? 'rgba(196,135,74,0.06)' : 'transparent',
+                        cursor: 'pointer', padding: '5px 6px', borderRadius: 8,
+                        background: checked ? CS_UI.blueBg : 'transparent',
                         transition: 'background 0.15s ease-out',
                       }}
                     >
@@ -355,17 +347,17 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
                         style={{ display: 'none' }}
                       />
                       <div style={{
-                        width: 18, height: 18, borderRadius: 2, flexShrink: 0,
-                        border: `2px solid ${checked ? '#C4874A' : '#1B2A4A'}`,
-                        background: checked ? '#C4874A' : '#fff',
+                        width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                        border: `2px solid ${checked ? CS_UI.ink : CS_UI.border}`,
+                        background: checked ? CS_UI.ink : '#fff',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all 0.15s ease-out',
                       }}>
                         {checked && <Check size={11} color="#fff" strokeWidth={3} />}
                       </div>
                       <span style={{
-                        fontSize: '0.85rem',
-                        color: checked ? '#5C5449' : '#1B2A4A',
+                        fontSize: '0.8125rem',
+                        color: checked ? CS_UI.textMuted : CS_UI.text,
                         textDecoration: checked ? 'line-through' : 'none',
                         opacity: checked ? 0.65 : 1,
                         transition: 'all 0.15s ease-out',
@@ -391,7 +383,7 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
           onClick={() => setShowCompletionModal(false)}
         >
           <div
-            style={{ background: '#fff', borderRadius: 20, padding: '40px 48px', textAlign: 'center', position: 'relative', overflow: 'hidden', maxWidth: 420, width: '90%' }}
+            style={{ ...CS_CARD, padding: '32px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden', maxWidth: 420, width: '90%', borderRadius: 16 }}
             onClick={e => e.stopPropagation()}
           >
             {/* Confetti */}
@@ -406,13 +398,14 @@ export default function SetUpTab({ chapter, onUpdate, showToast, onOpenWizard }:
             ))}
             <div style={{ fontSize: '3rem', marginBottom: 12 }}><Sparkles size={48} style={{ color: '#f59e0b' }} /></div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: 8 }}>🎉 Setup Complete!</h2>
-            <p style={{ color: '#6b7280', marginBottom: 8 }}>
-              <strong style={{ color: '#111827' }}>{chapter.chapter_name}</strong> has completed all setup steps!
+            <p style={{ color: CS_UI.textMuted, marginBottom: 8 }}>
+              <strong style={{ color: CS_UI.text }}>{chapter.chapter_name}</strong> has completed all setup steps!
             </p>
-            <p style={{ color: '#4A7060', fontWeight: 600, fontSize: '0.9rem', marginBottom: 24 }}>Status automatically updated to Active.</p>
+            <p style={{ color: CS_UI.success, fontWeight: 600, fontSize: '0.875rem', marginBottom: 24 }}>Status automatically updated to Active.</p>
             <button
+              type="button"
               onClick={() => setShowCompletionModal(false)}
-              style={{ padding: '10px 28px', borderRadius: 2, background: '#1B2A4A', color: '#F7F5F1', border: 'none', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}
+              style={{ ...TOOLBAR_BUTTON_PRIMARY, padding: '0 24px', height: 40 }}
             >
               Awesome! 🎊
             </button>
@@ -512,9 +505,9 @@ function ActivationTimeline({ chapter }: { chapter: ChapterWithOnboarding }) {
     <div style={{ marginTop: 32 }}>
       {/* Section header */}
       <div style={{
-        fontSize: '0.75rem',
-        fontWeight: 700,
-        color: '#5C5449',
+        fontSize: '0.6875rem',
+        fontWeight: 600,
+        color: CS_UI.textSubtle,
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
         marginBottom: 14,
@@ -522,12 +515,7 @@ function ActivationTimeline({ chapter }: { chapter: ChapterWithOnboarding }) {
         Activation Timeline
       </div>
 
-      <div style={{
-        background: '#fff',
-        border: '1px solid #D9D4CC',
-        borderRadius: 2,
-        padding: '4px 0',
-      }}>
+      <div style={{ ...CS_CARD, padding: '4px 0' }}>
         {milestones.map((m, i) => {
           const done = m.boolOnly ? !!m.boolDone : !!m.date;
           const isLast = i === milestones.length - 1;
@@ -540,21 +528,21 @@ function ActivationTimeline({ chapter }: { chapter: ChapterWithOnboarding }) {
                 alignItems: 'center',
                 gap: 12,
                 padding: '9px 16px',
-                borderBottom: isLast ? 'none' : '1px solid #F0EDEA',
+                borderBottom: isLast ? 'none' : `1px solid ${CS_UI.border}`,
               }}
             >
               {/* Icon */}
               <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                 {done
-                  ? <CheckCircle2 size={16} color="#2A7A4A" strokeWidth={2} />
-                  : <Clock size={16} color="#B0A898" strokeWidth={1.8} />}
+                  ? <CheckCircle2 size={16} color={CS_UI.success} strokeWidth={2} />
+                  : <Clock size={16} color={CS_UI.textSubtle} strokeWidth={1.8} />}
               </div>
 
               {/* Label */}
               <span style={{
                 flex: 1,
-                fontSize: '0.85rem',
-                color: done ? '#1B2A4A' : '#9ca3af',
+                fontSize: '0.8125rem',
+                color: done ? CS_UI.text : CS_UI.textSubtle,
                 fontWeight: done ? 500 : 400,
               }}>
                 {m.label}
@@ -564,7 +552,7 @@ function ActivationTimeline({ chapter }: { chapter: ChapterWithOnboarding }) {
               <span style={{
                 fontSize: '0.78rem',
                 fontWeight: done ? 600 : 400,
-                color: done ? '#2A7A4A' : '#B0A898',
+                color: done ? CS_UI.success : CS_UI.textSubtle,
                 flexShrink: 0,
                 minWidth: 80,
                 textAlign: 'right',

@@ -9,6 +9,9 @@ import {
 } from 'lucide-react';
 import EmailTemplatesTab from './EmailTemplatesTab';
 import { EmailCampaignEditorV2 } from './EmailCampaignEditorV2';
+import {
+  CS_UI, TOOLBAR_BUTTON, TOOLBAR_BUTTON_PRIMARY, CS_CARD, LIST_PILL,
+} from './cs-ui';
 /* ─── Types ─── */
 
 interface Campaign {
@@ -81,9 +84,45 @@ function fmtDate(d: string | null) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-function fmtNum(n: number) {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
+function fmtNum(n: number | null | undefined) {
+  const v = n ?? 0;
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
+  return String(v);
+}
+
+function pct(numerator: number | null | undefined, denominator: number | null | undefined): string {
+  const num = numerator ?? 0;
+  const den = denominator ?? 0;
+  if (den <= 0) return '0%';
+  return `${Math.round((num / den) * 100)}%`;
+}
+
+/** Expand fixed-width email templates to fill the preview panel. */
+function previewSrcDoc(html: string): string {
+  const stretchCss = `
+    <style id="cs-preview-stretch">
+      html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; background: transparent !important; }
+      body { overflow-x: hidden !important; }
+      table[width="600"],
+      table[width='600'],
+      .email-container,
+      table.email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+      }
+      table[role="presentation"] { max-width: 100% !important; }
+      img { max-width: 100% !important; height: auto !important; }
+    </style>
+  `;
+
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${stretchCss}</head>`);
+  }
+  if (/<body[^>]*>/i.test(html)) {
+    return html.replace(/<body([^>]*)>/i, `<body$1>${stretchCss}`);
+  }
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${stretchCss}</head><body>${html}</body></html>`;
 }
 
 /* ─── Main component ─── */
@@ -97,6 +136,7 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [sends, setSends] = useState<EmailSend[]>([]);
+  const [totalSends, setTotalSends] = useState(0);
   const [detailLoading, setDetailLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendsFilter, setSendsFilter] = useState('');
@@ -164,6 +204,7 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
       if (!json.error) {
         setSelectedCampaign(json.data.campaign);
         setSends(json.data.sends || []);
+        setTotalSends(json.data.total_sends || 0);
       }
     } catch { /* silent */ }
     finally { setDetailLoading(false); }
@@ -470,107 +511,90 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
   if (view === 'detail' && selectedCampaign) {
     const c = selectedCampaign;
     const statusCfg = STATUS_CONFIG[c.status];
+    const touchCfg = TOUCH_CONFIG[c.touch_number];
 
     const filteredSends = sends.filter(s =>
       !sendsFilter || s.status === sendsFilter || s.email.includes(sendsFilter) || `${s.first_name} ${s.last_name}`.toLowerCase().includes(sendsFilter.toLowerCase())
     );
 
+    // Prefer campaign counters (API now reconciles with live email_sends); fall back to loaded rows
+    const liveSentFromPage = sends.filter(s => s.status !== 'pending' && s.status !== 'failed').length;
+    const sentCount = Math.max(
+      c.sent_count ?? 0,
+      liveSentFromPage,
+      // If this page is entirely successful sends, total_sends is a better lower bound mid-send
+      liveSentFromPage === sends.length && sends.length > 0 ? totalSends : 0,
+    );
+    const deliveredCount = Math.max(c.delivered_count ?? 0, 0);
+    const openedCount = c.opened_count ?? 0;
+    const clickedCount = c.clicked_count ?? 0;
+    const bouncedCount = c.bounced_count ?? 0;
+    const unsubCount = c.unsubscribed_count ?? 0;
+    const openRate = sentCount > 0 ? Math.round((openedCount / sentCount) * 100) : (c.open_rate ?? 0);
+    const clickRate = sentCount > 0 ? Math.round((clickedCount / sentCount) * 100) : (c.click_rate ?? 0);
+    const bounceRate = sentCount > 0 ? Math.round((bouncedCount / sentCount) * 100) : (c.bounce_rate ?? 0);
+
+    const kpiStats = [
+      { label: 'Available', value: fmtNum(c.total_contacts), sub: 'eligible' },
+      { label: 'Sent', value: fmtNum(sentCount), sub: pct(sentCount, c.total_contacts) + ' of list' },
+      { label: 'Delivered', value: fmtNum(deliveredCount), sub: pct(deliveredCount, sentCount) + ' delivery' },
+      { label: 'Opens', value: `${openRate}%`, sub: `${openedCount} contacts` },
+      { label: 'Clicks', value: `${clickRate}%`, sub: `${clickedCount} contacts` },
+      { label: 'Bounced', value: `${bounceRate}%`, sub: `${bouncedCount} contacts` },
+      { label: 'Unsubs', value: fmtNum(unsubCount), sub: '' },
+    ];
+
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {/* Header */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button onClick={() => { setView('list'); fetchCampaigns(); }} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.8125rem', color: '#374151' }}>
+          <button type="button" onClick={() => { setView('list'); fetchCampaigns(); }} style={TOOLBAR_BUTTON}>
             <ArrowLeft size={14} /> Back
           </button>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{c.subject_line}</span>
-              <span style={{ padding: '2px 8px', borderRadius: 20, background: TOUCH_CONFIG[c.touch_number].bg, color: TOUCH_CONFIG[c.touch_number].color, fontSize: '0.7rem', fontWeight: 700 }}>
-                {TOUCH_CONFIG[c.touch_number].label}
+              <span style={{ fontWeight: 600, fontSize: '0.9375rem', color: CS_UI.text }}>{c.subject_line}</span>
+              <span style={{ ...LIST_PILL, color: touchCfg.color, background: touchCfg.bg, border: `1px solid ${touchCfg.color}33` }}>
+                {touchCfg.label}
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, background: statusCfg.bg, color: statusCfg.color, fontSize: '0.7rem', fontWeight: 700 }}>
+              <span style={{ ...LIST_PILL, color: statusCfg.color, background: statusCfg.bg, border: `1px solid ${statusCfg.color}33`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 {statusCfg.icon} {statusCfg.label}
               </span>
             </div>
-            <p style={{ margin: '2px 0 0', fontSize: '0.8125rem', color: '#6b7280' }}>{c.chapter_name} · Created {fmtDate(c.created_at)}</p>
+            <p style={{ margin: '2px 0 0', fontSize: '0.8125rem', color: CS_UI.textMuted }}>{c.chapter_name} · Created {fmtDate(c.created_at)}</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {c.status !== 'sent' && c.status !== 'cancelled' && (
-              <button
-                onClick={() => sendCampaign(c.id)}
-                disabled={sending}
-                style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: sending ? '#9ca3af' : 'linear-gradient(135deg, #2563eb, #3b82f6)', color: '#fff', cursor: sending ? 'not-allowed' : 'pointer', fontSize: '0.8125rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
-              >
+              <button type="button" onClick={() => sendCampaign(c.id)} disabled={sending} style={{ ...TOOLBAR_BUTTON_PRIMARY, opacity: sending ? 0.7 : 1, cursor: sending ? 'not-allowed' : 'pointer' }}>
                 {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                 {c.status === 'draft' ? 'Send Now' : 'Resend Failed'}
               </button>
             )}
             {['draft', 'scheduled'].includes(c.status) && (
-              <button onClick={() => cancelCampaign(c.id)} style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff', color: '#dc2626', cursor: 'pointer', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <button type="button" onClick={() => cancelCampaign(c.id)} style={{ ...TOOLBAR_BUTTON, color: CS_UI.danger, borderColor: '#fecaca' }}>
                 <Trash2 size={13} /> Cancel
               </button>
             )}
           </div>
         </div>
 
-        {/* Stats grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
-          {[
-            { icon: <Users size={16} />, label: 'Available', value: fmtNum(c.total_contacts), sub: 'eligible contacts', color: '#374151' },
-            { icon: <Send size={16} />, label: 'Sent', value: fmtNum(c.sent_count), sub: c.total_contacts > 0 ? `${Math.round((c.sent_count/c.total_contacts)*100)}% of list` : '', color: '#0F172A' },
-            { icon: <CheckCircle2 size={16} />, label: 'Delivered', value: fmtNum(c.delivered_count), sub: c.sent_count > 0 ? `${Math.round((c.delivered_count/c.sent_count)*100)}% delivery` : '', color: '#059669' },
-            { icon: <Eye size={16} />, label: 'Opens', value: `${c.open_rate}%`, sub: `${c.opened_count} contacts`, color: '#2563eb' },
-            { icon: <MousePointer size={16} />, label: 'Clicks', value: `${c.click_rate}%`, sub: `${c.clicked_count} contacts`, color: '#7c3aed' },
-            { icon: <AlertTriangle size={16} />, label: 'Bounced', value: `${c.bounce_rate}%`, sub: `${c.bounced_count} contacts`, color: c.bounced_count > 0 ? '#d97706' : '#9ca3af' },
-            { icon: <XCircle size={16} />, label: 'Unsubs', value: String(c.unsubscribed_count), sub: '', color: c.unsubscribed_count > 0 ? '#ef4444' : '#9ca3af' },
-          ].map(stat => (
-            <div key={stat.label} style={{ padding: '12px 14px', background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{ color: stat.color }}>{stat.icon}</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af' }}>{stat.label}</span>
-              </div>
-              <div style={{ fontSize: '1.375rem', fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-              {stat.sub && <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 2 }}>{stat.sub}</div>}
-            </div>
-          ))}
-        </div>
-
-        {/* Email preview */}
-        {c.template_html && (
-          <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 14, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Preview</p>
-              <p style={{ margin: 0, fontSize: '0.8125rem', color: '#6B7280' }}>Subject: <span style={{ fontWeight: 600, color: '#111827' }}>{c.subject_line}</span></p>
-            </div>
-            <div style={{ padding: 0, maxHeight: 400, overflow: 'auto', background: '#F9FAFB' }}>
-              <iframe
-                srcDoc={c.template_html}
-                style={{ width: '100%', minHeight: 300, border: 'none', display: 'block' }}
-                title="Email preview"
-                sandbox="allow-same-origin"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Next touch callout */}
         {c.status === 'sent' && c.touch_number < 3 && c.next_touch_eligible_at && (
-          <div style={{ padding: '12px 16px', borderRadius: 12, border: `1px solid ${c.next_touch_due ? '#bbf7d0' : '#e5e7eb'}`, background: c.next_touch_due ? '#f0fdf4' : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ ...CS_CARD, padding: '10px 14px', borderColor: c.next_touch_due ? '#bbf7d0' : CS_UI.border, background: c.next_touch_due ? '#f0fdf4' : CS_UI.surfaceMuted, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {c.next_touch_due ? <CheckCircle2 size={18} style={{ color: '#16a34a' }} /> : <Clock size={18} style={{ color: '#6b7280' }} />}
+              {c.next_touch_due ? <CheckCircle2 size={16} style={{ color: CS_UI.success }} /> : <Clock size={16} style={{ color: CS_UI.textMuted }} />}
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: c.next_touch_due ? '#166534' : '#374151' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: CS_UI.text }}>
                   {c.next_touch_due ? `Touch ${c.touch_number + 1} is ready to send` : `Touch ${c.touch_number + 1} eligible ${fmtDate(c.next_touch_eligible_at)}`}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {TOUCH_CONFIG[c.touch_number].days === null ? '' : `${TOUCH_CONFIG[(c.touch_number + 1) as 2 | 3].days} days after this campaign`}
+                <div style={{ fontSize: '0.75rem', color: CS_UI.textMuted }}>
+                  {TOUCH_CONFIG[(c.touch_number + 1) as 2 | 3].days} days after this campaign
                 </div>
               </div>
             </div>
             {c.next_touch_due && (
               <button
+                type="button"
                 onClick={() => { setForm(f => ({ ...f, touch_number: (c.touch_number + 1) as 1 | 2 | 3 })); setSelectedChapter(c.chapter_id); setView('create'); loadTemplate((c.touch_number + 1) as 1 | 2 | 3); }}
-                style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                style={{ ...TOOLBAR_BUTTON_PRIMARY, background: CS_UI.success }}
               >
                 <Plus size={13} /> Create T{c.touch_number + 1}
               </button>
@@ -578,58 +602,111 @@ export default function EmailOutreachTab({ showToast }: EmailOutreachTabProps) {
           </div>
         )}
 
-        {/* Contacts table */}
-        {detailLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#6b7280', padding: 16 }}><Loader2 size={16} className="animate-spin" /><span style={{ fontSize: '0.875rem' }}>Loading contacts…</span></div>
-        ) : (
-          <div style={{ borderRadius: 14, border: '1px solid #e5e7eb', background: '#fff', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', flex: 1 }}>Contacts ({sends.length})</span>
-              <input
-                type="text"
-                value={sendsFilter}
-                onChange={e => setSendsFilter(e.target.value)}
-                placeholder="Filter by name, email, or status…"
-                style={{ padding: '6px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: '0.8125rem', width: 220, outline: 'none' }}
-              />
-              <button onClick={() => fetchCampaignDetail(c.id)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', color: '#374151' }}>
-                <RefreshCw size={13} /> Refresh
-              </button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(300px, 0.95fr)', gap: 16, alignItems: 'start' }}>
+          {/* Left: stats + sent contacts */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+            <div style={{ ...CS_CARD, padding: '12px 0', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'stretch', overflowX: 'auto' }}>
+                {kpiStats.map((stat, index) => (
+                  <React.Fragment key={stat.label}>
+                    {index > 0 && (
+                      <div aria-hidden style={{ width: 1, alignSelf: 'stretch', margin: '2px 0', background: CS_UI.border, flexShrink: 0 }} />
+                    )}
+                    <div style={{ flex: '1 1 72px', padding: '0 10px', minWidth: 72, textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '0.625rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CS_UI.textSubtle, whiteSpace: 'nowrap' }}>
+                        {stat.label}
+                      </p>
+                      <p style={{ margin: '3px 0 0', fontSize: '1rem', fontWeight: 700, color: CS_UI.text, fontVariantNumeric: 'tabular-nums' }}>
+                        {stat.value}
+                      </p>
+                      {stat.sub && (
+                        <p style={{ margin: '1px 0 0', fontSize: '0.65rem', color: CS_UI.textSubtle, whiteSpace: 'nowrap' }}>{stat.sub}</p>
+                      )}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    {['Contact', 'Email', 'Status', 'Sent', 'Opened', 'Clicked'].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSends.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#9ca3af' }}>No contacts found</td></tr>
-                  ) : filteredSends.map((s, i) => {
-                    const sCfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.draft;
-                    return (
-                      <tr key={s.id} style={{ borderTop: i > 0 ? '1px solid #f3f4f6' : 'none' }}>
-                        <td style={{ padding: '9px 12px', fontWeight: 600, color: '#111827', whiteSpace: 'nowrap' }}>{s.first_name} {s.last_name}</td>
-                        <td style={{ padding: '9px 12px', color: '#6b7280' }}>{s.email}</td>
-                        <td style={{ padding: '9px 12px' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, background: sCfg.bg, color: sCfg.color, fontSize: '0.7rem', fontWeight: 700 }}>
-                            {sCfg.icon} {sCfg.label}
-                          </span>
-                        </td>
-                        <td style={{ padding: '9px 12px', color: '#9ca3af', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{s.sent_at ? fmtDate(s.sent_at) : '—'}</td>
-                        <td style={{ padding: '9px 12px' }}>{s.opened_at ? <span style={{ color: '#2563eb', fontSize: '0.75rem' }}>✓ {fmtDate(s.opened_at)}</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
-                        <td style={{ padding: '9px 12px' }}>{s.first_clicked_at ? <span style={{ color: '#7c3aed', fontSize: '0.75rem' }}>✓ {fmtDate(s.first_clicked_at)}</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
+
+            {detailLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: CS_UI.textMuted, padding: 16 }}>
+                <Loader2 size={16} className="animate-spin" />
+                <span style={{ fontSize: '0.8125rem' }}>Loading contacts…</span>
+              </div>
+            ) : (
+              <div style={{ ...CS_CARD, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 'min(68vh, 640px)' }}>
+                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${CS_UI.border}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: CS_UI.text, flex: 1 }}>Sent ({totalSends || sends.length})</span>
+                  <input
+                    type="text"
+                    value={sendsFilter}
+                    onChange={e => setSendsFilter(e.target.value)}
+                    placeholder="Filter…"
+                    style={{ padding: '0 10px', height: 30, border: `1px solid ${CS_UI.border}`, borderRadius: 9999, fontSize: '0.75rem', width: 140, outline: 'none', fontFamily: 'inherit' }}
+                  />
+                  <button type="button" onClick={() => fetchCampaignDetail(c.id)} style={{ ...TOOLBAR_BUTTON, height: 30, padding: '0 10px', fontSize: '0.75rem' }}>
+                    <RefreshCw size={12} />
+                  </button>
+                </div>
+                <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: CS_UI.surfaceMuted }}>
+                      <tr>
+                        {['Contact', 'Status', 'Sent', 'Opened'].map(h => (
+                          <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: CS_UI.textSubtle, fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {filteredSends.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: CS_UI.textSubtle }}>No contacts found</td></tr>
+                      ) : filteredSends.map((s, i) => {
+                        const sCfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.draft;
+                        return (
+                          <tr key={s.id} style={{ borderTop: i > 0 ? `1px solid ${CS_UI.border}` : 'none' }}>
+                            <td style={{ padding: '8px 12px', minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, color: CS_UI.text, fontSize: '0.8125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.first_name} {s.last_name}</div>
+                              <div style={{ fontSize: '0.72rem', color: CS_UI.textSubtle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.email}</div>
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <span style={{ ...LIST_PILL, color: sCfg.color, background: sCfg.bg, border: `1px solid ${sCfg.color}33`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                {sCfg.label}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 12px', color: CS_UI.textSubtle, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{s.sent_at ? fmtDate(s.sent_at) : '—'}</td>
+                            <td style={{ padding: '8px 12px', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                              {s.opened_at ? <span style={{ color: CS_UI.blue }}>{fmtDate(s.opened_at)}</span> : <span style={{ color: CS_UI.textSubtle }}>—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Right: email preview */}
+          {c.template_html && (
+            <div style={{ ...CS_CARD, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 'min(68vh, 640px)', position: 'sticky', top: 12 }}>
+              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${CS_UI.border}`, flexShrink: 0 }}>
+                <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, color: CS_UI.textSubtle, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email Preview</p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: CS_UI.textMuted }}>
+                  Subject: <span style={{ fontWeight: 600, color: CS_UI.text }}>{c.subject_line}</span>
+                </p>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: '#fff' }}>
+                <iframe
+                  srcDoc={previewSrcDoc(c.template_html)}
+                  style={{ width: '100%', minHeight: 'calc(min(68vh, 640px) - 56px)', height: '100%', border: 'none', display: 'block' }}
+                  title="Email preview"
+                  sandbox="allow-same-origin"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
