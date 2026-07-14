@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { authenticateBrainRequest } from '@/lib/brain/auth';
+import {
+  getSupabaseMcpAllowedUserIds,
+  getSupabaseMcpEndpoint,
+  getSupabaseProjectRef,
+  isSupabaseMcpConfigured,
+} from '@/lib/brain/connectors/supabase-mcp';
 import { getConnectorStatus } from '@/lib/brain/router';
 
 /**
@@ -30,6 +36,13 @@ export async function GET(request: NextRequest) {
     github_configured: Boolean(process.env.GITHUB_TOKEN || process.env.GH_TOKEN),
     linear_read_only: process.env.BRAIN_LINEAR_READ_ONLY !== 'false',
     linear_mcp_url: process.env.LINEAR_MCP_URL || 'https://mcp.linear.app/mcp',
+    supabase_mcp_configured: isSupabaseMcpConfigured(),
+    supabase_mcp_read_only: true,
+    supabase_mcp_project_ref: getSupabaseProjectRef() || null,
+    supabase_mcp_endpoint: isSupabaseMcpConfigured() ? getSupabaseMcpEndpoint() : null,
+    supabase_mcp_allowed_user_ids: [...getSupabaseMcpAllowedUserIds()],
+    supabase_mcp_note:
+      'Requires SUPABASE_ACCESS_TOKEN (personal access token). Optional BRAIN_SUPABASE_MCP_ALLOWED_USER_IDS gates Slack users.',
     rate_limits: {
       per_minute: parseInt(process.env.BRAIN_RATE_LIMIT_PER_MINUTE || '8', 10) || 8,
       per_hour: parseInt(process.env.BRAIN_RATE_LIMIT_PER_HOUR || '40', 10) || 40,

@@ -12,6 +12,8 @@ export interface ConnectorContext {
   surface?: 'workspace' | 'slack';
   slackChannel?: string | null;
   slackThreadTs?: string | null;
+  /** Slack user who triggered the run — used for gated MCP connectors. */
+  slackUserId?: string | null;
 }
 
 export interface ConnectorTool {
