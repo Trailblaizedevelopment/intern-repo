@@ -19,6 +19,10 @@ const SLICE_SIGNALS =
 const GOAL_SIGNALS =
   /\b(goal|work on .+ for (an hour|\d+\s*(min|minutes|hour|hours))|keep iterating|tasks_start_goal)\b/i;
 
+/** File / create a Linear ticket — Lookup write, never Slice/Goal. */
+const LINEAR_TICKET_CREATE =
+  /\b((i\s+need\s+to|please|can\s+you|help\s+me|want\s+to)\s+)?(create|file|open|draft|build)\b.{0,80}\b(a\s+)?(ticket|linear\s+issue|roadmap\s+item)\b|\badd\s+(this\s+)?to\s+the\s+roadmap\b|\b(create|file|open)\s+(a\s+)?TRA\b/i;
+
 function messageText(msg: BrainMessage): string {
   if (typeof msg.content === 'string') return msg.content;
   return msg.content
@@ -27,10 +31,23 @@ function messageText(msg: BrainMessage): string {
     .join('\n');
 }
 
+/**
+ * True when the user wants Dynamo to create/file a Linear ticket (not implement code).
+ * Examples: "create a ticket for…", "build a ticket for the governance persona", "add to the roadmap".
+ */
+export function isLinearTicketCreateIntent(message: string): boolean {
+  const text = message.trim();
+  if (!text) return false;
+  return LINEAR_TICKET_CREATE.test(text);
+}
+
 /** Detect Slice vs Goal kickoff from user message (not Lookup). */
 export function detectOrchestrationKickoff(message: string): BrainTaskKind | null {
   const text = message.trim();
   if (!text || LOOKUP_ONLY.test(text) || QUESTION_ONLY.test(text)) return null;
+
+  // Creating/filing a Linear ticket must stay in the Lookup chat path (TRA-896 / TRA-897).
+  if (isLinearTicketCreateIntent(text)) return null;
 
   const lower = text.toLowerCase();
   if (/^(yes dispatch|yes|approve|cancel|stop|dispatch it)\b/.test(lower)) return null;
@@ -178,8 +195,28 @@ export async function tryOrchestrationKickoff(
   };
 }
 
-/** Strong queue-first instructions appended to chat agent runs. */
+/** Create-first Linear ticket instructions for Slack Lookup (TRA-896). */
+function buildSlackTicketCreateAppend(): string {
+  return [
+    'SLACK LINEAR TICKET CREATE (Lookup)',
+    'Mode: Lookup — create a Linear issue. Do NOT call tasks_start_slice or tasks_start_goal.',
+    'Your FIRST tool call MUST be linear_save_issue with:',
+    '  - title: concise invented title from the user request',
+    '  - team: Trailblaize (or team key TRA)',
+    '  - description: the user request (and any constraints) as markdown',
+    '  - priority: set only if clearly implied; otherwise omit',
+    'Do NOT call github_*, tickets_*, or linear_list_* / search before create unless the user asked to check for duplicates.',
+    'Ask at most one clarifying question only if you cannot invent a title from the message.',
+    'After create succeeds, reply with the Linear identifier (e.g. TRA-xxx) and URL. Keep the reply short.',
+  ].join('\n');
+}
+
+/** Strong queue-first / ticket-create instructions appended to chat agent runs. */
 export function buildSlackOrchestrationAppend(message: string, history: BrainMessage[]): string | undefined {
+  if (isLinearTicketCreateIntent(message)) {
+    return buildSlackTicketCreateAppend();
+  }
+
   const kind = detectOrchestrationKickoff(message);
   if (!kind) return undefined;
 

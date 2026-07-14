@@ -117,7 +117,10 @@ function buildSystemPrompt(
     );
     if (linearWriteMode) {
       toolGuidance.push(
-        '- Write mode is ON. You may create or update Linear issues when asked. Confirm title, team, and priority before creating; use create_issue (or equivalent) with minimal required fields.'
+        '- Write mode is ON. Create/update Linear issues with linear_save_issue (not create_issue).',
+        '- When the user asks to create/file/open/build a ticket or add to the roadmap: FIRST tool call linear_save_issue with title, team Trailblaize (or TRA), and description from their message.',
+        '- Do not call github_*, tickets_*, or linear list/search tools before creating unless they asked to check for duplicates.',
+        '- Ask at most one clarifying question only if a title cannot be inferred. After create, reply with the TRA identifier and URL.'
       );
     } else {
       toolGuidance.push('- Linear write tools are disabled (read-only). Do not attempt creates or updates.');
