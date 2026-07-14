@@ -17,6 +17,8 @@ import { publishHomeView } from '@/lib/brain/slack/home';
  * Configure in Slack app: Event Subscriptions → Request URL → this endpoint.
  *
  * Subscribed events: app_mention, message.im, app_home_opened
+ *
+ * Home quick-prompt buttons use Interactivity → /api/brain/slack/interactions
  */
 
 export const maxDuration = 120;
