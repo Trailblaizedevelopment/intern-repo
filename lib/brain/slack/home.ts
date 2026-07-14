@@ -1,6 +1,37 @@
-import { slackApi } from '@/lib/brain/slack/client';
+import { slackApi, openDmChannel, postSlackMessageReturningTs } from '@/lib/brain/slack/client';
+import { handleSlackChatMessage } from '@/lib/brain/slack/handle-message';
+import { getAllowedSlackUserIds } from '@/lib/brain/slack/verify';
 
 type SlackBlock = Record<string, unknown>;
+
+/** Action IDs for Home quick-prompt buttons → agent prompt text. */
+export const HOME_QUICK_PROMPTS: Record<string, string> = {
+  home_qp_linear_open: "What's open in Linear that I should know about?",
+  home_qp_crm_tickets: 'Show me open CRM tickets and their status.',
+  home_qp_github_prs: 'List open pull requests on GitHub.',
+  home_qp_create_ticket:
+    'I want to create a Linear ticket. Ask me for title, description, and team, then create it.',
+};
+
+function getSlackTeamId(): string {
+  return (process.env.SLACK_TEAM_ID || 'T09UHKVCCC').trim();
+}
+
+function getSlackAppId(): string {
+  return (process.env.SLACK_APP_ID || 'A0BGB2NPJ6L').trim();
+}
+
+/** Deep link to Dynamo App Home → Messages tab (desktop clients). */
+export function messagesTabDeepLink(): string {
+  return `slack://app?team=${getSlackTeamId()}&id=${getSlackAppId()}&tab=messages`;
+}
+
+function linearAccessNote(): string {
+  const readOnly = process.env.BRAIN_LINEAR_READ_ONLY !== 'false';
+  return readOnly
+    ? '• *Linear* — read issues + status (writes disabled unless configured)\n'
+    : '• *Linear* — read/create/update issues\n';
+}
 
 function buildHomeBlocks(userId: string): SlackBlock[] {
   return [
@@ -12,8 +43,56 @@ function buildHomeBlocks(userId: string): SlackBlock[] {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `Welcome <@${userId}>. Ask me in *Messages*, or use the tips below.`,
+        text:
+          `Welcome <@${userId}>. Your Trailblaize ops agent — ask in *Messages*, or start below.`,
       },
+    },
+    {
+      type: 'actions',
+      block_id: 'home_nav',
+      elements: [
+        {
+          type: 'button',
+          action_id: 'home_open_messages',
+          text: { type: 'plain_text', text: 'Open Messages', emoji: true },
+          url: messagesTabDeepLink(),
+          style: 'primary',
+        },
+      ],
+    },
+    { type: 'divider' },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '*Quick prompts*\nTap one to start a chat in Messages automatically.',
+      },
+    },
+    {
+      type: 'actions',
+      block_id: 'home_quick_prompts',
+      elements: [
+        {
+          type: 'button',
+          action_id: 'home_qp_linear_open',
+          text: { type: 'plain_text', text: "What's open in Linear?", emoji: true },
+        },
+        {
+          type: 'button',
+          action_id: 'home_qp_crm_tickets',
+          text: { type: 'plain_text', text: 'Open CRM tickets', emoji: true },
+        },
+        {
+          type: 'button',
+          action_id: 'home_qp_github_prs',
+          text: { type: 'plain_text', text: 'List open PRs', emoji: true },
+        },
+        {
+          type: 'button',
+          action_id: 'home_qp_create_ticket',
+          text: { type: 'plain_text', text: 'Create a Linear ticket', emoji: true },
+        },
+      ],
     },
     { type: 'divider' },
     {
@@ -21,10 +100,24 @@ function buildHomeBlocks(userId: string): SlackBlock[] {
       text: {
         type: 'mrkdwn',
         text:
-          '*Quick tips*\n' +
-          '• DM or @mention Dynamo for tickets / status\n' +
-          '• Use *Messages* for the full chat thread\n' +
-          '• Ask about CRM tickets, Linear issues, or brainstorming',
+          '*What I can do*\n' +
+          '• *Lookup* — status, lists, summaries, create Linear tickets\n' +
+          '• *Slice* — one focused fix / small PR via Cursor\n' +
+          '• *Goal* — longer multi-step background work\n' +
+          'Say what you need in Messages; I pick the mode.',
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text:
+          '*What I can access*\n' +
+          '• *GitHub* — open/merged PRs, code search, commits\n' +
+          linearAccessNote() +
+          '• *CRM tickets* — pipeline / ticket status\n' +
+          '• *Supabase* — Trailblaize 1.0 (web) + Growth Space (CRM) read access\n' +
+          '• *Cursor / tasks* — dispatch implementation work when you ask',
       },
     },
   ];
@@ -45,5 +138,44 @@ export async function publishHomeView(
   if (!result.ok) {
     return { ok: false, error: result.error || 'views.publish failed' };
   }
+  return { ok: true };
+}
+
+/**
+ * Run a Home quick-prompt: open DM, post the prompt, run the agent in that thread.
+ */
+export async function runHomeQuickPrompt(
+  userId: string,
+  actionId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const prompt = HOME_QUICK_PROMPTS[actionId];
+  if (!prompt) {
+    return { ok: false, error: `Unknown quick prompt: ${actionId}` };
+  }
+
+  const allowed = getAllowedSlackUserIds();
+  if (allowed.size > 0 && !allowed.has(userId)) {
+    return { ok: false, error: 'User not allowed' };
+  }
+
+  const dm = await openDmChannel(userId);
+  if (!dm.ok || !dm.channel) {
+    return { ok: false, error: dm.error || 'conversations.open failed' };
+  }
+
+  const banner = await postSlackMessageReturningTs(
+    dm.channel,
+    `*Quick prompt:* ${prompt}`
+  );
+  if (!banner.ok || !banner.ts) {
+    return { ok: false, error: banner.error || 'Failed to post prompt banner' };
+  }
+
+  await handleSlackChatMessage(prompt, {
+    channel: dm.channel,
+    threadTs: banner.ts,
+    userId,
+  });
+
   return { ok: true };
 }
