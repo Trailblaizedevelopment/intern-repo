@@ -1,7 +1,10 @@
 import { cursorConnector } from './connectors/cursor';
 import { githubConnector } from './connectors/github';
 import { linearConnector } from './connectors/linear';
-import { supabaseMcpConnector } from './connectors/supabase-mcp';
+import {
+  supabaseCrmMcpConnector,
+  supabaseWebMcpConnector,
+} from './connectors/supabase-mcp';
 import { tasksConnector } from './connectors/tasks';
 import { ticketsConnector } from './connectors/tickets';
 import {
@@ -13,12 +16,13 @@ import {
 
 export type { ConnectorContext } from './connectors/types';
 
-/** Connectors: GitHub, Linear, CRM tickets, Supabase MCP (read-only), Cursor, Tasks. */
+/** Connectors: GitHub, Linear, CRM tickets, dual Supabase MCP (web + CRM), Cursor, Tasks. */
 const CONNECTORS: BrainConnector[] = [
   githubConnector,
   linearConnector,
   ticketsConnector,
-  supabaseMcpConnector,
+  supabaseWebMcpConnector,
+  supabaseCrmMcpConnector,
   cursorConnector,
   tasksConnector,
 ];

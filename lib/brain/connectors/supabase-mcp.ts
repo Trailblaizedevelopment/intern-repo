@@ -11,21 +11,39 @@ import {
 } from './types';
 
 /**
- * Official Supabase remote MCP — Cursor-like schema/SQL depth for Brain.
+ * Official Supabase remote MCP — dual databases for Brain.
  *
- * Defaults (hardcoded into URL):
- * - read_only=true
- * - project_ref scoped
- * - features=database (no branching / edge deploy / account tools)
+ * - supabase_web_*  → Trailblaize 1.0 consumer app (DEFAULT product DB)
+ * - supabase_crm_*  → Growth Space internal CRM
  *
- * Auth: SUPABASE_ACCESS_TOKEN (personal access token) — not the service role key.
- * Optional Slack gate: BRAIN_SUPABASE_MCP_ALLOWED_USER_IDS
+ * URL always includes read_only=true + project_ref + features=database.
+ * Auth: SUPABASE_ACCESS_TOKEN (PAT). Optional Slack gate shared across both.
  */
 
-const CONNECTOR_ID = 'supabase_mcp';
 const DEFAULT_BASE = 'https://mcp.supabase.com/mcp';
 
-/** Block anything that can mutate schema/data even if the remote list drifts. */
+/** Hardcoded defaults — override with env if projects rotate. */
+export const SUPABASE_DB_CATALOG = {
+  web: {
+    id: 'supabase_web' as const,
+    key: 'trailblaize_web' as const,
+    label: 'Trailblaize 1.0 (web app)',
+    description:
+      'Consumer GreekSpeed / Trailblaize production DB — profiles, spaces, alumni, announcements, messages, invitations, chapters branding, etc.',
+    defaultProjectRef: 'ssqpfkiesxwnmphwyezb',
+  },
+  crm: {
+    id: 'supabase_crm' as const,
+    key: 'growth_space' as const,
+    label: 'Growth Space (internal CRM)',
+    description:
+      'Internal CRM DB — employees, contacts, pipeline_deals, tickets, chapters (CS), outreach, brain_* tables.',
+    defaultProjectRef: 'uoemlefauspgmmpeoilq',
+  },
+} as const;
+
+export type SupabaseDbKey = (typeof SUPABASE_DB_CATALOG)[keyof typeof SUPABASE_DB_CATALOG]['key'];
+
 const TOOL_DENYLIST = new Set([
   'apply_migration',
   'deploy_edge_function',
@@ -42,47 +60,69 @@ const TOOL_DENYLIST = new Set([
 
 const TOOLS_CACHE_TTL_MS = 5 * 60 * 1000;
 
-let toolsCache: { tools: ConnectorTool[]; expiresAt: number; endpoint: string } | null = null;
+/** Per-connector endpoint cache. */
+const toolsCacheByConnector = new Map<
+  string,
+  { tools: ConnectorTool[]; expiresAt: number; endpoint: string }
+>();
 
 export function invalidateSupabaseMcpToolsCache(): void {
-  toolsCache = null;
+  toolsCacheByConnector.clear();
 }
 
 function getAccessToken(): string {
   return (process.env.SUPABASE_ACCESS_TOKEN || '').trim();
 }
 
-/** Prefer explicit ref; else parse from NEXT_PUBLIC_SUPABASE_URL. */
-export function getSupabaseProjectRef(): string {
-  const explicit = (process.env.SUPABASE_PROJECT_REF || process.env.BRAIN_SUPABASE_PROJECT_REF || '').trim();
-  if (explicit) return explicit;
-
-  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
-  if (!url) return '';
-  try {
-    const host = new URL(url).hostname; // e.g. uoemlefauspgmmpeoilq.supabase.co
-    const ref = host.split('.')[0] || '';
-    return ref && ref !== 'supabase' ? ref : '';
-  } catch {
-    return '';
-  }
-}
-
 function getFeatures(): string {
   return (process.env.BRAIN_SUPABASE_MCP_FEATURES || 'database').trim() || 'database';
 }
 
-/** Built URL with safety query params. */
-export function getSupabaseMcpEndpoint(): string {
+function projectRefFor(db: 'web' | 'crm'): string {
+  if (db === 'web') {
+    return (
+      (process.env.BRAIN_SUPABASE_WEB_PROJECT_REF || '').trim() ||
+      SUPABASE_DB_CATALOG.web.defaultProjectRef
+    );
+  }
+  return (
+    (process.env.BRAIN_SUPABASE_CRM_PROJECT_REF || '').trim() ||
+    // Fall back to CRM URL used by the intern app, then hard default
+    (() => {
+      const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+      if (url) {
+        try {
+          const host = new URL(url).hostname;
+          const ref = host.split('.')[0] || '';
+          if (ref && ref !== 'supabase') return ref;
+        } catch {
+          /* ignore */
+        }
+      }
+      return SUPABASE_DB_CATALOG.crm.defaultProjectRef;
+    })()
+  );
+}
+
+export function getSupabaseMcpEndpointFor(db: 'web' | 'crm'): string {
   const base = (process.env.SUPABASE_MCP_URL || DEFAULT_BASE).trim().replace(/\/$/, '');
-  const projectRef = getSupabaseProjectRef();
+  const projectRef = projectRefFor(db);
   const params = new URLSearchParams();
   params.set('read_only', 'true');
   if (projectRef) params.set('project_ref', projectRef);
   params.set('features', getFeatures());
-
   const join = base.includes('?') ? '&' : '?';
   return `${base}${join}${params.toString()}`;
+}
+
+/** @deprecated Use getSupabaseMcpEndpointFor('web') — web is the product default. */
+export function getSupabaseMcpEndpoint(): string {
+  return getSupabaseMcpEndpointFor('web');
+}
+
+/** @deprecated Prefer catalog; returns web project ref (product default). */
+export function getSupabaseProjectRef(): string {
+  return projectRefFor('web');
 }
 
 function getAuthHeader(): string {
@@ -91,7 +131,6 @@ function getAuthHeader(): string {
   return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
 }
 
-/** Comma-separated Slack user IDs. Empty = no extra Slack user gate. */
 export function getSupabaseMcpAllowedUserIds(): Set<string> {
   const raw = (process.env.BRAIN_SUPABASE_MCP_ALLOWED_USER_IDS || '').trim();
   return new Set(
@@ -103,13 +142,9 @@ export function getSupabaseMcpAllowedUserIds(): Set<string> {
 }
 
 export function isSupabaseMcpConfigured(): boolean {
-  return Boolean(getAccessToken() && getSupabaseProjectRef());
+  return Boolean(getAccessToken());
 }
 
-/**
- * When BRAIN_SUPABASE_MCP_ALLOWED_USER_IDS is set and surface is Slack,
- * only listed users get tools. Workspace / tasks skip this gate.
- */
 export function isSupabaseMcpAllowedForContext(ctx: ConnectorContext): boolean {
   if (!isSupabaseMcpConfigured()) return false;
   const allowed = getSupabaseMcpAllowedUserIds();
@@ -119,19 +154,27 @@ export function isSupabaseMcpAllowedForContext(ctx: ConnectorContext): boolean {
   return Boolean(userId && allowed.has(userId));
 }
 
-function getClient(ctx: ConnectorContext): McpHttpClient {
-  const existing = ctx.mcpSessions.get(CONNECTOR_ID) as McpHttpClient | undefined;
-  if (existing) return existing;
-
-  const client = new McpHttpClient(getSupabaseMcpEndpoint(), getAuthHeader);
-  ctx.mcpSessions.set(CONNECTOR_ID, client);
-  return client;
-}
-
-function dropClient(ctx: ConnectorContext): void {
-  const existing = ctx.mcpSessions.get(CONNECTOR_ID) as McpHttpClient | undefined;
-  existing?.reset();
-  ctx.mcpSessions.delete(CONNECTOR_ID);
+export function listSupabaseDbCatalog() {
+  return [
+    {
+      key: SUPABASE_DB_CATALOG.web.key,
+      connector_id: SUPABASE_DB_CATALOG.web.id,
+      label: SUPABASE_DB_CATALOG.web.label,
+      description: SUPABASE_DB_CATALOG.web.description,
+      project_ref: projectRefFor('web'),
+      tool_prefix: `${SUPABASE_DB_CATALOG.web.id}_`,
+      is_default_product_db: true,
+    },
+    {
+      key: SUPABASE_DB_CATALOG.crm.key,
+      connector_id: SUPABASE_DB_CATALOG.crm.id,
+      label: SUPABASE_DB_CATALOG.crm.label,
+      description: SUPABASE_DB_CATALOG.crm.description,
+      project_ref: projectRefFor('crm'),
+      tool_prefix: `${SUPABASE_DB_CATALOG.crm.id}_`,
+      is_default_product_db: false,
+    },
+  ];
 }
 
 function mcpResultToData(result: unknown): unknown {
@@ -157,11 +200,14 @@ function isReconnectError(err: unknown): boolean {
   return /MCP HTTP (401|404|410|502|503)/.test(msg) || /session/i.test(msg);
 }
 
-function mapTools(mcpTools: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>): ConnectorTool[] {
+function mapTools(
+  connectorId: string,
+  label: string,
+  mcpTools: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>
+): ConnectorTool[] {
   return mcpTools
     .filter(t => !TOOL_DENYLIST.has(t.name))
     .filter(t => {
-      // Defense in depth: never expose obvious write tooling
       const n = t.name.toLowerCase();
       if (n.includes('apply_migration')) return false;
       if (n.startsWith('deploy_') || n.startsWith('create_') || n.startsWith('delete_')) return false;
@@ -170,96 +216,133 @@ function mapTools(mcpTools: Array<{ name: string; description?: string; inputSch
       return true;
     })
     .map(t => ({
-      name: prefixedToolName(CONNECTOR_ID, t.name),
+      name: prefixedToolName(connectorId, t.name),
       mcpName: t.name,
-      description: `[Supabase MCP read-only] ${t.description || t.name}`,
+      description: `[${label} · Supabase MCP read-only] ${t.description || t.name}`,
       inputSchema: t.inputSchema || { type: 'object', properties: {} },
     }));
 }
 
-async function callMcpTool(
-  ctx: ConnectorContext,
-  mcpName: string,
-  input: Record<string, unknown>
-): Promise<unknown> {
-  try {
-    const client = getClient(ctx);
-    return await client.callTool(mcpName, input);
-  } catch (err) {
-    if (!isReconnectError(err)) throw err;
-    dropClient(ctx);
-    invalidateSupabaseMcpToolsCache();
-    const client = getClient(ctx);
-    return client.callTool(mcpName, input);
+function createSupabaseMcpConnector(opts: {
+  db: 'web' | 'crm';
+}): BrainConnector {
+  const meta = SUPABASE_DB_CATALOG[opts.db];
+  const connectorId = meta.id;
+  const sessionKey = connectorId;
+
+  function getClient(ctx: ConnectorContext): McpHttpClient {
+    const existing = ctx.mcpSessions.get(sessionKey) as McpHttpClient | undefined;
+    if (existing) return existing;
+    const client = new McpHttpClient(getSupabaseMcpEndpointFor(opts.db), getAuthHeader);
+    ctx.mcpSessions.set(sessionKey, client);
+    return client;
   }
-}
 
-export const supabaseMcpConnector: BrainConnector = {
-  id: CONNECTOR_ID,
-  label: 'Supabase (remote MCP, read-only)',
-  kind: 'mcp-http',
+  function dropClient(ctx: ConnectorContext): void {
+    const existing = ctx.mcpSessions.get(sessionKey) as McpHttpClient | undefined;
+    existing?.reset();
+    ctx.mcpSessions.delete(sessionKey);
+  }
 
-  isAvailable() {
-    return isSupabaseMcpConfigured();
-  },
-
-  async listTools(ctx) {
-    if (!this.isAvailable() || !isSupabaseMcpAllowedForContext(ctx)) return [];
-
-    const endpoint = getSupabaseMcpEndpoint();
-    if (toolsCache && toolsCache.endpoint === endpoint && toolsCache.expiresAt > Date.now()) {
-      return toolsCache.tools;
-    }
-
+  async function callMcpTool(
+    ctx: ConnectorContext,
+    mcpName: string,
+    input: Record<string, unknown>
+  ): Promise<unknown> {
     try {
       const client = getClient(ctx);
-      const mcpTools = await client.listTools();
-      const tools = mapTools(mcpTools);
-      toolsCache = { tools, endpoint, expiresAt: Date.now() + TOOLS_CACHE_TTL_MS };
-      return tools;
+      return await client.callTool(mcpName, input);
     } catch (err) {
-      if (isReconnectError(err)) {
-        dropClient(ctx);
-        invalidateSupabaseMcpToolsCache();
-        try {
-          const client = getClient(ctx);
-          const mcpTools = await client.listTools();
-          const tools = mapTools(mcpTools);
-          toolsCache = { tools, endpoint, expiresAt: Date.now() + TOOLS_CACHE_TTL_MS };
-          return tools;
-        } catch (retryErr) {
-          console.error('[brain/supabase_mcp] tools/list retry failed:', retryErr);
-          return [];
-        }
+      if (!isReconnectError(err)) throw err;
+      dropClient(ctx);
+      toolsCacheByConnector.delete(connectorId);
+      const client = getClient(ctx);
+      return client.callTool(mcpName, input);
+    }
+  }
+
+  return {
+    id: connectorId,
+    label: `Supabase · ${meta.label}`,
+    kind: 'mcp-http',
+
+    isAvailable() {
+      return Boolean(getAccessToken() && projectRefFor(opts.db));
+    },
+
+    async listTools(ctx) {
+      if (!this.isAvailable() || !isSupabaseMcpAllowedForContext(ctx)) return [];
+
+      const endpoint = getSupabaseMcpEndpointFor(opts.db);
+      const cached = toolsCacheByConnector.get(connectorId);
+      if (cached && cached.endpoint === endpoint && cached.expiresAt > Date.now()) {
+        return cached.tools;
       }
-      console.error('[brain/supabase_mcp] tools/list failed:', err);
-      return [];
-    }
-  },
 
-  async callTool(toolName, input, ctx): Promise<ConnectorCallResult> {
-    if (!this.isAvailable()) {
-      return {
-        ok: false,
-        error: 'Supabase MCP not configured (need SUPABASE_ACCESS_TOKEN + project ref)',
-      };
-    }
-    if (!isSupabaseMcpAllowedForContext(ctx)) {
-      return { ok: false, error: 'Supabase MCP not allowed for this Slack user' };
-    }
+      try {
+        const client = getClient(ctx);
+        const mcpTools = await client.listTools();
+        const tools = mapTools(connectorId, meta.label, mcpTools);
+        toolsCacheByConnector.set(connectorId, {
+          tools,
+          endpoint,
+          expiresAt: Date.now() + TOOLS_CACHE_TTL_MS,
+        });
+        return tools;
+      } catch (err) {
+        if (isReconnectError(err)) {
+          dropClient(ctx);
+          toolsCacheByConnector.delete(connectorId);
+          try {
+            const client = getClient(ctx);
+            const mcpTools = await client.listTools();
+            const tools = mapTools(connectorId, meta.label, mcpTools);
+            toolsCacheByConnector.set(connectorId, {
+              tools,
+              endpoint,
+              expiresAt: Date.now() + TOOLS_CACHE_TTL_MS,
+            });
+            return tools;
+          } catch (retryErr) {
+            console.error(`[brain/${connectorId}] tools/list retry failed:`, retryErr);
+            return [];
+          }
+        }
+        console.error(`[brain/${connectorId}] tools/list failed:`, err);
+        return [];
+      }
+    },
 
-    const mcpName = unprefixedToolName(CONNECTOR_ID, toolName);
-    if (TOOL_DENYLIST.has(mcpName)) {
-      return { ok: false, error: `Supabase MCP tool "${mcpName}" is blocked (read-only connector)` };
-    }
+    async callTool(toolName, input, ctx): Promise<ConnectorCallResult> {
+      if (!this.isAvailable()) {
+        return {
+          ok: false,
+          error: `${meta.label} MCP not configured (need SUPABASE_ACCESS_TOKEN)`,
+        };
+      }
+      if (!isSupabaseMcpAllowedForContext(ctx)) {
+        return { ok: false, error: 'Supabase MCP not allowed for this Slack user' };
+      }
 
-    try {
-      const result = await callMcpTool(ctx, mcpName, input);
-      return { ok: true, data: mcpResultToData(result) };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Supabase MCP call failed';
-      console.error(`[brain/supabase_mcp] tools/call ${mcpName}:`, err);
-      return { ok: false, error: message };
-    }
-  },
-};
+      const mcpName = unprefixedToolName(connectorId, toolName);
+      if (TOOL_DENYLIST.has(mcpName)) {
+        return { ok: false, error: `Tool "${mcpName}" is blocked (read-only connector)` };
+      }
+
+      try {
+        const result = await callMcpTool(ctx, mcpName, input);
+        return { ok: true, data: mcpResultToData(result) };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Supabase MCP call failed';
+        console.error(`[brain/${connectorId}] tools/call ${mcpName}:`, err);
+        return { ok: false, error: message };
+      }
+    },
+  };
+}
+
+export const supabaseWebMcpConnector = createSupabaseMcpConnector({ db: 'web' });
+export const supabaseCrmMcpConnector = createSupabaseMcpConnector({ db: 'crm' });
+
+/** @deprecated Use supabaseWebMcpConnector — kept for any stray imports. */
+export const supabaseMcpConnector = supabaseWebMcpConnector;

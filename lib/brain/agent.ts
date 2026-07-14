@@ -95,7 +95,9 @@ function buildSystemPrompt(
   const hasCursor = toolNames.some(n => n.startsWith('cursor_'));
   const hasTasks = toolNames.some(n => n.startsWith('tasks_'));
   const hasTickets = toolNames.some(n => n.startsWith('tickets_'));
-  const hasSupabaseMcp = toolNames.some(n => n.startsWith('supabase_mcp_'));
+  const hasSupabaseWeb = toolNames.some(n => n.startsWith('supabase_web_'));
+  const hasSupabaseCrm = toolNames.some(n => n.startsWith('supabase_crm_'));
+  const hasSupabaseMcp = hasSupabaseWeb || hasSupabaseCrm;
 
   const toolGuidance: string[] = [];
   if (hasGitHub) {
@@ -128,10 +130,17 @@ function buildSystemPrompt(
   }
   if (hasSupabaseMcp) {
     toolGuidance.push(
-      '- supabase_mcp_* tools: official Supabase MCP (read-only). Use for schema questions, table lists, and SELECT-style SQL via execute_sql.',
-      '- Prefer list_tables (verbose when needed) before execute_sql. Keep queries read-only SELECTs with LIMIT; never attempt DDL/DML.',
-      '- Do NOT use supabase_mcp_* for Linear tickets or GitHub — use linear_* / tickets_* / github_* instead.',
-      '- If a tool errors or returns no rows, say so plainly.'
+      '- Dual Supabase MCP (read-only):',
+      '  • supabase_web_* → Trailblaize 1.0 web app DB (profiles, spaces, alumni, announcements, messages, invitations, …). Product default.',
+      '  • supabase_crm_* → Growth Space internal CRM (employees, contacts, pipeline_deals, tickets, CS chapters, outreach, brain_*, …).',
+      '- CRITICAL — database selection before any Supabase tool call:',
+      '  1. If the user has not clearly chosen a database in this thread, STOP. Do not call supabase_web_* or supabase_crm_* yet.',
+      '  2. Ask exactly: "Which database should I use — *Trailblaize 1.0* (web app) or *Growth Space* (internal CRM)?"',
+      '  3. After they answer, use that DB for the rest of the thread unless they switch.',
+      '- Clear signals (no need to re-ask): "web app" / "Trailblaize 1.0" / "profiles" / "alumni" / "spaces" → supabase_web_*.',
+      '  "CRM" / "Growth Space" / "pipeline" / "contacts" / "tickets table" / internal employees → supabase_crm_*.',
+      '- Prefer list_tables before execute_sql. SELECTs with LIMIT only; never DDL/DML.',
+      '- Do NOT use Supabase MCP for Linear/GitHub workflow — use linear_* / tickets_* / github_*.'
     );
   }
   if (hasCursor) {
@@ -167,7 +176,7 @@ function buildSystemPrompt(
     'Tool routing:',
     ...toolGuidance,
     '- Reference tickets by Linear identifier (e.g. TRA-238) when available.',
-    '- CRM cached tickets: tickets_* tools. Linear live issues: linear_* tools. Database schema/SQL: supabase_mcp_* tools. Do not mix sources for the same question.',
+    '- CRM cached tickets: tickets_* tools. Linear live issues: linear_* tools. Database schema/SQL: supabase_web_* (Trailblaize 1.0) or supabase_crm_* (Growth Space) — ask which DB if unclear.',
     surface === 'slack'
       ? '- You are replying in Slack. Be concise. Use Slack mrkdwn (*bold*, • bullets). No emojis.'
       : '- Keep answers concise. Use markdown lists for multiple items.',
