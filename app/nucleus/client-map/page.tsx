@@ -28,6 +28,10 @@ import {
   Link2,
   Phone,
 } from 'lucide-react';
+import {
+  CM_UI, CM_CARD, SECTION_TITLE, TOOLBAR_BUTTON, TOOLBAR_BUTTON_PRIMARY,
+  LIST_PILL, TOOLBAR_SEARCH, NEUTRAL_BADGE, DRAWER_LABEL, DRAWER_INPUT,
+} from './cm-ui';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type SchoolStatus = 'active_client' | 'in_pipeline' | 'not_contacted';
@@ -143,17 +147,6 @@ interface StateData {
 const FOUNDERS = ['Owen', 'Ford', 'Adam', 'Hyatt'] as const;
 type Founder = (typeof FOUNDERS)[number];
 
-const FOUNDER_COLORS: Record<Founder, { bg: string; text: string; border: string; accent: string }> = {
-  Owen:  { bg: 'bg-amber-50',  text: 'text-amber-800',  border: 'border-amber-200',  accent: '#C4874A' },
-  Ford:  { bg: 'bg-blue-50',   text: 'text-blue-800',   border: 'border-blue-200',   accent: '#2563eb' },
-  Adam:  { bg: 'bg-emerald-50',text: 'text-emerald-800',border: 'border-emerald-200',accent: '#059669' },
-  Hyatt: { bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200', accent: '#7c3aed' },
-};
-
-const REP_ACCENT: Record<string, string> = {
-  Owen: '#C4874A', Ford: '#2563eb', Adam: '#059669', Hyatt: '#7c3aed',
-};
-
 const OUTREACH_STATUS_CONFIG: Record<OutreachStatus, { label: string; color: string; bg: string; border: string }> = {
   not_contacted: { label: 'Not Contacted', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
   contacted:     { label: 'Contacted',     color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
@@ -162,12 +155,18 @@ const OUTREACH_STATUS_CONFIG: Record<OutreachStatus, { label: string; color: str
 };
 
 const STAGE_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  lead:          { label: 'New Lead',      color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
-  demo_booked:   { label: 'Demo Booked',   color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-  first_demo:    { label: 'First Demo',    color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-  second_call:   { label: 'Second Call',   color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-  contract_sent: { label: 'Contract Sent', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
-  closed_won:    { label: 'Closed Won',    color: '#065f46', bg: '#ecfdf5', border: '#6ee7b7' },
+  lead:          { label: 'New Lead',      color: CM_UI.textMuted, bg: NEUTRAL_BADGE.bg, border: NEUTRAL_BADGE.border },
+  demo_booked:   { label: 'Demo Booked',   color: CM_UI.blueDark, bg: CM_UI.blueBg, border: '#bfdbfe' },
+  first_demo:    { label: 'First Demo',    color: CM_UI.blueDark, bg: CM_UI.blueBg, border: '#bfdbfe' },
+  second_call:   { label: 'Second Call',   color: CM_UI.textSecondary, bg: NEUTRAL_BADGE.bg, border: NEUTRAL_BADGE.border },
+  contract_sent: { label: 'Contract Sent', color: CM_UI.warning, bg: '#fffbeb', border: '#fde68a' },
+  closed_won:    { label: 'Closed Won',    color: CM_UI.success, bg: '#ecfdf5', border: '#6ee7b7' },
+};
+
+const TEMP_STYLE: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  hot:  { label: 'Hot',  color: CM_UI.danger,  bg: '#fef2f2', border: '#fecaca' },
+  warm: { label: 'Warm', color: CM_UI.warning, bg: '#fffbeb', border: '#fde68a' },
+  cold: { label: 'Cold', color: CM_UI.blueDark, bg: CM_UI.blueBg, border: '#bfdbfe' },
 };
 
 const STAGE_OPTIONS = [
@@ -180,12 +179,10 @@ const STAGE_OPTIONS = [
 ];
 
 const TEMP_OPTIONS = [
-  { value: 'hot',  label: '🔥 Hot' },
-  { value: 'warm', label: '🟡 Warm' },
-  { value: 'cold', label: '🧊 Cold' },
+  { value: 'hot',  label: 'Hot' },
+  { value: 'warm', label: 'Warm' },
+  { value: 'cold', label: 'Cold' },
 ];
-
-const TEMP_EMOJI: Record<string, string> = { hot: '🔥', warm: '🟡', cold: '🧊' };
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json';
 
@@ -209,12 +206,14 @@ type PipelineTab = 'all' | 'hot' | 'warm' | 'cold' | 'demo_booked' | 'no_contact
 
 const PIPELINE_TABS: { id: PipelineTab; label: string }[] = [
   { id: 'all',         label: 'All' },
-  { id: 'hot',         label: 'Hot 🔥' },
-  { id: 'warm',        label: 'Warm 🟡' },
-  { id: 'cold',        label: 'Cold 🧊' },
+  { id: 'hot',         label: 'Hot' },
+  { id: 'warm',        label: 'Warm' },
+  { id: 'cold',        label: 'Cold' },
   { id: 'demo_booked', label: 'Demo Booked' },
   { id: 'no_contact',  label: 'No Contact Yet' },
 ];
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmt$(n: number): string {
@@ -227,19 +226,29 @@ function todayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+function displayOrgName(name: string | null | undefined): string {
+  if (!name?.trim()) return 'Untitled org';
+  return UUID_RE.test(name.trim()) ? 'Untitled org' : name;
+}
+
 // ── KPI Chip ───────────────────────────────────────────────────────────────
-function KpiChip({ icon, label, value, color }: {
-  icon: React.ReactNode; label: string; value: string; color: string;
+function KpiChip({ icon, label, value, last }: {
+  icon: React.ReactNode; label: string; value: string; last?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm min-w-0">
-      <div className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${color}18`, color }}>
+    <div style={{
+      flex: '1 1 140px', minWidth: 0, padding: '12px 14px',
+      borderRight: last ? undefined : `1px solid ${CM_UI.border}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, color: CM_UI.textMuted }}>
         {icon}
+        <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CM_UI.textMuted }}>
+          {label}
+        </p>
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide leading-none truncate">{label}</p>
-        <p className="text-base font-bold text-[#1B2A4A] leading-tight mt-0.5">{value}</p>
-      </div>
+      <p style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: CM_UI.text, fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -247,12 +256,15 @@ function KpiChip({ icon, label, value, color }: {
 // ── Method Pill ────────────────────────────────────────────────────────────
 function MethodPill({ method }: { method: OutreachMethod }) {
   const cfg = {
-    email:        { label: 'Email',  icon: <Mail size={10} />,          color: 'text-blue-700 bg-blue-50 border-blue-200' },
-    text:         { label: 'Text',   icon: <MessageSquare size={10} />, color: 'text-green-700 bg-green-50 border-green-200' },
-    instagram_dm: { label: 'IG DM', icon: <Instagram size={10} />,      color: 'text-pink-700 bg-pink-50 border-pink-200' },
+    email:        { label: 'Email',  icon: <Mail size={10} />,          color: CM_UI.blueDark, bg: CM_UI.blueBg, border: '#bfdbfe' },
+    text:         { label: 'Text',   icon: <MessageSquare size={10} />, color: CM_UI.success, bg: '#ecfdf5', border: '#6ee7b7' },
+    instagram_dm: { label: 'IG DM', icon: <Instagram size={10} />,      color: CM_UI.textSecondary, bg: NEUTRAL_BADGE.bg, border: NEUTRAL_BADGE.border },
   }[method];
   return (
-    <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border font-medium ${cfg.color}`}>
+    <span style={{
+      ...LIST_PILL, display: 'inline-flex', alignItems: 'center', gap: 4,
+      color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`,
+    }}>
       {cfg.icon}{cfg.label}
     </span>
   );
@@ -262,10 +274,20 @@ function MethodPill({ method }: { method: OutreachMethod }) {
 function StageBadge({ stage }: { stage: string }) {
   const cfg = STAGE_CONFIG[stage] ?? STAGE_CONFIG.lead;
   return (
-    <span
-      className="text-xs font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap"
-      style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}
-    >
+    <span style={{
+      ...LIST_PILL,
+      color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`,
+    }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function TempPill({ temperature }: { temperature: string }) {
+  const cfg = TEMP_STYLE[temperature];
+  if (!cfg) return null;
+  return (
+    <span style={{ ...LIST_PILL, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
       {cfg.label}
     </span>
   );
@@ -277,27 +299,31 @@ function MapTooltip({ stateAbbr, data, x, y }: {
 }) {
   return (
     <div
-      style={{ position: 'fixed', left: x + 14, top: y - 14, zIndex: 100 }}
-      className="bg-[#1B2A4A] text-white text-xs rounded-xl px-3 py-2.5 shadow-2xl pointer-events-none min-w-[160px]"
+      style={{
+        position: 'fixed', left: x + 14, top: y - 14, zIndex: 100,
+        background: CM_UI.ink, color: '#fff', fontSize: '0.75rem',
+        borderRadius: 10, padding: '10px 12px', pointerEvents: 'none', minWidth: 160,
+        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.18)',
+      }}
     >
-      <p className="font-bold text-sm mb-1.5">{stateAbbr}</p>
+      <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: '0.8125rem' }}>{stateAbbr}</p>
       {data ? (
-        <div className="space-y-0.5 text-white/80">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, color: 'rgba(255,255,255,0.8)' }}>
           {data.activeClients > 0 && (
-            <p>✅ {data.activeClients} active client{data.activeClients !== 1 ? 's' : ''}</p>
+            <p style={{ margin: 0 }}>{data.activeClients} active client{data.activeClients !== 1 ? 's' : ''}</p>
           )}
           {data.pipelineDeals > 0 && (
-            <p>📊 {data.pipelineDeals} pipeline deal{data.pipelineDeals !== 1 ? 's' : ''}</p>
+            <p style={{ margin: 0 }}>{data.pipelineDeals} pipeline deal{data.pipelineDeals !== 1 ? 's' : ''}</p>
           )}
           {data.pipelineValue > 0 && (
-            <p>💰 {fmt$(data.pipelineValue)}</p>
+            <p style={{ margin: 0 }}>{fmt$(data.pipelineValue)}</p>
           )}
           {data.activeClients === 0 && data.pipelineDeals === 0 && (
-            <p className="text-white/50">No activity yet</p>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.45)' }}>No activity yet</p>
           )}
         </div>
       ) : (
-        <p className="text-white/50">No activity yet</p>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,0.45)' }}>No activity yet</p>
       )}
     </div>
   );
@@ -333,58 +359,53 @@ function USPipelineMap({ schools, selectedState, onStateClick }: {
   }, [schools]);
 
   function getStateFill(stateAbbr: string, isHovered: boolean): string {
-    if (selectedState === stateAbbr) return '#1B2A4A';
+    if (selectedState === stateAbbr) return CM_UI.ink;
     const data = stateDataMap[stateAbbr];
-    if (isHovered) return selectedState === stateAbbr ? '#1B2A4A' : '#C4874A';
-    if (!data) return '#e5e7eb';
+    if (isHovered) return selectedState === stateAbbr ? CM_UI.ink : CM_UI.blue;
+    if (!data) return CM_UI.border;
     switch (data.status) {
-      case 'active_client': return 'rgba(16, 185, 129, 0.8)';
-      case 'in_pipeline':   return 'rgba(196, 135, 74, 0.6)';
-      default:              return '#e5e7eb';
+      case 'active_client': return 'rgba(5, 150, 105, 0.75)';
+      case 'in_pipeline':   return 'rgba(37, 99, 235, 0.45)';
+      default:              return CM_UI.border;
     }
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#10b98118' }}>
-            <MapPin size={15} className="text-emerald-600" />
+    <div style={{ ...CM_CARD, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${CM_UI.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: CM_UI.surfaceMuted, color: CM_UI.textMuted }}>
+            <MapPin size={14} />
           </div>
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-sm" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
-              US Pipeline Map
-            </h2>
-            <p className="text-xs text-gray-400">
+            <h2 style={SECTION_TITLE}>US Pipeline Map</h2>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: CM_UI.textSubtle }}>
               {selectedState ? `Filtering pipeline → ${selectedState} · click again to clear` : 'Click a state to filter the pipeline below'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-emerald-400" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: CM_UI.textMuted }}>
+            <div style={{ width: 10, height: 10, borderRadius: 9999, background: 'rgba(5, 150, 105, 0.75)' }} />
             Active Client
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'rgba(196, 135, 74, 0.6)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: CM_UI.textMuted }}>
+            <div style={{ width: 10, height: 10, borderRadius: 9999, background: 'rgba(37, 99, 235, 0.45)' }} />
             In Pipeline
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-gray-200" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: CM_UI.textMuted }}>
+            <div style={{ width: 10, height: 10, borderRadius: 9999, background: CM_UI.border }} />
             Not Contacted
           </div>
           {selectedState && (
-            <button
-              onClick={() => onStateClick(null)}
-              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#1B2A4A] text-white hover:bg-[#243560] transition-colors"
-            >
-              <X size={10} /> Clear
+            <button type="button" onClick={() => onStateClick(null)} style={TOOLBAR_BUTTON_PRIMARY}>
+              <X size={12} /> Clear
             </button>
           )}
         </div>
       </div>
 
-      <div className="relative px-4 pb-4 pt-2">
+      <div style={{ position: 'relative', padding: '8px 16px 16px' }}>
         {isMounted ? (
           <ComposableMap
             projection="geoAlbersUsa"
@@ -410,7 +431,7 @@ function USPipelineMap({ schools, selectedState, onStateClick }: {
                       strokeWidth={0.5}
                       style={{
                         default: { outline: 'none', cursor: stateAbbr ? 'pointer' : 'default' } as React.CSSProperties,
-                        hover:   { fill: isSelected ? '#243560' : '#C4874A', outline: 'none', opacity: 0.85, cursor: 'pointer' } as React.CSSProperties,
+                        hover:   { fill: isSelected ? CM_UI.ink : CM_UI.blue, outline: 'none', opacity: 0.9, cursor: 'pointer' } as React.CSSProperties,
                         pressed: { outline: 'none' } as React.CSSProperties,
                       }}
                       onClick={() => {
@@ -430,8 +451,8 @@ function USPipelineMap({ schools, selectedState, onStateClick }: {
             </Geographies>
           </ComposableMap>
         ) : (
-          <div className="h-72 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C4874A]" />
+          <div style={{ height: 288, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 24, height: 24, borderRadius: 9999, border: `2px solid ${CM_UI.border}`, borderTopColor: CM_UI.ink, animation: 'spin 1s linear infinite' }} />
           </div>
         )}
       </div>
@@ -453,43 +474,51 @@ function PipelineDealCard({ deal, onLogContact }: {
   deal: PipelineDeal;
   onLogContact: (deal: PipelineDeal) => void;
 }) {
-  const repAccent = deal.assigned_to ? (REP_ACCENT[deal.assigned_to] ?? '#6b7280') : '#6b7280';
   const val = deal.value ?? 0;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <p className="font-bold text-[#1B2A4A] text-sm truncate">{deal.organization?.name ?? '—'}</p>
-            {deal.temperature && <span className="text-sm flex-shrink-0">{TEMP_EMOJI[deal.temperature]}</span>}
+    <div style={{
+      ...CM_CARD,
+      padding: '12px 14px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+      transition: 'border-color 0.15s ease',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: '0.8125rem', color: CM_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {displayOrgName(deal.organization?.name)}
+            </p>
+            {deal.temperature && <TempPill temperature={deal.temperature} />}
           </div>
-          <p className="text-xs text-gray-400 truncate">{deal.organization?.school?.name ?? '—'}</p>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: CM_UI.textSubtle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {deal.organization?.school?.name ?? '—'}
+          </p>
         </div>
-        <button
-          onClick={() => onLogContact(deal)}
-          className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#1B2A4A] text-white hover:bg-[#243560] transition-colors whitespace-nowrap"
-        >
-          <Plus size={10} />
-          Log
+        <button type="button" onClick={() => onLogContact(deal)} style={{ ...TOOLBAR_BUTTON_PRIMARY, height: 28, padding: '0 10px', fontSize: '0.75rem', flexShrink: 0 }}>
+          <Plus size={11} /> Log
         </button>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <StageBadge stage={deal.stage} />
         {deal.assigned_to && (
-          <span
-            className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-            style={{ backgroundColor: repAccent }}
-          >
+          <span style={{
+            ...LIST_PILL,
+            background: NEUTRAL_BADGE.bg,
+            color: CM_UI.textSecondary,
+            border: `1px solid ${NEUTRAL_BADGE.border}`,
+          }}>
             {deal.assigned_to}
           </span>
         )}
         {val > 0 && (
-          <span className="text-xs font-bold text-[#1B2A4A]">{fmt$(val)}</span>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: CM_UI.text }}>{fmt$(val)}</span>
         )}
         {deal.next_followup && (
-          <span className="text-xs text-gray-400 flex items-center gap-1 ml-auto">
+          <span style={{ fontSize: '0.75rem', color: CM_UI.textSubtle, display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
             <Calendar size={10} />
             {new Date(deal.next_followup + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
@@ -557,87 +586,87 @@ function PipelineBoard({ deals, dealsLoading, stateFilter, onClearStateFilter, o
   }), [stateFiltered]);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#1B2A4A18' }}>
-            <TrendingUp size={15} className="text-[#1B2A4A]" />
+    <div style={{ ...CM_CARD, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${CM_UI.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: CM_UI.surfaceMuted, color: CM_UI.textMuted }}>
+            <TrendingUp size={14} />
           </div>
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-sm" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
-              Pipeline Board
-            </h2>
-            <p className="text-xs text-gray-400">{stateFiltered.length} active deals{stateFilter ? ` in ${stateFilter}` : ''}</p>
+            <h2 style={SECTION_TITLE}>Pipeline Board</h2>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: CM_UI.textSubtle }}>
+              {stateFiltered.length} active deals{stateFilter ? ` in ${stateFilter}` : ''}
+            </p>
           </div>
         </div>
         {stateFilter && (
-          <button
-            onClick={onClearStateFilter}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
-          >
-            <MapPin size={11} /> {stateFilter} <X size={10} />
+          <button type="button" onClick={onClearStateFilter} style={TOOLBAR_BUTTON}>
+            <MapPin size={12} /> {stateFilter} <X size={11} />
           </button>
         )}
       </div>
 
-      {/* Rep summary bar */}
       {repSummary.length > 0 && (
-        <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mr-1">Reps:</span>
+        <div style={{ padding: '10px 16px', borderBottom: `1px solid ${CM_UI.border}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: CM_UI.textSubtle }}>Reps:</span>
           {repSummary.map(([rep, data]) => {
-            const accent = REP_ACCENT[rep] ?? '#6b7280';
             const isActive = activeRep === rep;
             return (
               <button
                 key={rep}
+                type="button"
                 onClick={() => setActiveRep(isActive ? null : rep)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                  isActive ? 'text-white shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
-                }`}
-                style={isActive ? { backgroundColor: accent, borderColor: accent } : {}}
+                style={isActive
+                  ? { ...TOOLBAR_BUTTON_PRIMARY, height: 30, padding: '0 10px' }
+                  : { ...TOOLBAR_BUTTON, height: 30, padding: '0 10px' }}
               >
-                <span
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                  style={{ backgroundColor: accent, opacity: isActive ? 0.7 : 1 }}
-                >
+                <span style={{
+                  width: 18, height: 18, borderRadius: 9999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.625rem', fontWeight: 700,
+                  background: isActive ? 'rgba(255,255,255,0.2)' : CM_UI.surfaceMuted,
+                  color: isActive ? '#fff' : CM_UI.textMuted,
+                }}>
                   {rep[0]}
                 </span>
                 <span>{rep}</span>
-                <span className={isActive ? 'text-white/70' : 'text-gray-400'}>{data.count}</span>
+                <span style={{ color: isActive ? 'rgba(255,255,255,0.7)' : CM_UI.textSubtle }}>{data.count}</span>
                 {data.value > 0 && (
-                  <span className="font-bold" style={{ color: isActive ? 'rgba(255,255,255,0.9)' : accent }}>
-                    {fmt$(data.value)}
-                  </span>
+                  <span style={{ fontWeight: 700 }}>{fmt$(data.value)}</span>
                 )}
               </button>
             );
           })}
           {activeRep && (
-            <button onClick={() => setActiveRep(null)} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors">
+            <button type="button" onClick={() => setActiveRep(null)} style={{ ...TOOLBAR_BUTTON, height: 30, border: 'none', background: 'transparent', color: CM_UI.textSubtle }}>
               Clear
             </button>
           )}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="px-6 flex gap-0.5 overflow-x-auto border-b border-gray-100">
+      <div style={{ padding: '0 16px', display: 'flex', gap: 2, overflowX: 'auto', borderBottom: `1px solid ${CM_UI.border}` }}>
         {PIPELINE_TABS.map(tab => (
           <button
             key={tab.id}
+            type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === tab.id
-                ? 'border-[#1B2A4A] text-[#1B2A4A]'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '10px 12px', fontSize: '0.75rem', fontWeight: 600,
+              border: 'none', borderBottom: `2px solid ${activeTab === tab.id ? CM_UI.blue : 'transparent'}`,
+              background: 'transparent', cursor: 'pointer', whiteSpace: 'nowrap',
+              color: activeTab === tab.id ? CM_UI.text : CM_UI.textMuted,
+              fontFamily: 'inherit',
+            }}
           >
             {tab.label}
             {tabCounts[tab.id] > 0 && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                activeTab === tab.id ? 'bg-[#1B2A4A] text-white' : 'bg-gray-100 text-gray-500'
-              }`}>
+              <span style={{
+                ...LIST_PILL,
+                background: activeTab === tab.id ? CM_UI.ink : CM_UI.surfaceMuted,
+                color: activeTab === tab.id ? '#fff' : CM_UI.textMuted,
+                border: '1px solid transparent',
+              }}>
                 {tabCounts[tab.id]}
               </span>
             )}
@@ -645,20 +674,19 @@ function PipelineBoard({ deals, dealsLoading, stateFilter, onClearStateFilter, o
         ))}
       </div>
 
-      {/* Cards grid */}
-      <div className="p-5">
+      <div style={{ padding: 16 }}>
         {dealsLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C4874A]" />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 0' }}>
+            <div style={{ width: 24, height: 24, borderRadius: 9999, border: `2px solid ${CM_UI.border}`, borderTopColor: CM_UI.ink, animation: 'spin 1s linear infinite' }} />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <TrendingUp size={28} className="text-gray-200 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-gray-400">No deals in this view</p>
-            <p className="text-xs text-gray-300 mt-1">Try a different tab or clear filters</p>
+          <div style={{ textAlign: 'center', padding: '48px 0' }}>
+            <TrendingUp size={28} color={CM_UI.border} style={{ margin: '0 auto 12px' }} />
+            <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: CM_UI.textMuted }}>No deals in this view</p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: CM_UI.textSubtle }}>Try a different tab or clear filters</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
             {filtered.map(deal => (
               <PipelineDealCard key={deal.id} deal={deal} onLogContact={onLogContact} />
             ))}
@@ -682,34 +710,37 @@ function ChapterRow({ org, type, outreachEntry, onLogContact, onViewDeal }: {
   const primaryDeal = org.deals[0];
 
   return (
-    <div className="flex items-center gap-3 py-3.5 px-5 border-b border-gray-100 hover:bg-[#FAFAF8] transition-colors last:border-0">
-      <span className="flex-1 text-sm font-semibold text-[#1B2A4A] truncate min-w-0">{org.name}</span>
-      <span
-        className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full border"
-        style={{ color: statusCfg.color, backgroundColor: statusCfg.bg, borderColor: statusCfg.border }}
-      >
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+      borderBottom: `1px solid ${CM_UI.border}`, background: CM_UI.surface,
+    }}>
+      <span style={{ flex: 1, fontSize: '0.8125rem', fontWeight: 600, color: CM_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+        {displayOrgName(org.name)}
+      </span>
+      <span style={{
+        ...LIST_PILL, flexShrink: 0,
+        color: statusCfg.color, background: statusCfg.bg, border: `1px solid ${statusCfg.border}`,
+      }}>
         {statusCfg.label}
       </span>
       {outreachEntry && <MethodPill method={outreachEntry.method} />}
       {outreachEntry?.contactedAt ? (
-        <span className="flex-shrink-0 text-xs text-gray-400 hidden lg:block w-16">
+        <span style={{ flexShrink: 0, fontSize: '0.75rem', color: CM_UI.textSubtle, width: 56 }}>
           {new Date(outreachEntry.contactedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
       ) : (
-        <span className="flex-shrink-0 text-xs text-gray-300 hidden lg:block w-16">—</span>
+        <span style={{ flexShrink: 0, fontSize: '0.75rem', color: CM_UI.textSubtle, width: 56 }}>—</span>
       )}
-      <div className="flex-shrink-0 flex items-center gap-1.5">
-        <button
-          onClick={() => onLogContact(org, type)}
-          className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#1B2A4A] text-white hover:bg-[#243560] transition-colors whitespace-nowrap"
-        >
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button type="button" onClick={() => onLogContact(org, type)} style={{ ...TOOLBAR_BUTTON_PRIMARY, height: 30, padding: '0 10px', fontSize: '0.75rem' }}>
           <Plus size={11} /> Log Contact
         </button>
         <button
+          type="button"
           onClick={() => onViewDeal(org)}
-          className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
-            primaryDeal ? 'bg-[#C4874A] text-white hover:bg-[#b07640]' : 'border border-gray-200 text-gray-400 hover:bg-gray-50'
-          }`}
+          style={primaryDeal
+            ? { ...TOOLBAR_BUTTON_PRIMARY, height: 30, padding: '0 10px', fontSize: '0.75rem', background: CM_UI.blue }
+            : { ...TOOLBAR_BUTTON, height: 30, padding: '0 10px', fontSize: '0.75rem' }}
         >
           View Deal
         </button>
@@ -732,23 +763,27 @@ function ChapterSection({ label, orgs, type, outreachLog, onLogContact, onViewDe
     return e && e.status !== 'not_contacted';
   }).length;
 
-  const labelColor = type === 'fraternity' ? '#1d4ed8' : '#be185d';
-  const labelBg   = type === 'fraternity' ? '#eff6ff' : '#fdf2f8';
-
   return (
     <div>
-      <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/70 border-b border-gray-100">
-        <span className="text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-md" style={{ color: labelColor, backgroundColor: labelBg }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: CM_UI.surfaceMuted, borderBottom: `1px solid ${CM_UI.border}` }}>
+        <span style={{
+          ...LIST_PILL,
+          color: type === 'fraternity' ? CM_UI.blueDark : CM_UI.textSecondary,
+          background: type === 'fraternity' ? CM_UI.blueBg : NEUTRAL_BADGE.bg,
+          border: `1px solid ${type === 'fraternity' ? '#bfdbfe' : NEUTRAL_BADGE.border}`,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}>
           {label}
         </span>
-        <span className="text-xs text-gray-400">{contactedCount}/{orgs.length} contacted</span>
+        <span style={{ fontSize: '0.75rem', color: CM_UI.textSubtle }}>{contactedCount}/{orgs.length} contacted</span>
         {contactedCount === orgs.length && orgs.length > 0 && (
-          <span className="text-xs text-green-600 font-semibold">✓ All done!</span>
+          <span style={{ fontSize: '0.75rem', color: CM_UI.success, fontWeight: 600 }}>All done</span>
         )}
       </div>
       {orgs.length === 0 ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-xs text-gray-400">No {label.toLowerCase()} linked yet</p>
+        <div style={{ padding: '24px 16px', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: CM_UI.textSubtle }}>No {label.toLowerCase()} linked yet</p>
         </div>
       ) : (
         <div>
@@ -844,141 +879,150 @@ function LogContactDrawer({ org, orgType, schoolId, schoolName, onClose, onSaved
     { value: 'other',        label: 'Other' },
   ];
 
+  const toggleBtn = (selected: boolean): React.CSSProperties => ({
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    padding: '8px 12px', fontSize: '0.8125rem', fontWeight: 500, borderRadius: 10,
+    cursor: 'pointer', fontFamily: 'inherit', transition: 'border-color 0.15s ease',
+    border: `1px solid ${selected ? CM_UI.ink : CM_UI.border}`,
+    background: selected ? CM_UI.ink : '#fff',
+    color: selected ? '#fff' : CM_UI.textSecondary,
+  });
+
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="w-[440px] bg-white shadow-2xl flex flex-col h-full border-l border-gray-100">
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-[#FAFAF8]">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+      <div style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div style={{
+        width: 440, background: CM_UI.surface, display: 'flex', flexDirection: 'column',
+        height: '100%', borderLeft: `1px solid ${CM_UI.border}`,
+        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.12)',
+      }}>
+        <div style={{
+          padding: '16px 20px', borderBottom: `1px solid ${CM_UI.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: CM_UI.surfaceMuted,
+        }}>
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-base" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
-              Log Contact
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">{org.name} · {schoolName}</p>
+            <h2 style={{ ...SECTION_TITLE, fontSize: '0.9375rem', margin: 0 }}>Log Contact</h2>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: CM_UI.textMuted }}>
+              {displayOrgName(org.name)} · {schoolName}
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+          <button type="button" onClick={onClose} style={{
+            ...TOOLBAR_BUTTON, height: 32, width: 32, padding: 0, border: 'none', background: 'transparent', color: CM_UI.textSubtle,
+          }}>
             <X size={18} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {/* Who did you reach? */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Who did you reach?</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label style={DRAWER_LABEL}>Who did you reach?</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {contactOptions.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setContactType(opt.value)}
-                  className={`py-2 px-3 text-sm rounded-lg border font-medium transition-colors ${
-                    contactType === opt.value
-                      ? 'bg-[#1B2A4A] text-white border-[#1B2A4A]'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                  }`}
-                >
+                <button key={opt.value} type="button" onClick={() => setContactType(opt.value)} style={toggleBtn(contactType === opt.value)}>
                   {opt.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Contact Method */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Contact Method</label>
-            <div className="flex gap-2">
+            <label style={DRAWER_LABEL}>Contact Method</label>
+            <div style={{ display: 'flex', gap: 8 }}>
               {methodOptions.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setMethod(opt.value)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm rounded-lg border font-medium transition-colors ${
-                    method === opt.value
-                      ? 'bg-[#C4874A] text-white border-[#C4874A]'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                  }`}
-                >
+                <button key={opt.value} type="button" onClick={() => setMethod(opt.value)} style={{ ...toggleBtn(method === opt.value), flex: 1 }}>
                   {opt.icon}
-                  <span className="hidden sm:inline">{opt.label}</span>
+                  <span>{opt.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Contact Info */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Contact Info</label>
-            <div className="relative">
-              <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <label style={DRAWER_LABEL}>Contact Info</label>
+            <div style={{ position: 'relative' }}>
+              <Phone size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: CM_UI.textSubtle }} />
               <input
                 type="text"
                 value={contactInfo}
                 onChange={e => setContactInfo(e.target.value)}
                 placeholder="Phone number or @instagram handle"
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40"
+                style={{ ...DRAWER_INPUT, paddingLeft: 36 }}
               />
             </div>
           </div>
 
-          {/* Source URL */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Source URL</label>
-            <div className="relative">
-              <Link2 size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <label style={DRAWER_LABEL}>Source URL</label>
+            <div style={{ position: 'relative' }}>
+              <Link2 size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: CM_UI.textSubtle }} />
               <input
                 type="url"
                 value={sourceUrl}
                 onChange={e => setSourceUrl(e.target.value)}
                 placeholder="Instagram profile, chapter website, etc."
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40"
+                style={{ ...DRAWER_INPUT, paddingLeft: 36 }}
               />
             </div>
           </div>
 
-          {/* Notes */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notes</label>
+            <label style={DRAWER_LABEL}>Notes</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="What happened? Key details from the conversation..."
               rows={3}
-              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40 resize-none"
+              style={{ ...DRAWER_INPUT, resize: 'none' }}
             />
           </div>
 
-          {/* Meeting booked */}
-          <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
-            <div className="relative mt-0.5">
-              <input type="checkbox" checked={meetingBooked} onChange={e => setMeetingBooked(e.target.checked)} className="sr-only" />
-              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${meetingBooked ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}>
-                {meetingBooked && <CheckCircle2 size={12} className="text-white" />}
+          <label style={{
+            display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer',
+            padding: 12, borderRadius: 10, border: `1px solid ${CM_UI.border}`,
+          }}>
+            <div style={{ position: 'relative', marginTop: 2 }}>
+              <input type="checkbox" checked={meetingBooked} onChange={e => setMeetingBooked(e.target.checked)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+              <div style={{
+                width: 20, height: 20, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: `2px solid ${meetingBooked ? CM_UI.blue : CM_UI.border}`,
+                background: meetingBooked ? CM_UI.blue : '#fff',
+              }}>
+                {meetingBooked && <CheckCircle2 size={12} color="#fff" />}
               </div>
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-800">Meeting / demo booked</p>
-              <p className="text-xs text-gray-500 mt-0.5">Sets deal stage to Demo Booked automatically</p>
+              <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: CM_UI.text }}>Meeting / demo booked</p>
+              <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: CM_UI.textMuted }}>Sets deal stage to Demo Booked automatically</p>
             </div>
           </label>
 
-          {/* Create deal */}
-          <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
-            <div className="relative mt-0.5">
-              <input type="checkbox" checked={createDeal} onChange={e => setCreateDeal(e.target.checked)} className="sr-only" />
-              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${createDeal ? 'bg-[#1B2A4A] border-[#1B2A4A]' : 'bg-white border-gray-300'}`}>
-                {createDeal && <CheckCircle2 size={12} className="text-white" />}
+          <label style={{
+            display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer',
+            padding: 12, borderRadius: 10, border: `1px solid ${CM_UI.border}`,
+          }}>
+            <div style={{ position: 'relative', marginTop: 2 }}>
+              <input type="checkbox" checked={createDeal} onChange={e => setCreateDeal(e.target.checked)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+              <div style={{
+                width: 20, height: 20, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: `2px solid ${createDeal ? CM_UI.ink : CM_UI.border}`,
+                background: createDeal ? CM_UI.ink : '#fff',
+              }}>
+                {createDeal && <CheckCircle2 size={12} color="#fff" />}
               </div>
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-800">Create pipeline deal</p>
-              <p className="text-xs text-gray-500 mt-0.5">Add this chapter as a new lead in the pipeline</p>
+              <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: CM_UI.text }}>Create pipeline deal</p>
+              <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: CM_UI.textMuted }}>Add this chapter as a new lead in the pipeline</p>
             </div>
           </label>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-xl hover:bg-[#243560] transition-colors disabled:opacity-60">
+        <div style={{ padding: '14px 20px', borderTop: `1px solid ${CM_UI.border}`, display: 'flex', gap: 10 }}>
+          <button type="button" onClick={onClose} style={{ ...TOOLBAR_BUTTON, flex: 1, height: 38, borderRadius: 10 }}>Cancel</button>
+          <button type="button" onClick={handleSave} disabled={saving} style={{
+            ...TOOLBAR_BUTTON_PRIMARY, flex: 1, height: 38, borderRadius: 10, opacity: saving ? 0.6 : 1,
+          }}>
             {saving ? 'Saving...' : 'Save Contact'}
           </button>
         </div>
@@ -1032,70 +1076,111 @@ function ViewDealDrawer({ org, onClose, onSaved }: {
     finally { setSaving(false); }
   }
 
+  const tempBtn = (selected: boolean): React.CSSProperties => ({
+    flex: 1, padding: '8px 12px', fontSize: '0.8125rem', fontWeight: 500, borderRadius: 10,
+    cursor: 'pointer', fontFamily: 'inherit',
+    border: `1px solid ${selected ? CM_UI.ink : CM_UI.border}`,
+    background: selected ? CM_UI.ink : '#fff',
+    color: selected ? '#fff' : CM_UI.textSecondary,
+  });
+
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="w-[420px] bg-white shadow-2xl flex flex-col h-full border-l border-gray-100">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-[#FAFAF8]">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
+      <div style={{ flex: 1, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div style={{
+        width: 420, background: CM_UI.surface, display: 'flex', flexDirection: 'column',
+        height: '100%', borderLeft: `1px solid ${CM_UI.border}`,
+        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.12)',
+      }}>
+        <div style={{
+          padding: '16px 20px', borderBottom: `1px solid ${CM_UI.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: CM_UI.surfaceMuted,
+        }}>
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-base" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Pipeline Deal</h2>
-            <p className="text-sm text-gray-500 mt-0.5">{org.name}</p>
+            <h2 style={{ ...SECTION_TITLE, fontSize: '0.9375rem', margin: 0 }}>Pipeline Deal</h2>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: CM_UI.textMuted }}>{displayOrgName(org.name)}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"><X size={18} /></button>
+          <button type="button" onClick={onClose} style={{
+            ...TOOLBAR_BUTTON, height: 32, width: 32, padding: 0, border: 'none', background: 'transparent', color: CM_UI.textSubtle,
+          }}>
+            <X size={18} />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {loading ? (
-            <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1B2A4A]" /></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160 }}>
+              <div style={{ width: 24, height: 24, borderRadius: 9999, border: `2px solid ${CM_UI.border}`, borderTopColor: CM_UI.ink, animation: 'spin 1s linear infinite' }} />
+            </div>
           ) : !deal ? (
-            <div className="text-center py-12">
-              <Building2 size={28} className="text-gray-200 mx-auto mb-3" />
-              <p className="text-sm font-semibold text-gray-500">No deal found</p>
-              <p className="text-xs text-gray-400 mt-1">Log a contact first to create a pipeline deal</p>
+            <div style={{ textAlign: 'center', padding: '48px 0' }}>
+              <Building2 size={28} color={CM_UI.border} style={{ margin: '0 auto 12px' }} />
+              <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: CM_UI.textMuted }}>No deal found</p>
+              <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: CM_UI.textSubtle }}>Log a contact first to create a pipeline deal</p>
             </div>
           ) : (
             <>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Stage</label>
-                <div className="relative">
-                  <select value={stage} onChange={e => setStage(e.target.value)} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 appearance-none bg-white">
+                <label style={DRAWER_LABEL}>Stage</label>
+                <div style={{ position: 'relative' }}>
+                  <select
+                    value={stage}
+                    onChange={e => setStage(e.target.value)}
+                    style={{ ...DRAWER_INPUT, appearance: 'none', paddingRight: 32 }}
+                  >
                     {STAGE_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: CM_UI.textSubtle, pointerEvents: 'none' }} />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Temperature</label>
-                <div className="flex gap-2">
+                <label style={DRAWER_LABEL}>Temperature</label>
+                <div style={{ display: 'flex', gap: 8 }}>
                   {TEMP_OPTIONS.map(opt => (
-                    <button key={opt.value} onClick={() => setTemperature(opt.value === temperature ? '' : opt.value)}
-                      className={`flex-1 py-2 text-sm rounded-xl border font-medium transition-colors ${temperature === opt.value ? 'bg-[#C4874A] text-white border-[#C4874A]' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setTemperature(opt.value === temperature ? '' : opt.value)}
+                      style={tempBtn(temperature === opt.value)}
+                    >
                       {opt.label}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Next Follow-up</label>
-                <div className="relative">
-                  <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="date" value={nextFollowup} onChange={e => setNextFollowup(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20" />
+                <label style={DRAWER_LABEL}>Next Follow-up</label>
+                <div style={{ position: 'relative' }}>
+                  <Calendar size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: CM_UI.textSubtle }} />
+                  <input
+                    type="date"
+                    value={nextFollowup}
+                    onChange={e => setNextFollowup(e.target.value)}
+                    style={{ ...DRAWER_INPUT, paddingLeft: 36 }}
+                  />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notes</label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Deal notes, context, next steps..." rows={4}
-                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 resize-none" />
+                <label style={DRAWER_LABEL}>Notes</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="Deal notes, context, next steps..."
+                  rows={4}
+                  style={{ ...DRAWER_INPUT, resize: 'none' }}
+                />
               </div>
             </>
           )}
         </div>
 
         {deal && (
-          <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-xl hover:bg-[#243560] transition-colors disabled:opacity-60">
+          <div style={{ padding: '14px 20px', borderTop: `1px solid ${CM_UI.border}`, display: 'flex', gap: 10 }}>
+            <button type="button" onClick={onClose} style={{ ...TOOLBAR_BUTTON, flex: 1, height: 38, borderRadius: 10 }}>Cancel</button>
+            <button type="button" onClick={handleSave} disabled={saving} style={{
+              ...TOOLBAR_BUTTON_PRIMARY, flex: 1, height: 38, borderRadius: 10, opacity: saving ? 0.6 : 1,
+            }}>
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
@@ -1142,49 +1227,90 @@ function ImportChaptersModal({ school, existingOrgs, onClose, onImported }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-[#FAFAF8] rounded-t-2xl">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div style={{
+        ...CM_CARD, position: 'relative', width: '100%', maxWidth: 448,
+        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.12)', overflow: 'hidden',
+      }}>
+        <div style={{
+          padding: '16px 20px', borderBottom: `1px solid ${CM_UI.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: CM_UI.surfaceMuted,
+        }}>
           <div>
-            <h2 className="font-bold text-[#1B2A4A] text-base" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Import Chapters</h2>
-            <p className="text-sm text-gray-500 mt-0.5">{school.name}</p>
+            <h2 style={{ ...SECTION_TITLE, fontSize: '0.9375rem', margin: 0 }}>Import Chapters</h2>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: CM_UI.textMuted }}>{school.name}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"><X size={18} /></button>
+          <button type="button" onClick={onClose} style={{
+            ...TOOLBAR_BUTTON, height: 32, width: 32, padding: 0, border: 'none', background: 'transparent', color: CM_UI.textSubtle,
+          }}>
+            <X size={18} />
+          </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           {!result ? (
             <>
-              <p className="text-sm text-gray-600">Paste chapter names below, one per line. Existing chapters will be skipped.</p>
-              <textarea value={text} onChange={e => setText(e.target.value)}
-                placeholder={'Alpha Phi Alpha\nKappa Alpha Psi\nPhi Beta Sigma'} rows={8}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 resize-none font-mono" />
-              <div className="flex gap-3">
-                <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
-                <button onClick={handleImport} disabled={importing || !text.trim()}
-                  className="flex-1 py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-xl hover:bg-[#243560] transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-                  {importing ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />Importing...</> : <><Upload size={15} />Import</>}
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: CM_UI.textSecondary }}>
+                Paste chapter names below, one per line. Existing chapters will be skipped.
+              </p>
+              <textarea
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder={'Alpha Phi Alpha\nKappa Alpha Psi\nPhi Beta Sigma'}
+                rows={8}
+                style={{ ...DRAWER_INPUT, resize: 'none', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
+              />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="button" onClick={onClose} style={{ ...TOOLBAR_BUTTON, flex: 1, height: 38, borderRadius: 10 }}>Cancel</button>
+                <button
+                  type="button"
+                  onClick={handleImport}
+                  disabled={importing || !text.trim()}
+                  style={{
+                    ...TOOLBAR_BUTTON_PRIMARY, flex: 1, height: 38, borderRadius: 10,
+                    opacity: importing || !text.trim() ? 0.6 : 1,
+                  }}
+                >
+                  {importing ? (
+                    <>
+                      <div style={{ width: 14, height: 14, borderRadius: 9999, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }} />
+                      Importing...
+                    </>
+                  ) : (
+                    <><Upload size={15} />Import</>
+                  )}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {result.added.length > 0 && (
-                  <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-                    <p className="text-sm font-semibold text-green-800 mb-2">✅ Added {result.added.length} chapter{result.added.length !== 1 ? 's' : ''}</p>
-                    <ul className="space-y-1">{result.added.map(n => <li key={n} className="text-xs text-green-700">{n}</li>)}</ul>
+                  <div style={{ background: '#ecfdf5', border: '1px solid #d1fae5', borderRadius: 10, padding: 14 }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '0.8125rem', fontWeight: 600, color: CM_UI.success }}>
+                      Added {result.added.length} chapter{result.added.length !== 1 ? 's' : ''}
+                    </p>
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {result.added.map(n => <li key={n} style={{ fontSize: '0.75rem', color: '#047857' }}>{displayOrgName(n)}</li>)}
+                    </ul>
                   </div>
                 )}
                 {result.skipped.length > 0 && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                    <p className="text-sm font-semibold text-gray-600 mb-2">⏭ Skipped {result.skipped.length} (already exist or failed)</p>
-                    <ul className="space-y-1">{result.skipped.map(n => <li key={n} className="text-xs text-gray-500">{n}</li>)}</ul>
+                  <div style={{ background: CM_UI.surfaceMuted, border: `1px solid ${CM_UI.border}`, borderRadius: 10, padding: 14 }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '0.8125rem', fontWeight: 600, color: CM_UI.textSecondary }}>
+                      Skipped {result.skipped.length} (already exist or failed)
+                    </p>
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {result.skipped.map(n => <li key={n} style={{ fontSize: '0.75rem', color: CM_UI.textMuted }}>{displayOrgName(n)}</li>)}
+                    </ul>
                   </div>
                 )}
               </div>
-              <button onClick={onClose} className="w-full py-2.5 text-sm font-bold text-white bg-[#1B2A4A] rounded-xl hover:bg-[#243560] transition-colors">Done</button>
+              <button type="button" onClick={onClose} style={{ ...TOOLBAR_BUTTON_PRIMARY, width: '100%', height: 38, borderRadius: 10 }}>
+                Done
+              </button>
             </>
           )}
         </div>
@@ -1228,38 +1354,49 @@ function FounderTargetBoard({ schools, outreachLog, founderTargets, onTargetChan
   }, [editingFounder]);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#C4874A18' }}>
-          <Zap size={15} className="text-[#C4874A]" />
+    <div style={{ ...CM_CARD, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${CM_UI.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: CM_UI.surfaceMuted, color: CM_UI.textMuted }}>
+          <Zap size={14} />
         </div>
         <div>
-          <h2 className="font-bold text-[#1B2A4A] text-sm" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Founder Target Board</h2>
-          <p className="text-xs text-gray-400">Today's school targets — pick a school, blast every chapter</p>
+          <h2 style={SECTION_TITLE}>Founder Target Board</h2>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: CM_UI.textSubtle }}>Today&apos;s school targets — pick a school, blast every chapter</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-gray-100">
-        {FOUNDERS.map(founder => {
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        {FOUNDERS.map((founder, idx) => {
           const target = founderTargets[founder] ?? null;
-          const fc = FOUNDER_COLORS[founder];
           const progress = getProgress(target);
           const isEditing = editingFounder === founder;
           const pct = progress.total > 0 ? Math.round((progress.contacted / progress.total) * 100) : 0;
           const school = target ? schools.find(s => s.id === target.schoolId) : null;
 
           return (
-            <div key={founder} className="p-4 relative">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: fc.accent }}>
+            <div
+              key={founder}
+              style={{
+                padding: 16,
+                borderRight: (idx + 1) % 4 !== 0 ? `1px solid ${CM_UI.border}` : undefined,
+                borderBottom: `1px solid ${CM_UI.border}`,
+                position: 'relative',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    width: 24, height: 24, borderRadius: 9999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.6875rem', fontWeight: 700, color: '#fff', background: CM_UI.ink,
+                  }}>
                     {founder[0]}
                   </span>
-                  <span className="font-bold text-[#1B2A4A] text-sm">{founder}</span>
+                  <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: CM_UI.text }}>{founder}</span>
                 </div>
                 <button
+                  type="button"
                   onClick={() => { setEditingFounder(isEditing ? null : founder); setSearchQuery(''); }}
-                  className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-colors"
+                  style={{ ...TOOLBAR_BUTTON, height: 28, padding: '0 8px', fontSize: '0.72rem' }}
                 >
                   <Edit3 size={10} />
                   {target ? 'Change' : 'Set'}
@@ -1267,19 +1404,36 @@ function FounderTargetBoard({ schools, outreachLog, founderTargets, onTargetChan
               </div>
 
               {isEditing && (
-                <div className="mb-3 relative z-20">
-                  <div className="relative">
-                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input ref={searchRef} type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="Search school..." className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300/50" />
+                <div style={{ marginBottom: 12, position: 'relative', zIndex: 20 }}>
+                  <div style={{ ...TOOLBAR_SEARCH, height: 32 }}>
+                    <Search size={12} color={CM_UI.textSubtle} />
+                    <input
+                      ref={searchRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Search school..."
+                      style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.75rem', background: 'transparent', fontFamily: 'inherit', color: CM_UI.text }}
+                    />
                   </div>
-                  <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-30">
-                    {searchResults.map(school => (
-                      <button key={school.id}
-                        onClick={() => { onTargetChange(founder, { schoolId: school.id, schoolName: school.name }); setEditingFounder(null); setSearchQuery(''); }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0">
-                        <span className="font-medium text-gray-800 truncate">{school.name}</span>
-                        <span className="flex-shrink-0 text-gray-400 ml-2">{school.fraternities.length + school.sororities.length} orgs</span>
+                  <div style={{
+                    position: 'absolute', top: '100%', marginTop: 4, left: 0, right: 0,
+                    background: '#fff', border: `1px solid ${CM_UI.border}`, borderRadius: 10, overflow: 'hidden', zIndex: 30,
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.1)',
+                  }}>
+                    {searchResults.map(s => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { onTargetChange(founder, { schoolId: s.id, schoolName: s.name }); setEditingFounder(null); setSearchQuery(''); }}
+                        style={{
+                          width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: '0.75rem',
+                          border: 'none', borderBottom: `1px solid ${CM_UI.border}`, background: '#fff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'inherit',
+                        }}
+                      >
+                        <span style={{ fontWeight: 500, color: CM_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                        <span style={{ flexShrink: 0, color: CM_UI.textSubtle, marginLeft: 8 }}>{s.fraternities.length + s.sororities.length} orgs</span>
                       </button>
                     ))}
                   </div>
@@ -1287,25 +1441,39 @@ function FounderTargetBoard({ schools, outreachLog, founderTargets, onTargetChan
               )}
 
               {target ? (
-                <div className={`rounded-xl border p-3 cursor-pointer hover:shadow-md transition-all ${fc.border} ${fc.bg}`}
-                  onClick={() => { if (school) onSelectSchool(school); }}>
-                  <p className={`font-bold text-sm truncate ${fc.text} mb-2`}>{target.schoolName}</p>
-                  <div className="h-1.5 bg-white/80 rounded-full overflow-hidden mb-1.5">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: fc.accent }} />
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { if (school) onSelectSchool(school); }}
+                  onKeyDown={e => { if (e.key === 'Enter' && school) onSelectSchool(school); }}
+                  style={{
+                    borderRadius: 10, border: `1px solid ${CM_UI.border}`, padding: 12, cursor: 'pointer',
+                    background: CM_UI.surfaceMuted,
+                  }}
+                >
+                  <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: '0.8125rem', color: CM_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {target.schoolName}
+                  </p>
+                  <div style={{ height: 6, background: '#fff', borderRadius: 9999, overflow: 'hidden', marginBottom: 6, border: `1px solid ${CM_UI.border}` }}>
+                    <div style={{ height: '100%', borderRadius: 9999, width: `${pct}%`, background: CM_UI.ink, transition: 'width 0.4s ease' }} />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">{progress.contacted}/{progress.total} contacted</span>
-                    <span className="text-xs font-bold" style={{ color: fc.accent }}>{pct}%</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.75rem', color: CM_UI.textMuted }}>{progress.contacted}/{progress.total} contacted</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: CM_UI.text }}>{pct}%</span>
                   </div>
                   {school && school.pipelineValue > 0 && (
-                    <p className="text-xs font-semibold mt-1.5" style={{ color: fc.accent }}>{fmt$(school.pipelineValue)} pipeline</p>
+                    <p style={{ margin: '6px 0 0', fontSize: '0.75rem', fontWeight: 600, color: CM_UI.textSecondary }}>{fmt$(school.pipelineValue)} pipeline</p>
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-gray-200 p-4 flex flex-col items-center justify-center gap-1.5 text-center min-h-[80px]">
-                  <Target size={18} className="text-gray-300" />
-                  <p className="text-xs text-gray-400 font-medium">No target set</p>
-                  <p className="text-[10px] text-gray-300">Click to assign a school</p>
+                <div style={{
+                  borderRadius: 10, border: `1px dashed ${CM_UI.border}`, padding: 16,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                  textAlign: 'center', minHeight: 80,
+                }}>
+                  <Target size={18} color={CM_UI.textSubtle} />
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: CM_UI.textMuted, fontWeight: 500 }}>No target set</p>
+                  <p style={{ margin: 0, fontSize: '0.6875rem', color: CM_UI.textSubtle }}>Click Set to assign a school</p>
                 </div>
               )}
             </div>
@@ -1400,31 +1568,32 @@ export default function ClientMapPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8]">
-      <div className="max-w-[1400px] mx-auto px-6 py-8 space-y-6">
+    <div style={{ minHeight: '100vh', background: CM_UI.pageBg }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h1 className="text-3xl font-bold text-[#1B2A4A]" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+            <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: CM_UI.text }}>
               Sales Command Center
             </h1>
-            <p className="text-sm text-gray-400 mt-1">Founder-led outbound → scalable sales engine</p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: CM_UI.textSubtle }}>
+              Founder-led outbound → scalable sales engine
+            </p>
           </div>
-          <button onClick={() => { load(); loadDeals(); }}
-            className="flex items-center gap-2 text-sm font-medium text-gray-500 px-3 py-2 rounded-xl border border-gray-200 hover:bg-white hover:shadow-sm transition-all">
+          <button type="button" onClick={() => { load(); loadDeals(); }} style={TOOLBAR_BUTTON}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Refresh
           </button>
         </div>
 
         {/* KPI chips */}
-        <div className="flex gap-3 flex-wrap">
-          <KpiChip icon={<Users size={14} />} label="Active Chapters" value={String(kpis.totalActiveChapters)} color="#10b981" />
-          <KpiChip icon={<Building2 size={14} />} label="In Pipeline Schools" value={String(kpis.schoolsInPipeline)} color="#C4874A" />
-          <KpiChip icon={<DollarSign size={14} />} label="Pipeline Value" value={fmt$(kpis.totalPipelineValue)} color="#7c3aed" />
-          <KpiChip icon={<Zap size={14} />} label="Contacted Today" value={String(contactedToday)} color="#f59e0b" />
-          <KpiChip icon={<MapPin size={14} />} label="States Covered" value={String(kpis.statesCovered)} color="#2563eb" />
+        <div style={{ ...CM_CARD, display: 'flex', flexWrap: 'wrap', overflow: 'hidden' }}>
+          <KpiChip icon={<Users size={14} />} label="Active Chapters" value={String(kpis.totalActiveChapters)} />
+          <KpiChip icon={<Building2 size={14} />} label="In Pipeline Schools" value={String(kpis.schoolsInPipeline)} />
+          <KpiChip icon={<DollarSign size={14} />} label="Pipeline Value" value={fmt$(kpis.totalPipelineValue)} />
+          <KpiChip icon={<Zap size={14} />} label="Contacted Today" value={String(contactedToday)} />
+          <KpiChip icon={<MapPin size={14} />} label="States Covered" value={String(kpis.statesCovered)} last />
         </div>
 
         {/* US Map */}
@@ -1461,48 +1630,71 @@ export default function ClientMapPage() {
         />
 
         {/* School search + drill-down */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#2563eb18' }}>
-              <Building2 size={15} className="text-blue-600" />
+        <div style={{ ...CM_CARD, overflow: 'hidden' }}>
+          <div style={{
+            padding: '14px 16px', borderBottom: `1px solid ${CM_UI.border}`,
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', background: CM_UI.surfaceMuted, color: CM_UI.textMuted,
+            }}>
+              <Building2 size={14} />
             </div>
-            <div className="flex-1">
-              <h2 className="font-bold text-[#1B2A4A] text-sm" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>School Outreach</h2>
-              <p className="text-xs text-gray-400">Select a school to see all chapters</p>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={SECTION_TITLE}>School Outreach</h2>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: CM_UI.textSubtle }}>Select a school to see all chapters</p>
             </div>
             {selectedSchool && (
-              <button onClick={() => setShowImport(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+              <button type="button" onClick={() => setShowImport(true)} style={TOOLBAR_BUTTON}>
                 <Upload size={12} />Import Chapters
               </button>
             )}
           </div>
 
           {/* Search bar */}
-          <div className="px-6 py-3 border-b border-gray-100">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${CM_UI.border}` }}>
+            <div style={TOOLBAR_SEARCH}>
+              <Search size={14} color={CM_UI.textSubtle} />
               <input
                 type="text"
                 value={schoolSearch}
                 onChange={e => setSchoolSearch(e.target.value)}
                 onFocus={() => setSelectedSchool(null)}
                 placeholder="Search for a school to launch outbound..."
-                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]/40"
+                style={{
+                  flex: 1, border: 'none', outline: 'none', fontSize: '0.8125rem',
+                  background: 'transparent', fontFamily: 'inherit', color: CM_UI.text,
+                }}
               />
             </div>
             {schoolSearch && (
-              <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden shadow-lg">
+              <div style={{
+                marginTop: 8, border: `1px solid ${CM_UI.border}`, borderRadius: 10,
+                overflow: 'hidden', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.1)',
+              }}>
                 {filteredSchools.slice(0, 8).map(school => (
-                  <button key={school.id}
+                  <button
+                    key={school.id}
+                    type="button"
                     onClick={() => { setSelectedSchool(school); setSchoolSearch(''); }}
-                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-amber-50 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0">
-                    <span className="font-medium text-gray-800">{school.name}</span>
-                    <span className="text-xs text-gray-400">{school.fraternities.length + school.sororities.length} chapters</span>
+                    style={{
+                      width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: '0.8125rem',
+                      border: 'none', borderBottom: `1px solid ${CM_UI.border}`, background: '#fff',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <span style={{ fontWeight: 500, color: CM_UI.text }}>{school.name}</span>
+                    <span style={{ fontSize: '0.75rem', color: CM_UI.textSubtle }}>
+                      {school.fraternities.length + school.sororities.length} chapters
+                    </span>
                   </button>
                 ))}
                 {filteredSchools.length === 0 && (
-                  <div className="px-4 py-3 text-sm text-gray-400 text-center">No schools found</div>
+                  <div style={{ padding: '12px 14px', fontSize: '0.8125rem', color: CM_UI.textSubtle, textAlign: 'center' }}>
+                    No schools found
+                  </div>
                 )}
               </div>
             )}
@@ -1510,41 +1702,52 @@ export default function ClientMapPage() {
 
           {/* Drill-down or empty state */}
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C4874A]" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 0' }}>
+              <div style={{ width: 24, height: 24, borderRadius: 9999, border: `2px solid ${CM_UI.border}`, borderTopColor: CM_UI.ink, animation: 'spin 1s linear infinite' }} />
             </div>
           ) : selectedSchool ? (
             <div>
               {/* School header */}
-              <div className="px-6 py-3 bg-[#FAFAF8] border-b border-gray-100 flex items-center justify-between gap-3">
+              <div style={{
+                padding: '12px 16px', background: CM_UI.surfaceMuted, borderBottom: `1px solid ${CM_UI.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              }}>
                 <div>
-                  <p className="font-bold text-[#1B2A4A] text-sm">{selectedSchool.name}</p>
-                  <p className="text-xs text-gray-400">{selectedSchool.state}{selectedSchool.conference ? ` · ${selectedSchool.conference}` : ''} · {totalChaptersInSchool} chapters</p>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.8125rem', color: CM_UI.text }}>{selectedSchool.name}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: CM_UI.textSubtle }}>
+                    {selectedSchool.state}{selectedSchool.conference ? ` · ${selectedSchool.conference}` : ''} · {totalChaptersInSchool} chapters
+                  </p>
                 </div>
-                <button onClick={() => setSelectedSchool(null)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <button type="button" onClick={() => setSelectedSchool(null)} style={{
+                  ...TOOLBAR_BUTTON, height: 28, width: 28, padding: 0, border: 'none', background: 'transparent', color: CM_UI.textSubtle,
+                }}>
                   <X size={16} />
                 </button>
               </div>
 
               {/* Column headers */}
               {totalChaptersInSchool > 0 && (
-                <div className="flex items-center gap-3 px-5 py-2 border-b border-gray-100 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                  <span className="flex-1">Chapter</span>
-                  <span className="w-24 flex-shrink-0">Status</span>
-                  <span className="w-16 flex-shrink-0">Method</span>
-                  <span className="w-28 flex-shrink-0 hidden md:block">Contact</span>
-                  <span className="w-16 flex-shrink-0 hidden lg:block">Date</span>
-                  <span className="w-36 flex-shrink-0">Actions</span>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px',
+                  borderBottom: `1px solid ${CM_UI.border}`,
+                  fontSize: '0.625rem', fontWeight: 600, textTransform: 'uppercase',
+                  letterSpacing: '0.06em', color: CM_UI.textSubtle,
+                }}>
+                  <span style={{ flex: 1 }}>Chapter</span>
+                  <span style={{ width: 96, flexShrink: 0 }}>Status</span>
+                  <span style={{ width: 64, flexShrink: 0 }}>Method</span>
+                  <span style={{ width: 112, flexShrink: 0 }}>Contact</span>
+                  <span style={{ width: 64, flexShrink: 0 }}>Date</span>
+                  <span style={{ width: 144, flexShrink: 0 }}>Actions</span>
                 </div>
               )}
 
               {totalChaptersInSchool === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                  <Building2 size={28} className="text-gray-200 mb-3" />
-                  <p className="text-sm font-semibold text-gray-500">No chapters linked yet</p>
-                  <p className="text-xs mt-1 text-gray-400">Use Import to add chapters to this school</p>
-                  <button onClick={() => setShowImport(true)}
-                    className="mt-4 flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-[#1B2A4A] text-white hover:bg-[#243560] transition-colors">
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', color: CM_UI.textSubtle }}>
+                  <Building2 size={28} color={CM_UI.border} style={{ marginBottom: 12 }} />
+                  <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: CM_UI.textMuted }}>No chapters linked yet</p>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: CM_UI.textSubtle }}>Use Import to add chapters to this school</p>
+                  <button type="button" onClick={() => setShowImport(true)} style={{ ...TOOLBAR_BUTTON_PRIMARY, marginTop: 16 }}>
                     <Upload size={14} />Import Chapters
                   </button>
                 </div>
@@ -1562,12 +1765,23 @@ export default function ClientMapPage() {
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: '#C4874A12', border: '1.5px solid #C4874A30' }}>
-                <Target size={26} style={{ color: '#C4874A' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 12, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', marginBottom: 16,
+                background: CM_UI.surfaceMuted, border: `1px solid ${CM_UI.border}`, color: CM_UI.textSubtle,
+              }}>
+                <Target size={26} />
               </div>
-              <p className="text-base font-semibold text-[#1B2A4A]" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Select a school to see all chapters</p>
-              <p className="text-sm mt-2 text-gray-400 max-w-xs text-center leading-relaxed">Pick a school, then contact every frat and sorority in 30–45 minutes</p>
+              <p style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: CM_UI.text }}>
+                Select a school to see all chapters
+              </p>
+              <p style={{
+                margin: '8px 0 0', fontSize: '0.8125rem', color: CM_UI.textSubtle,
+                maxWidth: 280, textAlign: 'center', lineHeight: 1.5,
+              }}>
+                Pick a school, then contact every frat and sorority in 30–45 minutes
+              </p>
             </div>
           )}
         </div>
