@@ -11,8 +11,17 @@ interface SalesTabProps {
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
+type SalesStepKey = 'contract' | 'payment' | 'onboarding_form';
+
+interface SalesStepEdit {
+  checked: boolean;
+  date: string;
+  notes: string;
+  amount?: number | string;
+}
+
 interface SalesStep {
-  key: string;
+  key: SalesStepKey;
   label: string;
   icon: string;
   fields: {
@@ -70,7 +79,7 @@ const SALES_STEPS: SalesStep[] = [
   },
 ];
 
-function buildEdits(chapter: ChapterWithOnboarding) {
+function buildEdits(chapter: ChapterWithOnboarding): Record<SalesStepKey, SalesStepEdit> {
   return {
     contract: {
       checked: !!chapter.contract_signed,
@@ -99,7 +108,7 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
     setEdits(buildEdits(chapter));
   }, [chapter]);
 
-  async function saveStep(stepKey: string, step: SalesStep) {
+  async function saveStep(stepKey: SalesStepKey, step: SalesStep) {
     setSaving(stepKey);
     const edit = edits[stepKey];
 
@@ -109,7 +118,9 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
       [step.fields.notesKey]: edit.notes || null,
     };
     if (step.fields.amountKey) {
-      update[step.fields.amountKey] = edit.amount !== '' ? Number(edit.amount) : null;
+      update[step.fields.amountKey] = edit.amount !== '' && edit.amount !== undefined
+        ? Number(edit.amount)
+        : null;
     }
 
     try {
@@ -133,8 +144,11 @@ export default function SalesTab({ chapter, onUpdate, showToast }: SalesTabProps
     }
   }
 
-  function updateEdit(stepKey: string, field: string, value: unknown) {
-    setEdits(p => ({ ...p, [stepKey]: { ...p[stepKey], [field]: value } }));
+  function updateEdit(stepKey: SalesStepKey, field: keyof SalesStepEdit, value: unknown) {
+    setEdits((prev) => ({
+      ...prev,
+      [stepKey]: { ...prev[stepKey], [field]: value },
+    }));
   }
 
   const contractDone = edits.contract.checked;

@@ -32,7 +32,7 @@ export interface PipelineDealFull {
   organization?: {
     id: string;
     name: string;
-    school?: { id: string; name: string } | null;
+    school?: { id: string; name: string; conference?: string | null } | null;
     national_org?: { id: string; name: string } | null;
   } | null;
   contact?: {
@@ -40,12 +40,19 @@ export interface PipelineDealFull {
     name: string;
     email?: string | null;
     phone?: string | null;
+    role?: string | null;
   } | null;
   deal_contacts?: {
     id: string;
     contact_id: string;
     is_primary: boolean;
-    contact?: { id: string; name: string; email?: string | null; role?: string | null } | null;
+    contact?: {
+      id: string;
+      name: string;
+      email?: string | null;
+      phone?: string | null;
+      role?: string | null;
+    } | null;
   }[];
 }
 

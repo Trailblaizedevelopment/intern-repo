@@ -31,7 +31,13 @@ export function normalizeConference(name: string | null | undefined): string {
 
 export function getDealConference(deal: {
   conference?: string | null;
-  organization?: { school?: { conference?: string | null } | null } | null;
+  organization?: {
+    school?: {
+      id?: string;
+      name?: string;
+      conference?: string | null;
+    } | null;
+  } | null;
 }): string {
   const raw =
     deal.organization?.school?.conference ||
