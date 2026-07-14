@@ -95,6 +95,7 @@ function buildSystemPrompt(
   const hasCursor = toolNames.some(n => n.startsWith('cursor_'));
   const hasTasks = toolNames.some(n => n.startsWith('tasks_'));
   const hasTickets = toolNames.some(n => n.startsWith('tickets_'));
+  const hasSupabase = toolNames.some(n => n.startsWith('supabase_'));
 
   const toolGuidance: string[] = [];
   if (hasGitHub) {
@@ -123,6 +124,14 @@ function buildSystemPrompt(
   if (hasTickets) {
     toolGuidance.push(
       '- tickets_* reads the CRM Supabase ticket cache (board snapshot, assignee filters). Prefer linear_* for live Linear workflow state.'
+    );
+  }
+  if (hasSupabase) {
+    toolGuidance.push(
+      '- supabase_* tools: read-only Brain CRM views (brain_v_* only). Use for headcount, people, chapters, contacts.',
+      '- Call supabase_list_tables first — the catalog auto-discovers new brain_v_* views. Short names like "employees" map to brain_v_employees.',
+      '- Use supabase_count_rows for "how many" questions. Never invent SQL or query base tables (employees/contacts) directly — views only.',
+      '- If a view is not in the catalog, say you do not have access. Do NOT use supabase_* for tickets (tickets_* / linear_*) or GitHub.'
     );
   }
   if (hasCursor) {
@@ -158,7 +167,7 @@ function buildSystemPrompt(
     'Tool routing:',
     ...toolGuidance,
     '- Reference tickets by Linear identifier (e.g. TRA-238) when available.',
-    '- CRM cached tickets: tickets_* tools. Linear live issues: linear_* tools. Do not mix sources for the same question.',
+    '- CRM cached tickets: tickets_* tools. Linear live issues: linear_* tools. CRM people/data: supabase_* tools. Do not mix sources for the same question.',
     surface === 'slack'
       ? '- You are replying in Slack. Be concise. Use Slack mrkdwn (*bold*, • bullets). No emojis.'
       : '- Keep answers concise. Use markdown lists for multiple items.',
