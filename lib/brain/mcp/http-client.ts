@@ -229,6 +229,7 @@ export function isReadOnlyMcpTool(toolName: string): boolean {
 
 export function isWriteMcpTool(toolName: string): boolean {
   const n = toolName.toLowerCase();
+  if (n.startsWith('save_') || n.includes('_save_')) return true;
   const writePatterns = ['create', 'update', 'delete', 'remove', 'assign', 'archive', 'move'];
   return writePatterns.some(p => n.includes(p));
 }
