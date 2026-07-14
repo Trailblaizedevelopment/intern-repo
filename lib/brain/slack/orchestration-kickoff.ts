@@ -1,5 +1,6 @@
 import { BrainMessage, AgentRunResult } from '../agent';
 import { SLICE_DEFAULT_MAX_MINUTES } from '../intent-routing';
+import { buildLinearTicketTemplateGuidance } from '../linear-ticket-template';
 import { createBrainTask } from '../tasks/store';
 import { BrainTaskKind } from '../tasks/types';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -201,13 +202,14 @@ function buildSlackTicketCreateAppend(): string {
     'SLACK LINEAR TICKET CREATE (Lookup)',
     'Mode: Lookup — create a Linear issue. Do NOT call tasks_start_slice or tasks_start_goal.',
     'Your FIRST tool call MUST be linear_save_issue with:',
-    '  - title: concise invented title from the user request',
+    '  - title: Verb + what + where (actionable, one deliverable)',
     '  - team: Trailblaize (or team key TRA)',
-    '  - description: the user request (and any constraints) as markdown',
+    '  - description: markdown body per LINEAR TICKET FORMAT below (not a raw paste of the Slack message)',
     '  - priority: set only if clearly implied; otherwise omit',
+    buildLinearTicketTemplateGuidance(),
     'Do NOT call github_*, tickets_*, or linear_list_* / search before create unless the user asked to check for duplicates.',
-    'Ask at most one clarifying question only if you cannot invent a title from the message.',
-    'After create succeeds, reply with the Linear identifier (e.g. TRA-xxx) and URL. Keep the reply short.',
+    'Ask at most one clarifying question only if you cannot invent a title + at least two acceptance criteria from the message.',
+    'After create succeeds, reply with the Linear identifier (e.g. TRA-xxx), URL, and a one-line confirmation that AC were included. Keep the reply short.',
   ].join('\n');
 }
 

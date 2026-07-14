@@ -27,7 +27,7 @@ export function buildIntentRoutingPrompt(surface: 'workspace' | 'slack'): string
     '   Triggers: status questions, summaries, lists, "what is…", "show me…", "how many…", casual chat.',
     '   Also: "create/file/open/build a ticket", "add to the roadmap" — stay in Lookup and use Linear write tools.',
     '   Behavior: Answer in this thread using tools. Do NOT call tasks_start_goal or tasks_start_slice.',
-    '   Ticket create: first tool call should be linear_save_issue (title + team + description). Do NOT research github/tickets/list_issues first unless asked for duplicates.',
+    '   Ticket create: first tool call should be linear_save_issue with title (Verb + what + where), team, and description markdown using LINEAR TICKET FORMAT (Description + Acceptance criteria checklist; optional Steps/Files). Do NOT research github/tickets/list_issues first unless asked for duplicates.',
     '   If code change is mentioned casually, ask whether they want a *Slice* (one small PR) before starting work.',
     '',
     '2. *Slice* (focused implementation)',
