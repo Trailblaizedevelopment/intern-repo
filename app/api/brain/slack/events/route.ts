@@ -7,14 +7,16 @@ import {
   verifySlackSignature,
 } from '@/lib/brain/slack/verify';
 import { handleSlackChatMessage, stripBotMention } from '@/lib/brain/slack/handle-message';
+import { publishHomeView } from '@/lib/brain/slack/home';
 
 /**
  * POST /api/brain/slack/events
  *
- * Slack Events API — bidirectional Brain chat via @mention (channel) or DM.
+ * Slack Events API — bidirectional Brain chat via @mention (channel) or DM,
+ * plus App Home tab via views.publish.
  * Configure in Slack app: Event Subscriptions → Request URL → this endpoint.
  *
- * Subscribed events: app_mention, message.im
+ * Subscribed events: app_mention, message.im, app_home_opened
  */
 
 export const maxDuration = 120;
@@ -36,6 +38,8 @@ interface SlackEvent {
   thread_ts?: string;
   bot_id?: string;
   subtype?: string;
+  /** Present on app_home_opened — "home" | "messages" | "about" */
+  tab?: string;
 }
 
 async function isDuplicateEvent(eventId: string): Promise<boolean> {
@@ -92,12 +96,31 @@ function shouldHandleEvent(event: SlackEvent): { ok: true; text: string } | { ok
   return { ok: false };
 }
 
+async function handleAppHomeOpened(event: SlackEvent): Promise<void> {
+  if (event.tab && event.tab !== 'home') return;
+  if (!event.user) return;
+
+  const allowed = getAllowedSlackUserIds();
+  if (allowed.size > 0 && !allowed.has(event.user)) return;
+
+  const result = await publishHomeView(event.user);
+  if (!result.ok) {
+    console.error('[brain/slack/events] views.publish failed:', result.error);
+  }
+}
+
 async function processSlackEvent(envelope: SlackEventEnvelope): Promise<void> {
   const event = envelope.event;
   const eventId = envelope.event_id;
   if (!event || !eventId) return;
 
   if (await isDuplicateEvent(eventId)) return;
+
+  if (event.type === 'app_home_opened') {
+    await markEventProcessed(eventId);
+    await handleAppHomeOpened(event);
+    return;
+  }
 
   const parsed = shouldHandleEvent(event);
   if (!parsed.ok) return;
