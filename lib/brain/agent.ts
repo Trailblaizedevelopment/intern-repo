@@ -95,7 +95,7 @@ function buildSystemPrompt(
   const hasCursor = toolNames.some(n => n.startsWith('cursor_'));
   const hasTasks = toolNames.some(n => n.startsWith('tasks_'));
   const hasTickets = toolNames.some(n => n.startsWith('tickets_'));
-  const hasSupabase = toolNames.some(n => n.startsWith('supabase_'));
+  const hasSupabaseMcp = toolNames.some(n => n.startsWith('supabase_mcp_'));
 
   const toolGuidance: string[] = [];
   if (hasGitHub) {
@@ -126,12 +126,12 @@ function buildSystemPrompt(
       '- tickets_* reads the CRM Supabase ticket cache (board snapshot, assignee filters). Prefer linear_* for live Linear workflow state.'
     );
   }
-  if (hasSupabase) {
+  if (hasSupabaseMcp) {
     toolGuidance.push(
-      '- supabase_* tools: read-only Brain CRM views (brain_v_* only). Use for headcount, people, chapters, contacts.',
-      '- Call supabase_list_tables first — the catalog auto-discovers new brain_v_* views. Short names like "employees" map to brain_v_employees.',
-      '- Use supabase_count_rows for "how many" questions. Never invent SQL or query base tables (employees/contacts) directly — views only.',
-      '- If a view is not in the catalog, say you do not have access. Do NOT use supabase_* for tickets (tickets_* / linear_*) or GitHub.'
+      '- supabase_mcp_* tools: official Supabase MCP (read-only). Use for schema questions, table lists, and SELECT-style SQL via execute_sql.',
+      '- Prefer list_tables (verbose when needed) before execute_sql. Keep queries read-only SELECTs with LIMIT; never attempt DDL/DML.',
+      '- Do NOT use supabase_mcp_* for Linear tickets or GitHub — use linear_* / tickets_* / github_* instead.',
+      '- If a tool errors or returns no rows, say so plainly.'
     );
   }
   if (hasCursor) {
@@ -167,7 +167,7 @@ function buildSystemPrompt(
     'Tool routing:',
     ...toolGuidance,
     '- Reference tickets by Linear identifier (e.g. TRA-238) when available.',
-    '- CRM cached tickets: tickets_* tools. Linear live issues: linear_* tools. CRM people/data: supabase_* tools. Do not mix sources for the same question.',
+    '- CRM cached tickets: tickets_* tools. Linear live issues: linear_* tools. Database schema/SQL: supabase_mcp_* tools. Do not mix sources for the same question.',
     surface === 'slack'
       ? '- You are replying in Slack. Be concise. Use Slack mrkdwn (*bold*, • bullets). No emojis.'
       : '- Keep answers concise. Use markdown lists for multiple items.',
@@ -202,6 +202,7 @@ function createConnectorContext(
     surface: options.surface ?? 'workspace',
     slackChannel: options.slackChannel ?? null,
     slackThreadTs: options.slackThreadTs ?? null,
+    slackUserId: options.slackUserId ?? null,
   };
 }
 
