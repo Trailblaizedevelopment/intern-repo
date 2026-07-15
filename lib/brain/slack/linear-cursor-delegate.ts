@@ -10,13 +10,10 @@ import {
   fetchLinearIssueSummary,
 } from '../linear-delegate';
 import { extractLinearIssueId, isLinearTicketCreateIntent } from './orchestration-kickoff';
+import { isStartWorkIntent } from './ticket-intent';
 import { isTicketStatusIntent } from './ticket-status';
 
 export const LINEAR_CURSOR_DELEGATE_KIND = 'linear_cursor_delegate' as const;
-
-/** Implement / handoff phrasing — not ticket create and not status Lookup. */
-const IMPLEMENT_SIGNALS =
-  /\b(implement|fix|slice|dispatch\s+cursor|assign\s+(to\s+)?cursor|hand\s*off|handoff|work\s+on|do\s+the\s+work|ship\s+it)\b/i;
 
 export interface PendingLinearCursorDelegate {
   kind: typeof LINEAR_CURSOR_DELEGATE_KIND;
@@ -30,8 +27,10 @@ export interface PendingLinearCursorDelegate {
 /** True when user wants Cursor to implement an existing Linear ticket. */
 export function isTicketImplementIntent(message: string): boolean {
   const text = message.trim();
-  if (!text || isLinearTicketCreateIntent(text) || isTicketStatusIntent(text)) return false;
-  return IMPLEMENT_SIGNALS.test(text);
+  if (!text || isLinearTicketCreateIntent(text)) return false;
+  // Status Lookup wins only when there is no start/implement verb (see isTicketStatusIntent).
+  if (isTicketStatusIntent(text)) return false;
+  return isStartWorkIntent(text);
 }
 
 export function isPendingLinearCursorDelegate(
