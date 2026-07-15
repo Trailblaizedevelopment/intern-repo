@@ -11,6 +11,8 @@ export const HOME_QUICK_PROMPTS: Record<string, string> = {
   home_qp_github_prs: 'List open pull requests on GitHub.',
   home_qp_create_ticket:
     'I want to create a Linear ticket. Ask me for title, description, and team, then create it.',
+  home_qp_ticket_progress:
+    'I want a progress update on a Linear ticket. Ask me for the TRA id (e.g. TRA-123), then report status, recent comments, and Cursor Cloud progress if available.',
 };
 
 function getSlackTeamId(): string {
@@ -92,6 +94,11 @@ function buildHomeBlocks(userId: string): SlackBlock[] {
           action_id: 'home_qp_create_ticket',
           text: { type: 'plain_text', text: 'Create a Linear ticket', emoji: true },
         },
+        {
+          type: 'button',
+          action_id: 'home_qp_ticket_progress',
+          text: { type: 'plain_text', text: 'Ticket progress', emoji: true },
+        },
       ],
     },
     { type: 'divider' },
@@ -102,10 +109,9 @@ function buildHomeBlocks(userId: string): SlackBlock[] {
         text:
           '*What I can do*\n' +
           '• *Lookup* — status, lists, summaries, create Linear tickets\n' +
-          '• *Ticket progress* — *progress on TRA-123* / *status of TRA-123* (Linear + Cursor Cloud when linked)\n' +
-          '• *Hand off to Cursor* — say *fix TRA-123* / *implement TRA-123*; I confirm, then assign Cursor on Linear\n' +
-          '• Slice/Goal queues are frozen (ops: `BRAIN_SLICE_GOAL_ENABLED=true` to re-enable)\n' +
-          'Say what you need in Messages.',
+          '• *Ticket progress* — *progress on TRA-123* (Linear state + comments + Cursor Cloud when linked)\n' +
+          '• *Hand off to Cursor* — *fix TRA-123* / *implement TRA-123* → I confirm, then assign Cursor on Linear\n' +
+          'Ask in Messages; I stay in Lookup and never invent Slice/Goal queues.',
       },
     },
     {
@@ -118,7 +124,7 @@ function buildHomeBlocks(userId: string): SlackBlock[] {
           linearAccessNote() +
           '• *CRM tickets* — pipeline / ticket status\n' +
           '• *Supabase* — Trailblaize 1.0 (web) + Growth Space (CRM) read access\n' +
-          '• *Cursor* — assign on Linear when you approve; progress via Cloud Agents API when `CURSOR_API_KEY` is set',
+          '• *Cursor* — assign on Linear (`BRAIN_LINEAR_DELEGATE_CURSOR=true`); progress via Cloud Agents API (`CURSOR_API_KEY`)',
       },
     },
   ];
