@@ -13,6 +13,12 @@ import { pickSlackAckPhrase } from './ack-phrases';
 import { postSlackMessage, postSlackMessageReturningTs, replaceSlackThreadReply } from './client';
 import { formatAgentReplyForSlack } from './format-reply';
 import {
+  denyPendingLinearCursorDelegate,
+  executeApprovedLinearCursorDelegate,
+  findPendingLinearCursorDelegate,
+  tryStartLinearCursorDelegateFlow,
+} from './linear-cursor-delegate';
+import {
   buildSlackOrchestrationAppend,
   tryOrchestrationKickoff,
 } from './orchestration-kickoff';
@@ -123,6 +129,39 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
   const existing = await loadSlackConversation(convoTitle);
   let conversationId = existing?.id ?? null;
 
+  const pendingLinearDelegate = await findPendingLinearCursorDelegate(
+    supabase,
+    ctx.channel,
+    ctx.threadTs
+  );
+
+  if (pendingLinearDelegate && isCursorApprovalMessage(message)) {
+    const placeholder = await postSlackMessageReturningTs(
+      ctx.channel,
+      pickSlackAckPhrase(),
+      ctx.threadTs
+    );
+    const text = await executeApprovedLinearCursorDelegate(
+      supabase,
+      pendingLinearDelegate.pending
+    );
+    if (placeholder.ok && placeholder.ts) {
+      await replaceSlackThreadReply(ctx.channel, placeholder.ts, ctx.threadTs, text);
+    } else {
+      await postSlackMessage(ctx.channel, text, ctx.threadTs);
+    }
+    return;
+  }
+
+  if (pendingLinearDelegate && isCursorDenialMessage(message)) {
+    const text = await denyPendingLinearCursorDelegate(
+      supabase,
+      pendingLinearDelegate.pending
+    );
+    await postSlackMessage(ctx.channel, text, ctx.threadTs);
+    return;
+  }
+
   const pendingDispatch = await findPendingDispatchForSlackThread(
     supabase,
     ctx.channel,
@@ -161,10 +200,10 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
     return;
   }
 
-  if (isCursorApprovalMessage(message) && !pendingDispatch) {
+  if (isCursorApprovalMessage(message) && !pendingDispatch && !pendingLinearDelegate) {
     await postSlackMessage(
       ctx.channel,
-      'No pending Cursor dispatch in this thread. If a task is looping, reply *stop* to cancel it.',
+      'No pending Cursor handoff in this thread. Ask me to implement a TRA ticket (e.g. *fix TRA-123*), or reply *stop* if an old task is stuck.',
       ctx.threadTs
     );
     return;
@@ -188,32 +227,53 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
 
   let result;
   try {
-    const kickoff = await tryOrchestrationKickoff({
+    const delegateStart = await tryStartLinearCursorDelegateFlow({
       message,
       history,
-      ctx,
       supabase,
-      employeeId: employee.employeeId,
       conversationId,
+      channel: ctx.channel,
+      threadTs: ctx.threadTs,
+      employeeId: employee.employeeId,
     });
 
-    if (kickoff) {
-      result = kickoff;
+    if (delegateStart) {
+      if (delegateStart.conversationId) {
+        conversationId = delegateStart.conversationId;
+      }
+      result = {
+        reply: delegateStart.reply,
+        messages: delegateStart.messages,
+        toolEvents: [],
+      };
     } else {
-      history.push({ role: 'user', content: message });
-      result = await runBrainAgent(
+      const kickoff = await tryOrchestrationKickoff({
+        message,
         history,
-        { supabase, employeeId: employee.employeeId },
-        employee.employeeName,
-        {
-          surface: 'slack',
-          conversationId,
-          slackChannel: ctx.channel,
-          slackThreadTs: ctx.threadTs,
-          slackUserId: ctx.userId,
-          systemAppend: buildSlackOrchestrationAppend(message, history.slice(0, -1)),
-        }
-      );
+        ctx,
+        supabase,
+        employeeId: employee.employeeId,
+        conversationId,
+      });
+
+      if (kickoff) {
+        result = kickoff;
+      } else {
+        history.push({ role: 'user', content: message });
+        result = await runBrainAgent(
+          history,
+          { supabase, employeeId: employee.employeeId },
+          employee.employeeName,
+          {
+            surface: 'slack',
+            conversationId,
+            slackChannel: ctx.channel,
+            slackThreadTs: ctx.threadTs,
+            slackUserId: ctx.userId,
+            systemAppend: buildSlackOrchestrationAppend(message, history.slice(0, -1)),
+          }
+        );
+      }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Agent run failed';

@@ -102,9 +102,9 @@ function buildHomeBlocks(userId: string): SlackBlock[] {
         text:
           '*What I can do*\n' +
           '• *Lookup* — status, lists, summaries, create Linear tickets\n' +
-          '• *Slice* — one focused fix / small PR via Cursor\n' +
-          '• *Goal* — longer multi-step background work\n' +
-          'Say what you need in Messages; I pick the mode.',
+          '• *Hand off to Cursor* — say *fix TRA-123* / *implement TRA-123*; I confirm, then assign Cursor on Linear\n' +
+          '• Slice/Goal queues are frozen (ops: `BRAIN_SLICE_GOAL_ENABLED=true` to re-enable)\n' +
+          'Say what you need in Messages.',
       },
     },
     {
@@ -117,7 +117,7 @@ function buildHomeBlocks(userId: string): SlackBlock[] {
           linearAccessNote() +
           '• *CRM tickets* — pipeline / ticket status\n' +
           '• *Supabase* — Trailblaize 1.0 (web) + Growth Space (CRM) read access\n' +
-          '• *Cursor / tasks* — dispatch implementation work when you ask',
+          '• *Cursor* — assign on Linear when you approve (`BRAIN_LINEAR_DELEGATE_CURSOR=true`)',
       },
     },
   ];

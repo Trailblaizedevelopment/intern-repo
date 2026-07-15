@@ -1,6 +1,6 @@
 /**
- * Three conversation scopes for Brain chat — Lookup (default), Slice, Goal.
- * Used in the agent system prompt; task_kind on brain_tasks backs Slice vs Goal at runtime.
+ * Conversation scopes for Brain chat — Lookup (default) and optional frozen Slice/Goal.
+ * TRA-900: implement path is Linear Cursor delegate, not Slice/Goal.
  */
 
 export type BrainIntentMode = 'lookup' | 'slice' | 'goal';
@@ -20,31 +20,19 @@ export function buildIntentRoutingPrompt(surface: 'workspace' | 'slack'): string
   return [
     'INTENT ROUTING (required — classify every new user message before tools):',
     '',
-    'Default to *Lookup* unless the user clearly asks for implementation or sustained background work.',
+    'Default to *Lookup*. Dynamo does not implement code and does not start Slice/Goal (frozen unless ops re-enable).',
     `State the chosen mode in your first line, e.g. *Mode: Lookup* (${modeLabel} bold).`,
     '',
-    '1. *Lookup* (DEFAULT)',
+    '1. *Lookup* (DEFAULT — nearly always)',
     '   Triggers: status questions, summaries, lists, "what is…", "show me…", "how many…", casual chat.',
-    '   Also: "create/file/open/build a ticket", "add to the roadmap" — stay in Lookup and use Linear write tools.',
+    '   Ticket create: "create/file/open/build a ticket", "add to the roadmap" → linear_save_issue with LINEAR TICKET FORMAT. Never assign Cursor.',
+    '   Implement / fix / slice / handoff with a TRA-xxx id is handled outside the agent (Slack confirm → Linear Cursor delegate). Do NOT call tasks_start_* or cursor_dispatch_agent for that.',
     '   Behavior: Answer in this thread using tools. Do NOT call tasks_start_goal or tasks_start_slice.',
-    '   Ticket create: first tool call should be linear_save_issue with title (Verb + what + where), team, and description markdown using LINEAR TICKET FORMAT (Description + Acceptance criteria checklist; optional Steps/Files). Do NOT research github/tickets/list_issues first unless asked for duplicates.',
-    '   If code change is mentioned casually, ask whether they want a *Slice* (one small PR) before starting work.',
     '',
-    '2. *Slice* (focused implementation)',
-    '   Triggers: "fix X", "implement", "small PR", "dispatch Cursor", single Linear ticket with clear scope.',
-    '   NOT triggers: "create/build a ticket" (that is Lookup → linear_save_issue).',
-    '   Behavior: FIRST tool call MUST be tasks_start_slice — embed the full user request in goal. One Cursor dispatch max.',
-    '   Do NOT call linear_*, github_*, or tickets_* before queueing. Research happens in the background runner, NOT in Slack chat.',
-    '   If this thread already has Lookup answers, reuse them in the goal text — do not re-fetch.',
-    '   Do NOT use tasks_start_goal for small fixes. If research-only (no code), stay in Lookup.',
+    '2. *Slice* / *Goal* — FROZEN (TRA-900)',
+    '   Do NOT start Slice or Goal. If the user asks to "work on for an hour" or "slice", tell them to use a Linear ticket + implement phrasing so Dynamo can ask to assign Cursor on Linear.',
+    '   Legacy tasks may still exist; you may answer status via tasks_list_active / tasks_get_status only.',
     '',
-    '3. *Goal* (extended background work)',
-    '   Triggers: "work on for an hour", "keep iterating", multi-step epics, multiple PRs, vague large scope.',
-    '   Behavior: FIRST tool call MUST be tasks_start_goal — embed the full user request in goal.',
-    '   Do NOT research in Slack chat before queueing. Background runner handles iterations.',
-    '   Confirm briefly if the scope sounds like a Slice instead (one PR).',
-    '',
-    'Ambiguous implementation request → prefer Slice over Goal. Ambiguous question → Lookup.',
-    'Never start Goal or Slice for pure information requests.',
+    'Ambiguous question → Lookup. Never invent implementation work Dynamo will do itself.',
   ].join('\n');
 }

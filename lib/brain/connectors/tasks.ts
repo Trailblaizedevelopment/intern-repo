@@ -6,6 +6,7 @@ import {
   updateTaskStatus,
 } from '../tasks/store';
 import { SLICE_DEFAULT_MAX_MINUTES } from '../intent-routing';
+import { isSliceGoalEnabled } from '../slack/orchestration-kickoff';
 import { postSlackMessage } from '../slack/client';
 import {
   BrainConnector,
@@ -20,7 +21,7 @@ const TOOLS: ConnectorTool[] = [
   {
     name: 'tasks_start_slice',
     description:
-      'Start a focused Slice: one small PR, ~15 min budget, max one Cursor dispatch. Use for fixes and single-scope implementation — NOT for questions or multi-hour work.',
+      'FROZEN by default (TRA-900). Only works when BRAIN_SLICE_GOAL_ENABLED=true. Prefer Slack "fix TRA-xxx" → Linear Cursor delegate.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -34,7 +35,7 @@ const TOOLS: ConnectorTool[] = [
   {
     name: 'tasks_start_goal',
     description:
-      'Start a durable Goal: multi-step background work for an extended period. Use only when the user wants sustained iteration — NOT for lookups or single-PR fixes.',
+      'FROZEN by default (TRA-900). Only works when BRAIN_SLICE_GOAL_ENABLED=true. Prefer Linear ticket + Cursor assign.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -107,6 +108,14 @@ async function startTask(
   input: Record<string, unknown>,
   taskKind: 'slice' | 'goal'
 ): Promise<ConnectorCallResult> {
+  if (!isSliceGoalEnabled()) {
+    return {
+      ok: false,
+      error:
+        'Slice/Goal are frozen (TRA-900). Ask the user to say "fix TRA-xxx" so Dynamo can assign Cursor on Linear, or set BRAIN_SLICE_GOAL_ENABLED=true to re-enable legacy queues.',
+    };
+  }
+
   const goal = String(input.goal || '').trim();
   if (!goal) return { ok: false, error: 'goal is required' };
 

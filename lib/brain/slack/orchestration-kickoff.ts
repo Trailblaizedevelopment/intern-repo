@@ -42,8 +42,16 @@ export function isLinearTicketCreateIntent(message: string): boolean {
   return LINEAR_TICKET_CREATE.test(text);
 }
 
+/** Slice/Goal orchestration is frozen unless explicitly re-enabled (TRA-900). */
+export function isSliceGoalEnabled(): boolean {
+  return process.env.BRAIN_SLICE_GOAL_ENABLED === 'true';
+}
+
 /** Detect Slice vs Goal kickoff from user message (not Lookup). */
 export function detectOrchestrationKickoff(message: string): BrainTaskKind | null {
+  // TRA-900: default off — implement path is Linear Cursor delegate, not brain_tasks.
+  if (!isSliceGoalEnabled()) return null;
+
   const text = message.trim();
   if (!text || LOOKUP_ONLY.test(text) || QUESTION_ONLY.test(text)) return null;
 
