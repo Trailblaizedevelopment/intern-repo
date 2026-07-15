@@ -78,10 +78,45 @@ export interface LinearIssueSummary {
   description: string | null;
 }
 
+export interface LinearIssueCommentDigest {
+  author: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface LinearIssueStatusBundle {
+  id: string;
+  identifier: string;
+  title: string;
+  url: string;
+  description: string | null;
+  stateName: string;
+  stateType: string;
+  assigneeName: string | null;
+  delegateName: string | null;
+  comments: LinearIssueCommentDigest[];
+  attachmentUrls: string[];
+}
+
 /** Fetch title/url for Slack confirm (Path A). */
 export async function fetchLinearIssueSummary(
   linearIdentifier: string
 ): Promise<LinearIssueSummary | null> {
+  const status = await fetchLinearIssueStatusBundle(linearIdentifier);
+  if (!status) return null;
+  return {
+    id: status.id,
+    identifier: status.identifier,
+    title: status.title,
+    url: status.url,
+    description: status.description,
+  };
+}
+
+/** Full status bundle for Lookup progress reports (TRA-901). */
+export async function fetchLinearIssueStatusBundle(
+  linearIdentifier: string
+): Promise<LinearIssueStatusBundle | null> {
   const parsed = parseLinearIdentifier(linearIdentifier);
   if (!parsed) return null;
 
@@ -94,12 +129,42 @@ export async function fetchLinearIssueSummary(
           title: string;
           description: string | null;
           url: string;
+          state: { name: string; type: string } | null;
+          assignee: { name: string; displayName: string } | null;
+          delegate: { name: string; displayName: string } | null;
+          comments: {
+            nodes: Array<{
+              body: string;
+              createdAt: string;
+              user: { name: string; displayName: string } | null;
+            }>;
+          };
+          attachments: { nodes: Array<{ url: string; title: string | null }> };
         }>;
       };
     }>(
       `query($filter: IssueFilter!) {
         issues(filter: $filter, first: 1) {
-          nodes { id identifier title description url }
+          nodes {
+            id
+            identifier
+            title
+            description
+            url
+            state { name type }
+            assignee { name displayName }
+            delegate { name displayName }
+            comments(first: 12, orderBy: createdAt) {
+              nodes {
+                body
+                createdAt
+                user { name displayName }
+              }
+            }
+            attachments {
+              nodes { url title }
+            }
+          }
         }
       }`,
       {
@@ -112,12 +177,34 @@ export async function fetchLinearIssueSummary(
 
     const issue = data.issues.nodes[0];
     if (!issue) return null;
+
+    const person = (u: { name: string; displayName: string } | null): string | null => {
+      if (!u) return null;
+      return u.displayName || u.name || null;
+    };
+
     return {
       id: issue.id,
       identifier: issue.identifier,
       title: issue.title,
       url: issue.url,
       description: issue.description,
+      stateName: issue.state?.name || 'Unknown',
+      stateType: issue.state?.type || 'unknown',
+      assigneeName: person(issue.assignee),
+      delegateName: person(issue.delegate),
+      comments: (issue.comments?.nodes || [])
+        .slice()
+        .reverse()
+        .map(c => ({
+          author: person(c.user) || 'Unknown',
+          body: (c.body || '').trim(),
+          createdAt: c.createdAt,
+        }))
+        .filter(c => c.body.length > 0),
+      attachmentUrls: (issue.attachments?.nodes || [])
+        .map(a => a.url)
+        .filter((u): u is string => typeof u === 'string' && u.length > 0),
     };
   } catch {
     return null;

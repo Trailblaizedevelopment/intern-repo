@@ -150,8 +150,9 @@ function buildSystemPrompt(
   }
   if (hasCursor) {
     toolGuidance.push(
-      '- TRA-900: Do NOT call cursor_dispatch_agent from Slack Lookup. Ticket implement = Slack confirm → Linear assign Cursor (outside this agent loop).',
-      '- cursor_dispatch_agent remains only for legacy Slice/Goal runners if BRAIN_SLICE_GOAL_ENABLED=true. Never pass approved=true yourself.'
+      '- TRA-900/TRA-901: Do NOT call cursor_dispatch_agent from Slack Lookup. Ticket implement = Slack confirm → Linear assign Cursor; ticket progress = Slack status Lookup (Linear + Cloud heuristics).',
+      '- cursor_dispatch_agent remains only for legacy Slice/Goal runners if BRAIN_SLICE_GOAL_ENABLED=true. Never pass approved=true yourself.',
+      '- cursor_get_agent is for a known bc-… id only; prefer "progress on TRA-xxx" for ticket status.'
     );
   }
   if (hasTasks) {
