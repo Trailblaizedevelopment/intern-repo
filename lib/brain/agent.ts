@@ -150,21 +150,15 @@ function buildSystemPrompt(
   }
   if (hasCursor) {
     toolGuidance.push(
-      '- cursor_dispatch_agent pauses for Slack approval (awaiting_approval) — user must reply yes dispatch. Never pass approved=true yourself.',
-      '- Use cursor_dispatch_agent for implementation inside an active Slice or Goal task. Do not dispatch from Lookup mode.',
-      '- PRs target the task integration feature branch (feature/TRA-xxx-...) — NEVER develop or main.',
-      '- Integration branch is created from develop automatically. Humans merge feature → develop after review.',
-      '- Goal tasks: follow_up=true allowed after cursor PR merges into integration branch. Slice tasks: one dispatch only.',
-      '- Runner polls Cursor and PR merge into integration branch automatically.'
+      '- TRA-900: Do NOT call cursor_dispatch_agent from Slack Lookup. Ticket implement = Slack confirm → Linear assign Cursor (outside this agent loop).',
+      '- cursor_dispatch_agent remains only for legacy Slice/Goal runners if BRAIN_SLICE_GOAL_ENABLED=true. Never pass approved=true yourself.'
     );
   }
   if (hasTasks) {
     toolGuidance.push(
-      '- tasks_start_slice / tasks_start_goal from Slack chat: queue on the FIRST tool call. Never research before queueing.',
-      '- tasks_start_slice: focused one-PR work (~15 min). Use for fixes and small changes — NOT for questions.',
-      '- tasks_start_goal: multi-step background work (e.g. "work on this for an hour"). NOT for quick lookups or single-file fixes.',
-      '- During an active task iteration, call tasks_complete when done, tasks_block if you need human input, or cursor_dispatch_agent for code changes.',
-      '- tasks_list_active / tasks_get_status: answer status questions without starting new work.'
+      '- TRA-900: Slice/Goal are frozen. Do NOT call tasks_start_slice or tasks_start_goal from Slack.',
+      '- For "fix/implement TRA-xxx": the Slack handler asks to assign Cursor on Linear — do not invent a task queue.',
+      '- tasks_list_active / tasks_get_status: answer status questions for any legacy tasks without starting new work.'
     );
   }
 

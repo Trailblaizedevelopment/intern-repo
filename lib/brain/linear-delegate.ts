@@ -70,14 +70,82 @@ export interface DelegateToCursorResult {
   skipped?: boolean;
 }
 
+export interface LinearIssueSummary {
+  id: string;
+  identifier: string;
+  title: string;
+  url: string;
+  description: string | null;
+}
+
+/** Fetch title/url for Slack confirm (Path A). */
+export async function fetchLinearIssueSummary(
+  linearIdentifier: string
+): Promise<LinearIssueSummary | null> {
+  const parsed = parseLinearIdentifier(linearIdentifier);
+  if (!parsed) return null;
+
+  try {
+    const data = await linearGQLWithApiKey<{
+      issues: {
+        nodes: Array<{
+          id: string;
+          identifier: string;
+          title: string;
+          description: string | null;
+          url: string;
+        }>;
+      };
+    }>(
+      `query($filter: IssueFilter!) {
+        issues(filter: $filter, first: 1) {
+          nodes { id identifier title description url }
+        }
+      }`,
+      {
+        filter: {
+          number: { eq: parsed.number },
+          team: { key: { eq: parsed.teamKey } },
+        },
+      }
+    );
+
+    const issue = data.issues.nodes[0];
+    if (!issue) return null;
+    return {
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      url: issue.url,
+      description: issue.description,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function isLinearCursorDelegateEnabled(): boolean {
+  return process.env.BRAIN_LINEAR_DELEGATE_CURSOR === 'true';
+}
+
 /**
  * Delegate a Linear issue to the Cursor app user (triggers Linear ↔ Cursor integration).
  * Set LINEAR_CURSOR_DELEGATE_ID if auto-lookup fails.
+ *
+ * @param options.required — when true (Path A), fail instead of silently skipping if env is off.
  */
 export async function delegateLinearIssueToCursor(
-  linearIdentifier: string
+  linearIdentifier: string,
+  options?: { required?: boolean }
 ): Promise<DelegateToCursorResult> {
-  if (process.env.BRAIN_LINEAR_DELEGATE_CURSOR !== 'true') {
+  if (!isLinearCursorDelegateEnabled()) {
+    if (options?.required) {
+      return {
+        ok: false,
+        error:
+          'Linear Cursor delegate is disabled. Set BRAIN_LINEAR_DELEGATE_CURSOR=true on the Brain deployment.',
+      };
+    }
     return { ok: true, skipped: true };
   }
 

@@ -159,9 +159,11 @@ export async function findPendingDispatchForSlackThread(
     .eq('title', convoTitle)
     .maybeSingle();
 
-  if (convo?.pending_action) {
+  const action = convo?.pending_action as PendingCursorDispatch | null;
+  // TRA-900: conversation pending_action may be linear_cursor_delegate — ignore here.
+  if (action && action.kind === 'cursor_dispatch') {
     return {
-      pending: convo.pending_action as PendingCursorDispatch,
+      pending: action,
       source: 'conversation',
     };
   }
