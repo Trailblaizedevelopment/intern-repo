@@ -49,7 +49,8 @@ const TOOLS: ConnectorTool[] = [
   },
   {
     name: 'cursor_get_agent',
-    description: 'Get status of a Cursor Cloud Agent by id (includes latest run status).',
+    description:
+      'Get status of a Cursor Cloud Agent by id (bc-...). Prefer Slack "progress on TRA-xxx" status path for ticket progress — it resolves Linear + Cloud heuristics.',
     inputSchema: {
       type: 'object',
       properties: {

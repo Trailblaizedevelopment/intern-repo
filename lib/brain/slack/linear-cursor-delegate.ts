@@ -4,16 +4,17 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { BrainMessage } from '../agent';
 import {
   delegateLinearIssueToCursor,
   fetchLinearIssueSummary,
 } from '../linear-delegate';
-import { BrainMessage } from '../agent';
 import { extractLinearIssueId, isLinearTicketCreateIntent } from './orchestration-kickoff';
+import { isTicketStatusIntent } from './ticket-status';
 
 export const LINEAR_CURSOR_DELEGATE_KIND = 'linear_cursor_delegate' as const;
 
-/** Implement / handoff phrasing — not ticket create. */
+/** Implement / handoff phrasing — not ticket create and not status Lookup. */
 const IMPLEMENT_SIGNALS =
   /\b(implement|fix|slice|dispatch\s+cursor|assign\s+(to\s+)?cursor|hand\s*off|handoff|work\s+on|do\s+the\s+work|ship\s+it)\b/i;
 
@@ -29,7 +30,7 @@ export interface PendingLinearCursorDelegate {
 /** True when user wants Cursor to implement an existing Linear ticket. */
 export function isTicketImplementIntent(message: string): boolean {
   const text = message.trim();
-  if (!text || isLinearTicketCreateIntent(text)) return false;
+  if (!text || isLinearTicketCreateIntent(text) || isTicketStatusIntent(text)) return false;
   return IMPLEMENT_SIGNALS.test(text);
 }
 

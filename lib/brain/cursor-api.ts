@@ -156,3 +156,64 @@ export function isCursorRunActive(status: string): boolean {
   const upper = status.toUpperCase();
   return ACTIVE_RUN_STATUSES.has(upper) || upper === 'ACTIVE';
 }
+
+export interface CursorAgentListItem {
+  id: string;
+  name: string;
+  status: string;
+  url: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  latestRunId: string | null;
+  startingRefs: string[];
+  prUrls: string[];
+  repoUrls: string[];
+}
+
+/** List recent Cloud agents (newest first). Used to resolve TRA → agent heuristics. */
+export async function listCursorAgents(options?: {
+  limit?: number;
+  cursor?: string;
+}): Promise<{ items: CursorAgentListItem[]; nextCursor: string | null }> {
+  const limit = Math.min(Math.max(options?.limit ?? 50, 1), 100);
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (options?.cursor) params.set('cursor', options.cursor);
+
+  const res = await cursorFetch(`/v1/agents?${params.toString()}`, { method: 'GET' });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Cursor API ${res.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as {
+    items?: Array<Record<string, unknown>>;
+    nextCursor?: string;
+  };
+
+  const items: CursorAgentListItem[] = (data.items || []).map(item => {
+    const repos = Array.isArray(item.repos) ? (item.repos as Array<Record<string, unknown>>) : [];
+    const startingRefs: string[] = [];
+    const prUrls: string[] = [];
+    const repoUrls: string[] = [];
+    for (const repo of repos) {
+      if (typeof repo.startingRef === 'string' && repo.startingRef) startingRefs.push(repo.startingRef);
+      if (typeof repo.prUrl === 'string' && repo.prUrl) prUrls.push(repo.prUrl);
+      if (typeof repo.url === 'string' && repo.url) repoUrls.push(repo.url);
+    }
+    return {
+      id: String(item.id || ''),
+      name: String(item.name || ''),
+      status: String(item.status || 'UNKNOWN'),
+      url: typeof item.url === 'string' ? item.url : null,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : null,
+      updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : null,
+      latestRunId: typeof item.latestRunId === 'string' ? item.latestRunId : null,
+      startingRefs,
+      prUrls,
+      repoUrls,
+    };
+  });
+
+  return { items, nextCursor: typeof data.nextCursor === 'string' ? data.nextCursor : null };
+}
+
