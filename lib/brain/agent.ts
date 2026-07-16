@@ -20,7 +20,10 @@ import { buildLinearTicketTemplateGuidance } from './linear-ticket-template';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 /** Override via BRAIN_MODEL env. Must be a valid Anthropic model id with tool-use support. */
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
-const MAX_TOOL_ITERATIONS = parseInt(process.env.BRAIN_MAX_TOOL_ITERATIONS || '8', 10) || 8;
+export const MAX_TOOL_ITERATIONS = parseInt(process.env.BRAIN_MAX_TOOL_ITERATIONS || '8', 10) || 8;
+/** Extra headroom for ticket-create (research + save) without burning default Lookup budget. */
+export const TICKET_CREATE_MAX_TOOL_ITERATIONS =
+  parseInt(process.env.BRAIN_TICKET_CREATE_MAX_ITERATIONS || '12', 10) || 12;
 const MAX_TOKENS = 2048;
 
 interface TextBlock {
@@ -47,6 +50,52 @@ type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock;
 export interface BrainMessage {
   role: 'user' | 'assistant';
   content: string | ContentBlock[];
+}
+
+function textFromMessageContent(content: BrainMessage['content']): string {
+  if (typeof content === 'string') return content.trim();
+  return content
+    .filter((b): b is TextBlock => b.type === 'text')
+    .map(b => b.text)
+    .join('\n')
+    .trim();
+}
+
+/**
+ * Drop tool_use / tool_result blocks before persisting Slack thread history.
+ * Raw tool chains + slice(-40) orphan tool_result ids and break the Anthropic API on the next turn.
+ */
+export function compactBrainMessagesForStorage(messages: BrainMessage[]): BrainMessage[] {
+  const out: BrainMessage[] = [];
+  for (const msg of messages) {
+    const text = textFromMessageContent(msg.content);
+    if (!text) continue;
+    const last = out[out.length - 1];
+    if (last && last.role === msg.role && typeof last.content === 'string') {
+      last.content = `${last.content}\n\n${text}`;
+      continue;
+    }
+    out.push({ role: msg.role, content: text });
+  }
+  return out;
+}
+
+/** Normalize stored history before sending to Anthropic (repairs legacy tool-chain rows). */
+export function prepareBrainMessagesForApi(messages: BrainMessage[]): BrainMessage[] {
+  return compactBrainMessagesForStorage(messages);
+}
+
+function extractLinearSaveReply(toolEvents: ToolEvent[]): string | null {
+  const save = [...toolEvents].reverse().find(e => e.ok && e.name === 'linear_save_issue');
+  if (!save?.output) return null;
+  const raw = typeof save.output === 'string' ? save.output : JSON.stringify(save.output);
+  const idMatch = raw.match(/TRA-\d+/i);
+  const urlMatch = raw.match(/https:\/\/linear\.app\/[^\s"']+/i);
+  if (idMatch) {
+    const url = urlMatch ? ` — ${urlMatch[0]}` : '';
+    return `Filed ${idMatch[0]}${url}. (Tool-round limit reached before final reply — ticket should be in Linear.)`;
+  }
+  return 'Linear issue saved (tool-round limit reached before final reply). Check Linear for the new TRA.';
 }
 
 export interface ToolEvent {
@@ -312,7 +361,7 @@ export async function runBrainAgent(
     surface,
     opts.systemAppend
   );
-  const messages: BrainMessage[] = [...history];
+  const messages: BrainMessage[] = prepareBrainMessagesForApi(history);
   const toolEvents: ToolEvent[] = [];
 
   try {
@@ -402,7 +451,10 @@ export async function runBrainAgent(
       messages.push({ role: 'user', content: results });
     }
 
-    const reply = `I hit the limit of ${maxIterations} tool-call rounds for this message. Try a narrower question or split the task into steps (e.g. "list due tickets" then "rank by priority").`;
+    const savedTicket = extractLinearSaveReply(toolEvents);
+    const reply =
+      savedTicket ||
+      `I hit the limit of ${maxIterations} tool-call rounds for this message. Try a narrower question or split the task into steps (e.g. "list due tickets" then "rank by priority").`;
     return finishRun('success', reply, toolEvents);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Agent run failed';

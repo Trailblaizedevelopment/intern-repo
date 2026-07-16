@@ -1,5 +1,11 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { BrainMessage, runBrainAgent } from '../agent';
+import {
+  BrainMessage,
+  TICKET_CREATE_MAX_TOOL_ITERATIONS,
+  compactBrainMessagesForStorage,
+  prepareBrainMessagesForApi,
+  runBrainAgent,
+} from '../agent';
 import {
   denyPendingCursorDispatch,
   executeApprovedCursorDispatch,
@@ -20,6 +26,7 @@ import {
 } from './linear-cursor-delegate';
 import {
   buildSlackOrchestrationAppend,
+  isLinearTicketCreateIntent,
   tryOrchestrationKickoff,
 } from './orchestration-kickoff';
 import { handleTaskStopMessage, isTaskStopMessage } from './task-control';
@@ -70,7 +77,10 @@ async function loadSlackConversation(
     .maybeSingle();
 
   if (!data) return null;
-  return { id: data.id, messages: (data.messages as BrainMessage[]) || [] };
+  return {
+    id: data.id,
+    messages: prepareBrainMessagesForApi((data.messages as BrainMessage[]) || []),
+  };
 }
 
 async function saveSlackConversation(
@@ -82,7 +92,7 @@ async function saveSlackConversation(
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error('Database not configured');
 
-  const stored = messages.slice(-MAX_STORED_MESSAGES);
+  const stored = compactBrainMessagesForStorage(messages).slice(-MAX_STORED_MESSAGES);
 
   if (conversationId) {
     await supabase
@@ -279,6 +289,9 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
               slackChannel: ctx.channel,
               slackThreadTs: ctx.threadTs,
               slackUserId: ctx.userId,
+              maxIterations: isLinearTicketCreateIntent(message)
+                ? TICKET_CREATE_MAX_TOOL_ITERATIONS
+                : undefined,
               systemAppend: buildSlackOrchestrationAppend(message, history.slice(0, -1)),
             }
           );

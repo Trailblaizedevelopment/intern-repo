@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { authenticateBrainRequest } from '@/lib/brain/auth';
-import { BrainMessage, runBrainAgent, toDisplayMessages } from '@/lib/brain/agent';
+import {
+  BrainMessage,
+  compactBrainMessagesForStorage,
+  prepareBrainMessagesForApi,
+  runBrainAgent,
+  toDisplayMessages,
+} from '@/lib/brain/agent';
 import { checkBrainRateLimit } from '@/lib/brain/rate-limit';
 import { sanitizeForActionLog } from '@/lib/brain/sanitize-log';
 
@@ -109,7 +115,7 @@ export async function POST(request: NextRequest) {
       .eq('id', conversationId)
       .maybeSingle();
     if (convo) {
-      history = (convo.messages as BrainMessage[]) || [];
+      history = prepareBrainMessagesForApi((convo.messages as BrainMessage[]) || []);
     } else {
       conversationId = null;
     }
@@ -154,7 +160,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Persist conversation + audit log (best-effort) ──
-  const stored = result.messages.slice(-MAX_STORED_MESSAGES);
+  const stored = compactBrainMessagesForStorage(result.messages).slice(-MAX_STORED_MESSAGES);
   await supabase
     .from('brain_conversations')
     .update({ messages: stored, updated_at: new Date().toISOString() })

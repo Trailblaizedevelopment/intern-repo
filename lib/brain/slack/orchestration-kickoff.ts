@@ -22,7 +22,7 @@ const GOAL_SIGNALS =
 
 /** File / create a Linear ticket — Lookup write, never Slice/Goal. */
 const LINEAR_TICKET_CREATE =
-  /\b((i\s+need\s+to|please|can\s+you|help\s+me|want\s+to)\s+)?(create|file|open|draft|build)\b.{0,80}\b(a\s+)?(ticket|linear\s+issue|roadmap\s+item)\b|\badd\s+(this\s+)?to\s+the\s+roadmap\b|\b(create|file|open)\s+(a\s+)?TRA\b/i;
+  /\b((i\s+need\s+to|please|can\s+you|help\s+me|want\s+to|try\s+again\s+to)\s+)?(create|file|open|draft|build)\b.{0,80}\b(a\s+)?(ticket|linear\s+issue|roadmap\s+item)\b|\badd\s+(this\s+)?to\s+the\s+roadmap\b|\b(create|file|open)\s+(a\s+)?TRA\b|\b(need|want)\s+(another\s+)?(a\s+)?ticket\b/i;
 
 function messageText(msg: BrainMessage): string {
   if (typeof msg.content === 'string') return msg.content;
@@ -221,10 +221,13 @@ function buildSlackTicketCreateAppend(): string {
     '   - Dynamo / Brain / intern CRM / Nucleus → owentrailblaize/intern-repo',
     '   - If unclear: use safe default Trailblaizedevelopment/Trailblaize-Web. Ask once only if repo choice materially changes Files relating.',
     '2. Feature-shaped asks (create/file/build a ticket for a product feature or bug with implementable scope):',
-    '   BEFORE linear_save_issue, you MAY use 1–2 rounds of github_search_code and/or github_get_file (pass repo=...).',
+    '   BEFORE linear_save_issue, you MAY use at most 1–2 rounds of github_search_code and/or github_get_file (pass repo=...).',
+    '   Do NOT call supabase_web_* / supabase_crm_* for ticket create unless the user explicitly asked for database schema or SQL.',
+    '   Do NOT call github_search_commits or linear_list_* during create. Budget: research then save within ~4 tool rounds total.',
     '   Ground Description, Acceptance criteria, and Files relating in real paths when found.',
     '3. Short / CS-style one-liners (e.g. Ford-style intake): skip research — invent Description + ≥2 AC from the request and call linear_save_issue immediately. Do not hang waiting for GitHub.',
-    '4. If GitHub search times out or fails: still create with the full template; under Files relating note that paths were not resolved.',
+    '4. If GitHub search times out, fails, or you are running low on tool rounds: still call linear_save_issue with the full template; under Files relating note paths were not resolved.',
+    '5. linear_save_issue is mandatory — never end a ticket-create turn without calling it unless you asked one clarifying question.',
     '',
     'Then call linear_save_issue with:',
     '  - title: Verb + what + where (actionable, one deliverable)',
