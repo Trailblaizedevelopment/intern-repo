@@ -13,9 +13,13 @@ import {
 } from '../cursor-api';
 import { fetchLinearIssueStatusBundle, LinearIssueStatusBundle } from '../linear-delegate';
 import { extractLinearIssueId, isLinearTicketCreateIntent } from './orchestration-kickoff';
+import { isStartWorkIntent } from './ticket-intent';
 
-const STATUS_SIGNALS =
-  /\b(status|progress|update|updates|what's going on|whats going on|what is going on|how's it going|how is it going|how'?s .+ going|check on|look(?:ing)? up)\b/i;
+const STATUS_NEAR_TRA =
+  /\bTRA-\d+\b[\s\S]{0,40}\b(status|progress|update|updates)\b|\b(status|progress|update|updates)\b[\s\S]{0,40}\bTRA-\d+\b/i;
+
+const GOING_ON_NEAR_TRA =
+  /\bTRA-\d+\b[\s\S]{0,60}\b(what's going on|whats going on|what is going on|how's it going|how is it going|check on|look(?:ing)? up)\b|\b(what's going on|whats going on|what is going on|how's it going|how is it going|check on|look(?:ing)? up)\b[\s\S]{0,60}\bTRA-\d+\b/i;
 
 const AGENT_ID_RE = /\b(bc-[a-f0-9-]{8,})\b/i;
 const AGENT_URL_RE = /https?:\/\/(?:www\.)?cursor\.com\/agents\/(bc-[a-f0-9-]+)/i;
@@ -26,14 +30,18 @@ export function isTicketStatusIntent(message: string): boolean {
   const text = message.trim();
   if (!text || isLinearTicketCreateIntent(text)) return false;
 
+  // Prefer Path A handoff when start/implement verbs are present (even if "progress" appears later).
+  if (isStartWorkIntent(text)) return false;
+
   const hasTra = /TRA-\d+/i.test(text);
   if (!hasTra) return false;
 
-  if (STATUS_SIGNALS.test(text)) return true;
-
   // Short forms: "TRA-123 status", "TRA-123?"
   if (/^TRA-\d+\s*(status|progress|update)?\??$/i.test(text)) return true;
-  if (/\bTRA-\d+\b.{0,40}\b(status|progress|update)\b/i.test(text)) return true;
+
+  // Require status/progress words near the TRA id (avoid "check progress later" stealing handoff).
+  if (STATUS_NEAR_TRA.test(text)) return true;
+  if (GOING_ON_NEAR_TRA.test(text)) return true;
 
   return false;
 }
