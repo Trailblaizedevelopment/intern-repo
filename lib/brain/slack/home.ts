@@ -10,7 +10,7 @@ export const HOME_QUICK_PROMPTS: Record<string, string> = {
   home_qp_crm_tickets: 'Show me open CRM tickets and their status.',
   home_qp_github_prs: 'List open pull requests on GitHub.',
   home_qp_create_ticket:
-    'I want to create a Linear ticket. Ask me for title, description, and team, then create it.',
+    'I want to create a Linear ticket. Use the Linear ticket template (Description + Acceptance criteria + Files relating when known). For feature asks, do a short GitHub code search first, then create it.',
   home_qp_ticket_progress:
     'I want a progress update on a Linear ticket. Ask me for the TRA id (e.g. TRA-123), then report status, recent comments, and Cursor Cloud progress if available.',
 };
@@ -108,7 +108,8 @@ function buildHomeBlocks(userId: string): SlackBlock[] {
         type: 'mrkdwn',
         text:
           '*What I can do*\n' +
-          '• *Lookup* — status, lists, summaries, create Linear tickets\n' +
+          '• *Lookup* — status, lists, summaries\n' +
+          '• *Create tickets* — Linear issues using the ticket template MD; feature asks get a light GitHub code search before save\n' +
           '• *Ticket progress* — *progress on TRA-123* (Linear state + comments + Cursor Cloud when linked)\n' +
           '• *Hand off to Cursor* — *fix TRA-123* / *implement TRA-123* → I confirm, then assign Cursor on Linear\n' +
           'Ask in Messages; I stay in Lookup and never invent Slice/Goal queues.',

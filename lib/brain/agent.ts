@@ -103,8 +103,9 @@ function buildSystemPrompt(
   const toolGuidance: string[] = [];
   if (hasGitHub) {
     toolGuidance.push(
-      '- GitHub (Trailblaize-Web) questions use github_* tools ONLY — never Linear for PRs, commits, or code.',
-      '- Default branch for eng work: develop. Use main only when the user asks about production, releases, or main.',
+      '- GitHub questions use github_* tools ONLY — never Linear for PRs, commits, or code.',
+      '- Default repo: Trailblaize-Web. Pass repo= for Trailblaizedevelopment/greekspeed or owentrailblaize/intern-repo when researching ticket Files relating.',
+      '- Default branch for eng work: develop (use main for intern-repo). Use main on product repos only when the user asks about production, releases, or main.',
       '- Open PRs → github_list_open_prs. Merged PRs → github_list_merged_prs (base=develop or base=main).',
       '- Commit history → github_list_commits with branch=develop unless production is specified.',
       '- Keyword in commits → github_search_commits. Codebase paths → github_search_code + github_get_file.',
@@ -119,10 +120,17 @@ function buildSystemPrompt(
     if (linearWriteMode) {
       toolGuidance.push(
         '- Write mode is ON. Create/update Linear issues with linear_save_issue (not create_issue).',
-        '- When the user asks to create/file/open/build a ticket or add to the roadmap: FIRST tool call linear_save_issue with title (Verb + what + where), team Trailblaize (or TRA), and description markdown per the LINEAR TICKET FORMAT block.',
+        '- When the user asks to create/file/open/build a ticket or add to the roadmap (TRA-908):',
+        '  • Inject full LINEAR TICKET FORMAT (vendored MD) into the Linear description — not a thin paraphrase or raw Slack dump.',
+        '  • Feature-shaped asks: allow 1–2 rounds of github_search_code / github_get_file BEFORE linear_save_issue to ground Files relating (pass repo= when not default).',
+        '  • Short CS-style one-liners: skip research; invent Description + ≥2 AC and save immediately.',
+        '  • If GitHub search fails/times out: still create; note Files relating were not resolved.',
+        '  • Target repo from ask when clear (Trailblaize-Web / greekspeed / intern-repo); else Trailblaizedevelopment/Trailblaize-Web.',
+        '  • Then linear_save_issue with title (Verb + what + where), team Trailblaize (or TRA), and full template markdown.',
         buildLinearTicketTemplateGuidance(),
-        '- Do not call github_*, tickets_*, or linear list/search tools before creating unless they asked to check for duplicates.',
-        '- Ask at most one clarifying question only if a title + acceptance criteria cannot be inferred. After create, reply with the TRA identifier and URL.'
+        '- Do not call tickets_* or linear list/search before creating unless they asked to check for duplicates.',
+        '- This research-before-create allowance is ONLY for ticket create — not status Lookup or Cursor Path A handoff.',
+        '- Ask at most one clarifying question only if a title + acceptance criteria cannot be inferred. After create, reply with the TRA identifier, URL, and one-line AC confirmation (keep Slack short).'
       );
     } else {
       toolGuidance.push('- Linear write tools are disabled (read-only). Do not attempt creates or updates.');

@@ -25,7 +25,7 @@ export function buildIntentRoutingPrompt(surface: 'workspace' | 'slack'): string
     '',
     '1. *Lookup* (DEFAULT — nearly always)',
     '   Triggers: status questions, summaries, lists, "what is…", "show me…", "how many…", casual chat.',
-    '   Ticket create: "create/file/open/build a ticket", "add to the roadmap" → linear_save_issue with LINEAR TICKET FORMAT. Never assign Cursor.',
+    '   Ticket create: "create/file/open/build a ticket", "add to the roadmap" → optional 1–2 github_search_code/github_get_file rounds (feature asks), then linear_save_issue with vendored LINEAR_TICKET_TEMPLATE (Description + AC checklist + Files relating when known). Never assign Cursor. Short CS one-liners skip research.',
     '   Progress/status on a TRA (e.g. "progress on TRA-123", "what\'s going on with TRA-123") is handled by Slack Lookup status path — Linear state + comments + Cursor Cloud when resolvable. Do NOT call tasks_start_* or cursor_dispatch_agent.',
     '   Implement / fix / slice / handoff with a TRA-xxx id is handled outside the agent (Slack confirm → Linear Cursor delegate). Do NOT call tasks_start_* or cursor_dispatch_agent for that.',
     '   Behavior: Answer in this thread using tools. Do NOT call tasks_start_goal or tasks_start_slice.',

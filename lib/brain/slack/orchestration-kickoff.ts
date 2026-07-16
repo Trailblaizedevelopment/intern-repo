@@ -204,20 +204,38 @@ export async function tryOrchestrationKickoff(
   };
 }
 
-/** Create-first Linear ticket instructions for Slack Lookup (TRA-896). */
+/**
+ * Research-then-create Linear ticket instructions for Slack Lookup (TRA-908).
+ * Loosens "FIRST tool MUST be linear_save_issue" only for this create path.
+ * Lookup status and Path A Cursor handoff stay unchanged.
+ */
 function buildSlackTicketCreateAppend(): string {
   return [
     'SLACK LINEAR TICKET CREATE (Lookup)',
     'Mode: Lookup — create a Linear issue. Do NOT call tasks_start_slice or tasks_start_goal.',
-    'Your FIRST tool call MUST be linear_save_issue with:',
+    '',
+    'FLOW — research then create (TRA-908):',
+    '1. Infer target GitHub repo from the ask when clear:',
+    '   - Trailblaize-Web / web app / outreach / profiles → Trailblaizedevelopment/Trailblaize-Web',
+    '   - greekspeed / chapter events / attendance / Greekspeed → Trailblaizedevelopment/greekspeed',
+    '   - Dynamo / Brain / intern CRM / Nucleus → owentrailblaize/intern-repo',
+    '   - If unclear: use safe default Trailblaizedevelopment/Trailblaize-Web. Ask once only if repo choice materially changes Files relating.',
+    '2. Feature-shaped asks (create/file/build a ticket for a product feature or bug with implementable scope):',
+    '   BEFORE linear_save_issue, you MAY use 1–2 rounds of github_search_code and/or github_get_file (pass repo=...).',
+    '   Ground Description, Acceptance criteria, and Files relating in real paths when found.',
+    '3. Short / CS-style one-liners (e.g. Ford-style intake): skip research — invent Description + ≥2 AC from the request and call linear_save_issue immediately. Do not hang waiting for GitHub.',
+    '4. If GitHub search times out or fails: still create with the full template; under Files relating note that paths were not resolved.',
+    '',
+    'Then call linear_save_issue with:',
     '  - title: Verb + what + where (actionable, one deliverable)',
     '  - team: Trailblaize (or team key TRA)',
-    '  - description: markdown body per LINEAR TICKET FORMAT below (not a raw paste of the Slack message)',
+    '  - description: full markdown body per LINEAR TICKET FORMAT below (not a thin paraphrase or raw Slack paste)',
     '  - priority: set only if clearly implied; otherwise omit',
     buildLinearTicketTemplateGuidance(),
-    'Do NOT call github_*, tickets_*, or linear_list_* / search before create unless the user asked to check for duplicates.',
+    'Do NOT call tickets_* or linear_list_* / search before create unless the user asked to check for duplicates.',
+    'github_* research is allowed ONLY on this ticket-create path (max 1–2 rounds). Pure status Lookup and Cursor Path A handoff must not research-then-create.',
     'Ask at most one clarifying question only if you cannot invent a title + at least two acceptance criteria from the message.',
-    'After create succeeds, reply with the Linear identifier (e.g. TRA-xxx), URL, and a one-line confirmation that AC were included. Keep the reply short.',
+    'After create succeeds, reply with the Linear identifier (e.g. TRA-xxx), URL, and a one-line confirmation that AC were included. Keep the reply short — full template lives in Linear, not Slack.',
   ].join('\n');
 }
 
