@@ -49,7 +49,7 @@ const TOOLS: ConnectorTool[] = [
   {
     name: 'github_search_code',
     description:
-      'Search the Trailblaize-Web codebase on GitHub by keyword. Use for "where is X", "what file has Y", outreach sequences, profile cards, email templates, etc. Returns file paths — follow with github_get_file if needed.',
+      'Search a GitHub codebase by keyword. Default repo is Trailblaize-Web; pass repo= for greekspeed (Trailblaizedevelopment/greekspeed) or Dynamo (owentrailblaize/intern-repo). Use for "where is X", ticket Files relating research, etc. Returns file paths — follow with github_get_file if needed.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -57,7 +57,10 @@ const TOOLS: ConnectorTool[] = [
           type: 'string',
           description: 'Keywords to search (e.g. "profile card", "outreach sequence email")',
         },
-        repo: { type: 'string', description: 'owner/repo' },
+        repo: {
+          type: 'string',
+          description: `owner/repo (default ${DEFAULT_REPO}; also Trailblaizedevelopment/greekspeed, owentrailblaize/intern-repo)`,
+        },
         limit: { type: 'number', description: 'Max results (default 8, max 30)' },
       },
       required: ['query'],
@@ -66,16 +69,19 @@ const TOOLS: ConnectorTool[] = [
   {
     name: 'github_get_file',
     description:
-      'Read a file from Trailblaize-Web at a repo path (e.g. src/components/ProfileCard.tsx). Use after github_search_code or when the user names a path.',
+      'Read a file from a GitHub repo at a path (e.g. src/components/ProfileCard.tsx). Default Trailblaize-Web; pass repo= for greekspeed or intern-repo. Use after github_search_code or when the user names a path.',
     inputSchema: {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'File path in the repo' },
         ref: {
           type: 'string',
-          description: `Branch or commit (default ${getDevelopBranch()})`,
+          description: `Branch or commit (default ${getDevelopBranch()}; use main for intern-repo)`,
         },
-        repo: { type: 'string', description: 'owner/repo' },
+        repo: {
+          type: 'string',
+          description: `owner/repo (default ${DEFAULT_REPO})`,
+        },
       },
       required: ['path'],
     },
