@@ -2581,7 +2581,7 @@ export default function WarRoomPage() {
         <div style={WAR_ROOM_HEADER_SHELL}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '44px', paddingTop: 0, paddingBottom: 0 }}>
             <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: 0 }}>Sales Room</h1>
-            <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Live sales intelligence</span>
+            <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Your deal work queue</span>
             {statsLoading && <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', color: '#9ca3af' }} />}
           </div>
 

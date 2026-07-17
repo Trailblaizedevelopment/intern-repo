@@ -2,9 +2,22 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, X, RefreshCw, Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Mail, Phone, Clock, User } from 'lucide-react';
 import { STAGE_CONFIG, type DealStage } from '@/lib/supabase';
 import { getDealConference } from '@/lib/pipeline-conference';
+import { useAuth } from '@/lib/auth-context';
+
+/** REVIEW FLAG: Next-action guidance. Search "NextActionBar" / "FollowUpQueueView" to remove if rejected. */
+const START_HERE_DISMISS_KEY = 'sales-room-start-here-dismissed';
+
+function dealDisplayTitle(deal: { organization?: { name?: string | null; school?: { name?: string | null } | null } | null }): string {
+  const org = deal.organization?.name?.trim() || 'Unknown deal';
+  const school = deal.organization?.school?.name?.trim() || '';
+  if (!school) return org;
+  if (org.toLowerCase().includes(school.toLowerCase())) return org;
+  return `${org} @ ${school}`;
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1544,6 +1557,448 @@ interface NeedsAttentionProps {
   onViewAll?: () => void;
 }
 
+interface NextActionBarProps {
+  deal: PipelineDealFull | null;
+  queueCount: number;
+  employees: { id: string; name: string }[];
+  onLogFollowup: (dealId: string, text: string) => void;
+  onOpenDeal: (deal: PipelineDealFull) => void;
+  onOpenFollowUpQueue: () => void;
+  dismissed: boolean;
+  onDismiss: () => void;
+  onRestore: () => void;
+}
+
+function NextActionBar({
+  deal,
+  queueCount,
+  employees,
+  onLogFollowup,
+  onOpenDeal,
+  onOpenFollowUpQueue,
+  dismissed,
+  onDismiss,
+  onRestore,
+}: NextActionBarProps) {
+  const [logging, setLogging] = useState(false);
+  const [note, setNote] = useState('');
+  const othersCount = Math.max(0, queueCount - (deal ? 1 : 0));
+
+  useEffect(() => {
+    setLogging(false);
+    setNote('');
+  }, [deal?.id]);
+
+  if (dismissed) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 0' }}>
+        <span style={{ fontSize: '0.8125rem', color: CRM_UI.textMuted }}>Next-step helper hidden</span>
+        <button
+          type="button"
+          onClick={onRestore}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: CRM_UI.blueDark, fontFamily: 'inherit' }}
+        >
+          Show again
+        </button>
+      </div>
+    );
+  }
+
+  if (!deal) {
+    return (
+      <div style={{ padding: '4px 0 16px', borderBottom: `1px solid ${CRM_UI.border}` }}>
+        <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: CRM_UI.textSubtle }}>
+          Next step
+        </p>
+        <p style={{ margin: '8px 0 0', fontSize: '1.125rem', fontWeight: 600, color: CRM_UI.text }}>
+          You&apos;re caught up on stalled deals.
+        </p>
+        <p style={{ margin: '6px 0 0', fontSize: '0.875rem', color: CRM_UI.textMuted }}>
+          Browse the list below, or add a new deal when you have one.
+        </p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          style={{ marginTop: 10, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.75rem', color: CRM_UI.textSubtle, fontFamily: 'inherit' }}
+        >
+          Hide this
+        </button>
+      </div>
+    );
+  }
+
+  const title = dealDisplayTitle(deal);
+  const idle = dealIdleDays(deal);
+  const stageLabel = STAGE_LABELS[deal.stage] ?? deal.stage;
+  const owner = resolveRep(deal.assigned_to, employees);
+
+  function submitFollowup() {
+    const text = note.trim();
+    if (!text) return;
+    onLogFollowup(deal.id, text);
+    setNote('');
+    setLogging(false);
+  }
+
+  return (
+    <div style={{ padding: '4px 0 18px', borderBottom: `1px solid ${CRM_UI.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+        <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: CRM_UI.textSubtle }}>
+          Next step
+        </p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.75rem', color: CRM_UI.textSubtle, fontFamily: 'inherit' }}
+        >
+          Hide
+        </button>
+      </div>
+
+      <p style={{ margin: '10px 0 0', fontSize: '1.25rem', fontWeight: 600, color: CRM_UI.text, lineHeight: 1.25 }}>
+        Follow up with {title}
+      </p>
+      <p style={{ margin: '8px 0 0', fontSize: '0.875rem', color: CRM_UI.textMuted }}>
+        {stageLabel}
+        {owner ? ` · ${owner}` : ''}
+        {' · '}
+        idle {idle} day{idle === 1 ? '' : 's'}
+      </p>
+
+      {!logging ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12, marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setLogging(true)}
+              style={{
+                height: 40,
+                padding: '0 18px',
+                border: 'none',
+                borderRadius: 10,
+                background: CRM_UI.ink,
+                color: '#fff',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Log follow-up
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenDeal(deal)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: CRM_UI.textSecondary,
+                fontFamily: 'inherit',
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
+              }}
+            >
+              Open deal
+            </button>
+          </div>
+          {othersCount > 0 && (
+            <button
+              type="button"
+              onClick={onOpenFollowUpQueue}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                color: CRM_UI.blueDark,
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
+              }}
+            >
+              You have {othersCount} other chapter{othersCount === 1 ? '' : 's'} to follow up with
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 520 }}>
+          <input
+            type="text"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') submitFollowup();
+              if (e.key === 'Escape') { setLogging(false); setNote(''); }
+            }}
+            placeholder="What did you do / what's next?"
+            autoFocus
+            style={{
+              width: '100%',
+              height: 42,
+              border: 'none',
+              borderBottom: `2px solid ${CRM_UI.ink}`,
+              borderRadius: 0,
+              padding: '0 2px',
+              fontSize: '0.9375rem',
+              outline: 'none',
+              fontFamily: 'inherit',
+              background: 'transparent',
+              color: CRM_UI.text,
+              boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <button
+              type="button"
+              onClick={submitFollowup}
+              disabled={!note.trim()}
+              style={{
+                height: 40,
+                padding: '0 18px',
+                border: 'none',
+                borderRadius: 10,
+                background: note.trim() ? CRM_UI.ink : '#d1d5db',
+                color: '#fff',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: note.trim() ? 'pointer' : 'default',
+                fontFamily: 'inherit',
+              }}
+            >
+              Save & next
+            </button>
+            <button
+              type="button"
+              onClick={() => { setLogging(false); setNote(''); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                color: CRM_UI.textSubtle,
+                fontFamily: 'inherit',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface FollowUpQueueViewProps {
+  deals: PipelineDealFull[];
+  employees: { id: string; name: string }[];
+  onBack: () => void;
+  onLogFollowup: (dealId: string, text: string) => void;
+  onOpenDeal: (deal: PipelineDealFull) => void;
+}
+
+function FollowUpQueueView({
+  deals,
+  employees,
+  onBack,
+  onLogFollowup,
+  onOpenDeal,
+}: FollowUpQueueViewProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [inputs, setInputs] = useState<Record<string, string>>({});
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            color: CRM_UI.textMuted,
+            fontFamily: 'inherit',
+          }}
+        >
+          ← Back to next step
+        </button>
+        <h2 style={{ margin: '12px 0 0', fontSize: '1.375rem', fontWeight: 600, color: CRM_UI.text }}>
+          Chapters to follow up with
+        </h2>
+        <p style={{ margin: '8px 0 0', fontSize: '0.875rem', color: CRM_UI.textMuted }}>
+          {deals.length} chapter{deals.length === 1 ? '' : 's'} idle 3+ days at First Demo, Second Call, or Contract Sent.
+          Log a follow-up on each — or open the deal for full details.
+        </p>
+      </div>
+
+      {deals.length === 0 ? (
+        <p style={{ margin: 0, fontSize: '0.9375rem', color: CRM_UI.textSecondary }}>
+          All clear — nothing left in this queue.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {deals.map((deal, index) => {
+            const title = dealDisplayTitle(deal);
+            const idle = dealIdleDays(deal);
+            const stageLabel = STAGE_LABELS[deal.stage] ?? deal.stage;
+            const owner = resolveRep(deal.assigned_to, employees);
+            const isOpen = expandedId === deal.id;
+
+            return (
+              <div
+                key={deal.id}
+                style={{
+                  padding: '16px 0',
+                  borderTop: index === 0 ? `1px solid ${CRM_UI.border}` : undefined,
+                  borderBottom: `1px solid ${CRM_UI.border}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: CRM_UI.text }}>
+                      {title}
+                    </p>
+                    <p style={{ margin: '6px 0 0', fontSize: '0.8125rem', color: CRM_UI.textMuted }}>
+                      {stageLabel}
+                      {owner ? ` · ${owner}` : ''}
+                      {' · '}
+                      idle {idle}d
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isOpen ? null : deal.id)}
+                      style={{
+                        height: 36,
+                        padding: '0 14px',
+                        border: 'none',
+                        borderRadius: 10,
+                        background: CRM_UI.ink,
+                        color: '#fff',
+                        fontSize: '0.8125rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      Log follow-up
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenDeal(deal)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        fontSize: '0.8125rem',
+                        fontWeight: 600,
+                        color: CRM_UI.textSecondary,
+                        fontFamily: 'inherit',
+                        textDecoration: 'underline',
+                        textUnderlineOffset: 3,
+                      }}
+                    >
+                      Open deal
+                    </button>
+                  </div>
+                </div>
+
+                {isOpen && (
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 520 }}>
+                    <input
+                      type="text"
+                      value={inputs[deal.id] ?? ''}
+                      onChange={e => setInputs(prev => ({ ...prev, [deal.id]: e.target.value }))}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          const text = (inputs[deal.id] ?? '').trim();
+                          if (!text) return;
+                          onLogFollowup(deal.id, text);
+                          setInputs(prev => ({ ...prev, [deal.id]: '' }));
+                          setExpandedId(null);
+                        }
+                      }}
+                      placeholder="What did you do / what's next?"
+                      autoFocus
+                      style={{
+                        width: '100%',
+                        height: 40,
+                        border: 'none',
+                        borderBottom: `2px solid ${CRM_UI.ink}`,
+                        borderRadius: 0,
+                        padding: '0 2px',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        background: 'transparent',
+                        color: CRM_UI.text,
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: 14 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const text = (inputs[deal.id] ?? '').trim();
+                          if (!text) return;
+                          onLogFollowup(deal.id, text);
+                          setInputs(prev => ({ ...prev, [deal.id]: '' }));
+                          setExpandedId(null);
+                        }}
+                        disabled={!(inputs[deal.id] ?? '').trim()}
+                        style={{
+                          height: 36,
+                          padding: '0 14px',
+                          border: 'none',
+                          borderRadius: 10,
+                          background: (inputs[deal.id] ?? '').trim() ? CRM_UI.ink : '#d1d5db',
+                          color: '#fff',
+                          fontSize: '0.8125rem',
+                          fontWeight: 600,
+                          cursor: (inputs[deal.id] ?? '').trim() ? 'pointer' : 'default',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(null)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          fontSize: '0.8125rem',
+                          color: CRM_UI.textSubtle,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NeedsAttentionSection({
   deals,
   onOpenDeal,
@@ -2186,6 +2641,8 @@ export function SalesCRM({
   conferenceFilter = null,
   onConferenceFilterChange,
 }: SalesCRMProps) {
+  const router = useRouter();
+  const { profile } = useAuth();
   const isMobile = useIsMobile();
   const [deals, setDeals] = useState<PipelineDealFull[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2198,11 +2655,37 @@ export function SalesCRM({
   const [idleSort, setIdleSort] = useState<IdleSort>('desc');
   const [pipelineView, setPipelineView] = useState<'list' | 'board'>('list');
   const dealsSectionRef = useRef<HTMLDivElement>(null);
-  const [selectedDeal, setSelectedDeal]     = useState<PipelineDealFull | null>(null);
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
-  const [granolaNotes, setGranolaNotes]     = useState<GranolaNote[] | null>(null);
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
-  const granolaFetchedRef = useRef(false);
+  const [startHereDismissed, setStartHereDismissed] = useState(false);
+  const [queueSkipIds, setQueueSkipIds] = useState<string[]>([]);
+  const [showFollowUpQueue, setShowFollowUpQueue] = useState(false);
+
+  const openDealPage = useCallback((deal: PipelineDealFull) => {
+    router.push(`/nucleus/war-room/deals/${deal.id}`);
+  }, [router]);
+
+  useEffect(() => {
+    try {
+      setStartHereDismissed(localStorage.getItem(START_HERE_DISMISS_KEY) === '1');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const myFirstName = useMemo(() => {
+    const fromProfile = profile?.name?.trim().split(/\s+/)[0] ?? '';
+    if (fromProfile) return fromProfile;
+    return null;
+  }, [profile?.name]);
+
+  const isMyDeal = useCallback((deal: PipelineDealFull) => {
+    if (!myFirstName && !profile?.id) return false;
+    const repName = resolveRep(deal.assigned_to, employees);
+    if (myFirstName && repName && repName.toLowerCase() === myFirstName.toLowerCase()) return true;
+    if (profile?.id && deal.assigned_to && deal.assigned_to.toLowerCase() === profile.id.toLowerCase()) return true;
+    return false;
+  }, [employees, myFirstName, profile?.id]);
 
   useEffect(() => {
     fetch('/api/pipeline/employees')
@@ -2237,20 +2720,6 @@ export function SalesCRM({
     fetchDeals();
   }, [fetchDeals, categoryFilter]);
 
-  // ── Fetch Granola notes on mount ──
-  useEffect(() => {
-    if (granolaFetchedRef.current) return;
-    granolaFetchedRef.current = true;
-    fetch('/api/granola/notes')
-      .then(r => r.json())
-      .then((data: any) => {
-        if (Array.isArray(data?.notes)) {
-          setGranolaNotes(data.notes as GranolaNote[]);
-        }
-      })
-      .catch(err => console.error('[sales-crm] granola error:', err));
-  }, []);
-
   // ── PATCH deal ──
   async function patchDeal(dealId: string, updates: Record<string, unknown>) {
     try {
@@ -2265,21 +2734,6 @@ export function SalesCRM({
     }
   }
 
-  // ── onPatch handler for drawer ──
-  function handlePatch(dealId: string, patch: Partial<PipelineDealFull>) {
-    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, ...patch } : d));
-    if (selectedDeal?.id === dealId) setSelectedDeal(prev => prev ? { ...prev, ...patch } : null);
-    patchDeal(dealId, patch as Record<string, unknown>);
-  }
-
-  // ── Advance stage ──
-  function handleAdvanceStage(dealId: string, stage: DealStage) {
-    const now = new Date().toISOString();
-    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage, last_touched: now } : d));
-    if (selectedDeal?.id === dealId) setSelectedDeal(prev => prev ? { ...prev, stage, last_touched: now } : null);
-    patchDeal(dealId, { stage, last_touched: now });
-  }
-
   // ── Log activity ──
   function handleLogActivity(dealId: string, text: string) {
     const deal = deals.find(d => d.id === dealId);
@@ -2290,7 +2744,6 @@ export function SalesCRM({
     const notesJson = serializeDealNotes(updatedNotes);
     const now = new Date().toISOString();
     setDeals(prev => prev.map(d => d.id === dealId ? { ...d, notes: notesJson, last_touched: now } : d));
-    if (selectedDeal?.id === dealId) setSelectedDeal(prev => prev ? { ...prev, notes: notesJson, last_touched: now } : null);
     patchDeal(dealId, { notes: notesJson, last_touched: now });
   }
 
@@ -2365,6 +2818,31 @@ export function SalesCRM({
     });
   }, []);
 
+  const actionQueue = useMemo(() => {
+    const stalled = deals
+      .filter(dealNeedsAttention)
+      .sort((a, b) => dealIdleDays(b) - dealIdleDays(a));
+    const mine = stalled.filter(isMyDeal);
+    const base = mine.length > 0 ? mine : stalled;
+    return base.filter(d => !queueSkipIds.includes(d.id));
+  }, [deals, isMyDeal, queueSkipIds]);
+
+  const nextActionDeal = actionQueue[0] ?? null;
+
+  useEffect(() => {
+    setQueueSkipIds(prev => prev.filter(id => deals.some(d => d.id === id && dealNeedsAttention(d))));
+  }, [deals]);
+
+  const dismissStartHere = useCallback(() => {
+    setStartHereDismissed(true);
+    try { localStorage.setItem(START_HERE_DISMISS_KEY, '1'); } catch { /* ignore */ }
+  }, []);
+
+  const restoreStartHere = useCallback(() => {
+    setStartHereDismissed(false);
+    try { localStorage.removeItem(START_HERE_DISMISS_KEY); } catch { /* ignore */ }
+  }, []);
+
   // ── Stats ──
   const stats = useMemo(() => {
     const total = deals.filter(d => d.stage !== 'closed_lost' && d.stage !== 'hold_off').length;
@@ -2385,120 +2863,38 @@ export function SalesCRM({
     );
   }
 
+  if (showFollowUpQueue) {
+    return (
+      <FollowUpQueueView
+        deals={actionQueue}
+        employees={employees}
+        onBack={() => setShowFollowUpQueue(false)}
+        onLogFollowup={handleLogActivity}
+        onOpenDeal={openDealPage}
+      />
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* ── Stats Row ── */}
-      {(() => {
-        const kpiStats = [
-          { label: 'Active Deals', value: stats.total },
-          { label: 'Hot (Demo+)', value: stats.hot },
-          { label: 'Closed Won', value: stats.closed },
-          { label: 'Pipeline Value', value: fmt$(stats.pipeline) },
-        ];
+      {/* REVIEW FLAG: NextActionBar — single next step */}
+      <NextActionBar
+        deal={nextActionDeal}
+        queueCount={actionQueue.length}
+        employees={employees}
+        onLogFollowup={handleLogActivity}
+        onOpenDeal={openDealPage}
+        onOpenFollowUpQueue={() => setShowFollowUpQueue(true)}
+        dismissed={startHereDismissed}
+        onDismiss={dismissStartHere}
+        onRestore={restoreStartHere}
+      />
 
-        const statBlock = (stat: { label: string; value: string | number }) => (
-          <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
-            <p
-              style={{
-                fontSize: '0.6875rem',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                color: '#9CA3AF',
-                margin: '0 0 6px 0',
-              }}
-            >
-              {stat.label}
-            </p>
-            <p
-              style={{
-                fontSize: isMobile ? '1.375rem' : '1.625rem',
-                fontWeight: 600,
-                color: '#111827',
-                margin: 0,
-                lineHeight: 1.1,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {stat.value}
-            </p>
-          </div>
-        );
-
-        const dividerStyle: React.CSSProperties = {
-          background: '#E5E7EB',
-          flexShrink: 0,
-        };
-
-        if (isMobile) {
-          return (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1px 1fr',
-                alignItems: 'center',
-                justifyItems: 'stretch',
-                rowGap: '20px',
-                width: '100%',
-                paddingBottom: '16px',
-                borderBottom: '1px solid #E5E7EB',
-              }}
-            >
-              <div style={{ padding: '0 12px' }}>{statBlock(kpiStats[0])}</div>
-              <div style={{ ...dividerStyle, width: '1px', height: '100%', minHeight: '44px', justifySelf: 'center' }} aria-hidden />
-              <div style={{ padding: '0 12px' }}>{statBlock(kpiStats[1])}</div>
-
-              <div style={{ ...dividerStyle, gridColumn: '1 / -1', height: '1px', width: '100%' }} aria-hidden />
-
-              <div style={{ padding: '0 12px' }}>{statBlock(kpiStats[2])}</div>
-              <div style={{ ...dividerStyle, width: '1px', height: '100%', minHeight: '44px', justifySelf: 'center' }} aria-hidden />
-              <div style={{ padding: '0 12px' }}>{statBlock(kpiStats[3])}</div>
-            </div>
-          );
-        }
-
-        return (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              width: '100%',
-              paddingBottom: '16px',
-              borderBottom: '1px solid #E5E7EB',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'stretch',
-                justifyContent: 'center',
-                width: '100%',
-                maxWidth: '960px',
-              }}
-            >
-              {kpiStats.map((stat, index) => (
-                <React.Fragment key={stat.label}>
-                  {index > 0 && (
-                    <div
-                      aria-hidden
-                      style={{
-                        ...dividerStyle,
-                        width: '1px',
-                        alignSelf: 'stretch',
-                        margin: '4px 0',
-                      }}
-                    />
-                  )}
-                  <div style={{ flex: '1 1 0', padding: '0 24px', minWidth: 0 }}>
-                    {statBlock(stat)}
-                  </div>
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+      {/* ── Stats Row (compact one-line) ── */}
+      <p style={{ margin: 0, fontSize: '0.8125rem', color: CRM_UI.textMuted }}>
+        {stats.total} active · {stats.hot} hot · {stats.closed} won · {fmt$(stats.pipeline)} pipeline
+      </p>
 
       {/* ── Search & Filters ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -2681,14 +3077,16 @@ export function SalesCRM({
         </div>
       </div>
 
-      {/* ── Needs Attention (preview) ── */}
-      <NeedsAttentionSection
-        deals={deals}
-        onOpenDeal={setSelectedDeal}
-        onLogFollowup={handleLogActivity}
-        employees={employees}
-        onViewAll={focusDealsSection}
-      />
+      {/* ── Needs Attention (only if next-step helper is hidden) ── */}
+      {startHereDismissed && (
+        <NeedsAttentionSection
+          deals={deals}
+          onOpenDeal={openDealPage}
+          onLogFollowup={handleLogActivity}
+          employees={employees}
+          onViewAll={focusDealsSection}
+        />
+      )}
 
       {/* ── All Deals ── */}
       <div ref={dealsSectionRef} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2750,48 +3148,26 @@ export function SalesCRM({
             idleSort={idleSort}
             onIdleSortChange={setIdleSort}
             onPageChange={setDealPage}
-            onOpenDeal={setSelectedDeal}
+            onOpenDeal={openDealPage}
             employees={employees}
           />
         ) : (
           <PipelineKanban
             deals={filteredDeals}
             archivedDeals={archivedDeals}
-            onOpenDeal={setSelectedDeal}
+            onOpenDeal={openDealPage}
             employees={employees}
           />
         )}
       </div>
 
-      {/* ── Create Deal Drawer ── */}
+      {/* ── Create Deal Drawer (new deals only) ── */}
       {showCreateDrawer && (
         <CreateDealDrawer
           onClose={() => setShowCreateDrawer(false)}
           onCreated={fetchDeals}
           employees={employees}
         />
-      )}
-
-      {/* ── Deal Detail Drawer ── */}
-      {selectedDeal && (
-        selectedDeal.stage === 'closed_won' ? (
-          <ClosedWonDetailDrawer
-            deal={selectedDeal}
-            employees={employees}
-            granolaNotesCache={granolaNotes}
-            onClose={() => setSelectedDeal(null)}
-          />
-        ) : (
-          <DealDetailDrawer
-            deal={selectedDeal}
-            granolaNotesCache={granolaNotes}
-            onClose={() => setSelectedDeal(null)}
-            onAdvanceStage={handleAdvanceStage}
-            onLogActivity={handleLogActivity}
-            onPatch={handlePatch}
-            employees={employees}
-          />
-        )
       )}
     </div>
   );
