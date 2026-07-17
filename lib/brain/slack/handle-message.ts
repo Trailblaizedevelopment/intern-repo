@@ -154,7 +154,8 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
     );
     const text = await executeApprovedLinearCursorDelegate(
       supabase,
-      pendingLinearDelegate.pending
+      pendingLinearDelegate.pending,
+      { channel: ctx.channel, threadTs: ctx.threadTs }
     );
     if (placeholder.ok && placeholder.ts) {
       await replaceSlackThreadReply(ctx.channel, placeholder.ts, ctx.threadTs, text);

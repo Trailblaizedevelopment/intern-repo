@@ -1,10 +1,12 @@
 /**
  * TRA-900 Path A: ticket-backed implement → Slack confirm → Linear Cursor delegate.
  * No brain_tasks / Slice / Goal / cursor_dispatch_agent.
+ * TRA-919: after successful delegate, start a lightweight Cursor finish watch.
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BrainMessage } from '../agent';
+import { upsertCursorWatch } from '../cursor-delegate-watch/store';
 import {
   delegateLinearIssueToCursor,
   fetchLinearIssueSummary,
@@ -53,6 +55,7 @@ export function formatDelegateConfirmSlackMessage(pending: PendingLinearCursorDe
     `*Dispatch Cursor on \`${pending.linear_issue_id}\`?*${title}${url}`,
     '',
     'I will assign Cursor on Linear only (no Slice/Goal / Cloud Agent from Dynamo).',
+    'When the agent finishes while the ticket is still In Progress, I will notify `#trailblaize-brain` (and this thread).',
     'Reply *yes dispatch* to assign, or *cancel* to skip.',
   ].join('\n');
 }
@@ -184,7 +187,8 @@ export async function tryStartLinearCursorDelegateFlow(input: {
 
 export async function executeApprovedLinearCursorDelegate(
   supabase: SupabaseClient,
-  pending: PendingLinearCursorDelegate
+  pending: PendingLinearCursorDelegate,
+  slackCtx?: { channel: string; threadTs: string }
 ): Promise<string> {
   const result = await delegateLinearIssueToCursor(pending.linear_issue_id, {
     required: true,
@@ -203,11 +207,23 @@ export async function executeApprovedLinearCursorDelegate(
   }
 
   const url = pending.issue_url || `https://linear.app/trailblaize/issue/${pending.linear_issue_id}`;
+
+  const watch = await upsertCursorWatch(supabase, {
+    linearIssueId: pending.linear_issue_id,
+    issueTitle: pending.issue_title,
+    issueUrl: url,
+    slackChannel: slackCtx?.channel ?? null,
+    slackThreadTs: slackCtx?.threadTs ?? null,
+  });
+
   return [
     `*Cursor owns \`${pending.linear_issue_id}\`*`,
     pending.issue_title ? pending.issue_title : null,
     url,
     '_Assigned via Linear Cursor delegate — Dynamo will not implement this itself._',
+    watch
+      ? '_I will ping `#trailblaize-brain` (and this thread) when the Cursor agent finishes while the ticket is still In Progress._'
+      : `_Could not start finish-watch — ask for *progress on ${pending.linear_issue_id}* if you need a status check._`,
   ]
     .filter(Boolean)
     .join('\n');
