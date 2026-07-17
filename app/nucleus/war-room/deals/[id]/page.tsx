@@ -455,7 +455,7 @@ export default function DealDetailPage() {
                   height: 40,
                   padding: '0 18px',
                   border: 'none',
-                  borderRadius: 10,
+                  borderRadius: 9999,
                   background: followupNote.trim() ? UI.ink : '#d1d5db',
                   color: '#fff',
                   fontSize: '0.875rem',
