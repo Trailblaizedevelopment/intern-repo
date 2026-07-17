@@ -1627,6 +1627,7 @@ function NextActionBar({
     );
   }
 
+  const dealId = deal.id;
   const title = dealDisplayTitle(deal);
   const idle = dealIdleDays(deal);
   const stageLabel = STAGE_LABELS[deal.stage] ?? deal.stage;
@@ -1635,7 +1636,7 @@ function NextActionBar({
   function submitFollowup() {
     const text = note.trim();
     if (!text) return;
-    onLogFollowup(deal.id, text);
+    onLogFollowup(dealId, text);
     setNote('');
     setLogging(false);
   }
