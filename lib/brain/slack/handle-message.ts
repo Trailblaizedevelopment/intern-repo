@@ -13,6 +13,13 @@ import {
   isCursorApprovalMessage,
   isCursorDenialMessage,
 } from '../cursor-approval';
+import {
+  addConversationMemories,
+  isMem0Configured,
+  resolveMem0UserId,
+  safeSearchMemories,
+} from '../mem0/client';
+import { mergeMemoryIntoSystemAppend } from '../mem0/prompt';
 import { checkBrainRateLimit } from '../rate-limit';
 import { sanitizeForActionLog } from '../sanitize-log';
 import { pickSlackAckPhrase } from './ack-phrases';
@@ -44,23 +51,28 @@ function slackConversationTitle(channel: string, threadTs: string): string {
   return `slack:${channel}:${threadTs}`;
 }
 
-async function resolveEmployee(): Promise<{ employeeId: string | null; employeeName: string | null }> {
+async function resolveEmployee(): Promise<{
+  employeeId: string | null;
+  employeeName: string | null;
+  employeeEmail: string;
+}> {
   const supabase = getSupabaseAdmin();
   const email = (process.env.BRAIN_BRIEFING_ASSIGNEE_EMAIL || 'devin@trailblaize.net').toLowerCase();
 
   if (!supabase) {
-    return { employeeId: null, employeeName: null };
+    return { employeeId: null, employeeName: null, employeeEmail: email };
   }
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('id, name')
+    .select('id, name, email')
     .eq('email', email)
     .maybeSingle();
 
   return {
     employeeId: employee?.id ?? null,
     employeeName: employee?.name ?? null,
+    employeeEmail: (employee?.email as string | undefined)?.toLowerCase() || email,
   };
 }
 
@@ -279,6 +291,15 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
         if (kickoff) {
           result = kickoff;
         } else {
+          const mem0UserId = resolveMem0UserId({
+            employeeEmail: employee.employeeEmail,
+            employeeId: employee.employeeId,
+            slackUserId: ctx.userId,
+          });
+          const memoryHits = isMem0Configured()
+            ? (await safeSearchMemories(message, mem0UserId)).memories
+            : [];
+
           history.push({ role: 'user', content: message });
           result = await runBrainAgent(
             history,
@@ -293,8 +314,21 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
               maxIterations: isLinearTicketCreateIntent(message)
                 ? TICKET_CREATE_MAX_TOOL_ITERATIONS
                 : undefined,
-              systemAppend: buildSlackOrchestrationAppend(message, history.slice(0, -1)),
+              systemAppend: mergeMemoryIntoSystemAppend(
+                buildSlackOrchestrationAppend(message, history.slice(0, -1)),
+                memoryHits
+              ),
             }
+          );
+
+          // Fire-and-forget: extract durable facts from this turn
+          void addConversationMemories(
+            [
+              { role: 'user', content: message },
+              { role: 'assistant', content: result.reply.slice(0, 4000) },
+            ],
+            mem0UserId,
+            { surface: 'slack', channel: ctx.channel }
           );
         }
       }

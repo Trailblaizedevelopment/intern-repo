@@ -148,6 +148,7 @@ function buildSystemPrompt(
   const hasSupabaseWeb = toolNames.some(n => n.startsWith('supabase_web_'));
   const hasSupabaseCrm = toolNames.some(n => n.startsWith('supabase_crm_'));
   const hasSupabaseMcp = hasSupabaseWeb || hasSupabaseCrm;
+  const hasMem0 = toolNames.some(n => n.startsWith('mem0_'));
 
   const toolGuidance: string[] = [];
   if (hasGitHub) {
@@ -217,6 +218,14 @@ function buildSystemPrompt(
       '- TRA-900: Slice/Goal are frozen. Do NOT call tasks_start_slice or tasks_start_goal from Slack.',
       '- For "fix/implement TRA-xxx": the Slack handler asks to assign Cursor on Linear — do not invent a task queue.',
       '- tasks_list_active / tasks_get_status: answer status questions for any legacy tasks without starting new work.'
+    );
+  }
+  if (hasMem0) {
+    toolGuidance.push(
+      '- Mem0 persistent memory is available (TRA-914).',
+      '- mem0_search: recall preferences, active Linear focus, recurring codebase paths across threads.',
+      '- mem0_remember: only when the user explicitly asks you to remember something durable.',
+      '- Relevant memories may also appear in the system prompt — prefer those; call mem0_search if you need more.'
     );
   }
 

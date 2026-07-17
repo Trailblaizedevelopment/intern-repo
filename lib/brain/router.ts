@@ -1,6 +1,7 @@
 import { cursorConnector } from './connectors/cursor';
 import { githubConnector } from './connectors/github';
 import { linearConnector } from './connectors/linear';
+import { mem0Connector } from './connectors/mem0';
 import {
   supabaseCrmMcpConnector,
   supabaseWebMcpConnector,
@@ -16,7 +17,7 @@ import {
 
 export type { ConnectorContext } from './connectors/types';
 
-/** Connectors: GitHub, Linear, CRM tickets, dual Supabase MCP (web + CRM), Cursor, Tasks. */
+/** Connectors: GitHub, Linear, CRM tickets, dual Supabase MCP (web + CRM), Cursor, Tasks, Mem0. */
 const CONNECTORS: BrainConnector[] = [
   githubConnector,
   linearConnector,
@@ -25,6 +26,7 @@ const CONNECTORS: BrainConnector[] = [
   supabaseCrmMcpConnector,
   cursorConnector,
   tasksConnector,
+  mem0Connector,
 ];
 
 /** Tool name → connector id (built on first listTools call per run). */

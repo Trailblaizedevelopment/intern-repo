@@ -8,6 +8,13 @@ import {
   runBrainAgent,
   toDisplayMessages,
 } from '@/lib/brain/agent';
+import {
+  addConversationMemories,
+  isMem0Configured,
+  resolveMem0UserId,
+  safeSearchMemories,
+} from '@/lib/brain/mem0/client';
+import { mergeMemoryIntoSystemAppend } from '@/lib/brain/mem0/prompt';
 import { checkBrainRateLimit } from '@/lib/brain/rate-limit';
 import { sanitizeForActionLog } from '@/lib/brain/sanitize-log';
 
@@ -144,6 +151,14 @@ export async function POST(request: NextRequest) {
 
   history.push({ role: 'user', content: message });
 
+  const mem0UserId = resolveMem0UserId({
+    employeeEmail: auth.identity.email,
+    employeeId: auth.identity.employeeId,
+  });
+  const memoryHits = isMem0Configured()
+    ? (await safeSearchMemories(message, mem0UserId)).memories
+    : [];
+
   // ── Run the agent ──
   let result;
   try {
@@ -151,13 +166,26 @@ export async function POST(request: NextRequest) {
       history,
       { supabase, employeeId: auth.identity.employeeId },
       auth.identity.employeeName,
-      { surface: 'workspace', conversationId: conversationId ?? undefined }
+      {
+        surface: 'workspace',
+        conversationId: conversationId ?? undefined,
+        systemAppend: mergeMemoryIntoSystemAppend(undefined, memoryHits),
+      }
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Agent run failed';
     console.error('[brain/chat] agent error:', err);
     return NextResponse.json({ error: msg }, { status: 502 });
   }
+
+  void addConversationMemories(
+    [
+      { role: 'user', content: message },
+      { role: 'assistant', content: result.reply.slice(0, 4000) },
+    ],
+    mem0UserId,
+    { surface: 'workspace' }
+  );
 
   // ── Persist conversation + audit log (best-effort) ──
   const stored = compactBrainMessagesForStorage(result.messages).slice(-MAX_STORED_MESSAGES);
