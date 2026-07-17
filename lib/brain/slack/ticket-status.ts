@@ -3,15 +3,8 @@
  */
 
 import { BrainMessage } from '../agent';
-import {
-  CursorAgentListItem,
-  CursorRunSnapshot,
-  getCursorAgent,
-  getLatestCursorRunSnapshot,
-  isCursorConfigured,
-  listCursorAgents,
-} from '../cursor-api';
-import { fetchLinearIssueStatusBundle, LinearIssueStatusBundle } from '../linear-delegate';
+import { resolveCursorCloudForTicket } from '../cursor-ticket-resolve';
+import { fetchLinearIssueStatusBundle } from '../linear-delegate';
 import { extractLinearIssueId, isLinearTicketCreateIntent } from './orchestration-kickoff';
 import { isStartWorkIntent } from './ticket-intent';
 
@@ -20,10 +13,6 @@ const STATUS_NEAR_TRA =
 
 const GOING_ON_NEAR_TRA =
   /\bTRA-\d+\b[\s\S]{0,60}\b(what's going on|whats going on|what is going on|how's it going|how is it going|check on|look(?:ing)? up)\b|\b(what's going on|whats going on|what is going on|how's it going|how is it going|check on|look(?:ing)? up)\b[\s\S]{0,60}\bTRA-\d+\b/i;
-
-const AGENT_ID_RE = /\b(bc-[a-f0-9-]{8,})\b/i;
-const AGENT_URL_RE = /https?:\/\/(?:www\.)?cursor\.com\/agents\/(bc-[a-f0-9-]+)/i;
-const PR_URL_RE = /https?:\/\/github\.com\/[^\s)>\]]+\/pull\/\d+/gi;
 
 /** True when user wants a progress/status report on a ticket (Lookup, not implement). */
 export function isTicketStatusIntent(message: string): boolean {
@@ -46,160 +35,13 @@ export function isTicketStatusIntent(message: string): boolean {
   return false;
 }
 
-function extractAgentIdsFromText(text: string): string[] {
-  const found = new Set<string>();
-  for (const match of text.matchAll(new RegExp(AGENT_URL_RE.source, 'gi'))) {
-    if (match[1]) found.add(match[1]);
-  }
-  for (const match of text.matchAll(new RegExp(AGENT_ID_RE.source, 'gi'))) {
-    if (match[1]) found.add(match[1]);
-  }
-  return [...found];
-}
-
-function extractPrUrls(...texts: string[]): string[] {
-  const found = new Set<string>();
-  for (const text of texts) {
-    for (const match of text.matchAll(PR_URL_RE)) {
-      found.add(match[0].replace(/[.,)]+$/, ''));
-    }
-  }
-  return [...found];
-}
-
-function normalizeTitleToken(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function scoreAgentForTicket(
-  agent: CursorAgentListItem,
-  linearId: string,
-  title: string,
-  prUrls: string[]
-): number {
-  let score = 0;
-  const idLower = linearId.toLowerCase();
-  const hay = [
-    agent.name,
-    ...agent.startingRefs,
-    ...agent.prUrls,
-    ...agent.repoUrls,
-  ]
-    .join(' ')
-    .toLowerCase();
-
-  if (hay.includes(idLower)) score += 100;
-  if (agent.startingRefs.some(r => r.toLowerCase().includes(idLower))) score += 40;
-
-  for (const pr of prUrls) {
-    if (agent.prUrls.some(u => u.toLowerCase() === pr.toLowerCase())) score += 80;
-  }
-
-  const titleTokens = normalizeTitleToken(title)
-    .split(/\s+/)
-    .filter(t => t.length > 3);
-  const nameNorm = normalizeTitleToken(agent.name);
-  let overlap = 0;
-  for (const token of titleTokens.slice(0, 6)) {
-    if (nameNorm.includes(token)) overlap += 1;
-  }
-  if (overlap >= 2) score += overlap * 8;
-
-  return score;
-}
-
-async function resolveCursorCloudForTicket(
-  linear: LinearIssueStatusBundle
-): Promise<{
-  agent: CursorAgentListItem | Record<string, unknown> | null;
-  run: CursorRunSnapshot | null;
-  agentUrl: string | null;
-  matchNote: string | null;
-  unavailableReason: string | null;
-}> {
-  if (!isCursorConfigured()) {
-    return {
-      agent: null,
-      run: null,
-      agentUrl: null,
-      matchNote: null,
-      unavailableReason: 'CURSOR_API_KEY is not configured on this deployment.',
-    };
-  }
-
-  const textBlob = [
-    linear.description || '',
-    ...linear.comments.map(c => c.body),
-    ...linear.attachmentUrls,
-  ].join('\n');
-
-  const embeddedIds = extractAgentIdsFromText(textBlob);
-  const prUrls = extractPrUrls(textBlob, ...linear.attachmentUrls);
-
-  try {
-    if (embeddedIds.length > 0) {
-      const agentId = embeddedIds[0];
-      const agent = await getCursorAgent(agentId);
-      const run = await getLatestCursorRunSnapshot(agentId);
-      const url =
-        typeof agent.url === 'string'
-          ? agent.url
-          : `https://cursor.com/agents/${agentId}`;
-      return {
-        agent,
-        run,
-        agentUrl: url,
-        matchNote: 'Resolved from Linear comments/description agent link.',
-        unavailableReason: null,
-      };
-    }
-
-    const { items } = await listCursorAgents({ limit: 80 });
-    let best: { agent: CursorAgentListItem; score: number } | null = null;
-    for (const agent of items) {
-      if (!agent.id) continue;
-      const score = scoreAgentForTicket(agent, linear.identifier, linear.title, prUrls);
-      if (score <= 0) continue;
-      if (!best || score > best.score) best = { agent, score };
-    }
-
-    if (!best || best.score < 40) {
-      return {
-        agent: null,
-        run: null,
-        agentUrl: null,
-        matchNote: null,
-        unavailableReason:
-          'No Cursor Cloud agent matched this TRA under the configured API key (try again after Cursor posts on the ticket, or confirm Linear↔Cursor uses the same org key).',
-      };
-    }
-
-    const run = await getLatestCursorRunSnapshot(best.agent.id);
-    return {
-      agent: best.agent,
-      run,
-      agentUrl: best.agent.url || `https://cursor.com/agents/${best.agent.id}`,
-      matchNote: `Matched Cloud agent via heuristics (score ${best.score}).`,
-      unavailableReason: null,
-    };
-  } catch (err) {
-    return {
-      agent: null,
-      run: null,
-      agentUrl: null,
-      matchNote: null,
-      unavailableReason: err instanceof Error ? err.message : 'Cursor API lookup failed',
-    };
-  }
-}
-
 function clipComment(body: string, max = 220): string {
   const oneLine = body.replace(/\s+/g, ' ').trim();
   return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
 }
 
 function formatStatusReply(
-  linear: LinearIssueStatusBundle,
+  linear: NonNullable<Awaited<ReturnType<typeof fetchLinearIssueStatusBundle>>>,
   cloud: Awaited<ReturnType<typeof resolveCursorCloudForTicket>>
 ): string {
   const lines: string[] = [
