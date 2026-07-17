@@ -37,6 +37,7 @@ import {
   tryOrchestrationKickoff,
 } from './orchestration-kickoff';
 import { handleTaskStopMessage, isTaskStopMessage } from './task-control';
+import { tryScheduledFollowUpSlack } from './scheduled-follow-up';
 import { tryTicketStatusLookup } from './ticket-status';
 
 const MAX_STORED_MESSAGES = 40;
@@ -251,85 +252,100 @@ export async function handleSlackChatMessage(text: string, ctx: SlackChatContext
 
   let result;
   try {
-    const statusLookup = await tryTicketStatusLookup({ message, history });
-    if (statusLookup) {
+    const scheduled = await tryScheduledFollowUpSlack({
+      message,
+      history,
+      supabase,
+      channel: ctx.channel,
+      threadTs: ctx.threadTs,
+      userId: ctx.userId,
+    });
+    if (scheduled) {
       result = {
-        reply: statusLookup.reply,
-        messages: statusLookup.messages,
+        reply: scheduled.reply,
+        messages: scheduled.messages,
         toolEvents: [],
       };
     } else {
-      const delegateStart = await tryStartLinearCursorDelegateFlow({
-        message,
-        history,
-        supabase,
-        conversationId,
-        channel: ctx.channel,
-        threadTs: ctx.threadTs,
-        employeeId: employee.employeeId,
-      });
-
-      if (delegateStart) {
-        if (delegateStart.conversationId) {
-          conversationId = delegateStart.conversationId;
-        }
+      const statusLookup = await tryTicketStatusLookup({ message, history });
+      if (statusLookup) {
         result = {
-          reply: delegateStart.reply,
-          messages: delegateStart.messages,
+          reply: statusLookup.reply,
+          messages: statusLookup.messages,
           toolEvents: [],
         };
       } else {
-        const kickoff = await tryOrchestrationKickoff({
+        const delegateStart = await tryStartLinearCursorDelegateFlow({
           message,
           history,
-          ctx,
           supabase,
-          employeeId: employee.employeeId,
           conversationId,
+          channel: ctx.channel,
+          threadTs: ctx.threadTs,
+          employeeId: employee.employeeId,
         });
 
-        if (kickoff) {
-          result = kickoff;
+        if (delegateStart) {
+          if (delegateStart.conversationId) {
+            conversationId = delegateStart.conversationId;
+          }
+          result = {
+            reply: delegateStart.reply,
+            messages: delegateStart.messages,
+            toolEvents: [],
+          };
         } else {
-          const mem0UserId = resolveMem0UserId({
-            employeeEmail: employee.employeeEmail,
-            employeeId: employee.employeeId,
-            slackUserId: ctx.userId,
-          });
-          const memoryHits = isMem0Configured()
-            ? (await safeSearchMemories(message, mem0UserId)).memories
-            : [];
-
-          history.push({ role: 'user', content: message });
-          result = await runBrainAgent(
+          const kickoff = await tryOrchestrationKickoff({
+            message,
             history,
-            { supabase, employeeId: employee.employeeId },
-            employee.employeeName,
-            {
-              surface: 'slack',
-              conversationId,
-              slackChannel: ctx.channel,
-              slackThreadTs: ctx.threadTs,
-              slackUserId: ctx.userId,
-              maxIterations: isLinearTicketCreateIntent(message)
-                ? TICKET_CREATE_MAX_TOOL_ITERATIONS
-                : undefined,
-              systemAppend: mergeMemoryIntoSystemAppend(
-                buildSlackOrchestrationAppend(message, history.slice(0, -1)),
-                memoryHits
-              ),
-            }
-          );
+            ctx,
+            supabase,
+            employeeId: employee.employeeId,
+            conversationId,
+          });
 
-          // Fire-and-forget: extract durable facts from this turn
-          void addConversationMemories(
-            [
-              { role: 'user', content: message },
-              { role: 'assistant', content: result.reply.slice(0, 4000) },
-            ],
-            mem0UserId,
-            { surface: 'slack', channel: ctx.channel }
-          );
+          if (kickoff) {
+            result = kickoff;
+          } else {
+            const mem0UserId = resolveMem0UserId({
+              employeeEmail: employee.employeeEmail,
+              employeeId: employee.employeeId,
+              slackUserId: ctx.userId,
+            });
+            const memoryHits = isMem0Configured()
+              ? (await safeSearchMemories(message, mem0UserId)).memories
+              : [];
+
+            history.push({ role: 'user', content: message });
+            result = await runBrainAgent(
+              history,
+              { supabase, employeeId: employee.employeeId },
+              employee.employeeName,
+              {
+                surface: 'slack',
+                conversationId,
+                slackChannel: ctx.channel,
+                slackThreadTs: ctx.threadTs,
+                slackUserId: ctx.userId,
+                maxIterations: isLinearTicketCreateIntent(message)
+                  ? TICKET_CREATE_MAX_TOOL_ITERATIONS
+                  : undefined,
+                systemAppend: mergeMemoryIntoSystemAppend(
+                  buildSlackOrchestrationAppend(message, history.slice(0, -1)),
+                  memoryHits
+                ),
+              }
+            );
+
+            void addConversationMemories(
+              [
+                { role: 'user', content: message },
+                { role: 'assistant', content: result.reply.slice(0, 4000) },
+              ],
+              mem0UserId,
+              { surface: 'slack', channel: ctx.channel }
+            );
+          }
         }
       }
     }
