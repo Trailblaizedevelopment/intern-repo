@@ -1664,6 +1664,9 @@ function NextActionBar({
         {' · '}
         idle {idle} day{idle === 1 ? '' : 's'}
       </p>
+      <p style={{ margin: '10px 0 0', fontSize: '0.8125rem', fontWeight: 700, color: CRM_UI.text, lineHeight: 1.4, maxWidth: 560 }}>
+        Sales teams: log a real follow-up to clear this chapter from your queue — it saves to the deal. Or open the deal to advance stage / Hold Off / Closed Lost.
+      </p>
 
       {!logging ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12, marginTop: 16 }}>
@@ -1800,6 +1803,8 @@ interface FollowUpQueueViewProps {
   employees: { id: string; name: string }[];
   onBack: () => void;
   onLogFollowup: (dealId: string, text: string) => void;
+  onSnooze: (dealId: string) => void;
+  onSetStage: (dealId: string, stage: DealStage) => void;
   onOpenDeal: (deal: PipelineDealFull) => void;
 }
 
@@ -1808,10 +1813,24 @@ function FollowUpQueueView({
   employees,
   onBack,
   onLogFollowup,
+  onSnooze,
+  onSetStage,
   onOpenDeal,
 }: FollowUpQueueViewProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [inputs, setInputs] = useState<Record<string, string>>({});
+
+  const linkBtn: React.CSSProperties = {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
+    fontSize: '0.8125rem',
+    fontWeight: 600,
+    fontFamily: 'inherit',
+    textDecoration: 'underline',
+    textUnderlineOffset: 3,
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1836,8 +1855,22 @@ function FollowUpQueueView({
         </h2>
         <p style={{ margin: '8px 0 0', fontSize: '0.875rem', color: CRM_UI.textMuted }}>
           {deals.length} chapter{deals.length === 1 ? '' : 's'} idle 3+ days at First Demo, Second Call, or Contract Sent.
-          Log a follow-up on each — or open the deal for full details.
         </p>
+      </div>
+
+      <div style={{ padding: '14px 0', borderTop: `1px solid ${CRM_UI.border}`, borderBottom: `1px solid ${CRM_UI.border}` }}>
+        <p style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 700, color: CRM_UI.text, lineHeight: 1.45 }}>
+          Sales teams: take an action on each chapter to clear it from this queue. Logging a follow-up is a real save — it writes to the deal and resets the idle timer — not cosmetic.
+        </p>
+        <p style={{ margin: '10px 0 0', fontSize: '0.875rem', color: CRM_UI.textSecondary, lineHeight: 1.5 }}>
+          Other ways to clear a chapter from this list:
+        </p>
+        <ul style={{ margin: '8px 0 0', paddingLeft: 18, color: CRM_UI.textSecondary, fontSize: '0.875rem', lineHeight: 1.55 }}>
+          <li><strong style={{ color: CRM_UI.text }}>Log follow-up</strong> — record outreach (primary).</li>
+          <li><strong style={{ color: CRM_UI.text }}>Snooze</strong> — reset the idle timer without a note (use sparingly).</li>
+          <li><strong style={{ color: CRM_UI.text }}>Open deal</strong> — advance stage (e.g. toward Closed Won).</li>
+          <li><strong style={{ color: CRM_UI.text }}>Hold Off / Closed Lost</strong> — park or kill dead deals so they stop clogging the queue.</li>
+        </ul>
       </div>
 
       {deals.length === 0 ? (
@@ -1874,7 +1907,7 @@ function FollowUpQueueView({
                       idle {idle}d
                     </p>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       onClick={() => setExpandedId(isOpen ? null : deal.id)}
@@ -1895,27 +1928,43 @@ function FollowUpQueueView({
                     </button>
                     <button
                       type="button"
+                      onClick={() => onSnooze(deal.id)}
+                      title="Resets idle timer without writing a follow-up note"
+                      style={{ ...linkBtn, color: CRM_UI.textSecondary }}
+                    >
+                      Snooze
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => onOpenDeal(deal)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'pointer',
-                        fontSize: '0.8125rem',
-                        fontWeight: 600,
-                        color: CRM_UI.textSecondary,
-                        fontFamily: 'inherit',
-                        textDecoration: 'underline',
-                        textUnderlineOffset: 3,
-                      }}
+                      style={{ ...linkBtn, color: CRM_UI.textSecondary }}
                     >
                       Open deal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSetStage(deal.id, 'hold_off')}
+                      title="Remove from active queue — bad timing / pause"
+                      style={{ ...linkBtn, color: CRM_UI.textMuted }}
+                    >
+                      Hold Off
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSetStage(deal.id, 'closed_lost')}
+                      title="Mark as lost — removes from active pipeline"
+                      style={{ ...linkBtn, color: '#dc2626' }}
+                    >
+                      Closed Lost
                     </button>
                   </div>
                 </div>
 
                 {isOpen && (
                   <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 520 }}>
+                    <p style={{ margin: 0, fontSize: '0.8125rem', color: CRM_UI.textMuted }}>
+                      This saves a real note on the deal and clears it from the queue.
+                    </p>
                     <input
                       type="text"
                       value={inputs[deal.id] ?? ''}
@@ -2747,6 +2796,18 @@ export function SalesCRM({
     patchDeal(dealId, { notes: notesJson, last_touched: now });
   }
 
+  function handleSnoozeDeal(dealId: string) {
+    const now = new Date().toISOString();
+    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, last_touched: now } : d));
+    patchDeal(dealId, { last_touched: now });
+  }
+
+  function handleSetStage(dealId: string, stage: DealStage) {
+    const now = new Date().toISOString();
+    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage, last_touched: now } : d));
+    patchDeal(dealId, { stage, last_touched: now });
+  }
+
   // ── Filters ──
   const { visibleDeals, archivedDeals, filteredDeals } = useMemo(() => {
     let list = deals;
@@ -2870,6 +2931,8 @@ export function SalesCRM({
         employees={employees}
         onBack={() => setShowFollowUpQueue(false)}
         onLogFollowup={handleLogActivity}
+        onSnooze={handleSnoozeDeal}
+        onSetStage={handleSetStage}
         onOpenDeal={openDealPage}
       />
     );

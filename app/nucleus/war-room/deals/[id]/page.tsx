@@ -259,6 +259,7 @@ export default function DealDetailPage() {
         last_touched: new Date().toISOString(),
       });
       setFollowupNote('');
+      router.push('/nucleus/war-room');
     } catch {
       setError('Could not log follow-up');
     } finally {
@@ -295,6 +296,9 @@ export default function DealDetailPage() {
     try {
       await patchDeal({ stage, last_touched: new Date().toISOString() });
       setEditing(false);
+      if (stage === 'hold_off' || stage === 'closed_lost' || stage === 'closed_won') {
+        router.push('/nucleus/war-room');
+      }
     } catch {
       setError('Could not update stage');
     }
@@ -409,13 +413,24 @@ export default function DealDetailPage() {
         {/* Next step — always clear */}
         {!isClosed && !editing && (
           <section style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${UI.border}` }}>
-            <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: UI.subtle }}>
-              What to do next
+            <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b45309' }}>
+              Action required
             </p>
-            <p style={{ margin: '8px 0 0', fontSize: '1.125rem', fontWeight: 600, color: UI.text }}>
-              Log a follow-up on this chapter
+            <p style={{ margin: '8px 0 0', fontSize: '1.25rem', fontWeight: 700, color: UI.text }}>
+              This chapter is idle — take an action to clear it from the queue
             </p>
-            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
+            <p style={{ margin: '10px 0 0', fontSize: '0.875rem', color: UI.muted, lineHeight: 1.5, maxWidth: 560 }}>
+              {idleDays !== null && idleDays >= 3
+                ? `No activity in ${idleDays} days at ${STAGE_LABELS[deal.stage] ?? deal.stage}. `
+                : ''}
+              <strong style={{ color: UI.text }}>Logging a follow-up is a real write</strong> — it saves a note and resets the idle timer.
+              You can also advance the stage, or mark Hold Off / Closed Lost if this deal is dead.
+            </p>
+
+            <p style={{ margin: '20px 0 0', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: UI.subtle }}>
+              1. Preferred — log follow-up
+            </p>
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
               <input
                 type="text"
                 value={followupNote}
@@ -431,45 +446,86 @@ export default function DealDetailPage() {
                   height: 42,
                 }}
               />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <button
-                  type="button"
-                  onClick={handleLogFollowup}
-                  disabled={!followupNote.trim() || logging}
-                  style={{
-                    height: 40,
-                    padding: '0 18px',
-                    border: 'none',
-                    borderRadius: 10,
-                    background: followupNote.trim() ? UI.ink : '#d1d5db',
-                    color: '#fff',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: followupNote.trim() ? 'pointer' : 'default',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {logging ? 'Saving…' : 'Log follow-up'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(true)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: UI.muted,
-                    fontFamily: 'inherit',
-                    textDecoration: 'underline',
-                    textUnderlineOffset: 3,
-                  }}
-                >
-                  Change stage / details
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleLogFollowup}
+                disabled={!followupNote.trim() || logging}
+                style={{
+                  alignSelf: 'flex-start',
+                  height: 40,
+                  padding: '0 18px',
+                  border: 'none',
+                  borderRadius: 10,
+                  background: followupNote.trim() ? UI.ink : '#d1d5db',
+                  color: '#fff',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: followupNote.trim() ? 'pointer' : 'default',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {logging ? 'Saving…' : 'Log follow-up'}
+              </button>
+            </div>
+
+            <p style={{ margin: '28px 0 0', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: UI.subtle }}>
+              2. Other ways to clear this deal
+            </p>
+            <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                style={{
+                  height: 40,
+                  padding: '0 14px',
+                  border: `1px solid ${UI.border}`,
+                  borderRadius: 10,
+                  background: '#fff',
+                  color: UI.text,
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Advance stage / edit details
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMarkStage('hold_off')}
+                style={{
+                  height: 40,
+                  padding: '0 14px',
+                  border: `1px solid ${UI.border}`,
+                  borderRadius: 10,
+                  background: '#fff',
+                  color: UI.muted,
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Hold Off
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMarkStage('closed_lost')}
+                style={{
+                  height: 40,
+                  padding: '0 14px',
+                  border: '1px solid #fecaca',
+                  borderRadius: 10,
+                  background: '#fff',
+                  color: '#dc2626',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Closed Lost
+              </button>
             </div>
           </section>
         )}
