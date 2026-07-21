@@ -1091,40 +1091,11 @@ function SetUpPage() {
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
-                  {/* Hybrid: SVG lines + HTML avatar nodes for reliable cross-origin rendering */}
-                  <div style={{ position: 'relative', width: '280px', height: '200px', maxWidth: '100%' }}>
-                    <svg viewBox="0 0 280 200" width="280" height="200" style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}>
-                      {[
-                        {cx:52,cy:52,d:0.25},{cx:228,cy:52,d:0.45},
-                        {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},{cx:140,cy:16,d:1.05},
-                      ].map((n,i) => (
-                        <line key={`line-${i}`} x1="140" y1="100" x2={n.cx} y2={n.cy}
-                          stroke="#E5E7EB" strokeWidth="1.5"
-                          style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }} />
-                      ))}
-                      <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
-                      <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
-                    </svg>
-                    {[
-                      {cx:52,cy:52,d:0.3,r:18,avatar:'/faces/face2.jpg',initials:'PP',color:'#EC4899'},
-                      {cx:228,cy:52,d:0.5,r:18,avatar:'/faces/face4.jpg',initials:'ND',color:'#6366F1'},
-                      {cx:228,cy:148,d:0.7,r:18,avatar:'/faces/face6.jpg',initials:'JC',color:'#0F172A'},
-                      {cx:52,cy:148,d:0.9,r:18,avatar:'/faces/face8.jpg',initials:'AL',color:'#F59E0B'},
-                      {cx:140,cy:16,d:1.1,r:18,avatar:'/faces/face11.jpg',initials:'GM',color:'#8B5CF6'},
-                    ].map((n,i) => (
-                      <div key={`node-${i}`} style={{
-                        position: 'absolute', left: n.cx - n.r, top: n.cy - n.r,
-                        width: n.r * 2, height: n.r * 2, borderRadius: '50%',
-                        border: '2px solid #E5E7EB', overflow: 'hidden',
-                        opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards`,
-                        background: `${n.color} url(${n.avatar}) center/cover no-repeat`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'white', fontSize: Math.round(n.r * 0.56), fontWeight: 700,
-                        fontFamily: 'Inter, sans-serif',
-                      }}>
-                      </div>
-                    ))}
-                  </div>
+                  <video
+                    src="/step2animation.mp4"
+                    autoPlay loop muted playsInline
+                    style={{ width: '100%', maxWidth: '320px', borderRadius: '16px' }}
+                  />
                 </div>
                 <div style={{ order: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -1340,64 +1311,13 @@ function SetUpPage() {
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
-                  {/* Hybrid: SVG lines + HTML avatar nodes */}
-                  <div style={{ position: 'relative', width: '260px', height: '180px', maxWidth: '100%' }}>
-                    <svg viewBox="0 0 260 180" width="260" height="180" style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}>
-                      <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
-                      <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
-                      {/* Inner ring lines */}
-                      {[
-                        {cx:86,cy:52,d:'0.2s'},{cx:174,cy:52,d:'0.4s'},
-                        {cx:174,cy:128,d:'0.6s'},{cx:86,cy:128,d:'0.8s'},
-                      ].map((n,i) => (
-                        <line key={i} x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
-                          strokeDasharray="200" strokeDashoffset="200"
-                          style={{ animation: `lineGrow 0.5s ease ${n.d} both` }} />
-                      ))}
-                      {/* Outer ring lines */}
-                      {[
-                        {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s'},{cx:218,cy:38,fromX:174,fromY:52,d:'1.2s'},
-                        {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s'},{cx:42,cy:142,fromX:86,fromY:128,d:'1.6s'},
-                        {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s'},{cx:130,cy:168,fromX:130,fromY:90,d:'2.0s'},
-                      ].map((n,i) => (
-                        <line key={i} x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
-                          strokeDasharray="200" strokeDashoffset="200"
-                          style={{ animation: `lineGrow 0.4s ease ${n.d} both` }} />
-                      ))}
-                    </svg>
-                    {/* Inner ring avatar nodes */}
-                    {[
-                      {cx:86,cy:52,d:'0.2s',r:11,avatar:'/faces/face2.jpg',color:'#EC4899'},
-                      {cx:174,cy:52,d:'0.4s',r:11,avatar:'/faces/face4.jpg',color:'#6366F1'},
-                      {cx:174,cy:128,d:'0.6s',r:11,avatar:'/faces/face6.jpg',color:'#0F172A'},
-                      {cx:86,cy:128,d:'0.8s',r:11,avatar:'/faces/face8.jpg',color:'#F59E0B'},
-                    ].map((n,i) => (
-                      <div key={i} style={{
-                        position: 'absolute', left: n.cx - n.r, top: n.cy - n.r,
-                        width: n.r * 2, height: n.r * 2, borderRadius: '50%',
-                        border: '1.5px solid #E5E7EB',
-                        animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite`,
-                        background: `${n.color} url(${n.avatar}) center/cover no-repeat`,
-                      }} />
-                    ))}
-                    {/* Outer ring avatar nodes */}
-                    {[
-                      {cx:42,cy:38,d:'1.0s',r:7,avatar:'/faces/face1.jpg',color:'#0F172A'},
-                      {cx:218,cy:38,d:'1.2s',r:7,avatar:'/faces/face11.jpg',color:'#8B5CF6'},
-                      {cx:218,cy:142,d:'1.4s',r:7,avatar:'/faces/face12.jpg',color:'#10B981'},
-                      {cx:42,cy:142,d:'1.6s',r:7,avatar:'/faces/face9.jpg',color:'#F59E0B'},
-                      {cx:130,cy:12,d:'1.8s',r:7,avatar:'/faces/face5.jpg',color:'#10B981'},
-                      {cx:130,cy:168,d:'2.0s',r:7,avatar:'/faces/face3.jpg',color:'#6366F1'},
-                    ].map((n,i) => (
-                      <div key={i} style={{
-                        position: 'absolute', left: n.cx - n.r, top: n.cy - n.r,
-                        width: n.r * 2, height: n.r * 2, borderRadius: '50%',
-                        border: '1.5px solid #E5E7EB',
-                        animation: `orbitIn 0.4s ease ${n.d} both`,
-                        background: `${n.color} url(${n.avatar}) center/cover no-repeat`,
-                      }} />
-                    ))}
-                  </div>
+                  <video
+                    src="/step6animation.mp4"
+                    autoPlay loop muted playsInline
+                    style={{ width: '100%', maxWidth: '320px', borderRadius: '16px' }}
+                  />
+                </div>
+                <div style={{ display: 'none' }}>
                 </div>
                 <div style={{ order: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
