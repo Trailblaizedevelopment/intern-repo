@@ -47,6 +47,19 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabaseAdmin();
     if (!supabase) return NextResponse.json({ error: 'DB unavailable' }, { status: 500 });
 
+    // Idempotency check — prevent duplicate chapters from React 18 double-invoke or page refresh
+    if (stripeSubscriptionId) {
+      const { data: existing } = await supabase
+        .from('chapters')
+        .select('id')
+        .eq('stripe_subscription_id', stripeSubscriptionId)
+        .maybeSingle();
+      if (existing) {
+        console.log(`[set-up/complete] duplicate call for subscription ${stripeSubscriptionId} — skipping`);
+        return NextResponse.json({ success: true, chapterId: existing.id, loginUrl: 'https://trailblaize.space/login' });
+      }
+    }
+
     // Create chapter
     const { data: chapter, error: chapterError } = await supabase
       .from('chapters')

@@ -585,6 +585,7 @@ function SetUpPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const testMode = searchParams.get('test') === '1';
+  const confirmCalledRef = useRef(false); // prevent React 18 StrictMode double-fire
 
   const [step, setStep] = useState(0);
   const [subStep, setSubStep] = useState(0);
@@ -642,11 +643,15 @@ function SetUpPage() {
     const bypassParam = searchParams.get('bypass');
 
     if (success === 'true' && bypassParam === '1') {
+      if (confirmCalledRef.current) return;
+      confirmCalledRef.current = true;
       setStep(5);
       const bypassData: Record<string, string> = {};
       searchParams.forEach((v, k) => { bypassData[k] = v; });
       handleBypassConfirmation(bypassData);
     } else if (success === 'true' && sessionId) {
+      if (confirmCalledRef.current) return;
+      confirmCalledRef.current = true;
       setStep(5);
       handleConfirmation(sessionId);
     } else if (stepParam) {
