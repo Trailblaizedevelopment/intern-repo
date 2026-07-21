@@ -173,6 +173,15 @@ Organization: ${orgName}, ${school}</pre>
       htmlBody: `<div style="font-family:sans-serif;padding:24px;"><h2>New signup!</h2><p>${msg}</p><p><b>${leaderName}</b> · ${leaderEmail} · ${leaderPhone}</p></div>`,
     })));
 
+    // Mark setup lead as converted
+    try {
+      await supabase.from('setup_leads').update({
+        status: 'converted',
+        stripe_session_id: sessionId || null,
+        updated_at: new Date().toISOString(),
+      }).eq('leader_email', leaderEmail);
+    } catch (e) { console.warn('[set-up/complete] lead update failed:', e); }
+
     return NextResponse.json({ success: true, chapterId, loginUrl: 'https://trailblaize.space/login' });
   } catch (err: unknown) {
     console.error('[set-up/complete] error:', err);

@@ -31,6 +31,8 @@ interface AlumniStats {
   contacted_with_phone: number;
   signed_up: number;
   outreach_coverage_pct: number;
+  needs_reply: number;
+  not_pitched: number;
 }
 
 interface TriageChapter extends ChapterWithOnboarding {
@@ -905,6 +907,18 @@ function ChapterTriageCard({ chapter, onOpen, onEdit }: {
               <Activity size={11} />
               {chapter.days_since_last_activity === 0 ? 'today' : chapter.days_since_last_activity === 1 ? '1d ago' : `${chapter.days_since_last_activity}d ago`}
             </span>
+          )}
+          {(stats?.needs_reply ?? 0) > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ color: '#ef4444', fontWeight: 700 }}>{stats.needs_reply}</span>
+              <span style={{ color: '#6b7280' }}>needs reply</span>
+            </div>
+          )}
+          {(stats?.not_pitched ?? 0) > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ color: '#f59e0b', fontWeight: 700 }}>{stats.not_pitched}</span>
+              <span style={{ color: '#6b7280' }}>not pitched</span>
+            </div>
           )}
         </div>
 
