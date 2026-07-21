@@ -237,7 +237,6 @@ function AvatarImg({ src, name, initials, bg, size, style: extraStyle }: {
     <img
       src={src}
       alt={name}
-      crossOrigin="anonymous"
       style={{ ...baseStyle, objectFit: 'cover' }}
       onError={() => setFailed(true)}
     />
@@ -749,9 +748,25 @@ function SetUpPage() {
   async function handleCheckout() {
     setCheckoutLoading(true); setCheckoutError('');
     try {
+      const memberCount = Number(form.memberCount);
+      const pricePerMonth = getPriceTier(memberCount);
+
+      // 1. Capture lead before redirecting — ensures we never lose a drop-off
+      fetch('/api/set-up/lead', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgName: form.orgName, school: form.school, orgType: form.orgType,
+          memberCount, designation: form.designation,
+          leaderName: form.leaderName, leaderEmail: form.leaderEmail, leaderPhone: form.leaderPhone,
+          instagramHandle: form.instagramHandle, pricePerMonth,
+          status: 'checkout_started',
+        }),
+      }).catch(() => {}); // fire-and-forget — don't block checkout on this
+
+      // 2. Create Stripe checkout session
       const res = await fetch('/api/set-up/checkout', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, memberCount: Number(form.memberCount), agreedName, agreedAt: agreedAtISO, discountCode: promoCode }),
+        body: JSON.stringify({ ...form, memberCount, agreedName, agreedAt: agreedAtISO, discountCode: promoCode }),
       });
       const data = await res.json();
       if (!res.ok || data.error) {
@@ -1338,36 +1353,40 @@ function SetUpPage() {
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
-                  <svg viewBox="0 0 280 200" width="280" height="200" style={{ overflow: 'visible', maxWidth: '100%' }}>
-                    <defs>
-                      {[{cx:52,cy:52},{cx:228,cy:52},{cx:228,cy:148},{cx:52,cy:148},{cx:140,cy:16}].map((n,i) => (
-                        <clipPath key={i} id={`ls1-clip-${i}`}><circle cx={n.cx} cy={n.cy} r={18} /></clipPath>
+                  {/* Hybrid: SVG lines + HTML avatar nodes for reliable cross-origin rendering */}
+                  <div style={{ position: 'relative', width: '280px', height: '200px', maxWidth: '100%' }}>
+                    <svg viewBox="0 0 280 200" width="280" height="200" style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}>
+                      {[
+                        {cx:52,cy:52,d:0.25},{cx:228,cy:52,d:0.45},
+                        {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},{cx:140,cy:16,d:1.05},
+                      ].map((n,i) => (
+                        <line key={`line-${i}`} x1="140" y1="100" x2={n.cx} y2={n.cy}
+                          stroke="#E5E7EB" strokeWidth="1.5"
+                          style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }} />
                       ))}
-                    </defs>
+                      <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
+                      <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
+                    </svg>
                     {[
-                      {cx:52,cy:52,d:0.25},{cx:228,cy:52,d:0.45},
-                      {cx:228,cy:148,d:0.65},{cx:52,cy:148,d:0.85},{cx:140,cy:16,d:1.05},
+                      {cx:52,cy:52,d:0.3,r:18,avatar:'/faces/face2.jpg',initials:'PP',color:'#EC4899'},
+                      {cx:228,cy:52,d:0.5,r:18,avatar:'/faces/face4.jpg',initials:'ND',color:'#6366F1'},
+                      {cx:228,cy:148,d:0.7,r:18,avatar:'/faces/face6.jpg',initials:'JC',color:'#0F172A'},
+                      {cx:52,cy:148,d:0.9,r:18,avatar:'/faces/face8.jpg',initials:'AL',color:'#F59E0B'},
+                      {cx:140,cy:16,d:1.1,r:18,avatar:'/faces/face11.jpg',initials:'GM',color:'#8B5CF6'},
                     ].map((n,i) => (
-                      <line key={`line-${i}`} x1="140" y1="100" x2={n.cx} y2={n.cy}
-                        stroke="#E5E7EB" strokeWidth="1.5"
-                        style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }} />
+                      <div key={`node-${i}`} style={{
+                        position: 'absolute', left: n.cx - n.r, top: n.cy - n.r,
+                        width: n.r * 2, height: n.r * 2, borderRadius: '50%',
+                        border: '2px solid #E5E7EB', overflow: 'hidden',
+                        opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards`,
+                        background: `${n.color} url(${n.avatar}) center/cover no-repeat`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontSize: Math.round(n.r * 0.56), fontWeight: 700,
+                        fontFamily: 'Inter, sans-serif',
+                      }}>
+                      </div>
                     ))}
-                    <circle cx="140" cy="100" r="24" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
-                    <text x="140" y="104" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">YOU</text>
-                    {[
-                      {cx:52,cy:52,d:0.3,avatar:RA.payneParker},
-                      {cx:228,cy:52,d:0.5,avatar:RA.nashDehmer},
-                      {cx:228,cy:148,d:0.7,avatar:RA.jakeCoppen},
-                      {cx:52,cy:148,d:0.9,avatar:RA.andrewLongo},
-                      {cx:140,cy:16,d:1.1,avatar:RA.gavinMurrey},
-                    ].map((n,i) => (
-                      <g key={`node-${i}`} style={{ opacity: 0, animation: `nodeAppear 0.5s ease ${n.d}s forwards` }}>
-                        <image href={n.avatar} x={n.cx-18} y={n.cy-18} width={36} height={36}
-                          clipPath={`url(#ls1-clip-${i})`} preserveAspectRatio="xMidYMid slice" />
-                        <circle cx={n.cx} cy={n.cy} r={18} fill="none" stroke="#E5E7EB" strokeWidth="2" />
-                      </g>
-                    ))}
-                  </svg>
+                  </div>
                 </div>
                 <div style={{ order: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -1583,54 +1602,64 @@ function SetUpPage() {
             <div style={{ flex: 1, padding: 'clamp(32px, 5vw, 56px) 16px 0', maxWidth: '680px', margin: '0 auto', width: '100%' }}>
               <div className="launch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '40px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', order: 0 }}>
-                  <svg viewBox="0 0 260 180" width="260" height="180" style={{ overflow: 'visible', maxWidth: '100%' }}>
-                    <defs>
-                      {[{cx:86,cy:52},{cx:174,cy:52},{cx:174,cy:128},{cx:86,cy:128}].map((n,i) => (
-                        <clipPath key={i} id={`ls5i-clip-${i}`}><circle cx={n.cx} cy={n.cy} r={11} /></clipPath>
-                      ))}
-                      {[{cx:42,cy:38},{cx:218,cy:38},{cx:218,cy:142},{cx:42,cy:142},{cx:130,cy:12},{cx:130,cy:168}].map((n,i) => (
-                        <clipPath key={i} id={`ls5o-clip-${i}`}><circle cx={n.cx} cy={n.cy} r={7} /></clipPath>
-                      ))}
-                    </defs>
-                    <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
-                    <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
-                    {[
-                      {cx:86,cy:52,d:'0.2s',avatar:RA.payneParker},
-                      {cx:174,cy:52,d:'0.4s',avatar:RA.nashDehmer},
-                      {cx:174,cy:128,d:'0.6s',avatar:RA.jakeCoppen},
-                      {cx:86,cy:128,d:'0.8s',avatar:RA.andrewLongo},
-                    ].map((n,i) => (
-                      <g key={i}>
-                        <line x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
+                  {/* Hybrid: SVG lines + HTML avatar nodes */}
+                  <div style={{ position: 'relative', width: '260px', height: '180px', maxWidth: '100%' }}>
+                    <svg viewBox="0 0 260 180" width="260" height="180" style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}>
+                      <circle cx="130" cy="90" r="18" fill="#0F172A" style={{ animation: 'hubPulse 2.5s ease infinite' }} />
+                      <text x="130" y="94" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">TB</text>
+                      {/* Inner ring lines */}
+                      {[
+                        {cx:86,cy:52,d:'0.2s'},{cx:174,cy:52,d:'0.4s'},
+                        {cx:174,cy:128,d:'0.6s'},{cx:86,cy:128,d:'0.8s'},
+                      ].map((n,i) => (
+                        <line key={i} x1="130" y1="90" x2={n.cx} y2={n.cy} stroke="#E5E7EB" strokeWidth="1.5"
                           strokeDasharray="200" strokeDashoffset="200"
                           style={{ animation: `lineGrow 0.5s ease ${n.d} both` }} />
-                        <image href={n.avatar} x={n.cx-11} y={n.cy-11} width={22} height={22}
-                          clipPath={`url(#ls5i-clip-${i})`} preserveAspectRatio="xMidYMid slice"
-                          style={{ animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite` }} />
-                        <circle cx={n.cx} cy={n.cy} r={11} fill="none" stroke="#E5E7EB" strokeWidth="1.5"
-                          style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
-                      </g>
-                    ))}
-                    {[
-                      {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s',avatar:RA.ethanHill},
-                      {cx:218,cy:38,fromX:174,fromY:52,d:'1.2s',avatar:RA.gavinMurrey},
-                      {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s',avatar:'/faces/face12.jpg'},
-                      {cx:42,cy:142,fromX:86,fromY:128,d:'1.6s',avatar:'/faces/face9.jpg'},
-                      {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s',avatar:'/faces/face5.jpg'},
-                      {cx:130,cy:168,fromX:130,fromY:90,d:'2.0s',avatar:'/faces/face3.jpg'},
-                    ].map((n,i) => (
-                      <g key={i}>
-                        <line x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
+                      ))}
+                      {/* Outer ring lines */}
+                      {[
+                        {cx:42,cy:38,fromX:86,fromY:52,d:'1.0s'},{cx:218,cy:38,fromX:174,fromY:52,d:'1.2s'},
+                        {cx:218,cy:142,fromX:174,fromY:128,d:'1.4s'},{cx:42,cy:142,fromX:86,fromY:128,d:'1.6s'},
+                        {cx:130,cy:12,fromX:130,fromY:90,d:'1.8s'},{cx:130,cy:168,fromX:130,fromY:90,d:'2.0s'},
+                      ].map((n,i) => (
+                        <line key={i} x1={n.fromX} y1={n.fromY} x2={n.cx} y2={n.cy} stroke="#F3F4F6" strokeWidth="1"
                           strokeDasharray="200" strokeDashoffset="200"
                           style={{ animation: `lineGrow 0.4s ease ${n.d} both` }} />
-                        <image href={n.avatar} x={n.cx-7} y={n.cy-7} width={14} height={14}
-                          clipPath={`url(#ls5o-clip-${i})`} preserveAspectRatio="xMidYMid slice"
-                          style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
-                        <circle cx={n.cx} cy={n.cy} r={7} fill="none" stroke="#E5E7EB" strokeWidth="1.5"
-                          style={{ animation: `orbitIn 0.4s ease ${n.d} both` }} />
-                      </g>
+                      ))}
+                    </svg>
+                    {/* Inner ring avatar nodes */}
+                    {[
+                      {cx:86,cy:52,d:'0.2s',r:11,avatar:'/faces/face2.jpg',color:'#EC4899'},
+                      {cx:174,cy:52,d:'0.4s',r:11,avatar:'/faces/face4.jpg',color:'#6366F1'},
+                      {cx:174,cy:128,d:'0.6s',r:11,avatar:'/faces/face6.jpg',color:'#0F172A'},
+                      {cx:86,cy:128,d:'0.8s',r:11,avatar:'/faces/face8.jpg',color:'#F59E0B'},
+                    ].map((n,i) => (
+                      <div key={i} style={{
+                        position: 'absolute', left: n.cx - n.r, top: n.cy - n.r,
+                        width: n.r * 2, height: n.r * 2, borderRadius: '50%',
+                        border: '1.5px solid #E5E7EB',
+                        animation: `orbitIn 0.4s ease ${n.d} both, nodePulse 2.6s ease ${i * 0.5}s infinite`,
+                        background: `${n.color} url(${n.avatar}) center/cover no-repeat`,
+                      }} />
                     ))}
-                  </svg>
+                    {/* Outer ring avatar nodes */}
+                    {[
+                      {cx:42,cy:38,d:'1.0s',r:7,avatar:'/faces/face1.jpg',color:'#0F172A'},
+                      {cx:218,cy:38,d:'1.2s',r:7,avatar:'/faces/face11.jpg',color:'#8B5CF6'},
+                      {cx:218,cy:142,d:'1.4s',r:7,avatar:'/faces/face12.jpg',color:'#10B981'},
+                      {cx:42,cy:142,d:'1.6s',r:7,avatar:'/faces/face9.jpg',color:'#F59E0B'},
+                      {cx:130,cy:12,d:'1.8s',r:7,avatar:'/faces/face5.jpg',color:'#10B981'},
+                      {cx:130,cy:168,d:'2.0s',r:7,avatar:'/faces/face3.jpg',color:'#6366F1'},
+                    ].map((n,i) => (
+                      <div key={i} style={{
+                        position: 'absolute', left: n.cx - n.r, top: n.cy - n.r,
+                        width: n.r * 2, height: n.r * 2, borderRadius: '50%',
+                        border: '1.5px solid #E5E7EB',
+                        animation: `orbitIn 0.4s ease ${n.d} both`,
+                        background: `${n.color} url(${n.avatar}) center/cover no-repeat`,
+                      }} />
+                    ))}
+                  </div>
                 </div>
                 <div style={{ order: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
