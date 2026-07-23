@@ -4,13 +4,14 @@ import { stripe, getPriceTier } from '@/lib/stripe';
 export const runtime = 'nodejs';
 
 // Internal bypass codes — these skip Stripe entirely and go straight to completion (free)
-const INTERNAL_BYPASS_CODES = ['TRAILBLAIZE100', 'FOUNDER', 'INTERNAL', 'NYUKAPPA'];
+const INTERNAL_BYPASS_CODES = ['TRAILBLAIZE100', 'FOUNDER', 'INTERNAL', 'NYUKAPPA', 'BRADY'];
 
 // Discounted price codes — these override the normal tier price
 const DISCOUNTED_PRICE_CODES: Record<string, number> = {
   ADAM: 29,
   MEMBER: 29,
   CONNECT: 49,
+  BRADY: 199,
 };
 
 /**
@@ -72,6 +73,31 @@ export async function POST(req: NextRequest) {
         pricePerMonth: String(priceInDollars),
         token: bypassToken,
       });
+
+      // Still capture bypass leads so we have the record
+      try {
+        const { getSupabaseAdmin } = await import('@/lib/supabase-admin');
+        const supabase = getSupabaseAdmin();
+        if (supabase) {
+          await supabase.from('setup_leads').upsert({
+            org_name: orgName,
+            school: school || null,
+            org_type: orgType || null,
+            member_count: Number(memberCount) || null,
+            leader_name: leaderName || null,
+            leader_email: leaderEmail,
+            leader_phone: leaderPhone || null,
+            instagram_handle: instagramHandle || null,
+            designation: designation || null,
+            discount_code: discountCode || null,
+            price_per_month: priceInDollars,
+            stripe_session_id: null,
+            status: 'bypass',
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'leader_email', ignoreDuplicates: false });
+        }
+      } catch (e) { console.warn('[set-up/checkout] bypass lead capture failed:', e); }
+
       return NextResponse.json({
         url: `https://trailblaize.space/set-up?success=true&bypass=1&${params.toString()}`,
       });
@@ -113,6 +139,31 @@ export async function POST(req: NextRequest) {
     sessionParams.allow_promotion_codes = true;
 
     const session = await stripe.checkout.sessions.create(sessionParams);
+
+    // Capture lead — upsert so retries don't create dupes
+    try {
+      const { getSupabaseAdmin } = await import('@/lib/supabase-admin');
+      const supabase = getSupabaseAdmin();
+      if (supabase) {
+        await supabase.from('setup_leads').upsert({
+          org_name: orgName,
+          school: school || null,
+          org_type: orgType || null,
+          member_count: Number(memberCount) || null,
+          leader_name: leaderName || null,
+          leader_email: leaderEmail,
+          leader_phone: leaderPhone || null,
+          instagram_handle: instagramHandle || null,
+          designation: designation || null,
+          discount_code: discountCode || null,
+          price_per_month: priceInDollars,
+          stripe_session_id: session.id,
+          status: 'checkout_started',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'leader_email', ignoreDuplicates: false });
+      }
+    } catch (e) { console.warn('[set-up/checkout] lead capture failed:', e); }
+
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     console.error('[set-up/checkout] error:', err);
