@@ -5,7 +5,7 @@ import {
   Phone, PhoneCall, Voicemail,
   ChevronDown, ChevronUp, RefreshCw, CheckSquare, Square,
   X, LayoutDashboard, User, Users, AlertCircle,
-  MessageSquare, Bell, Share2, Globe, Eye,
+  MessageSquare, Bell, Share2, Globe, Eye, Sparkles, Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -1264,6 +1264,49 @@ function LoggingPanel({ panel, currentUser, onClose, onSave, onChange }: {
 }) {
   const c = panel.contact;
   const followUpText = `Hey ${c.first_name}, great talking today! Here's the link to join: [chapter join link]. Would love for you to share it with other alumni too.`;
+  const [polishLoading, setPolishLoading] = useState(false);
+  const [polishError, setPolishError] = useState<string | null>(null);
+  const [polishPreview, setPolishPreview] = useState<string | null>(null);
+  const notesEmpty = !panel.notes.trim();
+
+  async function handlePolishNotes() {
+    if (notesEmpty || polishLoading) return;
+    setPolishError(null);
+    setPolishLoading(true);
+    try {
+      const res = await fetch('/api/call-logs/polish-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: panel.notes }),
+      });
+      const json = await res.json() as {
+        data?: { notes?: string } | null;
+        error?: { message?: string } | null;
+      };
+      if (!res.ok || !json.data?.notes) {
+        setPolishError(json.error?.message || 'Failed to polish notes');
+        return;
+      }
+      setPolishPreview(json.data.notes);
+    } catch {
+      setPolishError('Failed to polish notes. Try again.');
+    } finally {
+      setPolishLoading(false);
+    }
+  }
+
+  function acceptPolishedNotes() {
+    if (!polishPreview) return;
+    onChange({ notes: polishPreview });
+    setPolishPreview(null);
+    setPolishError(null);
+  }
+
+  function revertPolishedNotes() {
+    setPolishPreview(null);
+    setPolishError(null);
+  }
+
   function toggleTag(tag: string) {
     if (panel.tags.includes(tag)) onChange({ tags: panel.tags.filter(t => t !== tag) });
     else onChange({ tags: [...panel.tags, tag] });
@@ -1300,14 +1343,71 @@ function LoggingPanel({ panel, currentUser, onClose, onSave, onChange }: {
         <div style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Notes */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Notes</label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notes</label>
+              <button
+                type="button"
+                onClick={handlePolishNotes}
+                disabled={notesEmpty || polishLoading}
+                title={notesEmpty ? 'Add notes before polishing' : 'Polish notes with AI'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '5px 10px',
+                  borderRadius: 7,
+                  border: '1px solid #E5E7EB',
+                  background: notesEmpty || polishLoading ? '#f9fafb' : '#fff',
+                  color: notesEmpty || polishLoading ? '#9ca3af' : '#4f46e5',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: notesEmpty || polishLoading ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {polishLoading
+                  ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Polishing…</>
+                  : <><Sparkles size={12} /> Polish Notes</>}
+              </button>
+            </div>
             <textarea
               value={panel.notes}
-              onChange={e => onChange({ notes: e.target.value })}
+              onChange={e => {
+                onChange({ notes: e.target.value });
+                if (polishPreview) setPolishPreview(null);
+                if (polishError) setPolishError(null);
+              }}
               placeholder="What did you talk about? Industry, hiring, open to connecting, what chapter they were in..."
               rows={4}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', color: '#111827', background: '#fff', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              disabled={polishLoading}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: '0.875rem', color: '#111827', background: polishLoading ? '#f9fafb' : '#fff', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
             />
+            {polishError && (
+              <p style={{ margin: '8px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>{polishError}</p>
+            )}
+            {polishPreview && (
+              <div style={{ marginTop: 10, border: '1px solid #c7d2fe', background: '#eef2ff', borderRadius: 8, padding: '10px 12px' }}>
+                <p style={{ margin: '0 0 6px', fontSize: '0.7rem', fontWeight: 700, color: '#4338ca', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Polished preview</p>
+                <p style={{ margin: '0 0 10px', fontSize: '0.8125rem', color: '#312e81', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{polishPreview}</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={acceptPolishedNotes}
+                    style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: 'none', background: '#4f46e5', color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    onClick={revertPolishedNotes}
+                    style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1px solid #c7d2fe', background: '#fff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Revert
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Tags */}
