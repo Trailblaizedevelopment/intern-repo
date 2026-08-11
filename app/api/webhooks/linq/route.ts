@@ -110,20 +110,46 @@ async function generateReply(profileId: string): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
   try {
+    // #region agent log
+    console.log('[DEBUG f7e208] Webhook POST hit');
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:POST-entry',message:'Webhook POST hit',data:{},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     const webhookSecret = process.env.LINQ_WEBHOOK_SECRET;
+    // #region agent log
+    const allHeaders = Object.fromEntries(request.headers.entries());
+    console.log('[DEBUG f7e208] H1/H2: webhook secret check', JSON.stringify({ hasSecret: !!webhookSecret, secretLength: webhookSecret?.length, headers: allHeaders }));
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:secret-check',message:'H1/H2 webhook secret validation',data:{hasSecret:!!webhookSecret,secretLength:webhookSecret?.length,headers:allHeaders},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (webhookSecret) {
       const providedSecret = request.headers.get('x-webhook-secret') || request.headers.get('authorization');
+      // #region agent log
+      console.log('[DEBUG f7e208] H1/H2: comparing secrets', JSON.stringify({ providedSecret: providedSecret?.substring(0, 10), expectedStart: webhookSecret.substring(0, 10), match: providedSecret === webhookSecret || providedSecret === `Bearer ${webhookSecret}` }));
+      fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:secret-compare',message:'H1/H2 secret comparison',data:{providedSecretStart:providedSecret?.substring(0,10),expectedStart:webhookSecret.substring(0,10),match:providedSecret===webhookSecret||providedSecret===`Bearer ${webhookSecret}`},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (providedSecret !== webhookSecret && providedSecret !== `Bearer ${webhookSecret}`) {
+        // #region agent log
+        console.log('[DEBUG f7e208] H1/H2: REJECTED - returning 401');
+        fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:401',message:'H1/H2 REJECTED returning 401',data:{},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
 
     const supabase = getSupabaseAdmin();
+    // #region agent log
+    console.log('[DEBUG f7e208] H3: supabase admin', JSON.stringify({ hasSupabase: !!supabase, hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL, hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY }));
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:supabase-check',message:'H3 supabase admin check',data:{hasSupabase:!!supabase,hasUrl:!!process.env.NEXT_PUBLIC_SUPABASE_URL,hasKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (!supabase) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
     const body = await request.json();
+    // #region agent log
+    console.log('[DEBUG f7e208] H4: parsed body', JSON.stringify({ keys: Object.keys(body), from: body.from, chat_id: body.chat_id || body.id, hasMessage: !!body.message, hasParts: !!body.parts }));
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:body-parse',message:'H4 body parsing',data:{keys:Object.keys(body),from:body.from,chatId:body.chat_id||body.id,hasMessage:!!body.message,hasParts:!!body.parts},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     const chatId = body.chat_id || body.id;
     const fromPhone = body.from;
@@ -133,6 +159,10 @@ export async function POST(request: NextRequest) {
     const createdAt = body.created_at || new Date().toISOString();
 
     if (!fromPhone || !messageText) {
+      // #region agent log
+      console.log('[DEBUG f7e208] H4: REJECTED - missing from or message', JSON.stringify({ fromPhone, messageText: messageText?.substring(0, 30) }));
+      fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:missing-fields',message:'H4 REJECTED missing from or message',data:{fromPhone,messageText:messageText?.substring(0,30)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       return NextResponse.json({ error: 'Missing from or message' }, { status: 400 });
     }
 
@@ -145,6 +175,11 @@ export async function POST(request: NextRequest) {
       .or(`phone_number.eq.${fromPhone},phone_number.eq.${normalizedFrom},phone_number.eq.${rawDigits}`)
       .limit(1)
       .single();
+
+    // #region agent log
+    console.log('[DEBUG f7e208] Profile lookup result', JSON.stringify({ found: !!profile, fromPhone, normalizedFrom, rawDigits, profileId: profile?.id }));
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:profile-lookup',message:'Profile lookup result',data:{found:!!profile,fromPhone,normalizedFrom,rawDigits,profileId:profile?.id},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     if (!profile) {
       return NextResponse.json({ status: 'ignored', reason: 'sender not in scout_profiles' });
