@@ -125,17 +125,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    // Linq uses an envelope format: actual message data is in body.data
+    const payload = body.data || body;
     // #region agent log
-    console.log('[DEBUG f7e208] H4: parsed body', JSON.stringify({ keys: Object.keys(body), from: body.from, chat_id: body.chat_id || body.id, hasMessage: !!body.message, hasParts: !!body.parts }));
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:body-parse',message:'H4 body parsing',data:{keys:Object.keys(body),from:body.from,chatId:body.chat_id||body.id,hasMessage:!!body.message,hasParts:!!body.parts},timestamp:Date.now()})}).catch(()=>{});
+    console.log('[DEBUG f7e208] H4: parsed body', JSON.stringify({ topKeys: Object.keys(body), eventType: body.event_type, dataKeys: body.data ? Object.keys(body.data) : 'no-data', from: payload.from, chat_id: payload.chat_id || payload.id, hasMessage: !!payload.message, hasParts: !!payload.parts }));
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:body-parse',message:'H4 body parsing',data:{topKeys:Object.keys(body),eventType:body.event_type,dataKeys:body.data?Object.keys(body.data):'no-data',from:payload.from,chatId:payload.chat_id||payload.id,hasMessage:!!payload.message,hasParts:!!payload.parts},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
 
-    const chatId = body.chat_id || body.id;
-    const fromPhone = body.from;
-    const toPhone = body.to;
-    const messageParts = body.message?.parts || body.parts || [];
+    const chatId = payload.chat_id || payload.id;
+    const fromPhone = payload.from;
+    const toPhone = payload.to;
+    const messageParts = payload.message?.parts || payload.parts || [];
     const messageText = messageParts.find((p: { type: string; value: string }) => p.type === 'text')?.value || '';
-    const createdAt = body.created_at || new Date().toISOString();
+    const createdAt = payload.created_at || body.created_at || new Date().toISOString();
 
     if (!fromPhone || !messageText) {
       // #region agent log
