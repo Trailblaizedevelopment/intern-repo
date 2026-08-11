@@ -110,9 +110,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Normalize phone to E.164 for consistent matching
+      const phoneDigits = phone.replace(/\D/g, '');
+      const normalizedPhone = phoneDigits.length === 10 ? `+1${phoneDigits}` : phoneDigits.length === 11 && phoneDigits.startsWith('1') ? `+${phoneDigits}` : phone.startsWith('+') ? phone : `+${phoneDigits}`;
+
       const space = (Array.isArray(profile.spaces) ? profile.spaces[0] : profile.spaces) as { id: string; name: string } | null;
       profileData = {
-        phone_number: phone,
+        phone_number: normalizedPhone,
         name,
         chapter: space?.name || null,
         university: space?.name || null,

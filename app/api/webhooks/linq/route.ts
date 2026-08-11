@@ -157,18 +157,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Sandbox guard: only process if sender is in scout_profiles
+    // Use digit-based matching to handle various stored phone formats
     const normalizedFrom = normalizeToE164(fromPhone);
     const rawDigits = fromPhone.replace(/\D/g, '').slice(-10);
-    const { data: profile } = await supabase
+    const { data: matchedProfiles } = await supabase
       .from('scout_profiles')
       .select('id, phone_number, opt_in_status')
-      .or(`phone_number.eq.${fromPhone},phone_number.eq.${normalizedFrom},phone_number.eq.${rawDigits}`)
-      .limit(1)
-      .single();
+      .or(`phone_number.eq.${fromPhone},phone_number.eq.${normalizedFrom},phone_number.eq.${rawDigits},phone_number.like.%${rawDigits}%`)
+      .limit(1);
+
+    const profile = matchedProfiles?.[0] || null;
 
     // #region agent log
-    console.log('[DEBUG f7e208] Profile lookup result', JSON.stringify({ found: !!profile, fromPhone, normalizedFrom, rawDigits, profileId: profile?.id }));
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:profile-lookup',message:'Profile lookup result',data:{found:!!profile,fromPhone,normalizedFrom,rawDigits,profileId:profile?.id},timestamp:Date.now()})}).catch(()=>{});
+    console.log('[DEBUG f7e208] Profile lookup result', JSON.stringify({ found: !!profile, fromPhone, normalizedFrom, rawDigits, profileId: profile?.id, storedPhone: profile?.phone_number }));
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:profile-lookup',message:'Profile lookup result',data:{found:!!profile,fromPhone,normalizedFrom,rawDigits,profileId:profile?.id,storedPhone:profile?.phone_number},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
 
     if (!profile) {
