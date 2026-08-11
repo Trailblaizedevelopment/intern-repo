@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
     // #endregion
 
     const chatId = payload.chat_id || (typeof payload.chat === 'object' ? payload.chat?.id : payload.chat) || payload.id;
-    const fromPhone = payload.from || payload.sender_handle;
+    const fromPhone = payload.from || (typeof payload.sender_handle === 'object' ? payload.sender_handle?.handle : payload.sender_handle);
     const toPhone = payload.to || (typeof payload.chat === 'object' ? payload.chat?.handles?.find((h: { is_me: boolean }) => h.is_me)?.handle : undefined);
     const messageParts = payload.message?.parts || payload.parts || [];
     const messageText = messageParts.find((p: { type: string; value: string }) => p.type === 'text')?.value || '';
