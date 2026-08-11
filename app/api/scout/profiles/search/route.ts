@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         if (p.phone && existingPhones.has(p.phone)) continue;
         if (existingSourceIds.has(p.id)) continue;
 
-        const space = p.spaces as { id: string; name: string } | null;
+        const space = (Array.isArray(p.spaces) ? p.spaces[0] : p.spaces) as { id: string; name: string } | null;
         const name = p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown';
 
         results.push({

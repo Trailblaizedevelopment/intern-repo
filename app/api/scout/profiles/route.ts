@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const space = profile.spaces as { id: string; name: string } | null;
+      const space = (Array.isArray(profile.spaces) ? profile.spaces[0] : profile.spaces) as { id: string; name: string } | null;
       profileData = {
         phone_number: phone,
         name,
