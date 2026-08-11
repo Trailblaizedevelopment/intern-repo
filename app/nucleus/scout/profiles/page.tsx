@@ -72,7 +72,7 @@ export default function ProfilesPage() {
 
   // Message composer state
   const [composerText, setComposerText] = useState('');
-  const [composerLine, setComposerLine] = useState(SCOUT_LINES[0].phone);
+  const [composerLine, setComposerLine] = useState<string>(SCOUT_LINES[0].phone);
   const [composerSending, setComposerSending] = useState(false);
 
   const fetchProfiles = useCallback(async () => {
