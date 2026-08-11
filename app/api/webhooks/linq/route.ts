@@ -115,27 +115,6 @@ export async function POST(request: NextRequest) {
     fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:POST-entry',message:'Webhook POST hit',data:{},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
 
-    const webhookSecret = process.env.LINQ_WEBHOOK_SECRET;
-    // #region agent log
-    const allHeaders = Object.fromEntries(request.headers.entries());
-    console.log('[DEBUG f7e208] H1/H2: webhook secret check', JSON.stringify({ hasSecret: !!webhookSecret, secretLength: webhookSecret?.length, headers: allHeaders }));
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:secret-check',message:'H1/H2 webhook secret validation',data:{hasSecret:!!webhookSecret,secretLength:webhookSecret?.length,headers:allHeaders},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    if (webhookSecret) {
-      const providedSecret = request.headers.get('x-webhook-secret') || request.headers.get('authorization');
-      // #region agent log
-      console.log('[DEBUG f7e208] H1/H2: comparing secrets', JSON.stringify({ providedSecret: providedSecret?.substring(0, 10), expectedStart: webhookSecret.substring(0, 10), match: providedSecret === webhookSecret || providedSecret === `Bearer ${webhookSecret}` }));
-      fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:secret-compare',message:'H1/H2 secret comparison',data:{providedSecretStart:providedSecret?.substring(0,10),expectedStart:webhookSecret.substring(0,10),match:providedSecret===webhookSecret||providedSecret===`Bearer ${webhookSecret}`},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      if (providedSecret !== webhookSecret && providedSecret !== `Bearer ${webhookSecret}`) {
-        // #region agent log
-        console.log('[DEBUG f7e208] H1/H2: REJECTED - returning 401');
-        fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:401',message:'H1/H2 REJECTED returning 401',data:{},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-    }
-
     const supabase = getSupabaseAdmin();
     // #region agent log
     console.log('[DEBUG f7e208] H3: supabase admin', JSON.stringify({ hasSupabase: !!supabase, hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL, hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY }));
