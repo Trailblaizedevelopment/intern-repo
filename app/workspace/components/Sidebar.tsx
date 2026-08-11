@@ -273,6 +273,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     { name: 'Fundraising', href: '/nucleus/fundraising', icon: Rocket },
     { name: 'Employees', href: '/nucleus/employees', icon: Users },
     { name: 'Ambassadors', href: '/nucleus/ambassadors', icon: Star },
+    { name: 'Scout', href: '/nucleus/scout', icon: MessageCircle },
     { name: 'Mission Control', href: '/nucleus/mission-control', icon: Radar },
   ];
 
@@ -308,6 +309,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
       items: [
         { name: 'Employees',       href: '/nucleus/employees',       Icon: Users },
         { name: 'Ambassadors',     href: '/nucleus/ambassadors',     Icon: Star },
+        { name: 'Scout',           href: '/nucleus/scout',           Icon: MessageCircle },
         { name: 'Mission Control', href: '/nucleus/mission-control', Icon: Radar },
       ],
     },
@@ -335,6 +337,7 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
     { name: 'Fundraising',      href: '/nucleus/fundraising',        Icon: Rocket },
     { name: 'Employees',        href: '/nucleus/employees',          Icon: Users },
     { name: 'Ambassadors',      href: '/nucleus/ambassadors',        Icon: Star },
+    { name: 'Scout',             href: '/nucleus/scout',              Icon: MessageCircle },
     { name: 'Mission Control',  href: '/nucleus/mission-control',    Icon: Radar },
     { name: 'Creative Studio',  href: '/workspace/socials',          Icon: Palette },
     { name: 'Outreach',         href: '/workspace/outreach',         Icon: Send },
