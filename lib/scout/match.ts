@@ -5,7 +5,8 @@ export const EMPTY_MATCHES_INSTRUCTION =
   'None found in this chapter. Do not invent or name specific people.';
 
 const PEER_FETCH_LIMIT = 200;
-const TOP_N = 8;
+/** Larger pool so agent can walk offered_ids across many "who else" turns */
+const TOP_N = 40;
 
 const STOP_WORDS = new Set([
   'a', 'an', 'the', 'and', 'or', 'for', 'to', 'of', 'in', 'on', 'at', 'with',
@@ -359,10 +360,10 @@ export function formatAlumniMatches(candidates: ScoutCandidate[], opts?: { mode?
   const mode = opts?.mode || 'list';
   const header =
     mode === 'focus'
-      ? 'Focus person (answer the user about THIS person only — do not re-list the whole Texas roster):'
-      : candidates.length >= 2
-        ? `Match pool (${candidates.length} people). Only list names if the user asked who/who else is available. Otherwise answer their latest question.`
-        : null;
+      ? 'Focus person (answer ONLY about this person — do not list a roster):'
+      : candidates.length === 1
+        ? 'Next offer (name this ONE person with a sharp why — do not list others):'
+        : `Match pool note (${candidates.length}). Prefer naming at most one unused person.`;
 
   const lines = candidates.map((c, i) => {
     const parts = [
@@ -383,57 +384,94 @@ export function formatAlumniMatches(candidates: ScoutCandidate[], opts?: { mode?
   return [header, ...lines].filter(Boolean).join('\n');
 }
 
+/** Next unoffered/unrejected candidate — prefer geo hits, then score. */
+export function pickNextCandidate(
+  candidates: ScoutCandidate[],
+  offeredIds: string[],
+  rejectedIds: string[]
+): ScoutCandidate | null {
+  const skip = new Set([...offeredIds, ...rejectedIds]);
+  const available = candidates.filter(c => c.platform_id && !skip.has(c.platform_id));
+  if (available.length === 0) return null;
+  const geoFirst = available.filter(c => c.geoHit);
+  const pool = geoFirst.length > 0 ? geoFirst : available;
+  return pool[0] || null;
+}
+
+export function candidateToSnapshot(c: ScoutCandidate): Record<string, unknown> {
+  return {
+    name: c.name,
+    role: c.role,
+    major: c.major,
+    location: c.location,
+    hometown: c.hometown || null,
+    member_status: c.member_status,
+    grad_year: c.grad_year,
+    linkedin_url: c.linkedin_url,
+    bio: c.bio ? c.bio.slice(0, 200) : null,
+    reason: c.reason,
+  };
+}
+
+/** Upsert a single suggested intro; returns intro id. */
+export async function upsertSuggestedIntro(
+  requesterId: string,
+  candidate: ScoutCandidate,
+  status: 'suggested' | 'pending_approval' | 'declined' = 'suggested'
+): Promise<string | null> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+
+  const snapshot = candidateToSnapshot(candidate);
+
+  const { data: existing } = await supabase
+    .from('scout_introductions')
+    .select('id, status')
+    .eq('requester_id', requesterId)
+    .eq('platform_target_id', candidate.platform_id)
+    .maybeSingle();
+
+  if (existing) {
+    const updates: Record<string, unknown> = {
+      reason: candidate.reason,
+      platform_target_snapshot: snapshot,
+      updated_at: new Date().toISOString(),
+    };
+    // Don't downgrade pending_approval back to suggested
+    if (status === 'pending_approval' || status === 'declined' || existing.status === 'suggested') {
+      updates.status = status;
+    }
+    await supabase.from('scout_introductions').update(updates).eq('id', existing.id);
+    return existing.id as string;
+  }
+
+  const { data, error } = await supabase
+    .from('scout_introductions')
+    .insert({
+      requester_id: requesterId,
+      target_id: null,
+      platform_target_id: candidate.platform_id,
+      platform_target_snapshot: snapshot,
+      reason: candidate.reason,
+      status,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('[scout/match] Intro upsert failed:', error.message);
+    return null;
+  }
+  return (data?.id as string) || null;
+}
+
+/** @deprecated Prefer upsertSuggestedIntro for agent turns */
 export async function upsertSuggestedIntros(
   requesterId: string,
   candidates: ScoutCandidate[]
 ): Promise<void> {
-  if (candidates.length === 0) return;
-
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return;
-
   for (const c of candidates) {
-    const snapshot = {
-      name: c.name,
-      role: c.role,
-      major: c.major,
-      location: c.location,
-      member_status: c.member_status,
-      grad_year: c.grad_year,
-      linkedin_url: c.linkedin_url,
-    };
-
-    const { data: existing } = await supabase
-      .from('scout_introductions')
-      .select('id')
-      .eq('requester_id', requesterId)
-      .eq('platform_target_id', c.platform_id)
-      .maybeSingle();
-
-    if (existing) {
-      await supabase
-        .from('scout_introductions')
-        .update({
-          reason: c.reason,
-          platform_target_snapshot: snapshot,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-      continue;
-    }
-
-    const { error } = await supabase.from('scout_introductions').insert({
-      requester_id: requesterId,
-      target_id: null,
-      platform_target_id: c.platform_id,
-      platform_target_snapshot: snapshot,
-      reason: c.reason,
-      status: 'suggested',
-    });
-
-    if (error) {
-      console.error('[scout/match] Intro upsert failed:', error.message);
-    }
+    await upsertSuggestedIntro(requesterId, c, 'suggested');
   }
 }
 

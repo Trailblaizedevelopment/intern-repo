@@ -23,8 +23,8 @@ Conversation arc:
 1. Warm open — introduce yourself, what Scout does, make it feel low-stakes
 2. Learn what they're looking for — one question, let them lead
 3. Fill gaps only — city, industry/focus, what they bring — tailored to active vs alumni
-4. Surface a match — only when READY_TO_MATCH and matches are listed; be specific
-5. Facilitate the intro — double opt-in, get both sides to say yes, then send the connection
+4. Surface a match — only when READY_TO_MATCH and a Next offer / Focus person is listed; be specific
+5. Facilitate the intro — get their yes, then a teammate reaches out to the other side (you do not text the target yourself yet)
 
 Rules:
 - If someone replies STOP, immediately acknowledge and never contact them again.
@@ -38,14 +38,15 @@ Rules:
 
 When making an introduction:
 Be specific about why you're connecting them. Not "I think you two would get along" — that's lazy. Instead: "She's a Kappa at Georgia Tech, works in investment banking at Goldman, and told me she loves talking to people breaking into finance. Figured that's exactly who you need."
+When they say yes: confirm a teammate will reach out to that person — never claim you already contacted them.
 
 Matching rules (critical):
-- You may ONLY name or propose people who appear under "Relevant alumni matches" in your context.
-- If Discovery mode is GATHERING, or that matches section is missing/empty, do NOT invent names, companies, or opportunities — keep discovering.
-- When you surface a match, use real details from the match list (role, location, status) — never fabricate them.
-- If the match list has 2+ people and the user asked who is available, name at least two (or say roughly how many and highlight a couple). Never say someone is "the only" match when multiple are listed.
-- If the user asks about a specific person, answer about THAT person — do not restart with the full roster summary.
-- If the user says you are repeating yourself, acknowledge once and move on — never paste the same "8 guys in Texas" opener again.
+- You may ONLY name people who appear under "Relevant alumni matches" (Focus person or Next offer).
+- Follow Agent mode: one job per turn — deepen on focus, OR offer the single next person, OR advance an intro.
+- Offer turns: name EXACTLY one person with a sharp why. Never open with "I've got 8 guys in Texas" or dump a roster.
+- Deep dive: answer only about the Focus person. Do not restart with a network list.
+- People listed under Already offered are known — do not re-pitch them as news unless the user asks about them again.
+- If the user says you are repeating yourself, acknowledge once and continue from Agent mode — never paste the same roster opener.
 - looking_for is a clue, not a single tunnel — keep learning other ways to help them connect or contribute.
 
 Your identity:
@@ -77,11 +78,19 @@ export interface ScoutConversationMessage {
   created_at: string;
 }
 
+export interface ScoutAgentContext {
+  agentState: string;
+  focusName: string | null;
+  offeredNames: string[];
+  activeIntro: boolean;
+}
+
 export function buildScoutContext(
   profile: ScoutProfileContext,
   history: ScoutConversationMessage[],
   alumniMatches?: string,
-  discoveryGuidance?: string
+  discoveryGuidance?: string,
+  agent?: ScoutAgentContext
 ): string {
   const lines: string[] = [
     `Member name: ${profile.name}`,
@@ -107,6 +116,22 @@ export function buildScoutContext(
   }
   if (profile.skills.length > 0) {
     lines.push(`Skills: ${profile.skills.join(', ')}`);
+  }
+
+  if (agent) {
+    lines.push('', 'Agent mode:');
+    lines.push(`State: ${agent.agentState}`);
+    if (agent.focusName) {
+      lines.push(`Focus: ${agent.focusName}`);
+    }
+    if (agent.offeredNames.length > 0) {
+      lines.push(
+        `Already offered (do not re-pitch as news): ${agent.offeredNames.join(', ')}`
+      );
+    }
+    if (agent.activeIntro) {
+      lines.push('Active intro case: yes (pending teammate outreach to the other side)');
+    }
   }
 
   if (discoveryGuidance) {

@@ -5,13 +5,7 @@ import {
   ScoutProfileContext,
   ScoutConversationMessage,
 } from '@/lib/scout/prompt';
-import {
-  EMPTY_MATCHES_INSTRUCTION,
-  findChapterCandidates,
-  formatAlumniMatches,
-  upsertSuggestedIntros,
-  ScoutCandidate,
-} from '@/lib/scout/match';
+import { findChapterCandidates, ScoutCandidate } from '@/lib/scout/match';
 import {
   analyzeDiscovery,
   applyProfileUpdates,
@@ -22,7 +16,15 @@ import {
   toDiscoveryProfile,
 } from '@/lib/scout/discovery';
 import { MAX_UNANSWERED_OUTBOUND } from '@/lib/scout/followup';
-import { classifyReplyIntent, findCandidateByNameQuery } from '@/lib/scout/intent';
+import {
+  applyIntroSideEffects,
+  formatAgentInject,
+  instructionForTransition,
+  parseAgentEvent,
+  persistAgentSession,
+  sessionFromProfileRow,
+  transitionAgent,
+} from '@/lib/scout/agent';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6';
@@ -36,6 +38,7 @@ export interface GenerateScoutResult {
   reason?: string;
   matchCount?: number;
   matchReady?: boolean;
+  agentState?: string;
 }
 
 function latestInboundText(history: ScoutConversationMessage[]): string | null {
@@ -46,8 +49,7 @@ function latestInboundText(history: ScoutConversationMessage[]): string | null {
 }
 
 /**
- * Shared Scout message generation for agent API, send, webhook, and proactive follow-ups.
- * Discovery-first: enrich from platform, extract chat facts, gate matching on readiness.
+ * Shared Scout message generation: event → state transition → tools → reply writer.
  */
 export async function generateScoutMessage(
   profileId: string,
@@ -90,7 +92,6 @@ export async function generateScoutMessage(
     created_at: m.created_at,
   }));
 
-  // Max unanswered outbound without inbound (open + up to 2 proactive nudges)
   if (type === 'reply' || type === 'followup') {
     let unansweredCount = 0;
     const startIdx =
@@ -109,10 +110,8 @@ export async function generateScoutMessage(
     }
   }
 
-  // 1) Silent platform enrichment
   let profile = await enrichProfileFromPlatform(toDiscoveryProfile(profileRow));
 
-  // 2) Persist facts from conversation (when we have inbound answers)
   if ((type === 'reply' || type === 'followup') && history.some(m => m.direction === 'inbound')) {
     const extracted = await extractProfileUpdatesFromConversation(profile, history);
     profile = await applyProfileUpdates(profile, extracted);
@@ -122,18 +121,12 @@ export async function generateScoutMessage(
   const discoveryGuidance = formatDiscoveryGuidance(discovery);
 
   const latestInbound = latestInboundText(history);
-  const replyIntent =
-    type === 'reply' || type === 'followup'
-      ? classifyReplyIntent(latestInbound)
-      : { intent: 'other' as const, personQuery: null };
+  const event = parseAgentEvent(latestInbound, type);
 
-  // 3) Match when ready — inject based on reply intent (don't re-dump roster every turn)
-  let alumniMatches: string | undefined;
-  let matchCount = 0;
   const matchType = type === 'open' ? 'open' : 'reply';
   const matchReady = isMatchReady(matchType, profile);
-  let candidates: ScoutCandidate[] = [];
 
+  let candidates: ScoutCandidate[] = [];
   if (matchReady && type !== 'open') {
     candidates = await findChapterCandidates({
       id: profile.id,
@@ -145,75 +138,63 @@ export async function generateScoutMessage(
       goals: profile.goals,
       opt_in_status: profileRow.opt_in_status,
     });
-    matchCount = candidates.length;
-
-    if (replyIntent.intent === 'ask_about_person' && replyIntent.personQuery) {
-      const focused = findCandidateByNameQuery(candidates, replyIntent.personQuery);
-      alumniMatches = focused
-        ? formatAlumniMatches([focused], { mode: 'focus' })
-        : `No exact match in the current pool for "${replyIntent.personQuery}". Say you don't have a clear card on them yet — ask one clarifying question. Do NOT re-list the Texas roster.`;
-    } else if (replyIntent.intent === 'ask_matches' || type === 'followup') {
-      alumniMatches = formatAlumniMatches(candidates, { mode: 'list' });
-    } else if (replyIntent.intent === 'meta_repeat') {
-      alumniMatches = undefined;
-    } else {
-      alumniMatches =
-        candidates.length > 0
-          ? `Background match pool available (${candidates.length}) but DO NOT list them unless the user asks who is available. Answer their latest message first.`
-          : undefined;
-    }
-
-    // #region agent log
-    const debugInject = {
-      type,
-      matchReady,
-      replyIntent,
-      latestInbound: (latestInbound || '').slice(0, 120),
-      looking_for: profile.looking_for,
-      matchCount,
-      injectMode: replyIntent.intent,
-      formattedPreview: (alumniMatches || '').slice(0, 400),
-    };
-    console.log('[DEBUG 1cf407] generate match inject', JSON.stringify(debugInject));
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
-      body: JSON.stringify({
-        sessionId: '1cf407',
-        runId: 'post-fix',
-        hypothesisId: 'F,G',
-        location: 'lib/scout/generate.ts:afterMatch',
-        message: 'generate match inject',
-        data: debugInject,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    if (candidates.length > 0 && (replyIntent.intent === 'ask_matches' || type === 'followup')) {
-      await upsertSuggestedIntros(profile.id, candidates);
-    }
-  } else if (!matchReady) {
-    // #region agent log
-    console.log(
-      '[DEBUG 1cf407] matching locked',
-      JSON.stringify({ type, replyIntent, looking_for: profile.looking_for })
-    );
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
-      body: JSON.stringify({
-        sessionId: '1cf407',
-        runId: 'post-fix',
-        hypothesisId: 'F',
-        location: 'lib/scout/generate.ts:matchLocked',
-        message: 'matching locked',
-        data: { type, replyIntent, looking_for: profile.looking_for, gaps: discovery.gaps, matchReady },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   }
+
+  let session = sessionFromProfileRow(profileRow as Record<string, unknown>);
+  let transition = transitionAgent(session, event, {
+    matchReady,
+    candidates,
+    generateType: type,
+  });
+
+  session = await applyIntroSideEffects(profileId, transition);
+  transition = { ...transition, session };
+  await persistAgentSession(profileId, session);
+
+  const alumniMatches = formatAgentInject(transition);
+  const offeredNames =
+    session.offered_ids.length > 0
+      ? candidates
+          .filter(c => session.offered_ids.includes(c.platform_id))
+          .map(c => c.name)
+          .slice(0, 12)
+      : session.focus_person_snapshot?.name
+        ? [session.focus_person_snapshot.name]
+        : [];
+
+  // #region agent log
+  const debugAgent = {
+    type,
+    matchReady,
+    event: transition.event,
+    fromState: transition.fromState,
+    toState: transition.toState,
+    injectMode: transition.injectMode,
+    instructionKey: transition.instructionKey,
+    focusId: session.focus_person_id,
+    focusName: session.focus_person_snapshot?.name || null,
+    offeredCount: session.offered_ids.length,
+    rejectedCount: session.rejected_ids.length,
+    remainingPool: transition.remainingPool,
+    matchCount: candidates.length,
+    latestInbound: (latestInbound || '').slice(0, 120),
+    injectPreview: (alumniMatches || '').slice(0, 300),
+  };
+  console.log('[DEBUG 1cf407] agent transition', JSON.stringify(debugAgent));
+  fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
+    body: JSON.stringify({
+      sessionId: '1cf407',
+      runId: 'agent-machine',
+      hypothesisId: 'agent',
+      location: 'lib/scout/generate.ts:transition',
+      message: 'agent transition',
+      data: debugAgent,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
 
   const profileContext: ScoutProfileContext = {
     name: profile.name,
@@ -239,45 +220,14 @@ export async function generateScoutMessage(
     bio: profile.bio,
   };
 
-  const userContent = buildScoutContext(
-    profileContext,
-    history,
-    alumniMatches,
-    discoveryGuidance
-  );
+  const userContent = buildScoutContext(profileContext, history, alumniMatches, discoveryGuidance, {
+    agentState: session.agent_state,
+    focusName: session.focus_person_snapshot?.name || null,
+    offeredNames,
+    activeIntro: !!session.active_intro_id,
+  });
 
-  let instruction: string;
-  if (type === 'open') {
-    instruction =
-      'Generate your opening message to this person. This is your first text to them — make it warm, low-stakes, and brief. 1-2 sentences max. Do not claim you lack network access.';
-  } else if (replyIntent.intent === 'meta_repeat') {
-    instruction =
-      'The user is calling out that you keep repeating yourself. Apologize briefly in one short clause, then answer what they actually need next — do NOT re-list the Texas roster or say "8 guys" again. 1-2 sentences max.';
-  } else if (replyIntent.intent === 'ask_about_person') {
-    instruction =
-      'The user asked about a SPECIFIC person. Answer ONLY about that person using the Focus person details if present. Do NOT restart with "I\'ve got 8 guys in Texas". 1-2 sentences max.';
-  } else if (type === 'followup') {
-    instruction =
-      matchReady && alumniMatches && alumniMatches !== EMPTY_MATCHES_INSTRUCTION
-        ? 'This is a proactive follow-up — they have not replied. Briefly nudge with one concrete match or one sharp question from Discovery guidance. Do not apologize for messaging. Never say the network is unsynced. 1-2 sentences max.'
-        : 'This is a proactive follow-up — they have not replied. Nudge once using Discovery guidance (Next focus). One question max. Do not apologize, do not guilt them, never say the network is unsynced. 1-2 sentences max.';
-  } else if (!matchReady) {
-    instruction =
-      'Generate your next reply in discovery mode. Follow Discovery guidance (Next focus). Ask exactly one gap question or briefly acknowledge then ask. Never say the network is unsynced or unavailable. Stay in character. 1-2 sentences max.';
-  } else if (
-    replyIntent.intent === 'ask_matches' &&
-    alumniMatches &&
-    alumniMatches !== EMPTY_MATCHES_INSTRUCTION
-  ) {
-    instruction =
-      'User asked who is available. Highlight 2-3 people from Relevant alumni matches (or say there are several). Do not claim there is only one. 1-2 sentences max.';
-  } else if (alumniMatches === EMPTY_MATCHES_INSTRUCTION) {
-    instruction =
-      'Generate your next reply. Matching is unlocked but no strong peers scored — do not invent people or blame sync. Narrow what would help. Stay in character. 1-2 sentences max.';
-  } else {
-    instruction =
-      "Answer the user's LATEST message directly. Do NOT re-list the Texas roster unless they asked who is available. Stay in character. 1-2 sentences max.";
-  }
+  const instruction = instructionForTransition(transition, type);
 
   const res = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
@@ -319,9 +269,8 @@ export async function generateScoutMessage(
   // #region agent log
   const outDebug = {
     type,
-    matchCount,
-    matchReady,
-    replyIntent,
+    toState: transition.toState,
+    instructionKey: transition.instructionKey,
     replyPreview: generatedText.slice(0, 240),
   };
   console.log('[DEBUG 1cf407] generated scout reply', JSON.stringify(outDebug));
@@ -330,8 +279,8 @@ export async function generateScoutMessage(
     headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
     body: JSON.stringify({
       sessionId: '1cf407',
-      runId: 'post-fix',
-      hypothesisId: 'F,G',
+      runId: 'agent-machine',
+      hypothesisId: 'agent',
       location: 'lib/scout/generate.ts:output',
       message: 'generated scout reply',
       data: outDebug,
@@ -340,5 +289,10 @@ export async function generateScoutMessage(
   }).catch(() => {});
   // #endregion
 
-  return { message: generatedText, matchCount, matchReady };
+  return {
+    message: generatedText,
+    matchCount: candidates.length,
+    matchReady,
+    agentState: session.agent_state,
+  };
 }
