@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
         location: profile.location || null,
         current_title: profile.role || null,
         career_interest: profile.major || null,
+        platform_chapter_id: profile.chapter_id || null,
         source_type: 'platform_profile',
         source_id,
         profile_complete: 30,

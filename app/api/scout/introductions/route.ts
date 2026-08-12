@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+const INTRO_SELECT = `
+  *,
+  requester:requester_id(id, name, phone_number, university, chapter, career_interest),
+  target:target_id(id, name, phone_number, university, chapter, career_interest)
+`;
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
@@ -17,11 +23,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('scout_introductions')
-      .select(`
-        *,
-        requester:requester_id(id, name, phone_number, university, chapter, career_interest),
-        target:target_id(id, name, phone_number, university, chapter, career_interest)
-      `);
+      .select(INTRO_SELECT);
 
     if (status) {
       query = query.eq('status', status);
@@ -60,11 +62,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { requester_id, target_id, reason } = body;
+    const {
+      requester_id,
+      target_id,
+      platform_target_id,
+      platform_target_snapshot,
+      reason,
+    } = body;
 
-    if (!requester_id || !target_id || !reason) {
+    if (!requester_id || !reason) {
       return NextResponse.json(
-        { data: null, error: { message: 'requester_id, target_id, and reason are required', code: 'MISSING_FIELDS' } },
+        { data: null, error: { message: 'requester_id and reason are required', code: 'MISSING_FIELDS' } },
+        { status: 400 }
+      );
+    }
+
+    if (!target_id && !platform_target_id) {
+      return NextResponse.json(
+        {
+          data: null,
+          error: { message: 'target_id or platform_target_id is required', code: 'MISSING_FIELDS' },
+        },
         { status: 400 }
       );
     }
@@ -73,15 +91,13 @@ export async function POST(request: NextRequest) {
       .from('scout_introductions')
       .insert({
         requester_id,
-        target_id,
+        target_id: target_id || null,
+        platform_target_id: platform_target_id || null,
+        platform_target_snapshot: platform_target_snapshot || null,
         reason,
         status: body.status || 'suggested',
       })
-      .select(`
-        *,
-        requester:requester_id(id, name, phone_number, university, chapter, career_interest),
-        target:target_id(id, name, phone_number, university, chapter, career_interest)
-      `)
+      .select(INTRO_SELECT)
       .single();
 
     if (error) {
@@ -134,11 +150,7 @@ export async function PATCH(request: NextRequest) {
       .from('scout_introductions')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select(`
-        *,
-        requester:requester_id(id, name, phone_number, university, chapter, career_interest),
-        target:target_id(id, name, phone_number, university, chapter, career_interest)
-      `)
+      .select(INTRO_SELECT)
       .single();
 
     if (error) {

@@ -25,13 +25,42 @@ interface IntroProfile {
   career_interest: string | null;
 }
 
+interface PlatformTargetSnapshot {
+  name?: string;
+  role?: string | null;
+  major?: string | null;
+  location?: string | null;
+  member_status?: string | null;
+  grad_year?: number | null;
+  linkedin_url?: string | null;
+}
+
 interface Introduction {
   id: string;
   requester: IntroProfile;
-  target: IntroProfile;
+  target: IntroProfile | null;
+  platform_target_id: string | null;
+  platform_target_snapshot: PlatformTargetSnapshot | null;
   reason: string;
   status: 'suggested' | 'pending_approval' | 'sent' | 'accepted' | 'declined';
   created_at: string;
+}
+
+function targetDisplay(intro: Introduction): { name: string; subtitle: string } {
+  if (intro.target) {
+    return {
+      name: intro.target.name,
+      subtitle: [intro.target.university, intro.target.career_interest].filter(Boolean).join(' · '),
+    };
+  }
+  const snap = intro.platform_target_snapshot;
+  if (snap?.name) {
+    return {
+      name: snap.name,
+      subtitle: [snap.role, snap.location, snap.member_status].filter(Boolean).join(' · '),
+    };
+  }
+  return { name: 'Platform member', subtitle: intro.platform_target_id || '' };
 }
 
 function formatDate(iso: string): string {
@@ -114,6 +143,7 @@ export default function IntroductionsPage() {
 
   function IntroCard({ intro, showActions }: { intro: Introduction; showActions: boolean }) {
     const style = STATUS_STYLES[intro.status];
+    const target = targetDisplay(intro);
     return (
       <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
@@ -132,11 +162,11 @@ export default function IntroductionsPage() {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8125rem', fontWeight: 600, color: '#166534', flexShrink: 0 }}>
-                {intro.target.name.charAt(0)}
+                {target.name.charAt(0)}
               </div>
               <div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>{intro.target.name}</div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{intro.target.university || ''} · {intro.target.career_interest || ''}</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>{target.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{target.subtitle}</div>
               </div>
             </div>
           </div>

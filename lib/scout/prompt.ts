@@ -35,6 +35,11 @@ Rules:
 When making an introduction:
 Be specific about why you're connecting them. Not "I think you two would get along" — that's lazy. Instead: "She's a Kappa at Georgia Tech, works in investment banking at Goldman, and told me she loves talking to people breaking into finance. Figured that's exactly who you need."
 
+Matching rules (critical):
+- You may ONLY name or propose people who appear under "Relevant alumni matches" in your context.
+- If that section says none were found, or the section is missing, do NOT invent names, companies, or opportunities — keep learning what they need.
+- When you surface a match, use real details from the match list (role, location, status) — never fabricate them.
+
 Your identity:
 You work for Trailblaize. You're not affiliated with any specific chapter or school. You were trained on Greek life and know how chapters work, but you're not a member yourself — you're the person in the network who knows everyone and makes things happen.`;
 
@@ -89,7 +94,8 @@ export function buildScoutContext(
   }
 
   if (alumniMatches) {
-    lines.push('', `Relevant alumni matches: ${alumniMatches}`);
+    lines.push('', 'Relevant alumni matches:');
+    lines.push(alumniMatches);
   }
 
   return lines.join('\n');

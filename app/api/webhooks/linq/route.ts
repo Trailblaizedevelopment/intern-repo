@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendMessage } from '@/lib/linq';
-import {
-  SCOUT_SYSTEM_PROMPT,
-  buildScoutContext,
-  ScoutProfileContext,
-  ScoutConversationMessage,
-} from '@/lib/scout/prompt';
+import { generateScoutMessage } from '@/lib/scout/generate';
 
 const OPT_OUT_KEYWORDS = ['stop', 'unsubscribe', 'remove me', 'opt out', 'leave me alone', 'do not contact'];
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-6';
 
 function normalizeToE164(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -23,89 +16,6 @@ function normalizeToE164(phone: string): string {
 function containsOptOut(text: string): boolean {
   const lower = text.toLowerCase().trim();
   return OPT_OUT_KEYWORDS.some(kw => lower.includes(kw));
-}
-
-async function generateReply(profileId: string): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return null;
-
-  const { data: profile } = await supabase
-    .from('scout_profiles')
-    .select('*')
-    .eq('id', profileId)
-    .single();
-
-  if (!profile) return null;
-
-  const { data: messages } = await supabase
-    .from('scout_conversations')
-    .select('direction, message_body, created_at')
-    .eq('profile_id', profileId)
-    .order('created_at', { ascending: true })
-    .limit(30);
-
-  const history: ScoutConversationMessage[] = (messages || []).map(m => ({
-    direction: m.direction as 'inbound' | 'outbound',
-    message_body: m.message_body,
-    created_at: m.created_at,
-  }));
-
-  // Check 2-unanswered-followup rule (count consecutive outbound at end before latest inbound)
-  // Since we just inserted the inbound, the last message is inbound — check outbound streak before it
-  let unansweredOutbound = 0;
-  for (let i = history.length - 2; i >= 0; i--) {
-    if (history[i].direction === 'outbound') {
-      unansweredOutbound++;
-    } else {
-      break;
-    }
-  }
-  if (unansweredOutbound >= 2) return null;
-
-  const profileContext: ScoutProfileContext = {
-    name: profile.name,
-    chapter: profile.chapter,
-    university: profile.university,
-    graduation_year: profile.graduation_year,
-    current_title: profile.current_title,
-    career_interest: profile.career_interest,
-    looking_for: profile.looking_for,
-    goals: Array.isArray(profile.goals) ? profile.goals : [],
-    skills: Array.isArray(profile.skills) ? profile.skills : [],
-  };
-
-  const userContent = buildScoutContext(profileContext, history);
-  const instruction = 'Generate your next reply in this conversation. Stay in character. 1-2 sentences max.';
-
-  const res = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 256,
-      system: SCOUT_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: `${userContent}\n\n---\n\n${instruction}` }],
-    }),
-  });
-
-  if (!res.ok) {
-    console.error('[webhook/linq] Anthropic error:', res.status, await res.text());
-    return null;
-  }
-
-  const aiResponse = await res.json();
-  return aiResponse.content
-    ?.filter((b: { type: string }) => b.type === 'text')
-    .map((b: { text: string }) => b.text)
-    .join('')
-    .trim() || null;
 }
 
 export async function POST(request: NextRequest) {
@@ -214,7 +124,8 @@ export async function POST(request: NextRequest) {
     // Auto-reply if not flagged and not opted out
     let autoReplied = false;
     if (!shouldFlag && profile.opt_in_status !== 'opted_out') {
-      const reply = await generateReply(profile.id);
+      const result = await generateScoutMessage(profile.id, 'reply');
+      const reply = result.message;
 
       if (reply) {
         try {
