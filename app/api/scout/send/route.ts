@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendMessage, createChat } from '@/lib/linq';
 import { generateScoutMessage } from '@/lib/scout/generate';
+import { scheduleAfterOutbound } from '@/lib/scout/followup';
 
 function normalizeToE164(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -123,12 +124,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update last_contact on profile
     if (resolvedProfileId) {
-      await supabase
-        .from('scout_profiles')
-        .update({ last_contact: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq('id', resolvedProfileId);
+      await scheduleAfterOutbound(resolvedProfileId);
     }
 
     return NextResponse.json({ data: convo, error: null }, { status: 201 });

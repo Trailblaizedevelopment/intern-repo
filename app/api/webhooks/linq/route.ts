@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendMessage } from '@/lib/linq';
 import { generateScoutMessage } from '@/lib/scout/generate';
+import { clearFollowupSchedule, scheduleAfterOutbound } from '@/lib/scout/followup';
 
 const OPT_OUT_KEYWORDS = ['stop', 'unsubscribe', 'remove me', 'opt out', 'leave me alone', 'do not contact'];
 
@@ -111,15 +112,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: insertErr.message }, { status: 500 });
     }
 
-    // Update profile's last_contact
+    // Update profile's last_contact; clear proactive schedule on inbound
     await supabase
       .from('scout_profiles')
       .update({
         last_contact: createdAt,
         updated_at: new Date().toISOString(),
-        ...(shouldFlag ? { opt_in_status: 'opted_out' } : {}),
+        ...(shouldFlag ? { opt_in_status: 'opted_out', next_followup: null } : {}),
       })
       .eq('id', profile.id);
+
+    if (!shouldFlag) {
+      await clearFollowupSchedule(profile.id);
+    }
 
     // Auto-reply if not flagged and not opted out
     let autoReplied = false;
@@ -146,6 +151,7 @@ export async function POST(request: NextRequest) {
               read: true,
             });
 
+          await scheduleAfterOutbound(profile.id);
           autoReplied = true;
         } catch (sendErr) {
           console.error('[POST /api/webhooks/linq] Auto-reply send error:', sendErr);

@@ -90,7 +90,9 @@ export async function POST(request: NextRequest) {
 
       const { data: profile, error: profileErr } = await platform
         .from('profiles')
-        .select('id, first_name, last_name, full_name, phone, email, chapter_id, grad_year, major, location, role, linkedin_url, spaces:chapter_id(id, name)')
+        .select(
+          'id, first_name, last_name, full_name, phone, email, chapter_id, grad_year, major, location, role, linkedin_url, member_status, bio, hometown, industry, company, job_title, current_place, spaces:chapter_id(id, name)'
+        )
         .eq('id', source_id)
         .single();
 
@@ -115,16 +117,34 @@ export async function POST(request: NextRequest) {
       const normalizedPhone = phoneDigits.length === 10 ? `+1${phoneDigits}` : phoneDigits.length === 11 && phoneDigits.startsWith('1') ? `+${phoneDigits}` : phone.startsWith('+') ? phone : `+${phoneDigits}`;
 
       const space = (Array.isArray(profile.spaces) ? profile.spaces[0] : profile.spaces) as { id: string; name: string } | null;
+      const membershipRoles = new Set(['alumni', 'alum', 'active', 'active_member', 'graduated', 'member', 'pledge', 'new_member']);
+      const roleLabel = (profile.role || '').toLowerCase().replace(/\s+/g, '_');
+      const jobTitle = profile.job_title || null;
+      const currentTitle =
+        jobTitle ||
+        (profile.role && !membershipRoles.has(roleLabel) ? profile.role : null);
+
+      const careerInterest =
+        profile.industry ||
+        (profile.major && String(profile.major).toLowerCase() !== 'to be updated' ? profile.major : null);
+
       profileData = {
         phone_number: normalizedPhone,
         name,
         chapter: space?.name || null,
         university: space?.name || null,
         graduation_year: profile.grad_year,
-        location: profile.location || null,
-        current_title: profile.role || null,
-        career_interest: profile.major || null,
+        location: profile.location || profile.current_place || null,
+        current_title: currentTitle,
+        career_interest: careerInterest,
         platform_chapter_id: profile.chapter_id || null,
+        member_status: profile.member_status || null,
+        industry: profile.industry || null,
+        company: profile.company || null,
+        job_title: jobTitle,
+        hometown: profile.hometown || null,
+        linkedin_url: profile.linkedin_url || null,
+        bio: profile.bio || null,
         source_type: 'platform_profile',
         source_id,
         profile_complete: 30,
@@ -215,6 +235,8 @@ export async function PATCH(request: NextRequest) {
       'name', 'chapter', 'university', 'graduation_year', 'location',
       'current_title', 'career_interest', 'goals', 'skills', 'looking_for',
       'opt_in_status', 'last_contact', 'next_followup', 'profile_complete', 'notes',
+      'member_status', 'industry', 'company', 'job_title', 'hometown', 'linkedin_url', 'bio',
+      'platform_chapter_id',
     ];
 
     const sanitized: Record<string, unknown> = { updated_at: new Date().toISOString() };

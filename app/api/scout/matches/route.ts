@@ -3,12 +3,16 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import {
   findChapterCandidates,
   formatAlumniMatches,
-  shouldFetchMatches,
 } from '@/lib/scout/match';
+import {
+  analyzeDiscovery,
+  enrichProfileFromPlatform,
+  toDiscoveryProfile,
+} from '@/lib/scout/discovery';
 
 /**
  * GET /api/scout/matches?profile_id=...
- * Debug/ops: return ranked platform chapter peers for a Scout profile.
+ * Debug/ops: discovery state + ranked platform chapter peers.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -28,35 +32,40 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: profile, error } = await supabase
+    const { data: profileRow, error } = await supabase
       .from('scout_profiles')
       .select('*')
       .eq('id', profileId)
       .single();
 
-    if (error || !profile) {
+    if (error || !profileRow) {
       return NextResponse.json(
         { data: null, error: { message: 'Profile not found', code: 'NOT_FOUND' } },
         { status: 404 }
       );
     }
 
-    const wouldFetch = shouldFetchMatches('reply', profile);
-    const candidates = await findChapterCandidates({
-      id: profile.id,
-      platform_chapter_id: profile.platform_chapter_id,
-      source_type: profile.source_type,
-      source_id: profile.source_id,
-      looking_for: profile.looking_for,
-      career_interest: profile.career_interest,
-      goals: profile.goals,
-      opt_in_status: profile.opt_in_status,
-    });
+    const profile = await enrichProfileFromPlatform(toDiscoveryProfile(profileRow));
+    const discovery = analyzeDiscovery(profile);
+
+    const candidates = discovery.matchReady
+      ? await findChapterCandidates({
+          id: profile.id,
+          platform_chapter_id: profile.platform_chapter_id,
+          source_type: profile.source_type,
+          source_id: profile.source_id,
+          looking_for: profile.looking_for,
+          career_interest: profile.career_interest || profile.industry,
+          goals: profile.goals,
+          opt_in_status: profileRow.opt_in_status,
+        })
+      : [];
 
     return NextResponse.json({
       data: {
         platform_chapter_id: profile.platform_chapter_id,
-        would_inject_on_reply: wouldFetch,
+        discovery,
+        would_inject_on_reply: discovery.matchReady,
         candidates,
         formatted: formatAlumniMatches(candidates),
       },
