@@ -10,6 +10,7 @@ import {
   findChapterCandidates,
   formatAlumniMatches,
   upsertSuggestedIntros,
+  ScoutCandidate,
 } from '@/lib/scout/match';
 import {
   analyzeDiscovery,
@@ -21,6 +22,7 @@ import {
   toDiscoveryProfile,
 } from '@/lib/scout/discovery';
 import { MAX_UNANSWERED_OUTBOUND } from '@/lib/scout/followup';
+import { classifyReplyIntent, findCandidateByNameQuery } from '@/lib/scout/intent';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6';
@@ -34,6 +36,13 @@ export interface GenerateScoutResult {
   reason?: string;
   matchCount?: number;
   matchReady?: boolean;
+}
+
+function latestInboundText(history: ScoutConversationMessage[]): string | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].direction === 'inbound') return history[i].message_body;
+  }
+  return null;
 }
 
 /**
@@ -112,14 +121,21 @@ export async function generateScoutMessage(
   const discovery = analyzeDiscovery(profile);
   const discoveryGuidance = formatDiscoveryGuidance(discovery);
 
-  // 3) Match only when discovery is ready (not on opens; OK on followups if ready)
+  const latestInbound = latestInboundText(history);
+  const replyIntent =
+    type === 'reply' || type === 'followup'
+      ? classifyReplyIntent(latestInbound)
+      : { intent: 'other' as const, personQuery: null };
+
+  // 3) Match when ready — inject based on reply intent (don't re-dump roster every turn)
   let alumniMatches: string | undefined;
   let matchCount = 0;
   const matchType = type === 'open' ? 'open' : 'reply';
   const matchReady = isMatchReady(matchType, profile);
+  let candidates: ScoutCandidate[] = [];
 
-  if (matchReady) {
-    const candidates = await findChapterCandidates({
+  if (matchReady && type !== 'open') {
+    candidates = await findChapterCandidates({
       id: profile.id,
       platform_chapter_id: profile.platform_chapter_id,
       source_type: profile.source_type,
@@ -130,18 +146,72 @@ export async function generateScoutMessage(
       opt_in_status: profileRow.opt_in_status,
     });
     matchCount = candidates.length;
-    alumniMatches = formatAlumniMatches(candidates);
+
+    if (replyIntent.intent === 'ask_about_person' && replyIntent.personQuery) {
+      const focused = findCandidateByNameQuery(candidates, replyIntent.personQuery);
+      alumniMatches = focused
+        ? formatAlumniMatches([focused], { mode: 'focus' })
+        : `No exact match in the current pool for "${replyIntent.personQuery}". Say you don't have a clear card on them yet — ask one clarifying question. Do NOT re-list the Texas roster.`;
+    } else if (replyIntent.intent === 'ask_matches' || type === 'followup') {
+      alumniMatches = formatAlumniMatches(candidates, { mode: 'list' });
+    } else if (replyIntent.intent === 'meta_repeat') {
+      alumniMatches = undefined;
+    } else {
+      alumniMatches =
+        candidates.length > 0
+          ? `Background match pool available (${candidates.length}) but DO NOT list them unless the user asks who is available. Answer their latest message first.`
+          : undefined;
+    }
 
     // #region agent log
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1cf407'},body:JSON.stringify({sessionId:'1cf407',runId:'pre-fix',hypothesisId:'C,D,E',location:'lib/scout/generate.ts:afterMatch',message:'generate match inject',data:{type,matchReady,looking_for:profile.looking_for,matchCount,candidateNames:candidates.map(c=>c.name),formattedPreview:(alumniMatches||'').slice(0,500),gaps:discovery.gaps,nextGap:discovery.nextGap},timestamp:Date.now()})}).catch(()=>{});
+    const debugInject = {
+      type,
+      matchReady,
+      replyIntent,
+      latestInbound: (latestInbound || '').slice(0, 120),
+      looking_for: profile.looking_for,
+      matchCount,
+      injectMode: replyIntent.intent,
+      formattedPreview: (alumniMatches || '').slice(0, 400),
+    };
+    console.log('[DEBUG 1cf407] generate match inject', JSON.stringify(debugInject));
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
+      body: JSON.stringify({
+        sessionId: '1cf407',
+        runId: 'post-fix',
+        hypothesisId: 'F,G',
+        location: 'lib/scout/generate.ts:afterMatch',
+        message: 'generate match inject',
+        data: debugInject,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion
 
-    if (candidates.length > 0) {
+    if (candidates.length > 0 && (replyIntent.intent === 'ask_matches' || type === 'followup')) {
       await upsertSuggestedIntros(profile.id, candidates);
     }
-  } else {
+  } else if (!matchReady) {
     // #region agent log
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1cf407'},body:JSON.stringify({sessionId:'1cf407',runId:'pre-fix',hypothesisId:'E',location:'lib/scout/generate.ts:matchLocked',message:'matching locked',data:{type,looking_for:profile.looking_for,gaps:discovery.gaps,matchReady},timestamp:Date.now()})}).catch(()=>{});
+    console.log(
+      '[DEBUG 1cf407] matching locked',
+      JSON.stringify({ type, replyIntent, looking_for: profile.looking_for })
+    );
+    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
+      body: JSON.stringify({
+        sessionId: '1cf407',
+        runId: 'post-fix',
+        hypothesisId: 'F',
+        location: 'lib/scout/generate.ts:matchLocked',
+        message: 'matching locked',
+        data: { type, replyIntent, looking_for: profile.looking_for, gaps: discovery.gaps, matchReady },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion
   }
 
@@ -153,8 +223,12 @@ export async function generateScoutMessage(
     current_title: profile.current_title,
     career_interest: profile.career_interest,
     looking_for: profile.looking_for,
-    goals: Array.isArray(profile.goals) ? profile.goals.filter((g): g is string => typeof g === 'string') : [],
-    skills: Array.isArray(profile.skills) ? profile.skills.filter((s): s is string => typeof s === 'string') : [],
+    goals: Array.isArray(profile.goals)
+      ? profile.goals.filter((g): g is string => typeof g === 'string')
+      : [],
+    skills: Array.isArray(profile.skills)
+      ? profile.skills.filter((s): s is string => typeof s === 'string')
+      : [],
     location: profile.location,
     member_status: profile.member_status,
     industry: profile.industry,
@@ -176,21 +250,33 @@ export async function generateScoutMessage(
   if (type === 'open') {
     instruction =
       'Generate your opening message to this person. This is your first text to them — make it warm, low-stakes, and brief. 1-2 sentences max. Do not claim you lack network access.';
+  } else if (replyIntent.intent === 'meta_repeat') {
+    instruction =
+      'The user is calling out that you keep repeating yourself. Apologize briefly in one short clause, then answer what they actually need next — do NOT re-list the Texas roster or say "8 guys" again. 1-2 sentences max.';
+  } else if (replyIntent.intent === 'ask_about_person') {
+    instruction =
+      'The user asked about a SPECIFIC person. Answer ONLY about that person using the Focus person details if present. Do NOT restart with "I\'ve got 8 guys in Texas". 1-2 sentences max.';
   } else if (type === 'followup') {
-    instruction = matchReady && alumniMatches && alumniMatches !== EMPTY_MATCHES_INSTRUCTION
-      ? 'This is a proactive follow-up — they have not replied. Briefly nudge with one concrete match or one sharp question from Discovery guidance. Do not apologize for messaging. Never say the network is unsynced. 1-2 sentences max.'
-      : 'This is a proactive follow-up — they have not replied. Nudge once using Discovery guidance (Next focus). One question max. Do not apologize, do not guilt them, never say the network is unsynced. 1-2 sentences max.';
+    instruction =
+      matchReady && alumniMatches && alumniMatches !== EMPTY_MATCHES_INSTRUCTION
+        ? 'This is a proactive follow-up — they have not replied. Briefly nudge with one concrete match or one sharp question from Discovery guidance. Do not apologize for messaging. Never say the network is unsynced. 1-2 sentences max.'
+        : 'This is a proactive follow-up — they have not replied. Nudge once using Discovery guidance (Next focus). One question max. Do not apologize, do not guilt them, never say the network is unsynced. 1-2 sentences max.';
   } else if (!matchReady) {
-    instruction = `Generate your next reply in discovery mode. Follow Discovery guidance (Next focus). Ask exactly one gap question or briefly acknowledge then ask. Never say the network is unsynced or unavailable. Stay in character. 1-2 sentences max.`;
+    instruction =
+      'Generate your next reply in discovery mode. Follow Discovery guidance (Next focus). Ask exactly one gap question or briefly acknowledge then ask. Never say the network is unsynced or unavailable. Stay in character. 1-2 sentences max.';
+  } else if (
+    replyIntent.intent === 'ask_matches' &&
+    alumniMatches &&
+    alumniMatches !== EMPTY_MATCHES_INSTRUCTION
+  ) {
+    instruction =
+      'User asked who is available. Highlight 2-3 people from Relevant alumni matches (or say there are several). Do not claim there is only one. 1-2 sentences max.';
   } else if (alumniMatches === EMPTY_MATCHES_INSTRUCTION) {
     instruction =
       'Generate your next reply. Matching is unlocked but no strong peers scored — do not invent people or blame sync. Narrow what would help. Stay in character. 1-2 sentences max.';
-  } else if (alumniMatches) {
-    instruction =
-      'Generate your next reply. If multiple people are listed under Relevant alumni matches, name 2-3 (or say there are several and highlight a couple) — never claim there is only one. Stay in character. 1-2 sentences max. Optionally end with one short investigative question.';
   } else {
     instruction =
-      'Generate your next reply in this conversation. Stay in character. 1-2 sentences max. Never claim the alumni network is unsynced.';
+      "Answer the user's LATEST message directly. Do NOT re-list the Texas roster unless they asked who is available. Stay in character. 1-2 sentences max.";
   }
 
   const res = await fetch(ANTHROPIC_API_URL, {
@@ -231,7 +317,27 @@ export async function generateScoutMessage(
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1cf407'},body:JSON.stringify({sessionId:'1cf407',runId:'pre-fix',hypothesisId:'C',location:'lib/scout/generate.ts:output',message:'generated scout reply',data:{type,matchCount,matchReady,replyPreview:generatedText.slice(0,240)},timestamp:Date.now()})}).catch(()=>{});
+  const outDebug = {
+    type,
+    matchCount,
+    matchReady,
+    replyIntent,
+    replyPreview: generatedText.slice(0, 240),
+  };
+  console.log('[DEBUG 1cf407] generated scout reply', JSON.stringify(outDebug));
+  fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
+    body: JSON.stringify({
+      sessionId: '1cf407',
+      runId: 'post-fix',
+      hypothesisId: 'F,G',
+      location: 'lib/scout/generate.ts:output',
+      message: 'generated scout reply',
+      data: outDebug,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
   // #endregion
 
   return { message: generatedText, matchCount, matchReady };

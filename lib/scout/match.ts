@@ -353,15 +353,15 @@ export async function findChapterCandidates(
   return top;
 }
 
-export function formatAlumniMatches(candidates: ScoutCandidate[]): string {
+export function formatAlumniMatches(candidates: ScoutCandidate[], opts?: { mode?: 'list' | 'focus' }): string {
   if (candidates.length === 0) return EMPTY_MATCHES_INSTRUCTION;
 
-  const geoCount = candidates.filter(c => c.geoHit).length;
+  const mode = opts?.mode || 'list';
   const header =
-    geoCount >= 2
-      ? `Found ${candidates.length} strong matches to discuss (geo-aligned). Name 2-3 people, say there are more if helpful — do not claim there is only one.`
+    mode === 'focus'
+      ? 'Focus person (answer the user about THIS person only — do not re-list the whole Texas roster):'
       : candidates.length >= 2
-        ? `Found ${candidates.length} matches. Name 2-3 if useful — do not claim there is only one.`
+        ? `Match pool (${candidates.length} people). Only list names if the user asked who/who else is available. Otherwise answer their latest question.`
         : null;
 
   const lines = candidates.map((c, i) => {
@@ -374,6 +374,7 @@ export function formatAlumniMatches(candidates: ScoutCandidate[]): string {
       c.member_status ? `status: ${c.member_status}` : null,
       c.grad_year ? `grad_year: ${c.grad_year}` : null,
       c.linkedin_url ? 'has LinkedIn' : null,
+      c.bio ? `bio: ${c.bio.slice(0, 160)}` : null,
       `why: ${c.reason}`,
     ].filter(Boolean);
     return parts.join(' | ');
