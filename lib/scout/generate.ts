@@ -121,10 +121,10 @@ export async function generateScoutMessage(
   const discoveryGuidance = formatDiscoveryGuidance(discovery);
 
   const latestInbound = latestInboundText(history);
-  const event = parseAgentEvent(latestInbound, type);
-
   const matchType = type === 'open' ? 'open' : 'reply';
   const matchReady = isMatchReady(matchType, profile);
+
+  let session = sessionFromProfileRow(profileRow as Record<string, unknown>);
 
   let candidates: ScoutCandidate[] = [];
   if (matchReady && type !== 'open') {
@@ -140,7 +140,13 @@ export async function generateScoutMessage(
     });
   }
 
-  let session = sessionFromProfileRow(profileRow as Record<string, unknown>);
+  const knownNames = [
+    ...candidates.map(c => c.name),
+    session.focus_person_snapshot?.name,
+  ].filter((n): n is string => typeof n === 'string' && n.length > 0);
+
+  const event = parseAgentEvent(latestInbound, type, { knownNames });
+
   let transition = transitionAgent(session, event, {
     matchReady,
     candidates,

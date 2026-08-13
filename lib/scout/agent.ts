@@ -61,6 +61,7 @@ export interface AgentTransitionResult {
   instructionKey:
     | 'open'
     | 'clarify'
+    | 'chat'
     | 'offer'
     | 'deep_dive'
     | 'await_yes'
@@ -273,6 +274,25 @@ export function transitionAgent(
     });
   }
 
+  // Pure chat / greeting — never force an offer
+  if (event.type === 'USER_CHAT') {
+    injectCard = candidateFromFocus(next, candidates);
+    injectMode = injectCard ? 'focus' : 'none';
+    if (fromState === 'warmup') {
+      next = { ...next, agent_state: matchReady ? fromState : 'clarify_intent' };
+    }
+    return baseResult({
+      session: next,
+      fromState,
+      toState: next.agent_state,
+      event,
+      injectCard,
+      injectMode,
+      remainingPool: 0,
+      instructionKey: 'chat',
+    });
+  }
+
   if (!matchReady) {
     next = { ...next, agent_state: 'clarify_intent' };
     return baseResult({
@@ -442,32 +462,24 @@ export function transitionAgent(
   }
 
   if (fromState === 'warmup' || fromState === 'clarify_intent') {
-    if (event.type === 'USER_SUBSTANCE' || event.type === 'USER_CLARIFY') {
-      const offered = applyOffer(next, candidates);
-      next = offered.session;
-      if (offered.card) {
-        return baseResult({
-          session: next,
-          fromState,
-          toState: 'offer',
-          event,
-          injectCard: offered.card,
-          injectMode: 'offer',
-          remainingPool: offered.remaining,
-          instructionKey: 'offer',
-        });
-      }
-    }
+    // Do NOT auto-offer on small talk / vague clarify — only ASKED_WHO offers
     next = { ...next, agent_state: 'clarify_intent' };
-    instructionKey = 'clarify';
+    instructionKey =
+      event.type === 'USER_SUBSTANCE' || event.type === 'USER_CLARIFY' ? 'clarify' : 'chat';
   } else if (fromState === 'deep_dive' || fromState === 'await_requester_yes') {
     injectCard = candidateFromFocus(next, candidates);
     injectMode = injectCard ? 'focus' : 'none';
-    instructionKey = fromState === 'await_requester_yes' ? 'await_yes' : 'deep_dive';
+    // Non-connector acts: chat, don't re-pitch
+    if (event.type === 'USER_CLARIFY' || event.type === 'USER_SUBSTANCE') {
+      instructionKey = 'chat';
+    } else {
+      instructionKey = fromState === 'await_requester_yes' ? 'await_yes' : 'deep_dive';
+    }
   } else if (fromState === 'offer') {
     injectCard = candidateFromFocus(next, candidates);
-    injectMode = injectCard ? 'offer' : 'none';
-    instructionKey = 'offer';
+    injectMode = injectCard ? 'focus' : 'none';
+    // Stay in offer state but speak as chat — do not re-run "Offer EXACTLY"
+    instructionKey = 'chat';
   }
 
   return baseResult({
@@ -521,6 +533,8 @@ export async function applyIntroSideEffects(
   if (
     card &&
     (transition.injectMode === 'offer' || transition.injectMode === 'focus') &&
+    transition.instructionKey !== 'chat' &&
+    transition.instructionKey !== 'meta_repair' &&
     eventType !== 'USER_SAID_YES' &&
     eventType !== 'USER_SAID_NO'
   ) {
@@ -561,12 +575,18 @@ export async function applyIntroSideEffects(
 export function formatAgentInject(transition: AgentTransitionResult): string | undefined {
   if (transition.injectMode === 'missing_focus') {
     const q = transition.event.personQuery || 'them';
-    return `No exact match in the current pool for "${q}". Say you don't have a clear card yet — ask one clarifying question. Do NOT re-list a roster.`;
+    return `Could not resolve "${q}" in the current chapter match pool this turn. Be honest that you don't have a clear card pulled up — do NOT say they "aren't in the network" or that a prior mention was "fake/bad info". Ask one clarifying question (full name / city). Do NOT re-list a roster.`;
   }
   if (transition.injectMode === 'pool_empty') {
-    return 'No unused matches left in the current pool. Be honest — ask how to narrow (city, industry) without inventing names.';
+    return 'No unused matches left in the current pool. Be honest — ask how to narrow (city, industry) without inventing names. Never claim prior names were fake.';
   }
   if (!transition.injectCard) return undefined;
+
+  // Chat turns: background focus only — model must not re-pitch unless asked
+  if (transition.instructionKey === 'chat' || transition.instructionKey === 'meta_repair') {
+    const card = transition.injectCard;
+    return `Background focus (do NOT re-pitch unless they ask): ${card.name}${card.location ? ` — ${card.location}` : ''}${card.role ? `, ${card.role}` : ''}. Answer their latest message first.`;
+  }
 
   const mode = transition.injectMode === 'offer' ? 'list' : 'focus';
   let text = formatAlumniMatches([transition.injectCard], { mode });
@@ -585,10 +605,12 @@ export function instructionForTransition(
       return 'Generate your opening message to this person. This is your first text to them — make it warm, low-stakes, and brief. 1-2 sentences max. Do not claim you lack network access.';
     case 'clarify':
       return 'Generate your next reply in discovery mode. Follow Discovery guidance (Next focus). Ask exactly one gap question or briefly acknowledge then ask. Never say the network is unsynced. 1-2 sentences max.';
+    case 'chat':
+      return "Answer the user's LATEST message like a sharp friend. Greetings get a short human reply — do NOT pitch a new person or apologize about past matches unless they asked. No roster. No 'Heads up — bad info' opener. 1-2 sentences max.";
     case 'offer':
-      return 'Offer EXACTLY the one person under Relevant alumni matches with a sharp why. Ask if they want an intro or someone else. Do NOT list a roster or say "8 guys". 1-2 sentences max.';
+      return 'Offer EXACTLY the one person under Relevant alumni matches with a sharp why. Ask if they want an intro or someone else. Do NOT list a roster or say "8 guys". Do NOT claim other people from history were fake. 1-2 sentences max.';
     case 'deep_dive':
-      return 'Answer ONLY about the focus person. End with one clear move (intro yes/no or what they care about). Do NOT restart with a network list. 1-2 sentences max.';
+      return 'Answer ONLY about the focus person using the Focus card. If the user corrected you that someone IS in the network, acknowledge and use the card — never say they were a mistake. End with one clear move. No roster. 1-2 sentences max.';
     case 'await_yes':
       return 'They said yes to an intro. Confirm you will have a teammate reach out to that person — do NOT claim you already texted them. 1-2 sentences max.';
     case 'intro_confirmed':
@@ -596,17 +618,17 @@ export function instructionForTransition(
         ? 'Proactive nudge: remind them you are lining up the intro with the focus person / teammate. No roster. 1-2 sentences max.'
         : 'Confirm the intro request is with the team for the focus person. No roster dump. 1-2 sentences max.';
     case 'meta_repair':
-      return 'They called out repetition. Apologize once briefly, then continue from current Agent mode / focus — do NOT paste a roster or "8 guys" opener. 1-2 sentences max.';
+      return 'They called out repetition. Apologize once briefly, then answer what they need — do NOT paste a roster, re-offer Phillip, or invent that Jack (or anyone) "wasn\'t real". 1-2 sentences max.';
     case 'pool_empty':
       return 'No unused matches left. Be honest and ask one narrowing question. Do not invent people. 1-2 sentences max.';
     case 'missing_focus':
-      return 'You could not find that person in the pool. Say so briefly and ask one clarifying question. No roster. 1-2 sentences max.';
+      return 'You could not pull up a card for that name this turn. Say you want to double-check the right person — never say they are not in the network or that an earlier mention was fake. 1-2 sentences max.';
     case 'followup_nudge':
       return transition.injectCard
-        ? 'Proactive follow-up: nudge with the ONE person in context or ask if they want the intro. No roster. 1-2 sentences max.'
+        ? 'Proactive follow-up: light nudge about the ONE person in context or a check-in question. No roster. No fabricated retractions. 1-2 sentences max.'
         : 'Proactive follow-up: one sharp discovery or check-in question. No roster. 1-2 sentences max.';
     default:
-      return "Answer the user's LATEST message directly using Agent mode. Do NOT re-list a roster unless offering the single Next offer card. 1-2 sentences max.";
+      return "Answer the user's LATEST message directly. Do NOT re-list a roster or invent that someone from history was not real. 1-2 sentences max.";
   }
 }
 

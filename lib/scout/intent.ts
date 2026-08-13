@@ -17,6 +17,7 @@ export interface ReplyIntentResult {
 export type AgentEventType =
   | 'USER_SUBSTANCE'
   | 'USER_CLARIFY'
+  | 'USER_CHAT'
   | 'USER_ASKED_WHO'
   | 'USER_ASKED_ABOUT'
   | 'USER_SAID_YES'
@@ -31,8 +32,14 @@ export interface AgentEvent {
   personQuery: string | null;
 }
 
+export interface ParseAgentEventOpts {
+  /** First names / tokens from current match pool + offered people */
+  knownNames?: string[];
+}
+
+/** Explicit browse / who-else asks — do NOT use bare "network" (too broad). */
 const MATCH_ASK =
-  /\b(who else|anyone else|more people|other people|other guys|network|matches?|connect me|intros?|in texas|in dallas|in houston|in austin)\b/i;
+  /\b(who else|anyone else|more people|other people|other guys|show me (someone|anybody|people)|who('s| is) (in|around)|connect me|make (an )?intro|in texas|in dallas|in houston|in austin)\b/i;
 
 const META_REPEAT =
   /\b(why do you keep|stop repeating|you keep (on )?repeat|same (thing|message)|already (said|told)|repeating)\b/i;
@@ -41,6 +48,13 @@ const ABOUT_PERSON =
   /\b(?:tell me more about|what about|who is|who's|what does|where (?:is|does)|more on|info on)\s+([a-z][a-z'-]{1,30})\b/i;
 
 const ABOUT_PERSON_SHORT = /\b(?:about)\s+([a-z][a-z'-]{1,30})\??$/i;
+
+/** "Jack is in the network" / "Jack zook is real" corrections */
+const NAME_IN_NETWORK =
+  /\b([a-z][a-z'-]{1,30})(?:\s+[a-z][a-z'-]{1,30})?\s+(?:is|are)\s+(?:in\s+)?(?:the\s+)?(?:network|system|roster|file|real|legit)\b/i;
+
+const GREETING =
+  /^(hey|hi|hello|yo|sup|what'?s\s+up|whats\s+up|howdy|good\s+(morning|afternoon|evening))[\s,.!?]*(scout)?[\s,.!?]*$/i;
 
 const SAID_YES =
   /^(yes|yeah|yep|yup|sure|ok|okay|do it|go ahead|lets do it|let's do it|sounds good|please|absolutely)\b/i;
@@ -60,7 +74,34 @@ const GENERIC_NAMES = new Set([
   'anyone',
   'people',
   'guys',
+  'scout',
+  'man',
+  'dude',
 ]);
+
+function normalizeNameToken(s: string): string {
+  return s.toLowerCase().replace(/[^a-z]/g, '');
+}
+
+/** Find a known first/last name token mentioned in free text. */
+export function findMentionedKnownName(
+  text: string,
+  knownNames: string[] | undefined
+): string | null {
+  if (!knownNames || knownNames.length === 0) return null;
+  const tokens = new Set(
+    knownNames
+      .flatMap(n => n.split(/\s+/))
+      .map(normalizeNameToken)
+      .filter(t => t.length >= 3 && !GENERIC_NAMES.has(t))
+  );
+  const words = text.split(/[^a-zA-Z'-]+/).filter(Boolean);
+  for (const w of words) {
+    const n = normalizeNameToken(w);
+    if (tokens.has(n)) return w;
+  }
+  return null;
+}
 
 export function classifyReplyIntent(latestInbound: string | null | undefined): ReplyIntentResult {
   const event = parseAgentEvent(latestInbound, 'reply');
@@ -71,6 +112,7 @@ export function classifyReplyIntent(latestInbound: string | null | undefined): R
       return { intent: 'ask_about_person', personQuery: event.personQuery };
     case 'USER_META_REPAIR':
       return { intent: 'meta_repeat', personQuery: null };
+    case 'USER_CHAT':
     case 'USER_CLARIFY':
     case 'USER_SUBSTANCE':
       return { intent: 'discovery', personQuery: null };
@@ -81,7 +123,8 @@ export function classifyReplyIntent(latestInbound: string | null | undefined): R
 
 export function parseAgentEvent(
   latestInbound: string | null | undefined,
-  generateType: 'open' | 'reply' | 'followup'
+  generateType: 'open' | 'reply' | 'followup',
+  opts?: ParseAgentEventOpts
 ): AgentEvent {
   if (generateType === 'open') {
     return { type: 'OPEN', personQuery: null };
@@ -91,7 +134,7 @@ export function parseAgentEvent(
   }
 
   const text = (latestInbound || '').trim();
-  if (!text) return { type: 'USER_SUBSTANCE', personQuery: null };
+  if (!text) return { type: 'USER_CHAT', personQuery: null };
 
   if (STOP.test(text)) {
     return { type: 'USER_STOP', personQuery: null };
@@ -99,6 +142,10 @@ export function parseAgentEvent(
 
   if (META_REPEAT.test(text)) {
     return { type: 'USER_META_REPAIR', personQuery: null };
+  }
+
+  if (GREETING.test(text)) {
+    return { type: 'USER_CHAT', personQuery: null };
   }
 
   const about = text.match(ABOUT_PERSON) || text.match(ABOUT_PERSON_SHORT);
@@ -109,11 +156,20 @@ export function parseAgentEvent(
     }
   }
 
+  const inNetwork = text.match(NAME_IN_NETWORK);
+  if (inNetwork?.[1] && !GENERIC_NAMES.has(inNetwork[1].toLowerCase())) {
+    return { type: 'USER_ASKED_ABOUT', personQuery: inNetwork[1] };
+  }
+
+  const mentioned = findMentionedKnownName(text, opts?.knownNames);
+  if (mentioned) {
+    return { type: 'USER_ASKED_ABOUT', personQuery: mentioned };
+  }
+
   if (MATCH_ASK.test(text)) {
     return { type: 'USER_ASKED_WHO', personQuery: null };
   }
 
-  // Short affirm/deny — only meaningful in deep_dive / await_requester_yes (caller gates)
   if (text.split(/\s+/).length <= 6) {
     if (SAID_YES.test(text)) return { type: 'USER_SAID_YES', personQuery: null };
     if (SAID_NO.test(text)) return { type: 'USER_SAID_NO', personQuery: null };

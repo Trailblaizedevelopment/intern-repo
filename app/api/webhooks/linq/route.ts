@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
     // Linq uses an envelope format: actual message data is in body.data
     const payload = body.data || body;
 
-    // Ignore non-message events (typing indicators, read receipts, etc.)
-    if (body.event_type && body.event_type !== 'message.received' && body.event_type !== 'message.created') {
+    // Only process real inbound messages — message.created often duplicates message.received
+    if (body.event_type && body.event_type !== 'message.received') {
       // #region agent log
       console.log('[DEBUG f7e208] Ignoring non-message event:', body.event_type);
       // #endregion
@@ -67,6 +67,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing from or message' }, { status: 400 });
     }
 
+    const idempotencyKey =
+      (typeof payload.idempotency_key === 'string' && payload.idempotency_key) ||
+      (typeof body.idempotency_key === 'string' && body.idempotency_key) ||
+      (typeof payload.id === 'string' && payload.id) ||
+      null;
+
     // Sandbox guard: only process if sender is in scout_profiles
     // Use digit-based matching to handle various stored phone formats
     const normalizedFrom = normalizeToE164(fromPhone);
@@ -88,6 +94,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ignored', reason: 'sender not in scout_profiles' });
     }
 
+    // Dedupe: same inbound body within 90s, or same Linq message id already stored
+    const dedupeSince = new Date(Date.now() - 90_000).toISOString();
+    let recentQuery = supabase
+      .from('scout_conversations')
+      .select('id')
+      .eq('profile_id', profile.id)
+      .eq('direction', 'inbound')
+      .eq('message_body', messageText)
+      .gte('created_at', dedupeSince)
+      .limit(1);
+
+    const { data: recentDupes } = await recentQuery;
+    if (recentDupes && recentDupes.length > 0) {
+      console.log('[DEBUG 1cf407] duplicate inbound ignored', JSON.stringify({ profileId: profile.id, idempotencyKey }));
+      return NextResponse.json({ status: 'ignored', reason: 'duplicate_inbound' });
+    }
+
+    if (idempotencyKey) {
+      const { data: byKey } = await supabase
+        .from('scout_conversations')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .eq('direction', 'inbound')
+        .eq('flag_reason', `idempotency:${idempotencyKey}`)
+        .limit(1);
+      if (byKey && byKey.length > 0) {
+        console.log('[DEBUG 1cf407] duplicate idempotency ignored', idempotencyKey);
+        return NextResponse.json({ status: 'ignored', reason: 'duplicate_idempotency' });
+      }
+    }
+
     // Check for opt-out keywords
     const shouldFlag = containsOptOut(messageText);
 
@@ -103,7 +140,11 @@ export async function POST(request: NextRequest) {
         message_body: messageText,
         read: false,
         flagged: shouldFlag,
-        flag_reason: shouldFlag ? 'Auto-flagged: opt-out keyword detected' : null,
+        flag_reason: shouldFlag
+          ? 'Auto-flagged: opt-out keyword detected'
+          : idempotencyKey
+            ? `idempotency:${idempotencyKey}`
+            : null,
         created_at: createdAt,
       });
 
