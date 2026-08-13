@@ -37,12 +37,12 @@ export interface ParseAgentEventOpts {
   knownNames?: string[];
 }
 
-/** Explicit browse / who-else asks — do NOT use bare "network" (too broad). */
+/** Explicit browse / who-else / catch-up asks */
 const MATCH_ASK =
-  /\b(who else|anyone else|more people|other people|other guys|show me (someone|anybody|people)|who('s| is) (in|around)|connect me|make (an )?intro|in texas|in dallas|in houston|in austin)\b/i;
+  /\b(who else|anyone else|more people|other people|other guys|my friends|friends are up to|what .{0,24}(friends|guys|people|alums?|alumni).{0,24}(up to|doing|around)|catch up|show me (someone|anybody|people)|who('s| is) (in|around)|connect me|make (an )?intro|in texas|in dallas|in houston|in austin)\b/i;
 
 const META_REPEAT =
-  /\b(why do you keep|stop repeating|you keep (on )?repeat|same (thing|message)|already (said|told)|repeating)\b/i;
+  /\b(why do you keep|stop repeating|you keep (on )?repeat|same (thing|message)|already (said|told)|repeating|i just told|i (already )?said|that'?s all you|are you (even )?listen|you(?:'re| are) not listen)\b/i;
 
 const ABOUT_PERSON =
   /\b(?:tell me more about|what about|who is|who's|what does|where (?:is|does)|more on|info on)\s+([a-z][a-z'-]{1,30})\b/i;

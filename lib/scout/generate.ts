@@ -233,7 +233,8 @@ export async function generateScoutMessage(
     activeIntro: !!session.active_intro_id,
   });
 
-  const instruction = instructionForTransition(transition, type);
+  const lastOutbound = [...history].reverse().find(m => m.direction === 'outbound')?.message_body || null;
+  const instruction = instructionForTransition(transition, type, lastOutbound);
 
   const res = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
