@@ -437,8 +437,12 @@ export async function upsertSuggestedIntro(
       platform_target_snapshot: snapshot,
       updated_at: new Date().toISOString(),
     };
-    // Don't downgrade pending_approval back to suggested
-    if (status === 'pending_approval' || status === 'declined' || existing.status === 'suggested') {
+    const locked = existing.status === 'sent' || existing.status === 'accepted';
+    // Don't downgrade pending_approval / sent / accepted
+    if (
+      !locked &&
+      (status === 'pending_approval' || status === 'declined' || existing.status === 'suggested')
+    ) {
       updates.status = status;
     }
     await supabase.from('scout_introductions').update(updates).eq('id', existing.id);

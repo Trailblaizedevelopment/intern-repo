@@ -84,8 +84,9 @@ export default function FlaggedQueuePage() {
       .filter(c => c.phone_number === flaggedMsg.phone_number)
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     const idx = thread.findIndex(c => c.id === flaggedMsg.id);
-    const start = Math.max(0, idx - 2);
-    const end = Math.min(thread.length, idx + 2);
+    // Wider context window around the flagged message
+    const start = Math.max(0, idx - 5);
+    const end = Math.min(thread.length, idx + 4);
     return thread.slice(start, end);
   }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { notifyMemberOfApprovedIntro } from '@/lib/scout/intro-notify';
 
 const INTRO_SELECT = `
   *,
@@ -129,7 +130,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, status } = body;
+    const { id, status, approved_by } = body;
 
     if (!id || !status) {
       return NextResponse.json(
@@ -146,9 +147,28 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const { data: existing } = await supabase
+      .from('scout_introductions')
+      .select('id, status')
+      .eq('id', id)
+      .single();
+
+    const updates: Record<string, unknown> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    const approving = status === 'sent' && existing?.status !== 'sent';
+    if (approving) {
+      updates.approved_by = typeof approved_by === 'string' && approved_by.trim()
+        ? approved_by.trim()
+        : 'Nucleus';
+      updates.approved_at = new Date().toISOString();
+    }
+
     const { data, error } = await supabase
       .from('scout_introductions')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', id)
       .select(INTRO_SELECT)
       .single();
@@ -161,7 +181,15 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ data, error: null });
+    let notify: { sent: boolean; reason?: string } | null = null;
+    if (approving && data) {
+      notify = await notifyMemberOfApprovedIntro(
+        id,
+        (updates.approved_by as string) || 'Nucleus'
+      );
+    }
+
+    return NextResponse.json({ data, error: null, notify });
   } catch (err) {
     console.error('[PATCH /api/scout/introductions] Unexpected error:', err);
     return NextResponse.json(

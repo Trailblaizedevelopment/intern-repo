@@ -5,7 +5,7 @@ import {
   ScoutProfileContext,
   ScoutConversationMessage,
 } from '@/lib/scout/prompt';
-import { findChapterCandidates, ScoutCandidate } from '@/lib/scout/match';
+import { findChapterCandidates, ScoutCandidate, upsertSuggestedIntro } from '@/lib/scout/match';
 import {
   analyzeDiscovery,
   applyProfileUpdates,
@@ -25,10 +25,21 @@ import {
   sessionFromProfileRow,
   transitionAgent,
 } from '@/lib/scout/agent';
+import {
+  advanceStageAfterInbound,
+  asConversationStage,
+  ConversationStage,
+  looksUncertainAboutGoals,
+  persistConversationStage,
+  stageInstructionHint,
+} from '@/lib/scout/stages';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS = 256;
+const MAX_TOKENS = 320;
+
+/** Minimum top score to treat chapter pool as usable for matching */
+const MATCH_SCORE_THRESHOLD = 2;
 
 export type ScoutGenerateType = 'open' | 'reply' | 'followup';
 
@@ -39,6 +50,10 @@ export interface GenerateScoutResult {
   matchCount?: number;
   matchReady?: boolean;
   agentState?: string;
+  conversationStage?: ConversationStage;
+  profileUpdates?: boolean;
+  introSuggested?: boolean;
+  shouldStop?: boolean;
 }
 
 function latestInboundText(history: ScoutConversationMessage[]): string | null {
@@ -75,8 +90,14 @@ export async function generateScoutMessage(
     return { message: null, skipped: true, reason: 'profile_not_found' };
   }
 
-  if (profileRow.opt_in_status === 'opted_out') {
-    return { message: null, skipped: true, reason: 'opted_out' };
+  if (profileRow.opt_in_status === 'opted_out' || profileRow.conversation_stage === 'opted_out') {
+    return {
+      message: null,
+      skipped: true,
+      reason: 'opted_out',
+      conversationStage: 'opted_out',
+      shouldStop: true,
+    };
   }
 
   const { data: messages } = await supabase
@@ -111,18 +132,47 @@ export async function generateScoutMessage(
   }
 
   let profile = await enrichProfileFromPlatform(toDiscoveryProfile(profileRow));
+  let didProfileUpdates = false;
 
   if ((type === 'reply' || type === 'followup') && history.some(m => m.direction === 'inbound')) {
     const extracted = await extractProfileUpdatesFromConversation(profile, history);
+    const before = JSON.stringify({
+      looking_for: profile.looking_for,
+      goals: profile.goals,
+      location: profile.location,
+    });
     profile = await applyProfileUpdates(profile, extracted);
+    didProfileUpdates =
+      before !==
+      JSON.stringify({
+        looking_for: profile.looking_for,
+        goals: profile.goals,
+        location: profile.location,
+      });
   }
 
   const discovery = analyzeDiscovery(profile);
   const discoveryGuidance = formatDiscoveryGuidance(discovery);
 
+  let conversationStage = asConversationStage(profileRow.conversation_stage);
+  if (type === 'open') {
+    conversationStage = conversationStage === 'opted_out' ? 'opted_out' : 'intro_sent';
+  } else if (type === 'reply' || (type === 'followup' && history.some(m => m.direction === 'inbound'))) {
+    conversationStage = advanceStageAfterInbound(profile, conversationStage);
+  }
+
   const latestInbound = latestInboundText(history);
   const matchType = type === 'open' ? 'open' : 'reply';
-  const matchReady = isMatchReady(matchType, profile);
+  let matchReady = isMatchReady(matchType, profile) && conversationStage === 'ready_for_match';
+
+  // Discovery stages: do not unlock matching until ready_for_match
+  if (
+    conversationStage !== 'ready_for_match' &&
+    conversationStage !== 'active' &&
+    type !== 'open'
+  ) {
+    matchReady = false;
+  }
 
   let session = sessionFromProfileRow(profileRow as Record<string, unknown>);
 
@@ -138,7 +188,19 @@ export async function generateScoutMessage(
       goals: profile.goals,
       opt_in_status: profileRow.opt_in_status,
     });
+
+    const topScore = candidates[0]?.score ?? 0;
+    if (candidates.length === 0 || topScore < MATCH_SCORE_THRESHOLD) {
+      conversationStage = 'active';
+      matchReady = false;
+      candidates = [];
+    } else if (conversationStage === 'ready_for_match') {
+      // Seed Nucleus queue with top candidate as pending_approval
+      await upsertSuggestedIntro(profileId, candidates[0], 'pending_approval');
+    }
   }
+
+  await persistConversationStage(profileId, conversationStage);
 
   const knownNames = [
     ...candidates.map(c => c.name),
@@ -153,11 +215,18 @@ export async function generateScoutMessage(
     generateType: type,
   });
 
-  session = await applyIntroSideEffects(profileId, transition);
+  session = await applyIntroSideEffects(profileId, transition, {
+    preferPendingApproval: conversationStage === 'ready_for_match',
+  });
   transition = { ...transition, session };
   await persistAgentSession(profileId, session);
 
-  const alumniMatches = formatAgentInject(transition);
+  let alumniMatches = formatAgentInject(transition);
+  if (conversationStage === 'active' && !alumniMatches) {
+    alumniMatches =
+      'No strong chapter matches yet. Be honest that the network is still being built for their ask — do NOT invent people. Offer to refine city/industry or check back.';
+  }
+
   const offeredNames =
     session.offered_ids.length > 0
       ? candidates
@@ -168,39 +237,13 @@ export async function generateScoutMessage(
         ? [session.focus_person_snapshot.name]
         : [];
 
-  // #region agent log
-  const debugAgent = {
-    type,
-    matchReady,
-    event: transition.event,
-    fromState: transition.fromState,
-    toState: transition.toState,
-    injectMode: transition.injectMode,
-    instructionKey: transition.instructionKey,
-    focusId: session.focus_person_id,
-    focusName: session.focus_person_snapshot?.name || null,
-    offeredCount: session.offered_ids.length,
-    rejectedCount: session.rejected_ids.length,
-    remainingPool: transition.remainingPool,
-    matchCount: candidates.length,
-    latestInbound: (latestInbound || '').slice(0, 120),
-    injectPreview: (alumniMatches || '').slice(0, 300),
-  };
-  console.log('[DEBUG 1cf407] agent transition', JSON.stringify(debugAgent));
-  fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
-    body: JSON.stringify({
-      sessionId: '1cf407',
-      runId: 'agent-machine',
-      hypothesisId: 'agent',
-      location: 'lib/scout/generate.ts:transition',
-      message: 'agent transition',
-      data: debugAgent,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
+  const stageHint = stageInstructionHint(conversationStage);
+  const exploreMode =
+    looksUncertainAboutGoals(latestInbound) ||
+    (!matchReady &&
+      conversationStage !== 'ready_for_match' &&
+      conversationStage !== 'active' &&
+      !(profile.looking_for || '').trim());
 
   const profileContext: ScoutProfileContext = {
     name: profile.name,
@@ -224,6 +267,7 @@ export async function generateScoutMessage(
     hometown: profile.hometown,
     linkedin_url: profile.linkedin_url,
     bio: profile.bio,
+    conversation_stage: conversationStage,
   };
 
   const userContent = buildScoutContext(profileContext, history, alumniMatches, discoveryGuidance, {
@@ -231,10 +275,34 @@ export async function generateScoutMessage(
     focusName: session.focus_person_snapshot?.name || null,
     offeredNames,
     activeIntro: !!session.active_intro_id,
+    conversationStage,
+    stageHint,
+    exploreMode,
   });
 
   const lastOutbound = [...history].reverse().find(m => m.direction === 'outbound')?.message_body || null;
-  const instruction = instructionForTransition(transition, type, lastOutbound);
+  let instruction = instructionForTransition(transition, type, lastOutbound);
+
+  // Soft stage north-star only — never replace conversational instructions with an interview script
+  if (
+    conversationStage !== 'ready_for_match' &&
+    conversationStage !== 'active' &&
+    transition.instructionKey !== 'offer' &&
+    transition.instructionKey !== 'deep_dive' &&
+    transition.instructionKey !== 'await_yes' &&
+    transition.instructionKey !== 'intro_confirmed' &&
+    transition.instructionKey !== 'meta_repair'
+  ) {
+    if (exploreMode || transition.instructionKey === 'explore' || transition.instructionKey === 'chat') {
+      instruction = `${instruction}\nBackground (soft): ${stageHint}`;
+      if (exploreMode) {
+        instruction +=
+          '\nThey may not know what they want — normalize that and explore with them. Do not demand a crisp goal.';
+      }
+    } else {
+      instruction = `${instruction}\nBackground (soft): ${stageHint}\nReact to their latest message first; only then a natural follow-up if it fits.`;
+    }
+  }
 
   const res = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
@@ -259,7 +327,15 @@ export async function generateScoutMessage(
   if (!res.ok) {
     const errText = await res.text();
     console.error('[scout/generate] Anthropic error:', res.status, errText);
-    return { message: null, skipped: true, reason: 'ai_error' };
+    return {
+      message: null,
+      skipped: true,
+      reason: 'ai_error',
+      conversationStage,
+      agentState: session.agent_state,
+      matchReady,
+      matchCount: candidates.length,
+    };
   }
 
   const aiResponse = await res.json();
@@ -270,36 +346,22 @@ export async function generateScoutMessage(
     .trim();
 
   if (!generatedText) {
-    return { message: null, skipped: true, reason: 'ai_empty' };
+    return {
+      message: null,
+      skipped: true,
+      reason: 'ai_empty',
+      conversationStage,
+      agentState: session.agent_state,
+    };
   }
-
-  // #region agent log
-  const outDebug = {
-    type,
-    toState: transition.toState,
-    instructionKey: transition.instructionKey,
-    replyPreview: generatedText.slice(0, 240),
-  };
-  console.log('[DEBUG 1cf407] generated scout reply', JSON.stringify(outDebug));
-  fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1cf407' },
-    body: JSON.stringify({
-      sessionId: '1cf407',
-      runId: 'agent-machine',
-      hypothesisId: 'agent',
-      location: 'lib/scout/generate.ts:output',
-      message: 'generated scout reply',
-      data: outDebug,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
 
   return {
     message: generatedText,
     matchCount: candidates.length,
     matchReady,
     agentState: session.agent_state,
+    conversationStage,
+    profileUpdates: didProfileUpdates,
+    introSuggested: transition.injectMode === 'offer' || conversationStage === 'ready_for_match',
   };
 }

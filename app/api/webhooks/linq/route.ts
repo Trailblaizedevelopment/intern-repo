@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendMessage } from '@/lib/linq';
 import { generateScoutMessage } from '@/lib/scout/generate';
-import { clearFollowupSchedule, scheduleAfterOutbound } from '@/lib/scout/followup';
+import { clearFollowupSchedule, cancelPendingFollowups, scheduleAfterOutbound } from '@/lib/scout/followup';
+import { persistConversationStage } from '@/lib/scout/stages';
 
 const OPT_OUT_KEYWORDS = ['stop', 'unsubscribe', 'remove me', 'opt out', 'leave me alone', 'do not contact'];
 
@@ -21,16 +22,7 @@ function containsOptOut(text: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    // #region agent log
-    console.log('[DEBUG f7e208] Webhook POST hit');
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:POST-entry',message:'Webhook POST hit',data:{},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     const supabase = getSupabaseAdmin();
-    // #region agent log
-    console.log('[DEBUG f7e208] H3: supabase admin', JSON.stringify({ hasSupabase: !!supabase, hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL, hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY }));
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:supabase-check',message:'H3 supabase admin check',data:{hasSupabase:!!supabase,hasUrl:!!process.env.NEXT_PUBLIC_SUPABASE_URL,hasKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!supabase) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
@@ -41,16 +33,8 @@ export async function POST(request: NextRequest) {
 
     // Only process real inbound messages — message.created often duplicates message.received
     if (body.event_type && body.event_type !== 'message.received') {
-      // #region agent log
-      console.log('[DEBUG f7e208] Ignoring non-message event:', body.event_type);
-      // #endregion
       return NextResponse.json({ status: 'ignored', reason: `event_type: ${body.event_type}` });
     }
-
-    // #region agent log
-    console.log('[DEBUG f7e208] H4: parsed body', JSON.stringify({ eventType: body.event_type, dataKeys: body.data ? Object.keys(body.data) : 'no-data', from: payload.from, senderHandle: payload.sender_handle, chatType: typeof payload.chat, chatId: payload.chat_id || (typeof payload.chat === 'object' ? payload.chat?.id : payload.chat) || payload.id, hasMessage: !!payload.message, hasParts: !!payload.parts }));
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:body-parse',message:'H4 body parsing fixed',data:{eventType:body.event_type,from:payload.from,senderHandle:payload.sender_handle,chatType:typeof payload.chat,chatId:payload.chat_id||(typeof payload.chat==='object'?payload.chat?.id:payload.chat)||payload.id},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     const chatId = payload.chat_id || (typeof payload.chat === 'object' ? payload.chat?.id : payload.chat) || payload.id;
     const fromPhone = payload.from || (typeof payload.sender_handle === 'object' ? payload.sender_handle?.handle : payload.sender_handle);
@@ -58,45 +42,45 @@ export async function POST(request: NextRequest) {
     const messageParts = payload.message?.parts || payload.parts || [];
     const messageText = messageParts.find((p: { type: string; value: string }) => p.type === 'text')?.value || '';
     const createdAt = payload.sent_at || payload.created_at || body.created_at || new Date().toISOString();
+    const linqMessageId =
+      (typeof payload.id === 'string' && payload.id) ||
+      (typeof body.data?.id === 'string' && body.data.id) ||
+      null;
 
     if (!fromPhone || !messageText) {
-      // #region agent log
-      console.log('[DEBUG f7e208] H4: REJECTED - missing from or message', JSON.stringify({ fromPhone, messageText: messageText?.substring(0, 30) }));
-      fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:missing-fields',message:'H4 REJECTED missing from or message',data:{fromPhone,messageText:messageText?.substring(0,30)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       return NextResponse.json({ error: 'Missing from or message' }, { status: 400 });
     }
 
-    const idempotencyKey =
-      (typeof payload.idempotency_key === 'string' && payload.idempotency_key) ||
-      (typeof body.idempotency_key === 'string' && body.idempotency_key) ||
-      (typeof payload.id === 'string' && payload.id) ||
-      null;
-
     // Sandbox guard: only process if sender is in scout_profiles
-    // Use digit-based matching to handle various stored phone formats
     const normalizedFrom = normalizeToE164(fromPhone);
     const rawDigits = fromPhone.replace(/\D/g, '').slice(-10);
     const { data: matchedProfiles } = await supabase
       .from('scout_profiles')
-      .select('id, phone_number, opt_in_status')
+      .select('id, phone_number, opt_in_status, conversation_stage')
       .or(`phone_number.eq.${fromPhone},phone_number.eq.${normalizedFrom},phone_number.eq.${rawDigits},phone_number.like.%${rawDigits}%`)
       .limit(1);
 
     const profile = matchedProfiles?.[0] || null;
 
-    // #region agent log
-    console.log('[DEBUG f7e208] Profile lookup result', JSON.stringify({ found: !!profile, fromPhone, normalizedFrom, rawDigits, profileId: profile?.id, storedPhone: profile?.phone_number }));
-    fetch('http://127.0.0.1:7876/ingest/5884e2cc-023b-4455-ab41-0f188e22717a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f7e208'},body:JSON.stringify({sessionId:'f7e208',location:'webhooks/linq/route.ts:profile-lookup',message:'Profile lookup result',data:{found:!!profile,fromPhone,normalizedFrom,rawDigits,profileId:profile?.id,storedPhone:profile?.phone_number},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     if (!profile) {
       return NextResponse.json({ status: 'ignored', reason: 'sender not in scout_profiles' });
     }
 
-    // Dedupe: same inbound body within 90s, or same Linq message id already stored
+    // Primary dedupe: linq_message_id
+    if (linqMessageId) {
+      const { data: byMsgId } = await supabase
+        .from('scout_conversations')
+        .select('id')
+        .eq('linq_message_id', linqMessageId)
+        .limit(1);
+      if (byMsgId && byMsgId.length > 0) {
+        return NextResponse.json({ status: 'ignored', reason: 'duplicate_linq_message_id' });
+      }
+    }
+
+    // Backup dedupe: same inbound body within 90s
     const dedupeSince = new Date(Date.now() - 90_000).toISOString();
-    let recentQuery = supabase
+    const { data: recentDupes } = await supabase
       .from('scout_conversations')
       .select('id')
       .eq('profile_id', profile.id)
@@ -105,30 +89,12 @@ export async function POST(request: NextRequest) {
       .gte('created_at', dedupeSince)
       .limit(1);
 
-    const { data: recentDupes } = await recentQuery;
     if (recentDupes && recentDupes.length > 0) {
-      console.log('[DEBUG 1cf407] duplicate inbound ignored', JSON.stringify({ profileId: profile.id, idempotencyKey }));
       return NextResponse.json({ status: 'ignored', reason: 'duplicate_inbound' });
     }
 
-    if (idempotencyKey) {
-      const { data: byKey } = await supabase
-        .from('scout_conversations')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .eq('direction', 'inbound')
-        .eq('flag_reason', `idempotency:${idempotencyKey}`)
-        .limit(1);
-      if (byKey && byKey.length > 0) {
-        console.log('[DEBUG 1cf407] duplicate idempotency ignored', idempotencyKey);
-        return NextResponse.json({ status: 'ignored', reason: 'duplicate_idempotency' });
-      }
-    }
-
-    // Check for opt-out keywords
     const shouldFlag = containsOptOut(messageText);
 
-    // Insert inbound conversation record
     const { error: insertErr } = await supabase
       .from('scout_conversations')
       .insert({
@@ -136,53 +102,61 @@ export async function POST(request: NextRequest) {
         phone_number: fromPhone,
         linq_line: toPhone || '',
         linq_chat_id: chatId || null,
+        linq_message_id: linqMessageId,
         direction: 'inbound',
         message_body: messageText,
         read: false,
         flagged: shouldFlag,
-        flag_reason: shouldFlag
-          ? 'Auto-flagged: opt-out keyword detected'
-          : idempotencyKey
-            ? `idempotency:${idempotencyKey}`
-            : null,
+        flag_reason: shouldFlag ? 'Auto-flagged: opt-out keyword detected' : null,
         created_at: createdAt,
       });
 
     if (insertErr) {
+      // Unique violation on linq_message_id = concurrent duplicate
+      if (insertErr.code === '23505') {
+        return NextResponse.json({ status: 'ignored', reason: 'duplicate_linq_message_id' });
+      }
       console.error('[POST /api/webhooks/linq] Insert error:', insertErr.message);
       return NextResponse.json({ error: insertErr.message }, { status: 500 });
     }
 
-    // Update profile's last_contact; clear proactive schedule on inbound
-    await supabase
-      .from('scout_profiles')
-      .update({
-        last_contact: createdAt,
-        updated_at: new Date().toISOString(),
-        ...(shouldFlag ? { opt_in_status: 'opted_out', next_followup: null } : {}),
-      })
-      .eq('id', profile.id);
-
-    if (!shouldFlag) {
+    if (shouldFlag) {
+      await persistConversationStage(profile.id, 'opted_out');
+      await cancelPendingFollowups(profile.id);
+      await supabase
+        .from('scout_profiles')
+        .update({
+          last_contact: createdAt,
+          updated_at: new Date().toISOString(),
+          opt_in_status: 'opted_out',
+          next_followup: null,
+          conversation_stage: 'opted_out',
+        })
+        .eq('id', profile.id);
+    } else {
+      await supabase
+        .from('scout_profiles')
+        .update({
+          last_contact: createdAt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', profile.id);
       await clearFollowupSchedule(profile.id);
     }
 
-    // Auto-reply if not flagged and not opted out
     let autoReplied = false;
-    if (!shouldFlag && profile.opt_in_status !== 'opted_out') {
-      const result = await generateScoutMessage(profile.id, 'reply');
-      const reply = result.message;
+    if (!shouldFlag && profile.opt_in_status !== 'opted_out' && profile.conversation_stage !== 'opted_out') {
+      try {
+        const result = await generateScoutMessage(profile.id, 'reply');
+        const reply = result.message;
 
-      if (reply) {
-        try {
-          if (chatId) {
-            await sendMessage(chatId, reply, toPhone);
-          }
+        if (reply) {
+          try {
+            if (chatId) {
+              await sendMessage(chatId, reply, toPhone);
+            }
 
-          // Insert outbound reply record
-          await supabase
-            .from('scout_conversations')
-            .insert({
+            await supabase.from('scout_conversations').insert({
               profile_id: profile.id,
               phone_number: fromPhone,
               linq_line: toPhone || '',
@@ -192,11 +166,15 @@ export async function POST(request: NextRequest) {
               read: true,
             });
 
-          await scheduleAfterOutbound(profile.id);
-          autoReplied = true;
-        } catch (sendErr) {
-          console.error('[POST /api/webhooks/linq] Auto-reply send error:', sendErr);
+            await scheduleAfterOutbound(profile.id);
+            autoReplied = true;
+          } catch (sendErr) {
+            console.error('[POST /api/webhooks/linq] Auto-reply send error:', sendErr);
+          }
         }
+      } catch (genErr) {
+        // Log and return 201 without double-send
+        console.error('[POST /api/webhooks/linq] Generate error:', genErr);
       }
     }
 

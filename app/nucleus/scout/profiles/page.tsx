@@ -19,7 +19,7 @@ import {
   Send,
   Zap,
 } from 'lucide-react';
-import { ScoutProfile, SCOUT_LINES } from '../mock-data';
+import { ScoutProfile, SCOUT_LINES, CONVERSATION_STAGES } from '../mock-data';
 
 type OptInFilter = 'all' | 'opted_in' | 'opted_out' | 'pending';
 type SortField = 'name' | 'last_contact' | 'profile_complete';
@@ -646,6 +646,36 @@ export default function ProfilesPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <MessageCircle size={14} style={{ color: '#9ca3af', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.75rem', color: '#6b7280', width: '80px', flexShrink: 0 }}>
+                  Stage
+                </span>
+                {isEditing ? (
+                  <select
+                    value={String(editForm.conversation_stage ?? selectedProfile.conversation_stage ?? 'intro_sent')}
+                    onChange={(e) => setEditForm({ ...editForm, conversation_stage: e.target.value })}
+                    style={{
+                      flex: 1,
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #e5e7eb',
+                      fontSize: '0.8125rem',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {CONVERSATION_STAGES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span style={{ fontSize: '0.8125rem', color: '#111827' }}>
+                    {CONVERSATION_STAGES.find(s => s.value === selectedProfile.conversation_stage)?.label
+                      || selectedProfile.conversation_stage
+                      || 'intro_sent'}
+                  </span>
+                )}
+              </div>
               {[
                 { icon: GraduationCap, label: 'University', key: 'university' as const },
                 { icon: Users, label: 'Chapter', key: 'chapter' as const },

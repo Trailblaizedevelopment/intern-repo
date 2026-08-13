@@ -61,6 +61,7 @@ export interface AgentTransitionResult {
   instructionKey:
     | 'open'
     | 'clarify'
+    | 'explore'
     | 'chat'
     | 'offer'
     | 'deep_dive'
@@ -311,6 +312,13 @@ export function transitionAgent(
 
   if (!matchReady) {
     next = { ...next, agent_state: 'clarify_intent' };
+    // Substance/clarify while gathering: stay conversational (explore), not interview
+    const key =
+      generateType === 'followup'
+        ? 'followup_nudge'
+        : event.type === 'USER_SUBSTANCE' || event.type === 'USER_CLARIFY'
+          ? 'explore'
+          : 'explore';
     return baseResult({
       session: next,
       fromState,
@@ -319,7 +327,7 @@ export function transitionAgent(
       injectCard: null,
       injectMode: 'none',
       remainingPool: 0,
-      instructionKey: generateType === 'followup' ? 'followup_nudge' : 'clarify',
+      instructionKey: key,
     });
   }
 
@@ -555,11 +563,13 @@ export async function persistAgentSession(
  */
 export async function applyIntroSideEffects(
   profileId: string,
-  transition: AgentTransitionResult
+  transition: AgentTransitionResult,
+  opts?: { preferPendingApproval?: boolean }
 ): Promise<AgentSession> {
   let session = transition.session;
   const card = transition.injectCard;
   const eventType: AgentEventType = transition.event.type;
+  const offerStatus = opts?.preferPendingApproval ? 'pending_approval' : 'suggested';
 
   if (
     card &&
@@ -567,7 +577,7 @@ export async function applyIntroSideEffects(
     eventType !== 'USER_SAID_YES' &&
     eventType !== 'USER_SAID_NO'
   ) {
-    const introId = await upsertSuggestedIntro(profileId, card, 'suggested');
+    const introId = await upsertSuggestedIntro(profileId, card, offerStatus);
     if (introId) {
       session = { ...session, active_intro_id: introId };
     }
@@ -579,16 +589,48 @@ export async function applyIntroSideEffects(
     eventType !== 'USER_SAID_YES' &&
     eventType !== 'USER_SAID_NO'
   ) {
-    const introId = await upsertSuggestedIntro(profileId, card, 'suggested');
+    const introId = await upsertSuggestedIntro(profileId, card, offerStatus);
     if (introId && transition.toState === 'deep_dive') {
       session = { ...session, active_intro_id: introId };
     }
   }
 
   if (eventType === 'USER_SAID_YES' && card && transition.toState === 'await_requester_yes') {
+    // Member yes on an offer → Nucleus queue (pending_approval). If already sent (Nucleus
+    // approved + pinged), status stays locked — flag for human alumni outreach below.
     const introId = await upsertSuggestedIntro(profileId, card, 'pending_approval');
     if (introId) {
       session = { ...session, active_intro_id: introId };
+      if (transition.instructionKey === 'intro_confirmed') {
+        const supabase = getSupabaseAdmin();
+        if (supabase) {
+          const { data: profile } = await supabase
+            .from('scout_profiles')
+            .select('phone_number')
+            .eq('id', profileId)
+            .single();
+          const { data: recent } = await supabase
+            .from('scout_conversations')
+            .select('linq_line, linq_chat_id')
+            .eq('profile_id', profileId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (profile?.phone_number) {
+            await supabase.from('scout_conversations').insert({
+              profile_id: profileId,
+              phone_number: profile.phone_number,
+              linq_line: recent?.linq_line || '',
+              linq_chat_id: recent?.linq_chat_id || null,
+              direction: 'inbound',
+              message_body: '[system] Member confirmed intro — alumni outreach needed (manual)',
+              read: true,
+              flagged: true,
+              flag_reason: 'Member confirmed intro — reach out to alumni manually',
+            });
+          }
+        }
+      }
     }
   }
 
@@ -667,15 +709,20 @@ export function instructionForTransition(
 
   switch (transition.instructionKey) {
     case 'open':
-      return 'Generate your opening message to this person. This is your first text to them — make it warm, low-stakes, and brief. 1-2 sentences max. Do not claim you lack network access.';
+      return 'Generate your opening message. Warm, low-stakes, brief — like texting a friend you can actually help. Invite conversation, do not pitch a survey. 1-2 sentences max. Do not claim you lack network access.';
     case 'clarify':
       return (
-        'Acknowledge what they JUST said in a few words, then ask exactly one gap question from Discovery guidance if still needed. Never ask a generic "what\'s on your mind" if they already told you. Never say the network is unsynced. 1-2 sentences max.' +
+        'Acknowledge what they JUST said first. Then one natural follow-up only if it fits — never a form question. If they seem unsure what they want, help them explore (light fork or what they\'re into). Never ask a generic "what\'s on your mind" if they already told you. 1-2 sentences max.' +
+        antiRepeat
+      );
+    case 'explore':
+      return (
+        'Have a real conversation. FIRST react to what they just said (acknowledge / riff). If they do not know what they want, normalize that and help them figure it out — offer one light fork (internship vs people to know vs local network vs just curious) OR ask what they\'ve been into lately. Do NOT grill for career goals. Soft discovery only. 1-2 sentences max.' +
         antiRepeat
       );
     case 'chat':
       return (
-        "Answer the user's LATEST message like a sharp friend. FIRST acknowledge what they said (quote the gist). If they want to see friends/people in the network and a Next offer card is present, name that one person. Otherwise reply naturally — do NOT ask 'what's on your mind' or 'what's going on' again. No roster dump. 1-2 sentences max." +
+        "Answer like a sharp friend. FIRST acknowledge what they said. If they are unsure what they want, help them think — do not interview them. If they want to see people and a Next offer card is present, name that one person. Otherwise reply naturally — no 'what's on your mind' again. No roster dump. 1-2 sentences max." +
         antiRepeat
       );
     case 'offer':
@@ -720,11 +767,11 @@ export function instructionForTransition(
       return (
         (transition.injectCard
           ? 'Proactive follow-up: light nudge about the ONE person in context or a check-in question. No roster. No fabricated retractions. 1-2 sentences max.'
-          : 'Proactive follow-up: one sharp discovery or check-in question. No roster. 1-2 sentences max.') + antiRepeat
+          : 'Proactive follow-up: one human check-in — if they still seem unsure, a light exploratory fork is fine. Not a survey. No roster. 1-2 sentences max.') + antiRepeat
       );
     default:
       return (
-        "Answer the user's LATEST message directly. Do NOT re-list a roster or invent that someone from history was not real. 1-2 sentences max." +
+        "Answer the user's LATEST message directly like a friend. Acknowledge first. Soft discovery only if it fits. Do NOT re-list a roster or invent that someone from history was not real. 1-2 sentences max." +
         antiRepeat
       );
   }

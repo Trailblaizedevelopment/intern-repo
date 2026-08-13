@@ -44,6 +44,8 @@ interface Introduction {
   reason: string;
   status: 'suggested' | 'pending_approval' | 'sent' | 'accepted' | 'declined';
   created_at: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
 }
 
 function targetDisplay(intro: Introduction): { name: string; subtitle: string } {
@@ -110,11 +112,14 @@ export default function IntroductionsPage() {
       const res = await fetch('/api/scout/introductions', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: 'sent' }),
+        body: JSON.stringify({ id, status: 'sent', approved_by: 'Nucleus' }),
       });
       const json = await res.json();
       if (json.data) {
         setIntroductions(prev => prev.map(i => i.id === id ? json.data : i));
+      }
+      if (json.notify && !json.notify.sent) {
+        console.warn('Intro approved but member notify failed:', json.notify.reason);
       }
     } catch (err) {
       console.error('Failed to approve:', err);
@@ -178,6 +183,12 @@ export default function IntroductionsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.6875rem', fontWeight: 600, background: style.bg, color: style.color }}>{style.label}</span>
             <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{formatDate(intro.created_at)}</span>
+            {intro.approved_by && (
+              <span style={{ fontSize: '0.75rem', color: '#059669' }}>
+                Approved by {intro.approved_by}
+                {intro.approved_at ? ` · ${formatDate(intro.approved_at)}` : ''}
+              </span>
+            )}
           </div>
           {showActions && (
             <div style={{ display: 'flex', gap: '8px' }}>

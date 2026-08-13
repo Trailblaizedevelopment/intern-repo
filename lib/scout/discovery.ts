@@ -132,28 +132,28 @@ function hasBringSignal(profile: ScoutDiscoveryProfile): boolean {
 const QUESTION_HINTS: Record<ScoutPersona, Record<DiscoveryGap, string>> = {
   active: {
     looking_for:
-      'Ask what they want help with right now — internship, full-time, mentor, or peer intro. One question.',
-    location: 'Ask where they want to be for work or networking (city/region). One question.',
-    industry: 'Ask what industry or function they are aiming for. One question.',
+      'If they seem unsure: normalize it and offer a light fork (internship / people to know / just curious). If they have direction: ask what would actually help right now — conversationally, not like a form.',
+    location: 'Only if it fits: where they are or want to be (city/region). Soft ask.',
+    industry: 'Only if it fits: what kind of work or space they\'re curious about.',
     what_they_bring:
-      'Ask what they bring — major, internship, project, or skill worth leading with. One question.',
-    confirm_title: 'Confirm their current role or internship if unclear. One question.',
+      'When natural: what they\'re into / working on — not a resume dump request.',
+    confirm_title: 'If unclear, casually confirm what they do now.',
   },
   alumni: {
     looking_for:
-      'Ask what kind of people would actually help them — peers in their city, customers, mentors, investors, or hiring. One question.',
-    location: 'Ask where they are based now (city). One question.',
-    industry: 'Ask what industry or kind of work they are in / focused on. One question.',
-    what_they_bring:
-      'Ask briefly what they do now (company/role) so intros are relevant both ways. One question.',
-    confirm_title: 'Confirm their current title/company if you only have membership status. One question.',
+      'If unsure: help them name who would actually help (peers in city, customers, mentors, hiring). Soft forks OK. No formal goal grilling.',
+    location: 'Only if it fits: where they are based now.',
+    industry: 'Only if it fits: what they work on / care about.',
+    what_they_bring: 'When natural: what they do now so intros cut both ways.',
+    confirm_title: 'Casually confirm title/company if you only have membership status.',
   },
   unknown: {
-    looking_for: 'Ask what they are hoping to get from the network. One question.',
-    location: 'Ask where they are based. One question.',
-    industry: 'Ask what kind of work or industry they care about. One question.',
-    what_they_bring: 'Ask what they are working on or known for. One question.',
-    confirm_title: 'Ask what they do now. One question.',
+    looking_for:
+      'If unsure: explore with them. Ask what they\'re into or offer a light fork — never demand a crisp goal.',
+    location: 'Soft ask where they are if it helps.',
+    industry: 'Soft ask what kind of work interests them.',
+    what_they_bring: 'Soft ask what they\'re working on.',
+    confirm_title: 'Soft ask what they do now.',
   },
 };
 
@@ -566,31 +566,30 @@ export function formatDiscoveryGuidance(state: DiscoveryState): string {
   const lines: string[] = [
     `Discovery mode: ${state.matchReady ? 'READY_TO_MATCH' : 'GATHERING'}`,
     `Persona: ${state.persona}`,
+    'Tone: conversation first. Gaps are soft north stars — never turn this into an interview.',
   ];
   if (state.knownSummary.length > 0) {
     lines.push(`Already known (do NOT re-ask): ${state.knownSummary.join('; ')}`);
   }
   if (state.gaps.length > 0) {
-    lines.push(`Open gaps: ${state.gaps.join(', ')}`);
+    lines.push(`Open gaps (background only): ${state.gaps.join(', ')}`);
   }
   if (state.nextQuestionHint) {
-    lines.push(`Next focus: ${state.nextQuestionHint}`);
+    lines.push(`If a follow-up fits naturally: ${state.nextQuestionHint}`);
   }
   if (!state.matchReady) {
     lines.push(
-      'Matching is locked until you know what they want AND (where they are OR their industry/focus). Keep discovering. Never claim the alumni network is missing, unsynced, or unavailable.'
+      'Matching is locked until you know a rough ask AND (where they are OR industry/focus). If they do not know yet, explore with them — do not demand a polished goal. Never claim the alumni network is missing, unsynced, or unavailable.'
     );
   } else {
     lines.push(
       'Matching is unlocked. You may surface people only from Relevant alumni matches if provided.'
     );
     lines.push(
-      'looking_for is ONE clue, not the whole story — after naming matches, ask one investigative question about what else would help (industry, what they can offer, who they want to meet). Do not tunnel on a single phrase forever.'
+      'looking_for is ONE clue, not the whole story — after naming matches, keep the conversation human. Do not tunnel on a single phrase forever.'
     );
     if (!state.nextQuestionHint && state.gaps.length === 0) {
-      lines.push(
-        `Next focus: ${QUESTION_HINTS[state.persona].what_they_bring}`
-      );
+      lines.push(`If a follow-up fits naturally: ${QUESTION_HINTS[state.persona].what_they_bring}`);
     }
   }
   return lines.join('\n');

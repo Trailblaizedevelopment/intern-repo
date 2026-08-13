@@ -56,6 +56,9 @@ const NAME_IN_NETWORK =
 const GREETING =
   /^(hey|hi|hello|yo|sup|what'?s\s+up|whats\s+up|howdy|good\s+(morning|afternoon|evening))[\s,.!?]*(scout)?[\s,.!?]*$/i;
 
+const UNCERTAIN_GOALS =
+  /\b(idk|i\s*don'?t\s*know|not\s*sure|no\s*idea|dunno|figuring\s+(it|things)\s*out|just\s*(browsing|chatting|looking|curious)|open\s*to\s*anything|don'?t\s*(really\s*)?know\s*what\s*i\s*want|whatever|nothing\s*specific|no\s*clue|kinda\s*lost|still\s*deciding|maybe|could\s*be\s*anything)\b/i;
+
 const SAID_YES =
   /^(yes|yeah|yep|yup|sure|ok|okay|do it|go ahead|lets do it|let's do it|sounds good|please|absolutely)\b/i;
 
@@ -145,6 +148,11 @@ export function parseAgentEvent(
   }
 
   if (GREETING.test(text)) {
+    return { type: 'USER_CHAT', personQuery: null };
+  }
+
+  // Unsure / exploring — treat as chat so we don't force an interview script
+  if (UNCERTAIN_GOALS.test(text)) {
     return { type: 'USER_CHAT', personQuery: null };
   }
 

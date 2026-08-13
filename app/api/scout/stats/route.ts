@@ -89,6 +89,17 @@ export async function GET() {
       .eq('read', false)
       .eq('direction', 'inbound');
 
+    // Stage breakdown
+    const { data: stageRows } = await supabase
+      .from('scout_profiles')
+      .select('conversation_stage');
+
+    const stage_breakdown: Record<string, number> = {};
+    for (const row of stageRows || []) {
+      const stage = (row.conversation_stage as string) || 'intro_sent';
+      stage_breakdown[stage] = (stage_breakdown[stage] || 0) + 1;
+    }
+
     const stats = {
       messages_today: lineCounts,
       messages_today_total: (todayMessages || []).length,
@@ -99,6 +110,7 @@ export async function GET() {
       flagged_count: flaggedCount ?? 0,
       pending_intros: pendingIntros ?? 0,
       unread_count: unreadCount ?? 0,
+      stage_breakdown,
     };
 
     return NextResponse.json({ data: stats, error: null });

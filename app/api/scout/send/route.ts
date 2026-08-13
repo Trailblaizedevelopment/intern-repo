@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendMessage, createChat } from '@/lib/linq';
 import { generateScoutMessage } from '@/lib/scout/generate';
-import { scheduleAfterOutbound } from '@/lib/scout/followup';
+import { enqueueDefaultFollowups, scheduleAfterOutbound } from '@/lib/scout/followup';
 
 function normalizeToE164(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -125,6 +125,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (resolvedProfileId) {
+      // First successful open: ensure day_3 / day_7 queue exists
+      if (auto_generate && !body.message) {
+        await enqueueDefaultFollowups(resolvedProfileId);
+      }
       await scheduleAfterOutbound(resolvedProfileId);
     }
 

@@ -2,12 +2,13 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendMessage, createChat } from '@/lib/linq';
 import { generateScoutMessage } from '@/lib/scout/generate';
 import {
-  FOLLOWUP_FIRST_HOURS,
-  FOLLOWUP_SECOND_HOURS,
   MAX_UNANSWERED_OUTBOUND,
   countUnansweredOutbound,
+  fetchDueFollowups,
+  markFollowupStatus,
   resolveScoutSendContext,
   scheduleAfterOutbound,
+  enqueueDefaultFollowups,
 } from '@/lib/scout/followup';
 
 export interface ScoutFollowupRunResult {
@@ -15,11 +16,11 @@ export interface ScoutFollowupRunResult {
   sent: number;
   skipped: number;
   errors: string[];
-  details: Array<{ profile_id: string; name: string; status: string; reason?: string }>;
+  details: Array<{ profile_id: string; name: string; status: string; reason?: string; queue_id?: string }>;
 }
 
 /**
- * Process Scout profiles whose next_followup is due (or overdue cold threads).
+ * Drain scout_followup_queue: due pending rows → Claude followup → Linq send.
  */
 export async function runScoutFollowups(limit = 20): Promise<ScoutFollowupRunResult> {
   const supabase = getSupabaseAdmin();
@@ -36,119 +37,120 @@ export async function runScoutFollowups(limit = 20): Promise<ScoutFollowupRunRes
     return result;
   }
 
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const staleBefore = new Date(now.getTime() - FOLLOWUP_FIRST_HOURS * 60 * 60 * 1000).toISOString();
-
-  // Backfill schedules for threads that never got next_followup set
-  const { data: unscheduled } = await supabase
+  // Backfill default day_3/day_7 for opted-in profiles with no queue rows yet
+  const { data: bareProfiles } = await supabase
     .from('scout_profiles')
-    .select('id, last_contact')
+    .select('id, created_at')
     .neq('opt_in_status', 'opted_out')
-    .is('next_followup', null)
-    .not('last_contact', 'is', null)
-    .limit(50);
+    .neq('conversation_stage', 'opted_out')
+    .limit(30);
 
-  for (const row of unscheduled || []) {
-    const unanswered = await countUnansweredOutbound(row.id);
-    if (unanswered <= 0 || unanswered >= MAX_UNANSWERED_OUTBOUND) continue;
-    const base = row.last_contact ? new Date(row.last_contact) : now;
-    const hours = unanswered === 1 ? FOLLOWUP_FIRST_HOURS : FOLLOWUP_SECOND_HOURS;
-    const next = new Date(base.getTime() + hours * 60 * 60 * 1000).toISOString();
-    await supabase
-      .from('scout_profiles')
-      .update({ next_followup: next, updated_at: nowIso })
-      .eq('id', row.id);
+  for (const row of bareProfiles || []) {
+    const { count } = await supabase
+      .from('scout_followup_queue')
+      .select('*', { count: 'exact', head: true })
+      .eq('profile_id', row.id);
+    if ((count ?? 0) === 0 && row.created_at) {
+      await enqueueDefaultFollowups(row.id, new Date(row.created_at));
+    }
   }
 
-  // Explicitly scheduled
-  const { data: scheduled, error: schedErr } = await supabase
-    .from('scout_profiles')
-    .select('id, name, phone_number, opt_in_status, next_followup, last_contact')
-    .neq('opt_in_status', 'opted_out')
-    .not('next_followup', 'is', null)
-    .lte('next_followup', nowIso)
-    .order('next_followup', { ascending: true })
-    .limit(limit);
+  const dueRows = await fetchDueFollowups(limit);
+  result.due = dueRows.length;
 
-  if (schedErr) {
-    result.errors.push(schedErr.message);
-    return result;
-  }
-
-  // Cold threads: unanswered outbound, no next_followup, last_contact old enough
-  const { data: cold } = await supabase
-    .from('scout_profiles')
-    .select('id, name, phone_number, opt_in_status, next_followup, last_contact')
-    .neq('opt_in_status', 'opted_out')
-    .is('next_followup', null)
-    .not('last_contact', 'is', null)
-    .lte('last_contact', staleBefore)
-    .order('last_contact', { ascending: true })
-    .limit(limit);
-
-  const seen = new Set<string>();
-  const candidates = [...(scheduled || []), ...(cold || [])].filter(p => {
-    if (seen.has(p.id)) return false;
-    seen.add(p.id);
-    return true;
-  }).slice(0, limit);
-
-  result.due = candidates.length;
-
-  for (const profile of candidates) {
+  for (const row of dueRows) {
     try {
-      const unanswered = await countUnansweredOutbound(profile.id);
-      if (unanswered <= 0) {
-        // Last message was inbound or empty — don't proactive-nudge; clear stale schedule
-        await supabase
-          .from('scout_profiles')
-          .update({ next_followup: null, updated_at: nowIso })
-          .eq('id', profile.id);
+      const { data: profile } = await supabase
+        .from('scout_profiles')
+        .select('id, name, phone_number, opt_in_status, conversation_stage, agent_state')
+        .eq('id', row.profile_id)
+        .single();
+
+      const name = profile?.name || 'unknown';
+
+      if (!profile) {
+        await markFollowupStatus(row.id, 'skipped');
         result.skipped++;
-        result.details.push({ profile_id: profile.id, name: profile.name, status: 'skipped', reason: 'awaiting_reply_or_empty' });
+        result.details.push({
+          profile_id: row.profile_id,
+          name,
+          status: 'skipped',
+          reason: 'profile_missing',
+          queue_id: row.id,
+        });
+        continue;
+      }
+
+      if (
+        profile.opt_in_status === 'opted_out' ||
+        profile.conversation_stage === 'opted_out' ||
+        profile.agent_state === 'paused'
+      ) {
+        await markFollowupStatus(row.id, 'cancelled');
+        result.skipped++;
+        result.details.push({
+          profile_id: profile.id,
+          name,
+          status: 'skipped',
+          reason: 'opted_out_or_paused',
+          queue_id: row.id,
+        });
+        continue;
+      }
+
+      const unanswered = await countUnansweredOutbound(profile.id);
+      if (unanswered <= 0 && (row.trigger_type === 'custom' || row.trigger_type === 'day_3_checkin' || row.trigger_type === 'day_7_value')) {
+        // Last message was inbound — cancel this proactive nudge
+        await markFollowupStatus(row.id, 'cancelled');
+        result.skipped++;
+        result.details.push({
+          profile_id: profile.id,
+          name,
+          status: 'skipped',
+          reason: 'awaiting_reply_or_empty',
+          queue_id: row.id,
+        });
         continue;
       }
 
       if (unanswered >= MAX_UNANSWERED_OUTBOUND) {
-        await supabase
-          .from('scout_profiles')
-          .update({ next_followup: null, updated_at: nowIso })
-          .eq('id', profile.id);
+        await markFollowupStatus(row.id, 'skipped');
         result.skipped++;
-        result.details.push({ profile_id: profile.id, name: profile.name, status: 'skipped', reason: 'max_unanswered' });
+        result.details.push({
+          profile_id: profile.id,
+          name,
+          status: 'skipped',
+          reason: 'max_unanswered',
+          queue_id: row.id,
+        });
         continue;
       }
 
       const ctx = await resolveScoutSendContext(profile.id);
       if (!ctx) {
+        await markFollowupStatus(row.id, 'skipped');
         result.skipped++;
-        result.details.push({ profile_id: profile.id, name: profile.name, status: 'skipped', reason: 'no_send_context' });
+        result.details.push({
+          profile_id: profile.id,
+          name,
+          status: 'skipped',
+          reason: 'no_send_context',
+          queue_id: row.id,
+        });
         continue;
       }
 
       const generated = await generateScoutMessage(profile.id, 'followup');
       if (!generated.message) {
+        await markFollowupStatus(row.id, 'skipped');
         result.skipped++;
         result.details.push({
           profile_id: profile.id,
-          name: profile.name,
+          name,
           status: 'skipped',
           reason: generated.reason || 'generate_failed',
+          queue_id: row.id,
         });
-        // Avoid hammering: push schedule out if generation failed transiently
-        if (generated.reason !== 'max_unanswered_followups' && generated.reason !== 'opted_out') {
-          const retryAt = new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString();
-          await supabase
-            .from('scout_profiles')
-            .update({ next_followup: retryAt, updated_at: nowIso })
-            .eq('id', profile.id);
-        } else {
-          await supabase
-            .from('scout_profiles')
-            .update({ next_followup: null, updated_at: nowIso })
-            .eq('id', profile.id);
-        }
         continue;
       }
 
@@ -170,13 +172,25 @@ export async function runScoutFollowups(limit = 20): Promise<ScoutFollowupRunRes
         read: true,
       });
 
+      await markFollowupStatus(row.id, 'sent');
       await scheduleAfterOutbound(profile.id);
       result.sent++;
-      result.details.push({ profile_id: profile.id, name: profile.name, status: 'sent' });
+      result.details.push({
+        profile_id: profile.id,
+        name,
+        status: 'sent',
+        queue_id: row.id,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'unknown error';
-      result.errors.push(`${profile.name}: ${msg}`);
-      result.details.push({ profile_id: profile.id, name: profile.name, status: 'error', reason: msg });
+      result.errors.push(`${row.profile_id}: ${msg}`);
+      result.details.push({
+        profile_id: row.profile_id,
+        name: 'unknown',
+        status: 'error',
+        reason: msg,
+        queue_id: row.id,
+      });
     }
   }
 

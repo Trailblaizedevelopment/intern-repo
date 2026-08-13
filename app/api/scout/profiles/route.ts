@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getPlatformAdmin } from '@/lib/supabase-platform';
+import { enqueueDefaultFollowups } from '@/lib/scout/followup';
 
 export async function GET(request: NextRequest) {
   try {
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('scout_profiles')
-      .insert(profileData)
+      .insert({ ...profileData, conversation_stage: 'intro_sent' })
       .select()
       .single();
 
@@ -199,6 +200,10 @@ export async function POST(request: NextRequest) {
         { data: null, error: { message: error.message, code: error.code || 'DB_ERROR' } },
         { status: 500 }
       );
+    }
+
+    if (data?.id) {
+      await enqueueDefaultFollowups(data.id);
     }
 
     return NextResponse.json({ data, error: null }, { status: 201 });
@@ -236,7 +241,7 @@ export async function PATCH(request: NextRequest) {
       'current_title', 'career_interest', 'goals', 'skills', 'looking_for',
       'opt_in_status', 'last_contact', 'next_followup', 'profile_complete', 'notes',
       'member_status', 'industry', 'company', 'job_title', 'hometown', 'linkedin_url', 'bio',
-      'platform_chapter_id',
+      'platform_chapter_id', 'conversation_stage',
     ];
 
     const sanitized: Record<string, unknown> = { updated_at: new Date().toISOString() };

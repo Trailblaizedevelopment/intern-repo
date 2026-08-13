@@ -23,6 +23,7 @@ interface ScoutStats {
   flagged_count: number;
   pending_intros: number;
   unread_count: number;
+  stage_breakdown?: Record<string, number>;
 }
 
 export default function ScoutDashboard() {
@@ -117,6 +118,32 @@ export default function ScoutDashboard() {
             </div>
           </Link>
         </div>
+
+        {/* Stage breakdown */}
+        {stats?.stage_breakdown && Object.keys(stats.stage_breakdown).length > 0 && (
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '12px' }}>
+              Conversation stages
+            </h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {Object.entries(stats.stage_breakdown).map(([stage, count]) => (
+                <div
+                  key={stage}
+                  style={{
+                    background: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontSize: '0.8125rem',
+                  }}
+                >
+                  <span style={{ color: '#6b7280' }}>{stage.replace(/_/g, ' ')}</span>
+                  <span style={{ fontWeight: 600, color: '#111827', marginLeft: '8px' }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Line Health */}
         <div style={{ marginBottom: '24px' }}>
