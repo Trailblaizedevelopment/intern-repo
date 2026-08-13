@@ -5,7 +5,7 @@ import {
   ScoutProfileContext,
   ScoutConversationMessage,
 } from '@/lib/scout/prompt';
-import { findChapterCandidates, ScoutCandidate, upsertSuggestedIntro } from '@/lib/scout/match';
+import { findChapterCandidates, ScoutCandidate } from '@/lib/scout/match';
 import {
   analyzeDiscovery,
   applyProfileUpdates,
@@ -194,10 +194,8 @@ export async function generateScoutMessage(
       conversationStage = 'active';
       matchReady = false;
       candidates = [];
-    } else if (conversationStage === 'ready_for_match') {
-      // Seed Nucleus queue with top candidate as pending_approval
-      await upsertSuggestedIntro(profileId, candidates[0], 'pending_approval');
     }
+    // Do NOT upsert top candidate every turn — that re-seeds the same person into Nucleus
   }
 
   await persistConversationStage(profileId, conversationStage);

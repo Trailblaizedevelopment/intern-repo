@@ -30,6 +30,8 @@ export type AgentEventType =
 export interface AgentEvent {
   type: AgentEventType;
   personQuery: string | null;
+  /** Original inbound text for decline/pivot heuristics */
+  rawText?: string | null;
 }
 
 export interface ParseAgentEventOpts {
@@ -39,7 +41,7 @@ export interface ParseAgentEventOpts {
 
 /** Explicit browse / who-else / catch-up asks */
 const MATCH_ASK =
-  /\b(who else|anyone else|more people|other people|other guys|my friends|friends are up to|what .{0,24}(friends|guys|people|alums?|alumni).{0,24}(up to|doing|around)|catch up|show me (someone|anybody|people)|who('s| is) (in|around)|connect me|make (an )?intro|in texas|in dallas|in houston|in austin)\b/i;
+  /\b(who else|anyone else|more people|other people|other guys|my friends|friends are up to|what .{0,24}(friends|guys|people|alums?|alumni).{0,24}(up to|doing|around)|catch up|show me (someone|anybody|people)|who('s| is) (in|around)|connect me|make (an )?intro)\b/i;
 
 const META_REPEAT =
   /\b(why do you keep|stop repeating|you keep (on )?repeat|same (thing|message)|already (said|told)|repeating|i just told|i (already )?said|that'?s all you|are you (even )?listen|you(?:'re| are) not listen)\b/i;
@@ -62,8 +64,12 @@ const UNCERTAIN_GOALS =
 const SAID_YES =
   /^(yes|yeah|yep|yup|sure|ok|okay|do it|go ahead|lets do it|let's do it|sounds good|please|absolutely)\b/i;
 
-const SAID_NO =
-  /^(no|nah|nope|pass|skip|not him|not her|not that|someone else|next)\b/i;
+const SAID_NO_SHORT =
+  /^(no|nah|nope|pass|skip|not him|not her|not that|someone else|next|neither)\b/i;
+
+/** Broader declines — including longer messages that reject an offer / person / geo */
+const DECLINE =
+  /\b(don'?t want|do not want|not interested|no thanks|no intro|pass on|skip (him|her|them|that)|not (him|her|them|that)|neither|anyone else in|no one in|nobody in|not\s+\w+\s+in\s+(texas|dallas|houston|atlanta|austin)|don'?t (want|need) (an? )?intro|i don'?t want to know more|start over)\b/i;
 
 const STOP = /^\s*(stop|unsubscribe|opt out)\s*$/i;
 
@@ -83,7 +89,7 @@ const GENERIC_NAMES = new Set([
 ]);
 
 function normalizeNameToken(s: string): string {
-  return s.toLowerCase().replace(/[^a-z]/g, '');
+  return s.toLowerCase().replace(/[^a-z']/g, '');
 }
 
 /** Find a known first/last name token mentioned in free text. */
@@ -104,6 +110,15 @@ export function findMentionedKnownName(
     if (tokens.has(n)) return w;
   }
   return null;
+}
+
+/** True when the message is rejecting an offer / person rather than asking about them. */
+export function isDeclineText(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (DECLINE.test(t)) return true;
+  if (t.split(/\s+/).length <= 8 && SAID_NO_SHORT.test(t)) return true;
+  return false;
 }
 
 export function classifyReplyIntent(latestInbound: string | null | undefined): ReplyIntentResult {
@@ -130,64 +145,73 @@ export function parseAgentEvent(
   opts?: ParseAgentEventOpts
 ): AgentEvent {
   if (generateType === 'open') {
-    return { type: 'OPEN', personQuery: null };
+    return { type: 'OPEN', personQuery: null, rawText: null };
   }
   if (generateType === 'followup') {
-    return { type: 'FOLLOWUP_TICK', personQuery: null };
+    return { type: 'FOLLOWUP_TICK', personQuery: null, rawText: null };
   }
 
   const text = (latestInbound || '').trim();
-  if (!text) return { type: 'USER_CHAT', personQuery: null };
+  if (!text) return { type: 'USER_CHAT', personQuery: null, rawText: text };
+
+  const withText = (e: Omit<AgentEvent, 'rawText'>): AgentEvent => ({ ...e, rawText: text });
 
   if (STOP.test(text)) {
-    return { type: 'USER_STOP', personQuery: null };
+    return withText({ type: 'USER_STOP', personQuery: null });
   }
 
   if (META_REPEAT.test(text)) {
-    return { type: 'USER_META_REPAIR', personQuery: null };
+    return withText({ type: 'USER_META_REPAIR', personQuery: null });
   }
 
   if (GREETING.test(text)) {
-    return { type: 'USER_CHAT', personQuery: null };
+    return withText({ type: 'USER_CHAT', personQuery: null });
+  }
+
+  // Declines BEFORE name-mention / about-person — "don't want Jack" is NO, not deep_dive
+  if (isDeclineText(text)) {
+    const declinedName = findMentionedKnownName(text, opts?.knownNames);
+    return withText({ type: 'USER_SAID_NO', personQuery: declinedName });
   }
 
   // Unsure / exploring — treat as chat so we don't force an interview script
   if (UNCERTAIN_GOALS.test(text)) {
-    return { type: 'USER_CHAT', personQuery: null };
+    return withText({ type: 'USER_CHAT', personQuery: null });
   }
 
   const about = text.match(ABOUT_PERSON) || text.match(ABOUT_PERSON_SHORT);
   if (about?.[1]) {
     const name = about[1].toLowerCase();
     if (!GENERIC_NAMES.has(name)) {
-      return { type: 'USER_ASKED_ABOUT', personQuery: about[1] };
+      return withText({ type: 'USER_ASKED_ABOUT', personQuery: about[1] });
     }
   }
 
   const inNetwork = text.match(NAME_IN_NETWORK);
   if (inNetwork?.[1] && !GENERIC_NAMES.has(inNetwork[1].toLowerCase())) {
-    return { type: 'USER_ASKED_ABOUT', personQuery: inNetwork[1] };
+    return withText({ type: 'USER_ASKED_ABOUT', personQuery: inNetwork[1] });
   }
 
+  // Bare name mention → about ONLY when clearly seeking info (short "jack?")
   const mentioned = findMentionedKnownName(text, opts?.knownNames);
-  if (mentioned) {
-    return { type: 'USER_ASKED_ABOUT', personQuery: mentioned };
+  if (mentioned && text.split(/\s+/).length <= 5 && /\?$/.test(text)) {
+    return withText({ type: 'USER_ASKED_ABOUT', personQuery: mentioned });
   }
 
   if (MATCH_ASK.test(text)) {
-    return { type: 'USER_ASKED_WHO', personQuery: null };
+    return withText({ type: 'USER_ASKED_WHO', personQuery: null });
   }
 
   if (text.split(/\s+/).length <= 6) {
-    if (SAID_YES.test(text)) return { type: 'USER_SAID_YES', personQuery: null };
-    if (SAID_NO.test(text)) return { type: 'USER_SAID_NO', personQuery: null };
+    if (SAID_YES.test(text)) return withText({ type: 'USER_SAID_YES', personQuery: null });
+    if (SAID_NO_SHORT.test(text)) return withText({ type: 'USER_SAID_NO', personQuery: null });
   }
 
   if (/\?$/.test(text) || text.split(/\s+/).length <= 12) {
-    return { type: 'USER_CLARIFY', personQuery: null };
+    return withText({ type: 'USER_CLARIFY', personQuery: null });
   }
 
-  return { type: 'USER_SUBSTANCE', personQuery: null };
+  return withText({ type: 'USER_SUBSTANCE', personQuery: null });
 }
 
 export function findCandidateByNameQuery<T extends { name: string }>(

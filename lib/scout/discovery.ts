@@ -487,7 +487,7 @@ export async function applyProfileUpdates(
   const next: ScoutDiscoveryProfile = { ...profile };
   const dbUpdates: Record<string, unknown> = {};
 
-  // Only overwrite blanks OR merge looking_for as multi-intent (never replace with a single sticky phrase)
+  // Prefer latest intent: replace looking_for when the new ask clearly pivots (new city / new ask)
   if (updates.looking_for) {
     const incoming = updates.looking_for.trim();
     const existingGoals = asStringArray(profile.goals);
@@ -499,22 +499,42 @@ export async function applyProfileUpdates(
     if (isBlank(profile.looking_for)) {
       next.looking_for = incoming;
       dbUpdates.looking_for = incoming;
-    } else if (
-      !(profile.looking_for || '').toLowerCase().includes(incoming.toLowerCase()) &&
-      !incoming.toLowerCase().includes((profile.looking_for || '').toLowerCase())
-    ) {
-      const merged = `${profile.looking_for}; ${incoming}`.slice(0, 400);
-      next.looking_for = merged;
-      dbUpdates.looking_for = merged;
+    } else {
+      const prev = (profile.looking_for || '').toLowerCase();
+      const nextL = incoming.toLowerCase();
+      const geoWords =
+        /\b(texas|tx|dallas|houston|austin|atlanta|georgia|ga|california|ca|nyc|new york|chicago|miami|denver|seattle|nashville|charlotte)\b/gi;
+      const prevGeos = new Set((prev.match(geoWords) || []).map(s => s.toLowerCase()));
+      const nextGeos = new Set((nextL.match(geoWords) || []).map(s => s.toLowerCase()));
+      let geoConflict = false;
+      for (const g of nextGeos) {
+        if (prevGeos.size > 0 && !prevGeos.has(g)) {
+          // new geo not in previous → treat as pivot
+          geoConflict = true;
+          break;
+        }
+      }
+      if (geoConflict || nextL.includes('instead') || nextL.includes('rather')) {
+        next.looking_for = incoming;
+        dbUpdates.looking_for = incoming;
+      } else if (!prev.includes(nextL) && !nextL.includes(prev)) {
+        const merged = `${profile.looking_for}; ${incoming}`.slice(0, 400);
+        next.looking_for = merged;
+        dbUpdates.looking_for = merged;
+      }
+    }
+  }
+  if (updates.location) {
+    // Allow location overwrite on explicit networking-city pivot
+    const incomingLoc = updates.location.trim();
+    if (isBlank(profile.location) || incomingLoc.length >= 2) {
+      next.location = incomingLoc;
+      dbUpdates.location = incomingLoc;
     }
   }
   if (updates.career_interest && (isBlank(profile.career_interest) || (profile.career_interest || '').toLowerCase() === 'to be updated')) {
     next.career_interest = updates.career_interest;
     dbUpdates.career_interest = updates.career_interest;
-  }
-  if (updates.location && isBlank(profile.location)) {
-    next.location = updates.location;
-    dbUpdates.location = updates.location;
   }
   if (updates.industry && isBlank(profile.industry)) {
     next.industry = updates.industry;

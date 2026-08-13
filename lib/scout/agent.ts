@@ -403,28 +403,68 @@ export function transitionAgent(
   }
 
   if (event.type === 'USER_SAID_NO') {
-    if (fromState === 'deep_dive' || fromState === 'await_requester_yes' || fromState === 'offer') {
-      const rejectedPlatformId = next.focus_person_id;
-      if (rejectedPlatformId && !next.rejected_ids.includes(rejectedPlatformId)) {
-        next = {
-          ...next,
-          rejected_ids: [...next.rejected_ids, rejectedPlatformId],
-          active_intro_id: null,
-        };
+    if (
+      fromState === 'deep_dive' ||
+      fromState === 'await_requester_yes' ||
+      fromState === 'offer' ||
+      fromState === 'clarify_intent'
+    ) {
+      let rejectedPlatformId = next.focus_person_id;
+
+      if (event.personQuery) {
+        const named = findCandidateByNameQuery(candidates, event.personQuery);
+        if (named?.platform_id) rejectedPlatformId = named.platform_id;
       }
+
+      const rejectIds = new Set(next.rejected_ids);
+      if (rejectedPlatformId) rejectIds.add(rejectedPlatformId);
+      if (next.focus_person_id) rejectIds.add(next.focus_person_id);
+      // Park everyone already offered so we stop looping the same 1–2 people
+      for (const id of next.offered_ids) rejectIds.add(id);
+
+      next = {
+        ...next,
+        rejected_ids: [...rejectIds],
+        offered_ids: [...new Set([...next.offered_ids, ...rejectIds])],
+        focus_person_id: null,
+        focus_person_snapshot: null,
+        active_intro_id: null,
+      };
+
+      const raw = (event.rawText || '').toLowerCase();
+      const pivoted =
+        /\b(start over|looking for|instead|rather|atlanta|california|new york|chicago|miami|denver|seattle|nashville|charlotte)\b/i.test(
+          raw
+        ) || /\b(anyone|anybody|no one|nobody|else)\s+in\b/i.test(raw);
+
+      // Pivot / blanket geo reject → acknowledge, do NOT immediately pitch the next Texas guy
+      if (pivoted) {
+        return baseResult({
+          session: { ...next, agent_state: 'clarify_intent' },
+          fromState,
+          toState: 'clarify_intent',
+          event,
+          injectCard: null,
+          injectMode: 'none',
+          remainingPool: 0,
+          instructionKey: 'chat',
+          rejectedPlatformId: rejectedPlatformId || undefined,
+        });
+      }
+
       const offered = applyOffer(next, candidates);
       next = offered.session;
       if (!offered.card) {
         return baseResult({
-          session: next,
+          session: { ...next, agent_state: 'clarify_intent' },
           fromState,
-          toState: 'offer',
+          toState: 'clarify_intent',
           event,
           injectCard: null,
           injectMode: 'pool_empty',
           remainingPool: 0,
           instructionKey: 'pool_empty',
-          rejectedPlatformId,
+          rejectedPlatformId: rejectedPlatformId || undefined,
         });
       }
       return baseResult({
@@ -436,7 +476,7 @@ export function transitionAgent(
         injectMode: 'offer',
         remainingPool: offered.remaining,
         instructionKey: 'offer',
-        rejectedPlatformId,
+        rejectedPlatformId: rejectedPlatformId || undefined,
       });
     }
   }
@@ -508,16 +548,20 @@ export function transitionAgent(
     instructionKey =
       event.type === 'USER_CLARIFY' || event.type === 'USER_SUBSTANCE' ? 'chat' : 'chat';
   } else if (fromState === 'deep_dive' || fromState === 'await_requester_yes') {
-    injectCard = candidateFromFocus(next, candidates);
-    injectMode = injectCard ? 'focus' : 'none';
+    // Ordinary replies: do not force-pitch the focus card again
     if (event.type === 'USER_CLARIFY' || event.type === 'USER_SUBSTANCE') {
+      injectCard = null;
+      injectMode = 'none';
       instructionKey = 'chat';
     } else {
+      injectCard = candidateFromFocus(next, candidates);
+      injectMode = injectCard ? 'focus' : 'none';
       instructionKey = fromState === 'await_requester_yes' ? 'await_yes' : 'deep_dive';
     }
   } else if (fromState === 'offer') {
-    injectCard = candidateFromFocus(next, candidates);
-    injectMode = injectCard ? 'focus' : 'none';
+    // Critical: never re-inject the same focus person on ordinary chat turns
+    injectCard = null;
+    injectMode = 'none';
     instructionKey = 'chat';
   }
 
