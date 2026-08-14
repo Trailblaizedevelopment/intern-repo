@@ -1,0 +1,37 @@
+{
+  "id": "01-decline-person",
+  "history": [
+    {
+      "direction": "outbound",
+      "message_body": "Jack Zook is in Austin — want an intro?",
+      "created_at": "2026-08-14T12:00:00Z"
+    },
+    {
+      "direction": "inbound",
+      "message_body": "nah not Jack",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "record_rejection",
+      "input": { "type": "person", "value": "Jack Zook" }
+    },
+    {
+      "name": "search_network",
+      "input": { "query": "Texas alumni", "location": "Texas" }
+    },
+    {
+      "name": "send_reply",
+      "input": { "message": "Got it — I'll skip Jack. Want a different direction, or should I sit tight?" }
+    }
+  ],
+  "expect": {
+    "tools": ["record_rejection", "search_network", "send_reply"],
+    "notTools": ["propose_intro"],
+    "validationOk": true,
+    "sent": true,
+    "noNames": ["Phillip"],
+    "searchOmitsName": "Jack"
+  }
+}

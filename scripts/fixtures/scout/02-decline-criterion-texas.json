@@ -1,0 +1,35 @@
+{
+  "id": "02-decline-criterion-texas",
+  "history": [
+    {
+      "direction": "outbound",
+      "message_body": "I can look at Texas if that's still useful.",
+      "created_at": "2026-08-14T12:00:00Z"
+    },
+    {
+      "direction": "inbound",
+      "message_body": "anyone else in Texas? actually no Texas",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "record_rejection",
+      "input": { "type": "criterion", "value": "Texas" }
+    },
+    {
+      "name": "search_network",
+      "input": { "query": "alumni", "location": "Texas" }
+    },
+    {
+      "name": "send_reply",
+      "input": { "message": "All good — I'll drop Texas. Want a different city or industry instead?" }
+    }
+  ],
+  "expect": {
+    "tools": ["record_rejection", "search_network", "send_reply"],
+    "validationOk": true,
+    "sent": true,
+    "searchOmitsGeo": "texas"
+  }
+}

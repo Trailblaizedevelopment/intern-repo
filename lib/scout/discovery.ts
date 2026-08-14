@@ -1,9 +1,6 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getPlatformAdmin } from '@/lib/supabase-platform';
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-6';
-
 const MEMBERSHIP_ROLE_VALUES = new Set([
   'alumni',
   'alum',
@@ -351,130 +348,6 @@ export async function enrichProfileFromPlatform(
   return next;
 }
 
-/**
- * Extract structured profile updates from conversation (especially inbound answers).
- * Uses a small Anthropic JSON call — no LinkedIn scraping.
- */
-export async function extractProfileUpdatesFromConversation(
-  profile: ScoutDiscoveryProfile,
-  history: Array<{ direction: 'inbound' | 'outbound'; message_body: string }>
-): Promise<ProfileFieldUpdates> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return {};
-
-  const inbound = history.filter(m => m.direction === 'inbound');
-  if (inbound.length === 0) return {};
-
-  const transcript = history
-    .slice(-20)
-    .map(m => `${m.direction === 'outbound' ? 'Scout' : profile.name}: ${m.message_body}`)
-    .join('\n');
-
-  const known = {
-    looking_for: profile.looking_for,
-    career_interest: profile.career_interest,
-    location: profile.location,
-    industry: profile.industry,
-    company: profile.company,
-    job_title: profile.job_title,
-    hometown: profile.hometown,
-    goals: asStringArray(profile.goals),
-    skills: asStringArray(profile.skills),
-  };
-
-  try {
-    const res = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 400,
-        system: `You extract networking profile facts from a text conversation with Scout.
-Return ONLY valid JSON (no markdown) with any of these optional keys if clearly supported by the USER's messages:
-looking_for (string — what they want from the network),
-career_interest (string),
-location (string — current city/region for networking),
-industry (string),
-company (string),
-job_title (string),
-hometown (string),
-goals (string array),
-skills (string array).
-Rules:
-- Prefer the user's words; summarize tightly.
-- Do not invent. If unclear, omit the key.
-- If they mentioned a city/state for networking (e.g. Texas), put it in location when it's where they want connections, and also in looking_for / goals as an intent facet.
-- Prefer adding new intents to goals[] rather than collapsing everything into one looking_for sentence.
-- Do not erase prior intents; capture NEW facets from the latest user messages.
-- Do not copy Scout's questions as facts.`,
-        messages: [
-          {
-            role: 'user',
-            content: `Known profile so far:\n${JSON.stringify(known)}\n\nTranscript:\n${transcript}\n\nJSON updates:`,
-          },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error('[scout/discovery] extract API error:', res.status, await res.text());
-      return {};
-    }
-
-    const aiResponse = await res.json();
-    const text = aiResponse.content
-      ?.filter((b: { type: string }) => b.type === 'text')
-      .map((b: { text: string }) => b.text)
-      .join('')
-      .trim();
-
-    if (!text) return {};
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return {};
-
-    const parsed = JSON.parse(jsonMatch[0]) as ProfileFieldUpdates;
-    const cleaned: ProfileFieldUpdates = {};
-
-    if (typeof parsed.looking_for === 'string' && parsed.looking_for.trim()) {
-      cleaned.looking_for = parsed.looking_for.trim();
-    }
-    if (typeof parsed.career_interest === 'string' && parsed.career_interest.trim()) {
-      cleaned.career_interest = parsed.career_interest.trim();
-    }
-    if (typeof parsed.location === 'string' && parsed.location.trim()) {
-      cleaned.location = parsed.location.trim();
-    }
-    if (typeof parsed.industry === 'string' && parsed.industry.trim()) {
-      cleaned.industry = parsed.industry.trim();
-    }
-    if (typeof parsed.company === 'string' && parsed.company.trim()) {
-      cleaned.company = parsed.company.trim();
-    }
-    if (typeof parsed.job_title === 'string' && parsed.job_title.trim()) {
-      cleaned.job_title = parsed.job_title.trim();
-    }
-    if (typeof parsed.hometown === 'string' && parsed.hometown.trim()) {
-      cleaned.hometown = parsed.hometown.trim();
-    }
-    if (Array.isArray(parsed.goals)) {
-      cleaned.goals = parsed.goals.filter((g): g is string => typeof g === 'string' && g.trim().length > 0);
-    }
-    if (Array.isArray(parsed.skills)) {
-      cleaned.skills = parsed.skills.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
-    }
-
-    return cleaned;
-  } catch (err) {
-    console.error('[scout/discovery] extract failed:', err);
-    return {};
-  }
-}
-
 export async function applyProfileUpdates(
   profile: ScoutDiscoveryProfile,
   updates: ProfileFieldUpdates
@@ -582,38 +455,6 @@ export async function applyProfileUpdates(
   return next;
 }
 
-export function formatDiscoveryGuidance(state: DiscoveryState): string {
-  const lines: string[] = [
-    `Discovery mode: ${state.matchReady ? 'READY_TO_MATCH' : 'GATHERING'}`,
-    `Persona: ${state.persona}`,
-    'Tone: conversation first. Gaps are soft north stars — never turn this into an interview.',
-  ];
-  if (state.knownSummary.length > 0) {
-    lines.push(`Already known (do NOT re-ask): ${state.knownSummary.join('; ')}`);
-  }
-  if (state.gaps.length > 0) {
-    lines.push(`Open gaps (background only): ${state.gaps.join(', ')}`);
-  }
-  if (state.nextQuestionHint) {
-    lines.push(`If a follow-up fits naturally: ${state.nextQuestionHint}`);
-  }
-  if (!state.matchReady) {
-    lines.push(
-      'Matching is locked until you know a rough ask AND (where they are OR industry/focus). If they do not know yet, explore with them — do not demand a polished goal. Never claim the alumni network is missing, unsynced, or unavailable.'
-    );
-  } else {
-    lines.push(
-      'Matching is unlocked. You may surface people only from Relevant alumni matches if provided.'
-    );
-    lines.push(
-      'looking_for is ONE clue, not the whole story — after naming matches, keep the conversation human. Do not tunnel on a single phrase forever.'
-    );
-    if (!state.nextQuestionHint && state.gaps.length === 0) {
-      lines.push(`If a follow-up fits naturally: ${QUESTION_HINTS[state.persona].what_they_bring}`);
-    }
-  }
-  return lines.join('\n');
-}
 
 export function toDiscoveryProfile(row: Record<string, unknown>): ScoutDiscoveryProfile {
   return {

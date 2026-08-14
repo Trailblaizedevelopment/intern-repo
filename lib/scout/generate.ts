@@ -1,59 +1,108 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import {
   SCOUT_SYSTEM_PROMPT,
-  buildScoutContext,
-  ScoutProfileContext,
-  ScoutConversationMessage,
+  buildMemberContextBlock,
+  historyToAnthropicMessages,
+  type ScoutConversationMessage,
 } from '@/lib/scout/prompt';
-import { findChapterCandidates, ScoutCandidate } from '@/lib/scout/match';
+import { SCOUT_TOOLS } from '@/lib/scout/tools';
 import {
-  analyzeDiscovery,
-  applyProfileUpdates,
-  enrichProfileFromPlatform,
-  extractProfileUpdatesFromConversation,
-  formatDiscoveryGuidance,
-  isMatchReady,
-  toDiscoveryProfile,
-} from '@/lib/scout/discovery';
-import { MAX_UNANSWERED_OUTBOUND } from '@/lib/scout/followup';
+  handleScoutTool,
+  loadActiveRejections,
+  loadStandingIntents,
+  type ScoutTurnContext,
+  type StandingIntentRow,
+} from '@/lib/scout/tool-handlers';
+import { loadPrivacySettings, type ScoutRejection } from '@/lib/scout/search';
+import { introStatusLine } from '@/lib/scout/intro-status';
+import { validateOutbound, type ValidationResult } from '@/lib/scout/validate';
+import { persistTurnLog, flagValidationFailure } from '@/lib/scout/turn-log';
 import {
-  applyIntroSideEffects,
-  formatAgentInject,
-  instructionForTransition,
-  parseAgentEvent,
-  persistAgentSession,
-  sessionFromProfileRow,
-  transitionAgent,
-} from '@/lib/scout/agent';
-import {
-  advanceStageAfterInbound,
-  asConversationStage,
-  ConversationStage,
-  looksUncertainAboutGoals,
-  persistConversationStage,
-  stageInstructionHint,
-} from '@/lib/scout/stages';
+  MAX_UNANSWERED_OUTBOUND,
+  FOLLOWUP_RECENCY_HOURS,
+  hoursSinceLastInbound,
+} from '@/lib/scout/followup';
+import { enrichProfileFromPlatform, toDiscoveryProfile } from '@/lib/scout/discovery';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS = 320;
-
-/** Minimum top score to treat chapter pool as usable for matching */
-const MATCH_SCORE_THRESHOLD = 2;
+const MAX_TOKENS = 1024;
+const MAX_TOOL_ITERATIONS = 8;
+const HISTORY_LIMIT = 30;
 
 export type ScoutGenerateType = 'open' | 'reply' | 'followup';
+
+export interface ScriptedToolCall {
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface GenerateScoutOptions {
+  dryRun?: boolean;
+  historyOverride?: ScoutConversationMessage[];
+  scriptedToolCalls?: ScriptedToolCall[];
+  seedRejections?: ScoutRejection[];
+  seedIntents?: StandingIntentRow[];
+  recencyHours?: number;
+}
 
 export interface GenerateScoutResult {
   message: string | null;
   skipped?: boolean;
   reason?: string;
-  matchCount?: number;
-  matchReady?: boolean;
-  agentState?: string;
-  conversationStage?: ConversationStage;
-  profileUpdates?: boolean;
-  introSuggested?: boolean;
   shouldStop?: boolean;
+  validation?: ValidationResult;
+  turnLogId?: string | null;
+  toolCalls?: Array<{ name: string; input: unknown }>;
+  toolResults?: unknown[];
+  historyCount?: number;
+  introducibleNames?: string[];
+}
+
+type AnthropicContent =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+
+type AnthropicToolResult = {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+};
+
+interface AnthropicMessage {
+  role: 'user' | 'assistant';
+  content: string | Array<AnthropicContent | AnthropicToolResult>;
+}
+
+export async function loadNewestHistory(
+  profileId: string,
+  limit = HISTORY_LIMIT
+): Promise<ScoutConversationMessage[]> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return [];
+  const { data: messages } = await supabase
+    .from('scout_conversations')
+    .select('direction, message_body, created_at')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  const newestFirst = (messages || []) as ScoutConversationMessage[];
+  return [...newestFirst].reverse();
+}
+
+function unansweredOutboundCount(history: ScoutConversationMessage[]): number {
+  let count = 0;
+  const startIdx =
+    history.length > 0 && history[history.length - 1].direction === 'inbound'
+      ? history.length - 2
+      : history.length - 1;
+  for (let i = startIdx; i >= 0; i--) {
+    if (history[i].direction === 'outbound') count++;
+    else break;
+  }
+  return count;
 }
 
 function latestInboundText(history: ScoutConversationMessage[]): string | null {
@@ -63,17 +112,50 @@ function latestInboundText(history: ScoutConversationMessage[]): string | null {
   return null;
 }
 
+function lastOutboundText(history: ScoutConversationMessage[]): string | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].direction === 'outbound') return history[i].message_body;
+  }
+  return null;
+}
+
+function inboundNameHints(text: string | null): string[] {
+  if (!text) return [];
+  const matches = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/g) || [];
+  return matches;
+}
+
+async function loadOpenIntroStatuses(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  profileId: string
+): Promise<string[]> {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('scout_introductions')
+    .select('status, platform_target_snapshot')
+    .eq('requester_id', profileId)
+    .in('status', ['suggested', 'pending_approval', 'sent'])
+    .order('updated_at', { ascending: false })
+    .limit(8);
+  return (data || []).map(row =>
+    introStatusLine({
+      status: row.status as string,
+      platform_target_snapshot: row.platform_target_snapshot as { name?: string } | null,
+    })
+  );
+}
+
 /**
- * Shared Scout message generation: event → state transition → tools → reply writer.
+ * Claude plans with tools. Code validates send_reply before anything can go to Linq.
  */
 export async function generateScoutMessage(
   profileId: string,
-  type: ScoutGenerateType
+  type: ScoutGenerateType,
+  opts: GenerateScoutOptions = {}
 ): Promise<GenerateScoutResult> {
+  const started = Date.now();
+  const dryRun = Boolean(opts.dryRun);
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return { message: null, skipped: true, reason: 'missing_api_key' };
-  }
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
@@ -90,160 +172,43 @@ export async function generateScoutMessage(
     return { message: null, skipped: true, reason: 'profile_not_found' };
   }
 
-  if (profileRow.opt_in_status === 'opted_out' || profileRow.conversation_stage === 'opted_out') {
-    return {
-      message: null,
-      skipped: true,
-      reason: 'opted_out',
-      conversationStage: 'opted_out',
-      shouldStop: true,
-    };
+  if (profileRow.opt_in_status === 'opted_out') {
+    return { message: null, skipped: true, reason: 'opted_out', shouldStop: true };
   }
 
-  const { data: messages } = await supabase
-    .from('scout_conversations')
-    .select('direction, message_body, created_at')
-    .eq('profile_id', profileId)
-    .order('created_at', { ascending: true })
-    .limit(30);
-
-  const history: ScoutConversationMessage[] = (messages || []).map(m => ({
-    direction: m.direction as 'inbound' | 'outbound',
-    message_body: m.message_body,
-    created_at: m.created_at,
-  }));
+  const history =
+    opts.historyOverride && opts.historyOverride.length > 0
+      ? opts.historyOverride.slice(-HISTORY_LIMIT)
+      : await loadNewestHistory(profileId, HISTORY_LIMIT);
 
   if (type === 'reply' || type === 'followup') {
-    let unansweredCount = 0;
-    const startIdx =
-      history.length > 0 && history[history.length - 1].direction === 'inbound'
-        ? history.length - 2
-        : history.length - 1;
-    for (let i = startIdx; i >= 0; i--) {
-      if (history[i].direction === 'outbound') {
-        unansweredCount++;
-      } else {
-        break;
-      }
-    }
-    if (unansweredCount >= MAX_UNANSWERED_OUTBOUND) {
-      return { message: null, skipped: true, reason: 'max_unanswered_followups' };
+    if (unansweredOutboundCount(history) >= MAX_UNANSWERED_OUTBOUND) {
+      return { message: null, skipped: true, reason: 'max_unanswered_followups', historyCount: history.length };
     }
   }
 
-  let profile = await enrichProfileFromPlatform(toDiscoveryProfile(profileRow));
-  let didProfileUpdates = false;
-
-  if ((type === 'reply' || type === 'followup') && history.some(m => m.direction === 'inbound')) {
-    const extracted = await extractProfileUpdatesFromConversation(profile, history);
-    const before = JSON.stringify({
-      looking_for: profile.looking_for,
-      goals: profile.goals,
-      location: profile.location,
-    });
-    profile = await applyProfileUpdates(profile, extracted);
-    didProfileUpdates =
-      before !==
-      JSON.stringify({
-        looking_for: profile.looking_for,
-        goals: profile.goals,
-        location: profile.location,
-      });
-  }
-
-  const discovery = analyzeDiscovery(profile);
-  const discoveryGuidance = formatDiscoveryGuidance(discovery);
-
-  let conversationStage = asConversationStage(profileRow.conversation_stage);
-  if (type === 'open') {
-    conversationStage = conversationStage === 'opted_out' ? 'opted_out' : 'intro_sent';
-  } else if (type === 'reply' || (type === 'followup' && history.some(m => m.direction === 'inbound'))) {
-    conversationStage = advanceStageAfterInbound(profile, conversationStage);
-  }
-
-  const latestInbound = latestInboundText(history);
-  const matchType = type === 'open' ? 'open' : 'reply';
-  let matchReady = isMatchReady(matchType, profile) && conversationStage === 'ready_for_match';
-
-  // Discovery stages: do not unlock matching until ready_for_match
-  if (
-    conversationStage !== 'ready_for_match' &&
-    conversationStage !== 'active' &&
-    type !== 'open'
-  ) {
-    matchReady = false;
-  }
-
-  let session = sessionFromProfileRow(profileRow as Record<string, unknown>);
-
-  let candidates: ScoutCandidate[] = [];
-  if (matchReady && type !== 'open') {
-    candidates = await findChapterCandidates({
-      id: profile.id,
-      platform_chapter_id: profile.platform_chapter_id,
-      source_type: profile.source_type,
-      source_id: profile.source_id,
-      looking_for: profile.looking_for,
-      career_interest: profile.career_interest || profile.industry,
-      goals: profile.goals,
-      opt_in_status: profileRow.opt_in_status,
-    });
-
-    const topScore = candidates[0]?.score ?? 0;
-    if (candidates.length === 0 || topScore < MATCH_SCORE_THRESHOLD) {
-      conversationStage = 'active';
-      matchReady = false;
-      candidates = [];
+  if (type === 'followup') {
+    const recencyHours = opts.recencyHours ?? FOLLOWUP_RECENCY_HOURS;
+    const hours = await hoursSinceLastInbound(profileId);
+    if (hours != null && hours < recencyHours) {
+      return {
+        message: null,
+        skipped: true,
+        reason: 'inbound_recency',
+        historyCount: history.length,
+      };
     }
-    // Do NOT upsert top candidate every turn — that re-seeds the same person into Nucleus
   }
 
-  await persistConversationStage(profileId, conversationStage);
+  const profile = await enrichProfileFromPlatform(toDiscoveryProfile(profileRow));
+  const privacy = await loadPrivacySettings();
+  const dbRejections = opts.seedRejections || (await loadActiveRejections(supabase, profileId));
+  const standingIntents = await loadStandingIntents(supabase, profileId, opts.seedIntents);
+  const introStatuses = dryRun ? [] : await loadOpenIntroStatuses(supabase, profileId);
+  const inbound = latestInboundText(history);
+  const lastOutbound = lastOutboundText(history);
 
-  const knownNames = [
-    ...candidates.map(c => c.name),
-    session.focus_person_snapshot?.name,
-  ].filter((n): n is string => typeof n === 'string' && n.length > 0);
-
-  const event = parseAgentEvent(latestInbound, type, { knownNames });
-
-  let transition = transitionAgent(session, event, {
-    matchReady,
-    candidates,
-    generateType: type,
-  });
-
-  session = await applyIntroSideEffects(profileId, transition, {
-    preferPendingApproval: conversationStage === 'ready_for_match',
-  });
-  transition = { ...transition, session };
-  await persistAgentSession(profileId, session);
-
-  let alumniMatches = formatAgentInject(transition);
-  if (conversationStage === 'active' && !alumniMatches) {
-    alumniMatches =
-      'No strong chapter matches yet. Be honest that the network is still being built for their ask — do NOT invent people. Offer to refine city/industry or check back.';
-  }
-
-  const offeredNames =
-    session.offered_ids.length > 0
-      ? candidates
-          .filter(c => session.offered_ids.includes(c.platform_id))
-          .map(c => c.name)
-          .slice(0, 12)
-      : session.focus_person_snapshot?.name
-        ? [session.focus_person_snapshot.name]
-        : [];
-
-  const stageHint = stageInstructionHint(conversationStage);
-  const exploreMode =
-    looksUncertainAboutGoals(latestInbound) ||
-    (!matchReady &&
-      conversationStage !== 'ready_for_match' &&
-      conversationStage !== 'active' &&
-      !(profile.looking_for || '').trim());
-
-  const profileContext: ScoutProfileContext = {
+  const memberBlock = buildMemberContextBlock({
     name: profile.name,
     chapter: profile.chapter,
     university: profile.university,
@@ -265,101 +230,239 @@ export async function generateScoutMessage(
     hometown: profile.hometown,
     linkedin_url: profile.linkedin_url,
     bio: profile.bio,
-    conversation_stage: conversationStage,
-  };
-
-  const userContent = buildScoutContext(profileContext, history, alumniMatches, discoveryGuidance, {
-    agentState: session.agent_state,
-    focusName: session.focus_person_snapshot?.name || null,
-    offeredNames,
-    activeIntro: !!session.active_intro_id,
-    conversationStage,
-    stageHint,
-    exploreMode,
+    rejections: dbRejections.map(r => ({ type: r.type, value: r.value })),
+    introStatuses,
+    standingIntents: standingIntents.map(i => ({
+      id: i.id,
+      description: i.description,
+      location: i.location,
+      industry: i.industry,
+      effective_status: i.effective_status,
+    })),
+    sessionOfferSuppressed: Boolean(profileRow.session_offer_suppressed),
+    consecutiveDeclines: Number(profileRow.session_consecutive_declines || 0),
   });
 
-  const lastOutbound = [...history].reverse().find(m => m.direction === 'outbound')?.message_body || null;
-  let instruction = instructionForTransition(transition, type, lastOutbound);
+  const ctx: ScoutTurnContext = {
+    profileId,
+    profile: {
+      id: profile.id,
+      name: profile.name,
+      platform_chapter_id: profile.platform_chapter_id,
+      source_type: profile.source_type,
+      source_id: profile.source_id,
+      looking_for: profile.looking_for,
+      career_interest: profile.career_interest,
+      location: profile.location,
+      industry: profile.industry,
+      goals: profile.goals,
+      opt_in_status: profileRow.opt_in_status,
+      session_offer_suppressed: Boolean(profileRow.session_offer_suppressed),
+      session_consecutive_declines: Number(profileRow.session_consecutive_declines || 0),
+    },
+    supabase,
+    dryRun,
+    inboundText: inbound,
+    privacy,
+    rejections: [...dbRejections],
+    searchAllowlist: new Set(),
+    introducibleHits: new Map(),
+    introducibleNames: [],
+    sendReplyMessage: null,
+    lastProposeIntroId: null,
+    lastProposeStatusLine: null,
+    sessionReset: false,
+    standingIntents,
+  };
 
-  // Soft stage north-star only — never replace conversational instructions with an interview script
-  if (
-    conversationStage !== 'ready_for_match' &&
-    conversationStage !== 'active' &&
-    transition.instructionKey !== 'offer' &&
-    transition.instructionKey !== 'deep_dive' &&
-    transition.instructionKey !== 'await_yes' &&
-    transition.instructionKey !== 'intro_confirmed' &&
-    transition.instructionKey !== 'meta_repair'
-  ) {
-    if (exploreMode || transition.instructionKey === 'explore' || transition.instructionKey === 'chat') {
-      instruction = `${instruction}\nBackground (soft): ${stageHint}`;
-      if (exploreMode) {
-        instruction +=
-          '\nThey may not know what they want — normalize that and explore with them. Do not demand a crisp goal.';
+  const recordedCalls: Array<{ name: string; input: unknown }> = [];
+  const recordedResults: unknown[] = [];
+  let rawModelOutput: unknown = null;
+
+  const runTool = async (name: string, input: Record<string, unknown>) => {
+    recordedCalls.push({ name, input });
+    const result = await handleScoutTool(name, input, ctx);
+    recordedResults.push({ name, result });
+    return result;
+  };
+
+  if (opts.scriptedToolCalls) {
+    for (const call of opts.scriptedToolCalls) {
+      await runTool(call.name, call.input);
+    }
+  } else {
+    if (!apiKey) {
+      return { message: null, skipped: true, reason: 'missing_api_key', historyCount: history.length };
+    }
+
+    const anthropicMessages: AnthropicMessage[] = historyToAnthropicMessages(history);
+    if (anthropicMessages.length === 0) {
+      anthropicMessages.push({
+        role: 'user',
+        content:
+          type === 'open'
+            ? 'Start the conversation. This is the first outbound.'
+            : type === 'followup'
+              ? 'Send a short follow-up if it still makes sense. If not, do not call send_reply.'
+              : 'Reply to the member.',
+      });
+    } else if (type === 'followup' && anthropicMessages[anthropicMessages.length - 1].role === 'assistant') {
+      anthropicMessages.push({
+        role: 'user',
+        content: 'Send a short follow-up if it still makes sense. If not, do not call send_reply.',
+      });
+    }
+
+    const system = `${SCOUT_SYSTEM_PROMPT}\n\n${memberBlock}`;
+
+    try {
+      for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+        const res = await fetch(ANTHROPIC_API_URL, {
+          method: 'POST',
+          headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: MAX_TOKENS,
+            system,
+            tools: SCOUT_TOOLS,
+            messages: anthropicMessages,
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error('[scout/generate] Anthropic error:', res.status, errText);
+          return {
+            message: null,
+            skipped: true,
+            reason: 'ai_error',
+            historyCount: history.length,
+            toolCalls: recordedCalls,
+            toolResults: recordedResults,
+          };
+        }
+
+        const data = (await res.json()) as {
+          content: AnthropicContent[];
+          stop_reason: string;
+        };
+        rawModelOutput = data.content;
+        anthropicMessages.push({ role: 'assistant', content: data.content });
+
+        const toolUses = data.content.filter(
+          (b): b is Extract<AnthropicContent, { type: 'tool_use' }> => b.type === 'tool_use'
+        );
+
+        if (data.stop_reason !== 'tool_use' || toolUses.length === 0) {
+          break;
+        }
+
+        const results: AnthropicToolResult[] = [];
+        let sentThisRound = false;
+        for (const use of toolUses) {
+          const result = await runTool(use.name, use.input || {});
+          if (use.name === 'send_reply') sentThisRound = true;
+          const isError =
+            result &&
+            typeof result === 'object' &&
+            'error' in result &&
+            Boolean((result as { error?: unknown }).error);
+          results.push({
+            type: 'tool_result',
+            tool_use_id: use.id,
+            content: JSON.stringify(result),
+            is_error: Boolean(isError),
+          });
+        }
+        anthropicMessages.push({ role: 'user', content: results });
+        if (sentThisRound) break;
       }
-    } else {
-      instruction = `${instruction}\nBackground (soft): ${stageHint}\nReact to their latest message first; only then a natural follow-up if it fits.`;
+    } catch (err) {
+      console.error('[scout/generate] loop error:', err);
+      return {
+        message: null,
+        skipped: true,
+        reason: 'ai_error',
+        historyCount: history.length,
+        toolCalls: recordedCalls,
+      };
     }
   }
 
-  const res = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: SCOUT_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `${userContent}\n\n---\n\n${instruction}`,
-        },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('[scout/generate] Anthropic error:', res.status, errText);
-    return {
-      message: null,
-      skipped: true,
-      reason: 'ai_error',
-      conversationStage,
-      agentState: session.agent_state,
-      matchReady,
-      matchCount: candidates.length,
-    };
+  let candidate = ctx.sendReplyMessage;
+  if (candidate && ctx.lastProposeStatusLine && !/queued|waiting on team|have not been auto-texted/i.test(candidate)) {
+    const combined = `${candidate} ${ctx.lastProposeStatusLine}`.trim();
+    if (combined.length <= 500) candidate = combined;
   }
 
-  const aiResponse = await res.json();
-  const generatedText = aiResponse.content
-    ?.filter((b: { type: string }) => b.type === 'text')
-    .map((b: { text: string }) => b.text)
-    .join('')
-    .trim();
+  let validation: ValidationResult | undefined;
+  let sent: string | null = null;
+  let reason: string | undefined;
 
-  if (!generatedText) {
+  if (!candidate) {
+    reason = 'no_send_reply';
+  } else {
+    validation = validateOutbound(
+      candidate,
+      {
+        introducibleNames: ctx.introducibleNames,
+        inboundNames: inboundNameHints(inbound),
+        rejectedNames: ctx.rejections.filter(r => r.type === 'person').map(r => r.value),
+      },
+      lastOutbound
+    );
+    if (!validation.ok) {
+      reason = 'validation_failed';
+      if (!dryRun) {
+        await flagValidationFailure(profileId, `validation_failed: ${validation.reasons.join(',')}`);
+      }
+    } else {
+      sent = candidate;
+    }
+  }
+
+  const turnLogId = await persistTurnLog({
+    profile_id: profileId,
+    inbound_text: inbound,
+    tool_calls: recordedCalls,
+    tool_results: recordedResults.map(r => {
+      if (!r || typeof r !== 'object') return r;
+      const row = r as { name?: string; result?: unknown };
+      return { name: row.name, result: row.result };
+    }),
+    rejection_set: ctx.rejections,
+    raw_model_output: rawModelOutput,
+    validation: validation || { ok: !candidate, reasons: candidate ? [] : ['no_send_reply'] },
+    sent_text: dryRun ? null : sent,
+    latency_ms: Date.now() - started,
+    dry_run: dryRun,
+  });
+
+  if (!sent) {
     return {
       message: null,
       skipped: true,
-      reason: 'ai_empty',
-      conversationStage,
-      agentState: session.agent_state,
+      reason,
+      validation,
+      turnLogId,
+      toolCalls: recordedCalls,
+      toolResults: recordedResults,
+      historyCount: history.length,
+      introducibleNames: ctx.introducibleNames,
     };
   }
 
   return {
-    message: generatedText,
-    matchCount: candidates.length,
-    matchReady,
-    agentState: session.agent_state,
-    conversationStage,
-    profileUpdates: didProfileUpdates,
-    introSuggested: transition.injectMode === 'offer' || conversationStage === 'ready_for_match',
+    message: sent,
+    validation,
+    turnLogId,
+    toolCalls: recordedCalls,
+    toolResults: recordedResults,
+    historyCount: history.length,
+    introducibleNames: ctx.introducibleNames,
   };
 }

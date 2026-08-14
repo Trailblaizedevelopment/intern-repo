@@ -1,0 +1,32 @@
+{
+  "id": "08-duplicate-outbound-blocked",
+  "history": [
+    {
+      "direction": "inbound",
+      "message_body": "hey",
+      "created_at": "2026-08-14T12:00:00Z"
+    },
+    {
+      "direction": "outbound",
+      "message_body": "Hey — found a couple people in Texas who might be useful.",
+      "created_at": "2026-08-14T12:01:00Z"
+    },
+    {
+      "direction": "inbound",
+      "message_body": "cool who else",
+      "created_at": "2026-08-14T12:02:00Z"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "send_reply",
+      "input": { "message": "Hey — found a couple people in Texas who might be useful." }
+    }
+  ],
+  "expect": {
+    "tools": ["send_reply"],
+    "validationOk": false,
+    "sent": false,
+    "validationReasonsInclude": ["duplicate_outbound"]
+  }
+}

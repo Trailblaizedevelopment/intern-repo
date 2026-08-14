@@ -1,0 +1,30 @@
+{
+  "id": "06-tier-3-4-aggregate",
+  "history": [
+    {
+      "direction": "inbound",
+      "message_body": "anyone nationally in consulting?",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "search_network",
+      "input": { "query": "consulting", "tier_scope": [3, 4] }
+    },
+    {
+      "name": "request_visibility",
+      "input": { "platform_profile_ids": ["00000000-0000-0000-0000-000000000099"], "context": "national consulting" }
+    },
+    {
+      "name": "send_reply",
+      "input": { "message": "A few people in the wider network might fit, but I can't name them unless they opt in. Want me to ask?" }
+    }
+  ],
+  "expect": {
+    "tools": ["search_network", "request_visibility", "send_reply"],
+    "notTools": ["propose_intro"],
+    "validationOk": true,
+    "sent": true
+  }
+}

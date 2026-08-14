@@ -1,0 +1,32 @@
+{
+  "id": "04-start-over",
+  "history": [
+    {
+      "direction": "outbound",
+      "message_body": "Jack Zook is in Austin — want an intro?",
+      "created_at": "2026-08-14T12:00:00Z"
+    },
+    {
+      "direction": "inbound",
+      "message_body": "can we start over?",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "seedRejections": [
+    { "type": "person", "value": "Jack Zook" }
+  ],
+  "scriptedToolCalls": [
+    { "name": "reset_working_session", "input": {} },
+    {
+      "name": "send_reply",
+      "input": { "message": "Yep — clean slate. What would actually be useful right now?" }
+    }
+  ],
+  "expect": {
+    "tools": ["reset_working_session", "send_reply"],
+    "notTools": ["propose_intro", "search_network"],
+    "validationOk": true,
+    "sent": true,
+    "noNames": ["Jack"]
+  }
+}

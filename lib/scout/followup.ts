@@ -6,6 +6,8 @@ export const FOLLOWUP_FIRST_HOURS = 48;
 export const FOLLOWUP_SECOND_HOURS = 72;
 /** Max consecutive outbound without inbound (open + 2 nudges) */
 export const MAX_UNANSWERED_OUTBOUND = 3;
+/** No proactive follow-up if the member inbound'd within this window */
+export const FOLLOWUP_RECENCY_HOURS = 6;
 
 const DEFAULT_SCOUT_LINE = '+16462101111';
 
@@ -33,6 +35,21 @@ export async function countUnansweredOutbound(profileId: string): Promise<number
     else break;
   }
   return count;
+}
+
+export async function hoursSinceLastInbound(profileId: string): Promise<number | null> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from('scout_conversations')
+    .select('created_at')
+    .eq('profile_id', profileId)
+    .eq('direction', 'inbound')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data?.created_at) return null;
+  return (Date.now() - new Date(data.created_at).getTime()) / (60 * 60 * 1000);
 }
 
 export function computeNextFollowupIso(unansweredOutboundAfterSend: number, from = new Date()): string | null {
@@ -186,8 +203,8 @@ export async function clearFollowupSchedule(profileId: string): Promise<void> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return;
 
-  // Cancel day_3 / day_7 / custom when user replies
-  await cancelPendingFollowups(profileId, ['day_3_checkin', 'day_7_value', 'custom']);
+  // Cancel all pending nudges when the member texts back (no leftover intro_suggested / day_30)
+  await cancelPendingFollowups(profileId);
 
   await supabase
     .from('scout_profiles')

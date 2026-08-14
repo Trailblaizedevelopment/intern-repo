@@ -1,0 +1,31 @@
+{
+  "id": "09-unresolved-relationship-ben",
+  "history": [
+    {
+      "direction": "inbound",
+      "message_body": "had lunch with Ben at Deloitte yesterday",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "save_relationship_context",
+      "input": {
+        "display_name": "Ben",
+        "how_they_know_each_other": "lunch / Deloitte",
+        "last_context": "had lunch with Ben at Deloitte yesterday"
+      }
+    },
+    {
+      "name": "send_reply",
+      "input": { "message": "Nice — Ben at Deloitte sounds like a real one. Want me to keep that in mind, or are you looking for someone else too?" }
+    }
+  ],
+  "expect": {
+    "tools": ["save_relationship_context", "send_reply"],
+    "notTools": ["search_network", "propose_intro"],
+    "validationOk": true,
+    "sent": true,
+    "sentContains": "Ben"
+  }
+}

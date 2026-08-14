@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getPlatformAdmin } from '@/lib/supabase-platform';
-import { enqueueDefaultFollowups } from '@/lib/scout/followup';
 
 export async function GET(request: NextRequest) {
   try {
@@ -184,7 +183,7 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('scout_profiles')
-      .insert({ ...profileData, conversation_stage: 'intro_sent' })
+      .insert(profileData)
       .select()
       .single();
 
@@ -200,10 +199,6 @@ export async function POST(request: NextRequest) {
         { data: null, error: { message: error.message, code: error.code || 'DB_ERROR' } },
         { status: 500 }
       );
-    }
-
-    if (data?.id) {
-      await enqueueDefaultFollowups(data.id);
     }
 
     return NextResponse.json({ data, error: null }, { status: 201 });

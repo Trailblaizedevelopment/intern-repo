@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: { message: result.message, match_count: result.matchCount ?? 0 },
+      data: { message: result.message, match_count: result.introducibleNames?.length ?? 0 },
       error: null,
     });
   } catch (err) {

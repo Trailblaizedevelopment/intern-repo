@@ -12,6 +12,7 @@ import {
   X,
   User,
   Loader2,
+  List,
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import ModalOverlay from '@/components/ModalOverlay';
@@ -63,6 +64,18 @@ export default function ConversationsFeed() {
   const [showFlagModal, setShowFlagModal] = useState(false);
   const [flagReason, setFlagReason] = useState('');
   const [flagTargetId, setFlagTargetId] = useState<string | null>(null);
+  const [showTurns, setShowTurns] = useState(false);
+  const [turns, setTurns] = useState<Array<{
+    id: string;
+    inbound_text: string | null;
+    tool_calls: Array<{ name?: string }>;
+    validation: { ok?: boolean; reasons?: string[] } | null;
+    sent_text: string | null;
+    latency_ms: number | null;
+    dry_run: boolean;
+    created_at: string;
+  }>>([]);
+  const [turnsLoading, setTurnsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchData = useCallback(async () => {
@@ -166,6 +179,28 @@ export default function ConversationsFeed() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeThread?.messages.length]);
+
+  useEffect(() => {
+    const profileId = activeThread?.profile?.id;
+    if (!showTurns || !profileId) {
+      setTurns([]);
+      return;
+    }
+    let cancelled = false;
+    setTurnsLoading(true);
+    fetch(`/api/scout/turns?profile_id=${profileId}&limit=20`)
+      .then(r => r.json())
+      .then(json => {
+        if (!cancelled && json.data) setTurns(json.data);
+      })
+      .catch(err => console.error('Failed to fetch turn logs:', err))
+      .finally(() => {
+        if (!cancelled) setTurnsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showTurns, activeThread?.profile?.id]);
 
   async function handleSendReply() {
     if (!replyText.trim() || !selectedThread || sending) return;
@@ -287,7 +322,7 @@ export default function ConversationsFeed() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: selectedThread ? '360px 1fr' : '1fr', gap: '0', background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', height: 'calc(100vh - 320px)', minHeight: '500px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: selectedThread ? (showTurns ? '320px 1fr 300px' : '360px 1fr') : '1fr', gap: '0', background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', height: 'calc(100vh - 320px)', minHeight: '500px' }}>
           {/* Thread List */}
           <div style={{ borderRight: selectedThread ? '1px solid #e5e7eb' : 'none', overflowY: 'auto' }}>
             {filteredThreads.length === 0 ? (
@@ -359,9 +394,18 @@ export default function ConversationsFeed() {
                   </div>
                 </div>
                 {activeThread.profile && (
-                  <Link href="/nucleus/scout/profiles" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e5e7eb', background: 'white', fontSize: '0.75rem', color: '#374151', textDecoration: 'none', fontWeight: 500 }}>
-                    <User size={12} /> Profile
-                  </Link>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowTurns(v => !v)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e5e7eb', background: showTurns ? '#eff6ff' : 'white', fontSize: '0.75rem', color: '#374151', fontWeight: 500, cursor: 'pointer' }}
+                    >
+                      <List size={12} /> Turns
+                    </button>
+                    <Link href="/nucleus/scout/profiles" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e5e7eb', background: 'white', fontSize: '0.75rem', color: '#374151', textDecoration: 'none', fontWeight: 500 }}>
+                      <User size={12} /> Profile
+                    </Link>
+                  </>
                 )}
               </div>
 
@@ -415,6 +459,54 @@ export default function ConversationsFeed() {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+          {selectedThread && showTurns && (
+            <div style={{ borderLeft: '1px solid #e5e7eb', overflowY: 'auto', background: '#fafafa', padding: '12px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', marginBottom: '10px' }}>
+                Turn logs
+              </div>
+              {turnsLoading && (
+                <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Loading…</div>
+              )}
+              {!turnsLoading && turns.length === 0 && (
+                <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>No planner turns yet.</div>
+              )}
+              {turns.map(turn => {
+                const names = Array.isArray(turn.tool_calls)
+                  ? turn.tool_calls.map(t => t.name).filter(Boolean).join(', ')
+                  : '';
+                const ok = turn.validation?.ok;
+                return (
+                  <div key={turn.id} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', marginBottom: '8px', fontSize: '0.75rem' }}>
+                    <div style={{ color: '#9ca3af', marginBottom: '6px' }}>
+                      {new Date(turn.created_at).toLocaleString()}
+                      {turn.latency_ms != null ? ` · ${turn.latency_ms}ms` : ''}
+                      {turn.dry_run ? ' · dry-run' : ''}
+                    </div>
+                    {turn.inbound_text && (
+                      <div style={{ marginBottom: '6px' }}>
+                        <span style={{ color: '#6b7280' }}>In: </span>
+                        {turn.inbound_text.slice(0, 180)}
+                      </div>
+                    )}
+                    <div style={{ marginBottom: '6px' }}>
+                      <span style={{ color: '#6b7280' }}>Tools: </span>
+                      {names || '—'}
+                    </div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <span style={{ color: '#6b7280' }}>Validation: </span>
+                      <span style={{ color: ok ? '#065f46' : '#991b1b' }}>
+                        {ok ? 'ok' : (turn.validation?.reasons || []).join(', ') || 'n/a'}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6b7280' }}>Sent: </span>
+                      {turn.sent_text || '—'}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

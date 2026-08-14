@@ -3,43 +3,50 @@ export const SCOUT_SYSTEM_PROMPT = `You are Scout, Trailblaize's networking assi
 How you talk:
 - Sound human. React to what they JUST said before anything else (a short acknowledgment, joke, or reflection).
 - Then, if useful, ask ONE natural follow-up — never a checklist, never stacked questions.
-- Short: usually 1–2 sentences. Never bullets. Never corporate filler ("Great!", "Awesome!", "Absolutely!", "I'd love to help you with that").
+- Not every message needs a question.
+- Short: usually 1–3 sentences, under 500 characters. Never bullets. Never corporate filler ("Great!", "Awesome!", "Absolutely!", "I'd love to help you with that").
 - Match their energy and length. If they're vague or unsure, slow down — help them think, don't interrogate.
-- Use their first name sparingly.
+- Use their first name sparingly. Never greet with their name in an active thread.
+- Never open consecutive outbound messages the same way.
 
 Your real job:
-Help them feel understood, then gradually learn enough to make a useful intro. Discovery fields (goals, background, city/industry) are soft north stars — NOT a script you must walk in order.
+Help them feel understood, then make useful intros when you actually have introducible people from tools. Discovery fields are facts, not a script.
 
 When they don't know what they want (very common):
 - Normalize it: "totally fine" energy.
-- Offer light forks they can react to (internship vs people to know vs local network vs just curious) — one fork at a time, conversationally.
-- Or ask what they're into lately / what feels interesting — not "what are your career goals".
+- Offer light forks they can react to (internship vs people to know vs local network vs just curious) — one fork at a time.
 - Never pressure them to declare a clean goal before chatting.
-- You can still be useful: riff, ask curiosity questions, share how the network can help once something clicks.
 
-Conversation stage in context is a soft guide only:
-- intro_sent / needs_*: keep it conversational while gently learning.
-- ready_for_match: you may offer ONE real person from Relevant alumni matches.
-- active: stay useful without inventing people.
-- opted_out: stop.
+Tools:
+- Use search_network when you might offer a real person. Only name people returned as introducible this turn.
+- You may echo names the member just used in their latest message (e.g. a friend they mentioned). Those are not intros.
+- record_rejection when they decline a person, a place/criterion, or want you to stop offering.
+- Two consecutive declines → stop offering this session (record_rejection; session will show suppressed). Wait until they ask again or call reset_working_session.
+- save_standing_intent when the pool is empty or they want you to keep an eye out. Be honest there is no match — never invent people, never say the network is "not synced" / "not loaded" / "unavailable".
+- save_relationship_context for people they mention who are not search hits (unresolved). Do not search or introduce them.
+- propose_intro only after they want an intro to an introducible search hit. It queues a teammate review — you have NOT texted anyone.
+- reset_working_session when they want to start over. Rejections still stand.
+- send_reply is the ONLY text that can be sent. If you don't call it, nothing is sent. Do not put reasoning in send_reply.
 
 Hard rules:
-- Never re-ask something listed as Already known.
-- STOP / UNSUBSCRIBE → goodbye once.
+- Never re-ask something listed as already known unless they want to change it.
+- STOP / UNSUBSCRIBE → goodbye once via send_reply.
 - Hostile → de-escalate once, then offer to stop.
 - If asked if you're human: you're an AI built by Trailblaize — honest, brief.
-- NEVER say the network is "not synced", "not loaded", or "unavailable".
-- You may ONLY name people under Relevant alumni matches (or a resolved Focus person).
-- Offer turns: exactly ONE person + a sharp why. No roster dumps.
-- NEVER re-pitch someone listed under Already offered. If they declined, move on or ask a new direction — do not bring the same names back.
+- If something in history was wrong, correct it once in plain language — don't invent that a past person "wasn't real".
 - Yes to intro → teammate will reach out; never claim you already texted the alumni.
-- NEVER invent that someone from history "wasn't real" / "bad info".
 - NEVER repeat or lightly rephrase your previous outbound message.
 - Chat turns: answer them first. Do not force a discovery question if they're joking, venting, or just saying hi.
 
 Identity: Trailblaize connector for the chapter network. Not affiliated with any house. You know Greek life; you're the person who makes the right text intro.`;
 
-export interface ScoutProfileContext {
+export interface ScoutConversationMessage {
+  direction: 'inbound' | 'outbound';
+  message_body: string;
+  created_at: string;
+}
+
+export interface MemberContextBlockInput {
   name: string;
   chapter: string | null;
   university: string | null;
@@ -49,110 +56,116 @@ export interface ScoutProfileContext {
   looking_for: string | null;
   goals: string[];
   skills: string[];
-  location?: string | null;
-  member_status?: string | null;
-  industry?: string | null;
-  company?: string | null;
-  job_title?: string | null;
-  hometown?: string | null;
-  linkedin_url?: string | null;
-  bio?: string | null;
-  conversation_stage?: string | null;
+  location: string | null;
+  member_status: string | null;
+  industry: string | null;
+  company: string | null;
+  job_title: string | null;
+  hometown: string | null;
+  linkedin_url: string | null;
+  bio: string | null;
+  rejections: Array<{ type: string; value: string }>;
+  introStatuses: string[];
+  standingIntents: Array<{
+    id: string;
+    description: string;
+    location: string | null;
+    industry: string | null;
+    effective_status: string;
+  }>;
+  sessionOfferSuppressed: boolean;
+  consecutiveDeclines: number;
 }
 
-export interface ScoutConversationMessage {
-  direction: 'inbound' | 'outbound';
-  message_body: string;
-  created_at: string;
-}
-
-export interface ScoutAgentContext {
-  agentState: string;
-  focusName: string | null;
-  offeredNames: string[];
-  activeIntro: boolean;
-  conversationStage?: string | null;
-  stageHint?: string | null;
-  exploreMode?: boolean;
-}
-
-export function buildScoutContext(
-  profile: ScoutProfileContext,
-  history: ScoutConversationMessage[],
-  alumniMatches?: string,
-  discoveryGuidance?: string,
-  agent?: ScoutAgentContext
-): string {
+export function buildMemberContextBlock(input: MemberContextBlockInput): string {
   const lines: string[] = [
-    `Member name: ${profile.name}`,
-    `Chapter: ${profile.chapter || 'Unknown'}`,
-    `University: ${profile.university || 'Unknown'}`,
-    `Graduation year: ${profile.graduation_year || 'Unknown'}`,
-    `Member status: ${profile.member_status || 'Unknown'}`,
-    `Location: ${profile.location || 'Unknown'}`,
-    `Hometown: ${profile.hometown || 'Unknown'}`,
-    `Current role: ${profile.job_title || profile.current_title || 'Unknown'}`,
-    `Company: ${profile.company || 'Unknown'}`,
-    `Industry: ${profile.industry || 'Unknown'}`,
-    `Career interest: ${profile.career_interest || 'Unknown'}`,
-    `Looking for: ${profile.looking_for || 'Not yet specified'}`,
-    `LinkedIn on file: ${profile.linkedin_url ? 'yes' : 'no'}`,
-    `Conversation stage: ${agent?.conversationStage || profile.conversation_stage || 'intro_sent'}`,
+    'Member facts:',
+    `Name: ${input.name}`,
+    `Chapter: ${input.chapter || 'Unknown'}`,
+    `University: ${input.university || 'Unknown'}`,
+    `Graduation year: ${input.graduation_year || 'Unknown'}`,
+    `Member status: ${input.member_status || 'Unknown'}`,
+    `Location: ${input.location || 'Unknown'}`,
+    `Hometown: ${input.hometown || 'Unknown'}`,
+    `Current role: ${input.job_title || input.current_title || 'Unknown'}`,
+    `Company: ${input.company || 'Unknown'}`,
+    `Industry: ${input.industry || 'Unknown'}`,
+    `Career interest: ${input.career_interest || 'Unknown'}`,
+    `Looking for: ${input.looking_for || 'Not yet specified'}`,
+    `LinkedIn on file: ${input.linkedin_url ? 'yes' : 'no'}`,
   ];
 
-  if (profile.bio) {
-    lines.push(`Bio: ${profile.bio.slice(0, 280)}`);
-  }
-  if (profile.goals.length > 0) {
-    lines.push(`Goals: ${profile.goals.join(', ')}`);
-  }
-  if (profile.skills.length > 0) {
-    lines.push(`Skills: ${profile.skills.join(', ')}`);
-  }
+  if (input.bio) lines.push(`Bio: ${input.bio.slice(0, 280)}`);
+  if (input.goals.length > 0) lines.push(`Goals: ${input.goals.join(', ')}`);
+  if (input.skills.length > 0) lines.push(`Skills: ${input.skills.join(', ')}`);
 
-  if (agent) {
-    lines.push('', 'Agent mode:');
-    lines.push(`State: ${agent.agentState}`);
-    if (agent.exploreMode) {
-      lines.push(
-        'Explore mode: ON — they seem unsure or early. Prioritize natural conversation and helping them figure it out. Soft discovery only.'
-      );
-    }
-    if (agent.stageHint) {
-      lines.push(agent.stageHint);
-    }
-    if (agent.focusName) {
-      lines.push(`Focus: ${agent.focusName}`);
-    }
-    if (agent.offeredNames.length > 0) {
-      lines.push(
-        `Already offered (do not re-pitch as news): ${agent.offeredNames.join(', ')}`
-      );
-    }
-    if (agent.activeIntro) {
-      lines.push('Active intro case: yes (pending teammate outreach / member confirm)');
-    }
-  }
+  const known: string[] = [];
+  if (input.looking_for) known.push('looking_for');
+  if (input.location) known.push('location');
+  if (input.industry || input.career_interest) known.push('industry');
+  if (known.length > 0) lines.push(`Already known (do not re-ask): ${known.join(', ')}`);
 
-  if (discoveryGuidance) {
-    lines.push('', 'Discovery guidance:');
-    lines.push(discoveryGuidance);
-  }
-
-  if (history.length > 0) {
-    lines.push('', 'Conversation history:');
-    for (const msg of history) {
-      const speaker = msg.direction === 'outbound' ? 'Scout' : profile.name;
-      lines.push(`[${speaker}]: ${msg.message_body}`);
-    }
+  lines.push('');
+  lines.push('Rejections (do not offer these people/criteria):');
+  if (input.rejections.length === 0) {
+    lines.push('(none)');
   } else {
-    lines.push('', 'This is the first message. No prior conversation history.');
+    for (const r of input.rejections) {
+      lines.push(`- ${r.type}: ${r.value}`);
+    }
   }
 
-  if (alumniMatches) {
-    lines.push('', 'Relevant alumni matches:');
-    lines.push(alumniMatches);
+  lines.push('');
+  lines.push('Open intro status (from records — do not invent outreach):');
+  if (input.introStatuses.length === 0) {
+    lines.push('(none)');
+  } else {
+    for (const s of input.introStatuses) lines.push(`- ${s}`);
+  }
+
+  lines.push('');
+  lines.push('Standing intents:');
+  const active = input.standingIntents.filter(i => i.effective_status === 'active');
+  const stale = input.standingIntents.filter(i => i.effective_status === 'unconfirmed');
+  if (active.length === 0 && stale.length === 0) {
+    lines.push('(none)');
+  }
+  for (const i of active) {
+    lines.push(`- ACTIVE ${i.id}: ${i.description}${i.location ? ` @ ${i.location}` : ''}`);
+  }
+  for (const i of stale) {
+    lines.push(
+      `- UNCONFIRMED (expired, do not search unless they re-confirm via update_standing_intent) ${i.id}: ${i.description}`
+    );
+  }
+
+  lines.push('');
+  lines.push(
+    `Session: offer_suppressed=${input.sessionOfferSuppressed ? 'yes' : 'no'}; consecutive_declines=${input.consecutiveDeclines}`
+  );
+  if (input.sessionOfferSuppressed) {
+    lines.push('Do not offer new people this session unless they explicitly ask or you reset_working_session.');
   }
 
   return lines.join('\n');
+}
+
+/** Merge consecutive same-direction messages so Anthropic gets alternating turns. */
+export function historyToAnthropicMessages(
+  history: ScoutConversationMessage[]
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  const merged: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  for (const msg of history) {
+    const role: 'user' | 'assistant' = msg.direction === 'inbound' ? 'user' : 'assistant';
+    const prev = merged[merged.length - 1];
+    if (prev && prev.role === role) {
+      prev.content = `${prev.content}\n${msg.message_body}`;
+    } else {
+      merged.push({ role, content: msg.message_body });
+    }
+  }
+  if (merged.length > 0 && merged[0].role === 'assistant') {
+    merged.unshift({ role: 'user', content: '(conversation already in progress)' });
+  }
+  return merged;
 }

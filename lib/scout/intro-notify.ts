@@ -101,16 +101,6 @@ export async function notifyMemberOfApprovedIntro(
       })
       .eq('id', introId);
 
-    // Put agent in await_requester_yes so yes/no is handled cleanly
-    await supabase
-      .from('scout_profiles')
-      .update({
-        agent_state: 'await_requester_yes',
-        active_intro_id: introId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', requesterId);
-
     return { sent: true, message };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'send_failed';

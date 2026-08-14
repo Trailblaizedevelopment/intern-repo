@@ -1,0 +1,35 @@
+{
+  "id": "10-stale-intent-unconfirmed",
+  "history": [
+    {
+      "direction": "inbound",
+      "message_body": "what's up",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "seedIntents": [
+    {
+      "id": "00000000-0000-0000-0000-000000000010",
+      "description": "fintech in NYC",
+      "location": "NYC",
+      "industry": "fintech",
+      "status": "active",
+      "expires_at": "2026-01-01T00:00:00Z",
+      "last_confirmed_at": "2025-10-01T00:00:00Z",
+      "effective_status": "active"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "send_reply",
+      "input": { "message": "Not much — what's on your mind?" }
+    }
+  ],
+  "expect": {
+    "tools": ["send_reply"],
+    "notTools": ["search_network", "update_standing_intent"],
+    "validationOk": true,
+    "sent": true,
+    "noNames": ["fintech"]
+  }
+}

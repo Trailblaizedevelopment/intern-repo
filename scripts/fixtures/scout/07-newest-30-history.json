@@ -1,0 +1,16 @@
+{
+  "id": "07-newest-30-history",
+  "synthesizeHistory": 31,
+  "scriptedToolCalls": [
+    {
+      "name": "send_reply",
+      "input": { "message": "Still here — what would help?" }
+    }
+  ],
+  "expect": {
+    "tools": ["send_reply"],
+    "historyCount": 30,
+    "validationOk": true,
+    "sent": true
+  }
+}

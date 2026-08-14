@@ -3,12 +3,13 @@ import { sendMessage, createChat } from '@/lib/linq';
 import { generateScoutMessage } from '@/lib/scout/generate';
 import {
   MAX_UNANSWERED_OUTBOUND,
+  FOLLOWUP_RECENCY_HOURS,
   countUnansweredOutbound,
   fetchDueFollowups,
   markFollowupStatus,
   resolveScoutSendContext,
   scheduleAfterOutbound,
-  enqueueDefaultFollowups,
+  hoursSinceLastInbound,
 } from '@/lib/scout/followup';
 
 export interface ScoutFollowupRunResult {
@@ -37,24 +38,6 @@ export async function runScoutFollowups(limit = 20): Promise<ScoutFollowupRunRes
     return result;
   }
 
-  // Backfill default day_3/day_7 for opted-in profiles with no queue rows yet
-  const { data: bareProfiles } = await supabase
-    .from('scout_profiles')
-    .select('id, created_at')
-    .neq('opt_in_status', 'opted_out')
-    .neq('conversation_stage', 'opted_out')
-    .limit(30);
-
-  for (const row of bareProfiles || []) {
-    const { count } = await supabase
-      .from('scout_followup_queue')
-      .select('*', { count: 'exact', head: true })
-      .eq('profile_id', row.id);
-    if ((count ?? 0) === 0 && row.created_at) {
-      await enqueueDefaultFollowups(row.id, new Date(row.created_at));
-    }
-  }
-
   const dueRows = await fetchDueFollowups(limit);
   result.due = dueRows.length;
 
@@ -62,7 +45,7 @@ export async function runScoutFollowups(limit = 20): Promise<ScoutFollowupRunRes
     try {
       const { data: profile } = await supabase
         .from('scout_profiles')
-        .select('id, name, phone_number, opt_in_status, conversation_stage, agent_state')
+        .select('id, name, phone_number, opt_in_status')
         .eq('id', row.profile_id)
         .single();
 
@@ -81,11 +64,7 @@ export async function runScoutFollowups(limit = 20): Promise<ScoutFollowupRunRes
         continue;
       }
 
-      if (
-        profile.opt_in_status === 'opted_out' ||
-        profile.conversation_stage === 'opted_out' ||
-        profile.agent_state === 'paused'
-      ) {
+      if (profile.opt_in_status === 'opted_out') {
         await markFollowupStatus(row.id, 'cancelled');
         result.skipped++;
         result.details.push({
@@ -93,6 +72,19 @@ export async function runScoutFollowups(limit = 20): Promise<ScoutFollowupRunRes
           name,
           status: 'skipped',
           reason: 'opted_out_or_paused',
+          queue_id: row.id,
+        });
+        continue;
+      }
+
+      const hours = await hoursSinceLastInbound(profile.id);
+      if (hours != null && hours < FOLLOWUP_RECENCY_HOURS) {
+        result.skipped++;
+        result.details.push({
+          profile_id: profile.id,
+          name,
+          status: 'skipped',
+          reason: 'inbound_recency',
           queue_id: row.id,
         });
         continue;

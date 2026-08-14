@@ -3,7 +3,6 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { sendMessage } from '@/lib/linq';
 import { generateScoutMessage } from '@/lib/scout/generate';
 import { clearFollowupSchedule, cancelPendingFollowups, scheduleAfterOutbound } from '@/lib/scout/followup';
-import { persistConversationStage } from '@/lib/scout/stages';
 
 const OPT_OUT_KEYWORDS = ['stop', 'unsubscribe', 'remove me', 'opt out', 'leave me alone', 'do not contact'];
 
@@ -56,7 +55,7 @@ export async function POST(request: NextRequest) {
     const rawDigits = fromPhone.replace(/\D/g, '').slice(-10);
     const { data: matchedProfiles } = await supabase
       .from('scout_profiles')
-      .select('id, phone_number, opt_in_status, conversation_stage')
+      .select('id, phone_number, opt_in_status')
       .or(`phone_number.eq.${fromPhone},phone_number.eq.${normalizedFrom},phone_number.eq.${rawDigits},phone_number.like.%${rawDigits}%`)
       .limit(1);
 
@@ -121,7 +120,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (shouldFlag) {
-      await persistConversationStage(profile.id, 'opted_out');
       await cancelPendingFollowups(profile.id);
       await supabase
         .from('scout_profiles')
@@ -130,7 +128,6 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
           opt_in_status: 'opted_out',
           next_followup: null,
-          conversation_stage: 'opted_out',
         })
         .eq('id', profile.id);
     } else {
@@ -145,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     let autoReplied = false;
-    if (!shouldFlag && profile.opt_in_status !== 'opted_out' && profile.conversation_stage !== 'opted_out') {
+    if (!shouldFlag && profile.opt_in_status !== 'opted_out') {
       try {
         const result = await generateScoutMessage(profile.id, 'reply');
         const reply = result.message;

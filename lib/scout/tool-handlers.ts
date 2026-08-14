@@ -1,0 +1,505 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { introStatusLine } from '@/lib/scout/intro-status';
+import { computeTieStrength, type TieFeatures } from '@/lib/scout/ties';
+import {
+  searchNetwork,
+  sanitizeToolSearchResult,
+  type ScoutProfileForSearch,
+  type ScoutRejection,
+  type SearchHitIntroducible,
+  type SearchNetworkInput,
+} from '@/lib/scout/search';
+import type { ScoutPrivacySettings } from '@/lib/scout/privacy';
+
+export interface StandingIntentRow {
+  id: string;
+  description: string;
+  location: string | null;
+  industry: string | null;
+  status: string;
+  expires_at: string | null;
+  last_confirmed_at: string | null;
+  effective_status: string;
+}
+
+export interface ScoutTurnContext {
+  profileId: string;
+  profile: ScoutProfileForSearch & {
+    name: string;
+    looking_for: string | null;
+    location: string | null;
+    session_offer_suppressed?: boolean;
+    session_consecutive_declines?: number;
+  };
+  supabase: SupabaseClient;
+  dryRun: boolean;
+  inboundText: string | null;
+  privacy: ScoutPrivacySettings;
+  rejections: ScoutRejection[];
+  searchAllowlist: Set<string>;
+  introducibleHits: Map<string, SearchHitIntroducible>;
+  introducibleNames: string[];
+  sendReplyMessage: string | null;
+  lastProposeIntroId: string | null;
+  lastProposeStatusLine: string | null;
+  sessionReset: boolean;
+  standingIntents: StandingIntentRow[];
+}
+
+function asString(v: unknown): string | undefined {
+  return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+}
+
+function asStringArray(v: unknown): string[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+  return out.length > 0 ? out : undefined;
+}
+
+export function effectiveIntentStatus(row: {
+  status: string;
+  expires_at: string | null;
+}): string {
+  if (row.status === 'active' && row.expires_at && new Date(row.expires_at).getTime() < Date.now()) {
+    return 'unconfirmed';
+  }
+  return row.status;
+}
+
+export async function loadActiveRejections(
+  supabase: SupabaseClient,
+  memberId: string
+): Promise<ScoutRejection[]> {
+  const { data } = await supabase
+    .from('scout_rejections')
+    .select('type, value, person_id, platform_profile_id')
+    .eq('member_id', memberId)
+    .is('lifted_at', null);
+  return (data || []) as ScoutRejection[];
+}
+
+export async function loadStandingIntents(
+  supabase: SupabaseClient,
+  memberId: string,
+  dryRunSeed?: StandingIntentRow[]
+): Promise<StandingIntentRow[]> {
+  if (dryRunSeed) {
+    return dryRunSeed.map(r => ({ ...r, effective_status: effectiveIntentStatus(r) }));
+  }
+  const { data } = await supabase
+    .from('scout_standing_intents')
+    .select('id, description, location, industry, status, expires_at, last_confirmed_at')
+    .eq('member_id', memberId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  const rows = (data || []) as Omit<StandingIntentRow, 'effective_status'>[];
+  const out: StandingIntentRow[] = [];
+  for (const row of rows) {
+    const effective = effectiveIntentStatus(row);
+    if (effective !== row.status && !dryRunSeed) {
+      await supabase
+        .from('scout_standing_intents')
+        .update({ status: 'unconfirmed' })
+        .eq('id', row.id)
+        .eq('status', 'active');
+    }
+    out.push({ ...row, status: effective === 'unconfirmed' ? 'unconfirmed' : row.status, effective_status: effective });
+  }
+  return out;
+}
+
+async function persistRejection(ctx: ScoutTurnContext, row: ScoutRejection): Promise<void> {
+  ctx.rejections.push(row);
+  if (ctx.dryRun) return;
+  await ctx.supabase.from('scout_rejections').insert({
+    member_id: ctx.profileId,
+    type: row.type,
+    value: row.value,
+    person_id: row.person_id || null,
+    platform_profile_id: row.platform_profile_id || null,
+  });
+}
+
+export async function handleScoutTool(
+  name: string,
+  input: Record<string, unknown>,
+  ctx: ScoutTurnContext
+): Promise<unknown> {
+  switch (name) {
+    case 'search_network': {
+      const result = await searchNetwork(
+        {
+          ...ctx.profile,
+          looking_for: asString(input.query) || ctx.profile.looking_for,
+          location: asString(input.location) || ctx.profile.location,
+          industry: asString(input.industry) || ctx.profile.industry,
+          career_interest: asString(input.industry) || ctx.profile.career_interest,
+        },
+        input as SearchNetworkInput,
+        ctx.rejections,
+        ctx.privacy
+      );
+      for (const hit of result.hits) {
+        ctx.searchAllowlist.add(hit.id);
+        if (hit.introducible) {
+          ctx.introducibleHits.set(hit.id, hit);
+          if (!ctx.introducibleNames.includes(hit.name)) {
+            ctx.introducibleNames.push(hit.name);
+          }
+        }
+      }
+      return sanitizeToolSearchResult(result);
+    }
+
+    case 'get_person': {
+      const id = asString(input.id);
+      if (!id) return { error: 'id_required', status: 400 };
+      const hit = ctx.introducibleHits.get(id);
+      if (!hit || !ctx.searchAllowlist.has(id)) {
+        return { error: 'not_allowlisted_or_not_introducible', status: 403 };
+      }
+      return hit;
+    }
+
+    case 'propose_intro': {
+      const id = asString(input.id);
+      if (!id) return { error: 'id_required', status: 400 };
+      const hit = ctx.introducibleHits.get(id);
+      if (!hit) {
+        return { error: 'not_introducible_or_unknown', status: 403 };
+      }
+      if (ctx.rejections.some(r => r.type === 'person' && (r.platform_profile_id === id || r.value.toLowerCase() === hit.name.toLowerCase()))) {
+        return { error: 'person_rejected', status: 403 };
+      }
+      const snapshot = {
+        name: hit.name,
+        role: hit.role,
+        location: hit.location,
+        hometown: hit.hometown,
+        member_status: hit.member_status,
+        grad_year: hit.grad_year,
+        linkedin_url: hit.linkedin_url,
+        bio: hit.bio,
+        reason: asString(input.reason) || hit.reason,
+      };
+      let introId = 'dry-run-intro';
+      let status = 'suggested';
+      if (!ctx.dryRun) {
+        const { data: existing } = await ctx.supabase
+          .from('scout_introductions')
+          .select('id, status')
+          .eq('requester_id', ctx.profileId)
+          .eq('platform_target_id', id)
+          .maybeSingle();
+        if (existing) {
+          introId = existing.id as string;
+          status = (existing.status as string) || 'suggested';
+          const locked = status === 'sent' || status === 'accepted';
+          if (!locked) {
+            await ctx.supabase
+              .from('scout_introductions')
+              .update({
+                reason: snapshot.reason,
+                platform_target_snapshot: snapshot,
+                status: 'suggested',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', introId);
+            status = 'suggested';
+          }
+        } else {
+          const { data, error } = await ctx.supabase
+            .from('scout_introductions')
+            .insert({
+              requester_id: ctx.profileId,
+              target_id: null,
+              platform_target_id: id,
+              platform_target_snapshot: snapshot,
+              reason: snapshot.reason,
+              status: 'suggested',
+            })
+            .select('id, status')
+            .single();
+          if (error || !data) {
+            return { error: error?.message || 'intro_insert_failed', status: 500 };
+          }
+          introId = data.id as string;
+          status = data.status as string;
+        }
+      }
+      ctx.lastProposeIntroId = introId;
+      ctx.lastProposeStatusLine = introStatusLine({
+        status,
+        platform_target_snapshot: { name: hit.name },
+      });
+      return {
+        intro_id: introId,
+        status,
+        status_line: ctx.lastProposeStatusLine,
+        name: hit.name,
+      };
+    }
+
+    case 'request_visibility': {
+      const ids = asStringArray(input.platform_profile_ids) || [];
+      if (ids.length === 0) return { error: 'platform_profile_ids_required', status: 400 };
+      if (!ctx.dryRun) {
+        await ctx.supabase.from('scout_visibility_requests').insert({
+          member_id: ctx.profileId,
+          platform_profile_ids: ids,
+          context: asString(input.context) || null,
+          status: 'pending',
+        });
+      }
+      return {
+        ok: true,
+        count: ids.length,
+        reminder: 'Speak in aggregates only. Do not name these people.',
+      };
+    }
+
+    case 'save_member_context': {
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      const fields = [
+        'looking_for',
+        'location',
+        'industry',
+        'career_interest',
+        'company',
+        'job_title',
+        'hometown',
+        'notes',
+      ] as const;
+      for (const f of fields) {
+        const v = asString(input[f]);
+        if (v) {
+          patch[f] = v;
+          if (f === 'looking_for') ctx.profile.looking_for = v;
+          else if (f === 'location') ctx.profile.location = v;
+          else if (f === 'industry') ctx.profile.industry = v;
+          else if (f === 'career_interest') ctx.profile.career_interest = v;
+        }
+      }
+      const goals = asStringArray(input.goals);
+      if (goals) {
+        patch.goals = goals;
+        ctx.profile.goals = goals;
+      }
+      if (Object.keys(patch).length <= 1) return { ok: true, updated: [] };
+      if (!ctx.dryRun) {
+        await ctx.supabase.from('scout_profiles').update(patch).eq('id', ctx.profileId);
+      }
+      return { ok: true, updated: Object.keys(patch).filter(k => k !== 'updated_at') };
+    }
+
+    case 'record_rejection': {
+      const type = asString(input.type) as ScoutRejection['type'] | undefined;
+      const value = asString(input.value);
+      if (!type || !value) return { error: 'type_and_value_required', status: 400 };
+      if (!['person', 'criterion', 'action'].includes(type)) {
+        return { error: 'invalid_type', status: 400 };
+      }
+      await persistRejection(ctx, {
+        type,
+        value,
+        platform_profile_id: asString(input.platform_profile_id) || null,
+        person_id: asString(input.person_id) || null,
+      });
+
+      const declines = (ctx.profile.session_consecutive_declines || 0) + (type === 'action' ? 0 : 1);
+      let suppressed = Boolean(ctx.profile.session_offer_suppressed);
+      if (type === 'action' || declines >= 2) suppressed = true;
+      ctx.profile.session_consecutive_declines = type === 'action' ? ctx.profile.session_consecutive_declines : declines;
+      ctx.profile.session_offer_suppressed = suppressed;
+      if (!ctx.dryRun) {
+        await ctx.supabase
+          .from('scout_profiles')
+          .update({
+            session_consecutive_declines: ctx.profile.session_consecutive_declines,
+            session_offer_suppressed: suppressed,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', ctx.profileId);
+      }
+      return { ok: true, type, value, session_offer_suppressed: suppressed };
+    }
+
+    case 'save_standing_intent': {
+      const description = asString(input.description);
+      if (!description) return { error: 'description_required', status: 400 };
+      const now = new Date();
+      const expires = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+      const row = {
+        id: `dry-run-${Date.now()}`,
+        description,
+        location: asString(input.location) || null,
+        industry: asString(input.industry) || null,
+        status: 'active',
+        expires_at: expires.toISOString(),
+        last_confirmed_at: now.toISOString(),
+        effective_status: 'active',
+      };
+      if (!ctx.dryRun) {
+        const { data, error } = await ctx.supabase
+          .from('scout_standing_intents')
+          .insert({
+            member_id: ctx.profileId,
+            description,
+            location: row.location,
+            industry: row.industry,
+            status: 'active',
+            last_confirmed_at: row.last_confirmed_at,
+            expires_at: row.expires_at,
+          })
+          .select('id')
+          .single();
+        if (error) return { error: error.message, status: 500 };
+        row.id = data.id as string;
+      }
+      ctx.standingIntents.unshift(row);
+      return { ok: true, intent: row };
+    }
+
+    case 'update_standing_intent': {
+      const id = asString(input.id);
+      const status = asString(input.status);
+      if (!id || !status) return { error: 'id_and_status_required', status: 400 };
+      const now = new Date();
+      const patch: Record<string, unknown> = { status };
+      if (status === 'active') {
+        patch.last_confirmed_at = now.toISOString();
+        patch.expires_at = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
+      }
+      const existing = ctx.standingIntents.find(i => i.id === id);
+      if (existing) {
+        existing.status = status;
+        existing.effective_status = status;
+        if (typeof patch.expires_at === 'string') existing.expires_at = patch.expires_at;
+        if (typeof patch.last_confirmed_at === 'string') existing.last_confirmed_at = patch.last_confirmed_at;
+      }
+      if (!ctx.dryRun) {
+        await ctx.supabase.from('scout_standing_intents').update(patch).eq('id', id).eq('member_id', ctx.profileId);
+      }
+      return { ok: true, id, status };
+    }
+
+    case 'save_relationship_context': {
+      const displayName = asString(input.display_name);
+      if (!displayName) return { error: 'display_name_required', status: 400 };
+      const platformId = asString(input.platform_profile_id) || null;
+      const unresolved = !platformId;
+      const features: TieFeatures = {
+        same_chapter: false,
+        year_overlap: false,
+        accepted_intro: false,
+        recency_days: 0,
+        independent_source_count: 1,
+      };
+      const tieSources = ['conversation'];
+      const strength = computeTieStrength(features, tieSources);
+
+      let personId = `dry-run-person-${Date.now()}`;
+      if (!ctx.dryRun) {
+        let personQuery = ctx.supabase
+          .from('scout_people')
+          .select('id')
+          .eq('member_id', ctx.profileId);
+        if (platformId) {
+          personQuery = personQuery.eq('platform_profile_id', platformId);
+        } else {
+          personQuery = personQuery.ilike('display_name', displayName);
+        }
+        const { data: existingPerson } = await personQuery.maybeSingle();
+        if (existingPerson?.id) {
+          personId = existingPerson.id as string;
+          await ctx.supabase
+            .from('scout_people')
+            .update({
+              display_name: displayName,
+              unresolved,
+              notes: asString(input.notes) || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', personId);
+        } else {
+          const { data, error } = await ctx.supabase
+            .from('scout_people')
+            .insert({
+              member_id: ctx.profileId,
+              platform_profile_id: platformId,
+              display_name: displayName,
+              unresolved,
+              notes: asString(input.notes) || null,
+            })
+            .select('id')
+            .single();
+          if (error || !data) return { error: error?.message || 'person_insert_failed', status: 500 };
+          personId = data.id as string;
+        }
+
+        await ctx.supabase.from('scout_relationships').upsert(
+          {
+            member_id: ctx.profileId,
+            person_id: personId,
+            how_they_know_each_other: asString(input.how_they_know_each_other) || null,
+            last_context: asString(input.last_context) || null,
+            tie_sources: tieSources,
+            tie_features: features,
+            tie_strength: strength,
+            created_from: 'conversation',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'member_id,person_id' }
+        );
+      }
+
+      return {
+        ok: true,
+        person_id: personId,
+        unresolved,
+        display_name: displayName,
+        do_not_introduce: unresolved,
+      };
+    }
+
+    case 'get_relationships': {
+      if (ctx.dryRun) return { relationships: [] };
+      const { data } = await ctx.supabase
+        .from('scout_relationships')
+        .select(
+          'id, how_they_know_each_other, last_context, open_thread, tie_features, tie_strength, person:person_id(id, display_name, unresolved, platform_profile_id)'
+        )
+        .eq('member_id', ctx.profileId)
+        .limit(50);
+      return { relationships: data || [] };
+    }
+
+    case 'reset_working_session': {
+      ctx.sessionReset = true;
+      ctx.profile.session_offer_suppressed = false;
+      ctx.profile.session_consecutive_declines = 0;
+      if (!ctx.dryRun) {
+        await ctx.supabase
+          .from('scout_profiles')
+          .update({
+            session_offer_suppressed: false,
+            session_consecutive_declines: 0,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', ctx.profileId);
+      }
+      return { ok: true, rejections_persist: true };
+    }
+
+    case 'send_reply': {
+      const message = asString(input.message);
+      if (!message) return { error: 'message_required', status: 400 };
+      ctx.sendReplyMessage = message;
+      return { ok: true, queued: true };
+    }
+
+    default:
+      return { error: `unknown_tool:${name}`, status: 400 };
+  }
+}
