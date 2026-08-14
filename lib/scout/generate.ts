@@ -16,7 +16,8 @@ import {
 import { loadPrivacySettings, type ScoutRejection } from '@/lib/scout/search';
 import { introStatusLine } from '@/lib/scout/intro-status';
 import { validateOutbound, type ValidationResult } from '@/lib/scout/validate';
-import { persistTurnLog, flagValidationFailure } from '@/lib/scout/turn-log';
+import { persistTurnLog, persistSkipLog, flagInbound } from '@/lib/scout/turn-log';
+import type { SearchHitIntroducible } from '@/lib/scout/search';
 import {
   MAX_UNANSWERED_OUTBOUND,
   FOLLOWUP_RECENCY_HOURS,
@@ -43,6 +44,7 @@ export interface GenerateScoutOptions {
   scriptedToolCalls?: ScriptedToolCall[];
   seedRejections?: ScoutRejection[];
   seedIntents?: StandingIntentRow[];
+  seedAlreadyOffered?: Array<{ id: string; name: string }>;
   recencyHours?: number;
 }
 
@@ -125,24 +127,121 @@ function inboundNameHints(text: string | null): string[] {
   return matches;
 }
 
-async function loadOpenIntroStatuses(
+interface OpenIntro {
+  id: string;
+  name: string;
+  status: string;
+  statusLine: string;
+}
+
+async function loadOpenIntros(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   profileId: string
-): Promise<string[]> {
+): Promise<OpenIntro[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('scout_introductions')
-    .select('status, platform_target_snapshot')
+    .select('id, status, platform_target_id, platform_target_snapshot')
     .eq('requester_id', profileId)
     .in('status', ['suggested', 'pending_approval', 'sent'])
     .order('updated_at', { ascending: false })
-    .limit(8);
-  return (data || []).map(row =>
-    introStatusLine({
+    .limit(20);
+  return (data || []).map(row => {
+    const snap = row.platform_target_snapshot as { name?: string } | null;
+    const name = snap && typeof snap.name === 'string' ? snap.name : 'that person';
+    return {
+      id: (row.platform_target_id as string) || (row.id as string),
+      name,
       status: row.status as string,
-      platform_target_snapshot: row.platform_target_snapshot as { name?: string } | null,
-    })
-  );
+      statusLine: introStatusLine({
+        status: row.status as string,
+        platform_target_snapshot: snap,
+      }),
+    };
+  });
+}
+
+async function hydrateConversationSearch(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  profileId: string,
+  allow: Set<string>,
+  hits: Map<string, SearchHitIntroducible>
+): Promise<void> {
+  if (!supabase) return;
+  const { data } = await supabase
+    .from('scout_turn_logs')
+    .select('tool_results')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(15);
+  for (const row of data || []) {
+    const results = row.tool_results;
+    if (!Array.isArray(results)) continue;
+    for (const entry of results) {
+      if (!entry || typeof entry !== 'object') continue;
+      const rec = entry as {
+        name?: string;
+        result?: { hits?: Array<Partial<SearchHitIntroducible> & { id?: string; introducible?: boolean }> };
+      };
+      if (rec.name !== 'search_network') continue;
+      for (const hit of rec.result?.hits || []) {
+        if (!hit.id) continue;
+        allow.add(hit.id);
+        if (hit.introducible && hit.name && !hits.has(hit.id)) {
+          hits.set(hit.id, {
+            id: hit.id,
+            tier: 1,
+            introducible: true,
+            name: hit.name,
+            role: hit.role ?? null,
+            location: hit.location ?? null,
+            hometown: hit.hometown ?? null,
+            member_status: hit.member_status ?? null,
+            company: hit.company ?? null,
+            industry: hit.industry ?? null,
+            bio: hit.bio ?? null,
+            grad_year: hit.grad_year ?? null,
+            linkedin_url: hit.linkedin_url ?? null,
+            reason: hit.reason || 'prior search hit',
+            score: hit.score ?? 0,
+          });
+        }
+      }
+    }
+  }
+}
+
+async function skipGenerate(opts: {
+  profileId: string;
+  reason: string;
+  dryRun: boolean;
+  started: number;
+  inbound?: string | null;
+  historyCount?: number;
+  shouldStop?: boolean;
+  toolCalls?: Array<{ name: string; input: unknown }>;
+  toolResults?: unknown[];
+}): Promise<GenerateScoutResult> {
+  const turnLogId = await persistSkipLog({
+    profileId: opts.profileId,
+    reason: opts.reason,
+    inboundText: opts.inbound,
+    dryRun: opts.dryRun,
+    latencyMs: Date.now() - opts.started,
+    historyCount: opts.historyCount,
+    toolCalls: opts.toolCalls,
+    toolResults: opts.toolResults,
+  });
+  return {
+    message: null,
+    skipped: true,
+    reason: opts.reason,
+    shouldStop: opts.shouldStop,
+    turnLogId,
+    historyCount: opts.historyCount,
+    toolCalls: opts.toolCalls,
+    toolResults: opts.toolResults,
+  };
 }
 
 /**
@@ -173,17 +272,31 @@ export async function generateScoutMessage(
   }
 
   if (profileRow.opt_in_status === 'opted_out') {
-    return { message: null, skipped: true, reason: 'opted_out', shouldStop: true };
+    return skipGenerate({
+      profileId,
+      reason: 'opted_out',
+      dryRun,
+      started,
+      shouldStop: true,
+    });
   }
 
   const history =
     opts.historyOverride && opts.historyOverride.length > 0
       ? opts.historyOverride.slice(-HISTORY_LIMIT)
       : await loadNewestHistory(profileId, HISTORY_LIMIT);
+  const inboundEarly = latestInboundText(history);
 
   if (type === 'reply' || type === 'followup') {
     if (unansweredOutboundCount(history) >= MAX_UNANSWERED_OUTBOUND) {
-      return { message: null, skipped: true, reason: 'max_unanswered_followups', historyCount: history.length };
+      return skipGenerate({
+        profileId,
+        reason: 'max_unanswered_followups',
+        dryRun,
+        started,
+        inbound: inboundEarly,
+        historyCount: history.length,
+      });
     }
   }
 
@@ -191,12 +304,14 @@ export async function generateScoutMessage(
     const recencyHours = opts.recencyHours ?? FOLLOWUP_RECENCY_HOURS;
     const hours = await hoursSinceLastInbound(profileId);
     if (hours != null && hours < recencyHours) {
-      return {
-        message: null,
-        skipped: true,
+      return skipGenerate({
+        profileId,
         reason: 'inbound_recency',
+        dryRun,
+        started,
+        inbound: inboundEarly,
         historyCount: history.length,
-      };
+      });
     }
   }
 
@@ -204,7 +319,17 @@ export async function generateScoutMessage(
   const privacy = await loadPrivacySettings();
   const dbRejections = opts.seedRejections || (await loadActiveRejections(supabase, profileId));
   const standingIntents = await loadStandingIntents(supabase, profileId, opts.seedIntents);
-  const introStatuses = dryRun ? [] : await loadOpenIntroStatuses(supabase, profileId);
+  const openIntros: OpenIntro[] = dryRun
+    ? (opts.seedAlreadyOffered || []).map(o => ({
+        id: o.id,
+        name: o.name,
+        status: 'suggested',
+        statusLine: `${o.name} — already offered (queued).`,
+      }))
+    : await loadOpenIntros(supabase, profileId);
+  const introStatuses = openIntros.map(i => i.statusLine);
+  const alreadyOfferedNames = [...new Set(openIntros.map(i => i.name))];
+  const alreadyOfferedIds = new Set(openIntros.map(i => i.id));
   const inbound = latestInboundText(history);
   const lastOutbound = lastOutboundText(history);
 
@@ -232,6 +357,7 @@ export async function generateScoutMessage(
     bio: profile.bio,
     rejections: dbRejections.map(r => ({ type: r.type, value: r.value })),
     introStatuses,
+    alreadyOfferedNames,
     standingIntents: standingIntents.map(i => ({
       id: i.id,
       description: i.description,
@@ -273,15 +399,29 @@ export async function generateScoutMessage(
     lastProposeStatusLine: null,
     sessionReset: false,
     standingIntents,
+    alreadyOfferedIds,
+    alreadyOfferedNames: [...alreadyOfferedNames],
   };
+
+  if (!dryRun) {
+    await hydrateConversationSearch(supabase, profileId, ctx.searchAllowlist, ctx.introducibleHits);
+  }
 
   const recordedCalls: Array<{ name: string; input: unknown }> = [];
   const recordedResults: unknown[] = [];
   let rawModelOutput: unknown = null;
 
   const runTool = async (name: string, input: Record<string, unknown>) => {
-    recordedCalls.push({ name, input });
-    const result = await handleScoutTool(name, input, ctx);
+    let resolved = input;
+    if (
+      (name === 'propose_intro' || name === 'get_person') &&
+      resolved.id === '$first_introducible'
+    ) {
+      const first = [...ctx.introducibleHits.keys()][0] || '';
+      resolved = { ...resolved, id: first };
+    }
+    recordedCalls.push({ name, input: resolved });
+    const result = await handleScoutTool(name, resolved, ctx);
     recordedResults.push({ name, result });
     return result;
   };
@@ -292,7 +432,14 @@ export async function generateScoutMessage(
     }
   } else {
     if (!apiKey) {
-      return { message: null, skipped: true, reason: 'missing_api_key', historyCount: history.length };
+      return skipGenerate({
+        profileId,
+        reason: 'missing_api_key',
+        dryRun,
+        started,
+        inbound,
+        historyCount: history.length,
+      });
     }
 
     const anthropicMessages: AnthropicMessage[] = historyToAnthropicMessages(history);
@@ -336,14 +483,16 @@ export async function generateScoutMessage(
         if (!res.ok) {
           const errText = await res.text();
           console.error('[scout/generate] Anthropic error:', res.status, errText);
-          return {
-            message: null,
-            skipped: true,
+          return skipGenerate({
+            profileId,
             reason: 'ai_error',
+            dryRun,
+            started,
+            inbound,
             historyCount: history.length,
             toolCalls: recordedCalls,
             toolResults: recordedResults,
-          };
+          });
         }
 
         const data = (await res.json()) as {
@@ -383,13 +532,16 @@ export async function generateScoutMessage(
       }
     } catch (err) {
       console.error('[scout/generate] loop error:', err);
-      return {
-        message: null,
-        skipped: true,
+      return skipGenerate({
+        profileId,
         reason: 'ai_error',
+        dryRun,
+        started,
+        inbound,
         historyCount: history.length,
         toolCalls: recordedCalls,
-      };
+        toolResults: recordedResults,
+      });
     }
   }
 
@@ -418,12 +570,16 @@ export async function generateScoutMessage(
     if (!validation.ok) {
       reason = 'validation_failed';
       if (!dryRun) {
-        await flagValidationFailure(profileId, `validation_failed: ${validation.reasons.join(',')}`);
+        await flagInbound(profileId, `validation_failed: ${validation.reasons.join(',')}`);
       }
     } else {
       sent = candidate;
     }
   }
+
+  const validationPayload = validation
+    ? { ...validation, skip_reason: validation.ok ? undefined : reason }
+    : { ok: false, reasons: [reason || 'no_send_reply'], skip_reason: reason || 'no_send_reply' };
 
   const turnLogId = await persistTurnLog({
     profile_id: profileId,
@@ -436,7 +592,7 @@ export async function generateScoutMessage(
     }),
     rejection_set: ctx.rejections,
     raw_model_output: rawModelOutput,
-    validation: validation || { ok: !candidate, reasons: candidate ? [] : ['no_send_reply'] },
+    validation: validationPayload,
     sent_text: dryRun ? null : sent,
     latency_ms: Date.now() - started,
     dry_run: dryRun,
@@ -447,7 +603,7 @@ export async function generateScoutMessage(
       message: null,
       skipped: true,
       reason,
-      validation,
+      validation: validationPayload,
       turnLogId,
       toolCalls: recordedCalls,
       toolResults: recordedResults,

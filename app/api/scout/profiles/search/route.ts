@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
           name,
           phone: p.phone,
           source_type: 'platform_profile',
-          university: space?.name || null,
+          university: null,
           chapter: space?.name || null,
           location: p.location || null,
           role: p.role || null,

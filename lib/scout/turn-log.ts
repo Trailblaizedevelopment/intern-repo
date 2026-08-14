@@ -1,5 +1,11 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+export const FLAG_SKIP_REASONS = new Set([
+  'ai_error',
+  'missing_api_key',
+  'validation_failed',
+]);
+
 export interface ScoutTurnLogInput {
   profile_id: string;
   inbound_text: string | null;
@@ -22,9 +28,9 @@ export async function persistTurnLog(input: ScoutTurnLogInput): Promise<string |
     .insert({
       profile_id: input.profile_id,
       inbound_text: input.inbound_text,
-      tool_calls: input.tool_calls,
-      tool_results: input.tool_results,
-      rejection_set: input.rejection_set,
+      tool_calls: input.tool_calls ?? [],
+      tool_results: input.tool_results ?? [],
+      rejection_set: input.rejection_set ?? [],
       raw_model_output: input.raw_model_output,
       validation: input.validation,
       sent_text: input.sent_text,
@@ -41,10 +47,7 @@ export async function persistTurnLog(input: ScoutTurnLogInput): Promise<string |
   return (data?.id as string) || null;
 }
 
-export async function flagValidationFailure(
-  profileId: string,
-  reason: string
-): Promise<void> {
+export async function flagInbound(profileId: string, reason: string): Promise<void> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return;
   const { data: latest } = await supabase
@@ -61,4 +64,35 @@ export async function flagValidationFailure(
       .update({ flagged: true, flag_reason: reason })
       .eq('id', latest.id);
   }
+}
+
+/** @deprecated use flagInbound */
+export const flagValidationFailure = flagInbound;
+
+export async function persistSkipLog(opts: {
+  profileId: string;
+  reason: string;
+  inboundText?: string | null;
+  dryRun: boolean;
+  latencyMs: number;
+  historyCount?: number;
+  toolCalls?: unknown;
+  toolResults?: unknown;
+}): Promise<string | null> {
+  const id = await persistTurnLog({
+    profile_id: opts.profileId,
+    inbound_text: opts.inboundText ?? null,
+    tool_calls: opts.toolCalls ?? [],
+    tool_results: opts.toolResults ?? [],
+    rejection_set: [],
+    raw_model_output: null,
+    validation: { ok: false, reasons: [opts.reason], skip_reason: opts.reason },
+    sent_text: null,
+    latency_ms: opts.latencyMs,
+    dry_run: opts.dryRun,
+  });
+  if (!opts.dryRun && FLAG_SKIP_REASONS.has(opts.reason)) {
+    await flagInbound(opts.profileId, opts.reason);
+  }
+  return id;
 }

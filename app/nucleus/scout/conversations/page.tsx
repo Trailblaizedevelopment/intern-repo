@@ -69,7 +69,7 @@ export default function ConversationsFeed() {
     id: string;
     inbound_text: string | null;
     tool_calls: Array<{ name?: string }>;
-    validation: { ok?: boolean; reasons?: string[] } | null;
+    validation: { ok?: boolean; reasons?: string[]; skip_reason?: string } | null;
     sent_text: string | null;
     latency_ms: number | null;
     dry_run: boolean;
@@ -497,9 +497,15 @@ export default function ConversationsFeed() {
                     <div style={{ marginBottom: '6px' }}>
                       <span style={{ color: '#6b7280' }}>Validation: </span>
                       <span style={{ color: ok ? '#065f46' : '#991b1b' }}>
-                        {ok ? 'ok' : (turn.validation?.reasons || []).join(', ') || 'n/a'}
+                        {ok ? 'ok' : (turn.validation?.skip_reason || (turn.validation?.reasons || []).join(', ') || 'n/a')}
                       </span>
                     </div>
+                    {!turn.sent_text && (turn.validation?.skip_reason || (turn.validation?.reasons || []).length > 0) && (
+                      <div style={{ marginBottom: '6px' }}>
+                        <span style={{ color: '#6b7280' }}>Skip: </span>
+                        {turn.validation?.skip_reason || (turn.validation?.reasons || []).join(', ')}
+                      </div>
+                    )}
                     <div>
                       <span style={{ color: '#6b7280' }}>Sent: </span>
                       {turn.sent_text || '—'}

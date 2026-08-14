@@ -33,6 +33,7 @@ export interface ValidationAllowlist {
 export interface ValidationResult {
   ok: boolean;
   reasons: string[];
+  skip_reason?: string;
 }
 
 function normalizeNameToken(s: string): string {

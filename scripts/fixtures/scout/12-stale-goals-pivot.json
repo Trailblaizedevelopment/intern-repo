@@ -1,21 +1,21 @@
 {
-  "id": "03-atlanta-pivot",
+  "id": "12-stale-goals-pivot",
   "history": [
     {
       "direction": "outbound",
-      "message_body": "Still thinking Texas, or somewhere else?",
+      "message_body": "I still have Texas on file from earlier.",
       "created_at": "2026-08-14T12:00:00Z"
     },
     {
       "direction": "inbound",
-      "message_body": "actually Atlanta instead",
+      "message_body": "scratch that — Atlanta only",
       "created_at": "2026-08-14T12:01:00Z"
     }
   ],
   "scriptedToolCalls": [
     {
       "name": "save_member_context",
-      "input": { "looking_for": "people in Atlanta", "intent_location": "Atlanta" }
+      "input": { "looking_for": "People in Atlanta to connect with" }
     },
     {
       "name": "search_network",
@@ -23,7 +23,7 @@
     },
     {
       "name": "send_reply",
-      "input": { "message": "Atlanta it is — I'll look there instead of Texas." }
+      "input": { "message": "Got it — Atlanta only from here, not Texas." }
     }
   ],
   "expect": {

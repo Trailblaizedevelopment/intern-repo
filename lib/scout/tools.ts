@@ -7,8 +7,10 @@ export const SCOUT_TOOLS = [
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Free-text intent (city, industry, role, etc.)' },
-        location: { type: 'string' },
+        location: { type: 'string', description: 'Search geo for this query (not the member home city)' },
         industry: { type: 'string' },
+        min_grad_year: { type: 'integer' },
+        max_grad_year: { type: 'integer' },
         tier_scope: {
           type: 'array',
           items: { type: 'integer' },
@@ -21,7 +23,7 @@ export const SCOUT_TOOLS = [
   {
     name: 'get_person',
     description:
-      'Fetch details for an introducible person whose id appeared in this turn’s search_network results.',
+      'Fetch details for an introducible person whose id appeared in search_network this conversation.',
     input_schema: {
       type: 'object',
       properties: {
@@ -59,12 +61,13 @@ export const SCOUT_TOOLS = [
   {
     name: 'save_member_context',
     description:
-      'Patch this member’s scout profile (location, looking_for, industry, etc.). Replace fields on a pivot — do not merge conflicting geos.',
+      'Patch member facts. looking_for / intent_location are search intent (replaces goals). home_location / hometown are where they live — never write a networking city into home_location.',
     input_schema: {
       type: 'object',
       properties: {
-        looking_for: { type: 'string' },
-        location: { type: 'string' },
+        looking_for: { type: 'string', description: 'What they want from the network. Replaces prior looking_for and clears goals.' },
+        intent_location: { type: 'string', description: 'City/region they want intros in. Does not change home location.' },
+        home_location: { type: 'string', description: 'Where they live now.' },
         industry: { type: 'string' },
         career_interest: { type: 'string' },
         company: { type: 'string' },

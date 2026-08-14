@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getPlatformAdmin } from '@/lib/supabase-platform';
+import { computeProfileComplete, toDiscoveryProfile } from '@/lib/scout/discovery';
 
 export async function GET(request: NextRequest) {
   try {
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
         phone_number: normalizedPhone,
         name,
         chapter: space?.name || null,
-        university: space?.name || null,
+        university: null,
         graduation_year: profile.grad_year,
         location: profile.location || profile.current_place || null,
         current_title: currentTitle,
@@ -147,8 +148,10 @@ export async function POST(request: NextRequest) {
         bio: profile.bio || null,
         source_type: 'platform_profile',
         source_id,
-        profile_complete: 30,
       };
+      profileData.profile_complete = computeProfileComplete(
+        toDiscoveryProfile({ id: 'new', ...profileData })
+      );
     } else if (source_type === 'manual') {
       const { name, phone_number } = body;
       if (!name || !phone_number) {
@@ -172,8 +175,10 @@ export async function POST(request: NextRequest) {
         notes: body.notes || '',
         source_type: 'manual',
         source_id: null,
-        profile_complete: body.profile_complete || 10,
       };
+      profileData.profile_complete = computeProfileComplete(
+        toDiscoveryProfile({ id: 'new', ...profileData })
+      );
     } else {
       return NextResponse.json(
         { data: null, error: { message: 'Invalid source_type or missing source_id', code: 'VALIDATION_ERROR' } },
@@ -244,6 +249,18 @@ export async function PATCH(request: NextRequest) {
       if (key in updates) {
         sanitized[key] = updates[key];
       }
+    }
+
+    const { data: existing } = await supabase
+      .from('scout_profiles')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (existing) {
+      sanitized.profile_complete = computeProfileComplete(
+        toDiscoveryProfile({ ...existing, ...sanitized })
+      );
     }
 
     const { data, error } = await supabase

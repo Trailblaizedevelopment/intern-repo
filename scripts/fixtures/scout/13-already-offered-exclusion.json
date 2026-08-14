@@ -1,0 +1,45 @@
+{
+  "id": "13-already-offered-exclusion",
+  "history": [
+    {
+      "direction": "outbound",
+      "message_body": "Want an intro if I find someone?",
+      "created_at": "2026-08-14T12:00:00Z"
+    },
+    {
+      "direction": "inbound",
+      "message_body": "yes intro whoever fits Atlanta",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "seedAlreadyOffered": [
+    {
+      "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "name": "Pat Already"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "search_network",
+      "input": { "query": "people in Atlanta", "location": "Atlanta" }
+    },
+    {
+      "name": "propose_intro",
+      "input": { "id": "$first_introducible", "reason": "Atlanta fit" }
+    },
+    {
+      "name": "search_network",
+      "input": { "query": "people in Atlanta", "location": "Atlanta" }
+    },
+    {
+      "name": "send_reply",
+      "input": { "message": "Queued that intro with the team — they have not been auto-texted." }
+    }
+  ],
+  "expect": {
+    "tools": ["search_network", "send_reply"],
+    "validationOk": true,
+    "sent": true,
+    "searchExcludeIds": ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"]
+  }
+}

@@ -49,6 +49,12 @@ export interface SearchNetworkInput {
   industry?: string;
   tier_scope?: number[];
   limit?: number;
+  min_grad_year?: number;
+  max_grad_year?: number;
+  /** Platform profile ids already offered / in-flight intros */
+  exclude_ids?: string[];
+  /** Active standing-intent descriptions and locations */
+  intent_snippets?: string[];
 }
 
 export interface SearchHitIntroducible {
@@ -84,6 +90,7 @@ export interface SearchNetworkResult {
   opaque_count: number;
   skipped_tiers: number[];
   note: string;
+  query_tokens: string[];
 }
 
 interface PlatformPeer {
@@ -366,6 +373,7 @@ export async function searchNetwork(
     tier1_count: 0,
     opaque_count: 0,
     skipped_tiers: skippedTiers,
+    query_tokens: [],
     note:
       skippedTiers.length > 0
         ? 'Only chapter (tier 1) search is available. Broader network tiers are not wired.'
@@ -403,17 +411,15 @@ export async function searchNetwork(
     input.industry,
     profile.looking_for,
     profile.career_interest,
-    profile.location,
     profile.industry,
-    Array.isArray(profile.goals)
-      ? profile.goals.filter((g): g is string => typeof g === 'string').join(' ')
-      : '',
+    ...(input.intent_snippets || []),
   ]
     .filter(Boolean)
     .join(' ');
   const tokens = expandGeoTokens([...new Set(tokenize(queryParts))]);
   const boostAlumni = wantsAlumniBoost(tokens);
   const geoIntent = hasGeoIntent(tokens) || Boolean(input.location);
+  const exclude = new Set(input.exclude_ids || []);
 
   type Scored = {
     peer: PlatformPeer;
@@ -424,8 +430,23 @@ export async function searchNetwork(
   const scored: Scored[] = [];
   for (const peer of list) {
     if (profile.source_id && peer.id === profile.source_id) continue;
+    if (exclude.has(peer.id)) continue;
     if (personRejected(peer, rejections)) continue;
     if (criterionRejected(peer, rejections)) continue;
+    if (
+      input.min_grad_year != null &&
+      peer.grad_year != null &&
+      peer.grad_year < input.min_grad_year
+    ) {
+      continue;
+    }
+    if (
+      input.max_grad_year != null &&
+      peer.grad_year != null &&
+      peer.grad_year > input.max_grad_year
+    ) {
+      continue;
+    }
 
     const { score, reason, geoHit } = scorePeer(peer, tokens, boostAlumni, geoIntent);
     scored.push({ peer, score, reason, geoHit });
@@ -485,6 +506,7 @@ export async function searchNetwork(
     tier1_count: introducibleHits.length,
     opaque_count: opaqueHits.length,
     skipped_tiers: skippedTiers,
+    query_tokens: tokens,
     note:
       hits.length === 0
         ? empty.note

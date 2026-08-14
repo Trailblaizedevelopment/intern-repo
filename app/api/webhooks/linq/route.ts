@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     let autoReplied = false;
+    let generateSkipReason: string | undefined;
     if (!shouldFlag && profile.opt_in_status !== 'opted_out') {
       try {
         const result = await generateScoutMessage(profile.id, 'reply');
@@ -168,6 +169,9 @@ export async function POST(request: NextRequest) {
           } catch (sendErr) {
             console.error('[POST /api/webhooks/linq] Auto-reply send error:', sendErr);
           }
+        } else {
+          generateSkipReason = result.reason;
+          console.warn('[POST /api/webhooks/linq] generate skip:', result.reason || 'unknown');
         }
       } catch (genErr) {
         // Log and return 201 without double-send
@@ -176,7 +180,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { status: 'processed', flagged: shouldFlag, auto_replied: autoReplied },
+      {
+        status: 'processed',
+        flagged: shouldFlag,
+        auto_replied: autoReplied,
+        skip_reason: generateSkipReason,
+      },
       { status: 201 }
     );
   } catch (err) {

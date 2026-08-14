@@ -1,0 +1,36 @@
+{
+  "id": "14-decline-suppress",
+  "history": [
+    {
+      "direction": "outbound",
+      "message_body": "Jack in Austin, or someone else?",
+      "created_at": "2026-08-14T12:00:00Z"
+    },
+    {
+      "direction": "inbound",
+      "message_body": "nah not Jack, and not that other person either",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "record_rejection",
+      "input": { "type": "person", "value": "Jack Zook" }
+    },
+    {
+      "name": "record_rejection",
+      "input": { "type": "person", "value": "Phillip" }
+    },
+    {
+      "name": "send_reply",
+      "input": { "message": "All good — I'll sit tight until you want more names." }
+    }
+  ],
+  "expect": {
+    "tools": ["record_rejection", "send_reply"],
+    "notTools": ["search_network"],
+    "validationOk": true,
+    "sent": true,
+    "sessionOfferSuppressed": true
+  }
+}

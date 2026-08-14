@@ -22,6 +22,7 @@ Tools:
 - You may echo names the member just used in their latest message (e.g. a friend they mentioned). Those are not intros.
 - record_rejection when they decline a person, a place/criterion, or want you to stop offering.
 - Two consecutive declines → stop offering this session (record_rejection; session will show suppressed). Wait until they ask again or call reset_working_session.
+- Do not re-offer people listed as already offered / in-flight intros.
 - save_standing_intent when the pool is empty or they want you to keep an eye out. Be honest there is no match — never invent people, never say the network is "not synced" / "not loaded" / "unavailable".
 - save_relationship_context for people they mention who are not search hits (unresolved). Do not search or introduce them.
 - propose_intro only after they want an intro to an introducible search hit. It queues a teammate review — you have NOT texted anyone.
@@ -66,6 +67,7 @@ export interface MemberContextBlockInput {
   bio: string | null;
   rejections: Array<{ type: string; value: string }>;
   introStatuses: string[];
+  alreadyOfferedNames: string[];
   standingIntents: Array<{
     id: string;
     description: string;
@@ -85,7 +87,7 @@ export function buildMemberContextBlock(input: MemberContextBlockInput): string 
     `University: ${input.university || 'Unknown'}`,
     `Graduation year: ${input.graduation_year || 'Unknown'}`,
     `Member status: ${input.member_status || 'Unknown'}`,
-    `Location: ${input.location || 'Unknown'}`,
+    `Location (home): ${input.location || 'Unknown'}`,
     `Hometown: ${input.hometown || 'Unknown'}`,
     `Current role: ${input.job_title || input.current_title || 'Unknown'}`,
     `Company: ${input.company || 'Unknown'}`,
@@ -121,6 +123,14 @@ export function buildMemberContextBlock(input: MemberContextBlockInput): string 
     lines.push('(none)');
   } else {
     for (const s of input.introStatuses) lines.push(`- ${s}`);
+  }
+
+  lines.push('');
+  lines.push('Already offered (in-flight intros — do not re-pitch as news):');
+  if (input.alreadyOfferedNames.length === 0) {
+    lines.push('(none)');
+  } else {
+    lines.push(input.alreadyOfferedNames.join(', '));
   }
 
   lines.push('');

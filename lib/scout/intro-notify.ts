@@ -101,6 +101,14 @@ export async function notifyMemberOfApprovedIntro(
       })
       .eq('id', introId);
 
+    await supabase
+      .from('scout_profiles')
+      .update({
+        active_intro_id: introId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', requesterId);
+
     return { sent: true, message };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'send_failed';

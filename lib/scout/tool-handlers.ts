@@ -10,6 +10,7 @@ import {
   type SearchNetworkInput,
 } from '@/lib/scout/search';
 import type { ScoutPrivacySettings } from '@/lib/scout/privacy';
+import { computeProfileComplete, toDiscoveryProfile } from '@/lib/scout/discovery';
 
 export interface StandingIntentRow {
   id: string;
@@ -44,6 +45,8 @@ export interface ScoutTurnContext {
   lastProposeStatusLine: string | null;
   sessionReset: boolean;
   standingIntents: StandingIntentRow[];
+  alreadyOfferedIds: Set<string>;
+  alreadyOfferedNames: string[];
 }
 
 function asString(v: unknown): string | undefined {
@@ -128,15 +131,30 @@ export async function handleScoutTool(
 ): Promise<unknown> {
   switch (name) {
     case 'search_network': {
+      if (ctx.profile.session_offer_suppressed || (ctx.profile.session_consecutive_declines || 0) > 0) {
+        ctx.profile.session_offer_suppressed = false;
+        ctx.profile.session_consecutive_declines = 0;
+        if (!ctx.dryRun) {
+          await ctx.supabase
+            .from('scout_profiles')
+            .update({
+              session_offer_suppressed: false,
+              session_consecutive_declines: 0,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', ctx.profileId);
+        }
+      }
+      const intentSnippets = ctx.standingIntents
+        .filter(i => i.effective_status === 'active')
+        .flatMap(i => [i.description, i.location].filter((x): x is string => Boolean(x)));
       const result = await searchNetwork(
+        ctx.profile,
         {
-          ...ctx.profile,
-          looking_for: asString(input.query) || ctx.profile.looking_for,
-          location: asString(input.location) || ctx.profile.location,
-          industry: asString(input.industry) || ctx.profile.industry,
-          career_interest: asString(input.industry) || ctx.profile.career_interest,
+          ...(input as SearchNetworkInput),
+          exclude_ids: [...ctx.alreadyOfferedIds],
+          intent_snippets: intentSnippets,
         },
-        input as SearchNetworkInput,
         ctx.rejections,
         ctx.privacy
       );
@@ -149,7 +167,12 @@ export async function handleScoutTool(
           }
         }
       }
-      return sanitizeToolSearchResult(result);
+      const sanitized = sanitizeToolSearchResult(result) as Record<string, unknown>;
+      if (ctx.dryRun) {
+        sanitized.query_tokens = result.query_tokens;
+        sanitized.exclude_ids = [...ctx.alreadyOfferedIds];
+      }
+      return sanitized;
     }
 
     case 'get_person': {
@@ -233,6 +256,10 @@ export async function handleScoutTool(
         status,
         platform_target_snapshot: { name: hit.name },
       });
+      ctx.alreadyOfferedIds.add(id);
+      if (!ctx.alreadyOfferedNames.includes(hit.name)) {
+        ctx.alreadyOfferedNames.push(hit.name);
+      }
       return {
         intro_id: introId,
         status,
@@ -261,36 +288,54 @@ export async function handleScoutTool(
 
     case 'save_member_context': {
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      const fields = [
-        'looking_for',
-        'location',
-        'industry',
-        'career_interest',
-        'company',
-        'job_title',
-        'hometown',
-        'notes',
-      ] as const;
-      for (const f of fields) {
+      const lookingFor = asString(input.looking_for);
+      if (lookingFor) {
+        patch.looking_for = lookingFor;
+        ctx.profile.looking_for = lookingFor;
+        patch.goals = [];
+        ctx.profile.goals = [];
+      }
+      const intentLocation = asString(input.intent_location);
+      if (intentLocation && !lookingFor) {
+        patch.looking_for = `People in ${intentLocation}`;
+        ctx.profile.looking_for = patch.looking_for as string;
+        patch.goals = [];
+        ctx.profile.goals = [];
+      }
+      const homeLocation = asString(input.home_location);
+      if (homeLocation) {
+        patch.location = homeLocation;
+        ctx.profile.location = homeLocation;
+      }
+      const identityFields = ['industry', 'career_interest', 'company', 'job_title', 'hometown', 'notes'] as const;
+      for (const f of identityFields) {
         const v = asString(input[f]);
         if (v) {
           patch[f] = v;
-          if (f === 'looking_for') ctx.profile.looking_for = v;
-          else if (f === 'location') ctx.profile.location = v;
-          else if (f === 'industry') ctx.profile.industry = v;
+          if (f === 'industry') ctx.profile.industry = v;
           else if (f === 'career_interest') ctx.profile.career_interest = v;
         }
       }
       const goals = asStringArray(input.goals);
-      if (goals) {
+      if (goals && !lookingFor && !intentLocation) {
         patch.goals = goals;
         ctx.profile.goals = goals;
       }
       if (Object.keys(patch).length <= 1) return { ok: true, updated: [] };
       if (!ctx.dryRun) {
+        const { data: row } = await ctx.supabase
+          .from('scout_profiles')
+          .select('*')
+          .eq('id', ctx.profileId)
+          .single();
+        if (row) {
+          patch.profile_complete = computeProfileComplete(
+            toDiscoveryProfile({ ...row, ...patch })
+          );
+        }
         await ctx.supabase.from('scout_profiles').update(patch).eq('id', ctx.profileId);
       }
-      return { ok: true, updated: Object.keys(patch).filter(k => k !== 'updated_at') };
+      return { ok: true, updated: Object.keys(patch).filter(k => k !== 'updated_at' && k !== 'profile_complete') };
     }
 
     case 'record_rejection': {

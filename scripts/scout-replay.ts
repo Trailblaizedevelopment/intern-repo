@@ -38,6 +38,13 @@ interface FixtureExpect {
   historyCount?: number;
   searchOmitsName?: string;
   searchOmitsGeo?: string;
+  searchOmitsToken?: string;
+  searchOmitsProposedId?: boolean;
+  searchExcludeIds?: string[];
+  saveClearsGoals?: boolean;
+  sessionOfferSuppressed?: boolean;
+  skipReason?: string;
+  hasTurnLog?: boolean;
   validationReasonsInclude?: string[];
   skipIf?: string;
 }
@@ -60,6 +67,7 @@ interface Fixture {
     last_confirmed_at: string | null;
     effective_status: string;
   }>;
+  seedAlreadyOffered?: Array<{ id: string; name: string }>;
   expect: FixtureExpect;
 }
 
@@ -127,6 +135,7 @@ async function runFixture(path: string, profileId: string): Promise<void> {
     scriptedToolCalls: fixture.scriptedToolCalls,
     seedRejections: fixture.seedRejections,
     seedIntents: fixture.seedIntents,
+    seedAlreadyOffered: fixture.seedAlreadyOffered,
     recencyHours: 0,
   });
 
@@ -193,12 +202,118 @@ async function runFixture(path: string, profileId: string): Promise<void> {
       fail(fixture.id, `search still included geo ${exp.searchOmitsGeo}`);
     }
   }
+  if (exp.searchOmitsToken) {
+    const search = searchResultFromTools(result.toolResults || []);
+    const tokens = ((search?.query_tokens as string[]) || []).map(t => t.toLowerCase());
+    const needle = exp.searchOmitsToken.toLowerCase();
+    if (!Array.isArray(search?.query_tokens)) {
+      fail(fixture.id, 'expected query_tokens on dry-run search result');
+    }
+    if (tokens.some(t => t.includes(needle))) {
+      fail(fixture.id, `search tokens still included ${exp.searchOmitsToken}: ${tokens.join(',')}`);
+    }
+  }
+  if (exp.searchExcludeIds) {
+    const searches = (result.toolResults || []).filter(row => {
+      if (!row || typeof row !== 'object') return false;
+      return (row as { name?: string }).name === 'search_network';
+    }) as Array<{ result?: { exclude_ids?: string[] } }>;
+    const last = searches[searches.length - 1];
+    const excluded = last?.result?.exclude_ids || [];
+    for (const id of exp.searchExcludeIds) {
+      if (!excluded.includes(id)) {
+        fail(fixture.id, `search exclude_ids missing ${id}, got ${excluded.join(',') || '(none)'}`);
+      }
+    }
+  }
+  if (exp.searchOmitsProposedId) {
+    const proposed = (result.toolCalls || []).find(t => t.name === 'propose_intro');
+    const id = proposed && typeof proposed.input === 'object' && proposed.input
+      ? String((proposed.input as { id?: string }).id || '')
+      : '';
+    if (!id) fail(fixture.id, 'expected propose_intro id to exclude from later search');
+    const searches = (result.toolResults || []).filter(row => {
+      if (!row || typeof row !== 'object') return false;
+      return (row as { name?: string }).name === 'search_network';
+    });
+    const last = searches[searches.length - 1] as { result?: { hits?: Array<{ id?: string }> } } | undefined;
+    const hits = last?.result?.hits || [];
+    if (hits.some(h => h.id === id)) {
+      fail(fixture.id, `search still included already-offered id ${id}`);
+    }
+  }
+  if (exp.saveClearsGoals) {
+    const save = (result.toolResults || []).find(row => {
+      if (!row || typeof row !== 'object') return false;
+      return (row as { name?: string }).name === 'save_member_context';
+    }) as { result?: { updated?: string[] } } | undefined;
+    const updated = save?.result?.updated || [];
+    if (!updated.includes('goals')) {
+      fail(fixture.id, `save_member_context should clear goals, updated=${updated.join(',')}`);
+    }
+  }
+  if (exp.sessionOfferSuppressed) {
+    const rejections = (result.toolResults || []).filter(row => {
+      if (!row || typeof row !== 'object') return false;
+      return (row as { name?: string }).name === 'record_rejection';
+    }) as Array<{ result?: { session_offer_suppressed?: boolean } }>;
+    const last = rejections[rejections.length - 1];
+    if (!last?.result?.session_offer_suppressed) {
+      fail(fixture.id, 'expected session_offer_suppressed after consecutive person declines');
+    }
+  }
+  if (exp.skipReason) {
+    const reasons = [
+      result.reason,
+      result.validation?.skip_reason,
+      ...(result.validation?.reasons || []),
+    ].filter(Boolean) as string[];
+    if (!reasons.some(r => r.includes(exp.skipReason))) {
+      fail(fixture.id, `expected skip reason ${exp.skipReason}, got ${reasons.join(',') || '(none)'}`);
+    }
+  }
+  if (exp.hasTurnLog && !result.turnLogId) {
+    fail(fixture.id, 'expected a turn log id on skip/generate');
+  }
 
   console.log(`PASS ${fixture.id}`);
 }
 
+async function assertCompletenessFormula(): Promise<void> {
+  const { computeProfileComplete } = await import('../lib/scout/discovery');
+  const owenShaped = computeProfileComplete({
+    id: 'test',
+    name: 'Owen',
+    chapter: null,
+    university: null,
+    graduation_year: null,
+    location: 'Texas',
+    current_title: null,
+    career_interest: null,
+    looking_for: 'People in Atlanta to connect with',
+    goals: ['Texas finance', 'Texas alumni', 'Austin', 'Dallas'],
+    skills: [],
+    member_status: null,
+    industry: null,
+    company: null,
+    job_title: null,
+    hometown: null,
+    linkedin_url: null,
+    bio: null,
+    source_type: null,
+    source_id: null,
+    platform_chapter_id: null,
+    profile_complete: null,
+  });
+  if (owenShaped >= 85) {
+    fail('completeness', `Owen-shaped row scored ${owenShaped}; must not be 85+ from looking_for + search-city location`);
+  }
+  console.log(`PASS completeness-owen-shaped (${owenShaped})`);
+}
+
 async function main(): Promise<void> {
   loadEnvLocal();
+  await assertCompletenessFormula();
   const fixtureDir = resolve(process.cwd(), 'scripts/fixtures/scout');
   const single = argValue('--fixture');
   const files = single

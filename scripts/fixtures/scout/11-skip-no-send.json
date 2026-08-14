@@ -1,0 +1,28 @@
+{
+  "id": "11-skip-no-send",
+  "history": [
+    {
+      "direction": "outbound",
+      "message_body": "Want me to keep an eye out?",
+      "created_at": "2026-08-14T12:00:00Z"
+    },
+    {
+      "direction": "inbound",
+      "message_body": "yeah just note it",
+      "created_at": "2026-08-14T12:01:00Z"
+    }
+  ],
+  "scriptedToolCalls": [
+    {
+      "name": "save_standing_intent",
+      "input": { "description": "Atlanta finance intros", "location": "Atlanta" }
+    }
+  ],
+  "expect": {
+    "tools": ["save_standing_intent"],
+    "notTools": ["send_reply"],
+    "sent": false,
+    "skipReason": "no_send_reply",
+    "hasTurnLog": true
+  }
+}
