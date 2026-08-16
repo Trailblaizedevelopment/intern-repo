@@ -39,6 +39,8 @@ export interface ScoutTurnContext {
   rejections: ScoutRejection[];
   searchAllowlist: Set<string>;
   introducibleHits: Map<string, SearchHitIntroducible>;
+  /** Introducible ids from this turn's latest search_network call, in rank order. Null if none yet. */
+  lastSearchHitIds: string[] | null;
   introducibleNames: string[];
   sendReplyMessage: string | null;
   lastProposeIntroId: string | null;
@@ -147,7 +149,13 @@ export async function handleScoutTool(
       }
       const intentSnippets = ctx.standingIntents
         .filter(i => i.effective_status === 'active')
-        .flatMap(i => [i.description, i.location].filter((x): x is string => Boolean(x)));
+        .flatMap(i => {
+          const bits: string[] = [];
+          if (i.location) bits.push(i.location);
+          if (i.industry) bits.push(i.industry);
+          if (i.description) bits.push(i.description.slice(0, 80));
+          return bits;
+        });
       const result = await searchNetwork(
         ctx.profile,
         {
@@ -158,6 +166,9 @@ export async function handleScoutTool(
         ctx.rejections,
         ctx.privacy
       );
+      ctx.lastSearchHitIds = result.hits
+        .filter((h): h is SearchHitIntroducible => h.introducible)
+        .map(h => h.id);
       for (const hit of result.hits) {
         ctx.searchAllowlist.add(hit.id);
         if (hit.introducible) {
@@ -323,17 +334,23 @@ export async function handleScoutTool(
       }
       if (Object.keys(patch).length <= 1) return { ok: true, updated: [] };
       if (!ctx.dryRun) {
-        const { data: row } = await ctx.supabase
+        const { data: row, error: patchErr } = await ctx.supabase
           .from('scout_profiles')
-          .select('*')
+          .update(patch)
           .eq('id', ctx.profileId)
+          .select('*')
           .single();
-        if (row) {
-          patch.profile_complete = computeProfileComplete(
-            toDiscoveryProfile({ ...row, ...patch })
-          );
+        if (patchErr) {
+          console.error('[scout/tools] save_member_context persist failed:', patchErr.message);
+        } else if (row) {
+          const complete = computeProfileComplete(toDiscoveryProfile(row));
+          if (complete !== (row.profile_complete ?? 0)) {
+            await ctx.supabase
+              .from('scout_profiles')
+              .update({ profile_complete: complete })
+              .eq('id', ctx.profileId);
+          }
         }
-        await ctx.supabase.from('scout_profiles').update(patch).eq('id', ctx.profileId);
       }
       return { ok: true, updated: Object.keys(patch).filter(k => k !== 'updated_at' && k !== 'profile_complete') };
     }

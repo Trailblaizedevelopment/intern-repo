@@ -126,12 +126,30 @@ export interface ScoutProfileForSearch {
   opt_in_status?: string | null;
 }
 
+const INTENT_SNIPPET_MAX = 9;
+const INTENT_SNIPPET_CHAR_CAP = 80;
+const INTENT_SNIPPET_TOKEN_CAP = 12;
+
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(t => t.length > 1 && !STOP_WORDS.has(t));
+}
+
+/** Standing-intent text is user-influenced; cap tokens so it cannot dominate the query. */
+function intentSnippetTokens(snippets: string[] | undefined): string[] {
+  if (!snippets || snippets.length === 0) return [];
+  const tokens: string[] = [];
+  for (const snippet of snippets.slice(0, INTENT_SNIPPET_MAX)) {
+    const trimmed = snippet.trim().slice(0, INTENT_SNIPPET_CHAR_CAP);
+    for (const token of tokenize(trimmed)) {
+      if (!tokens.includes(token)) tokens.push(token);
+      if (tokens.length >= INTENT_SNIPPET_TOKEN_CAP) return tokens;
+    }
+  }
+  return tokens;
 }
 
 export function expandGeoTokens(tokens: string[]): string[] {
@@ -412,11 +430,12 @@ export async function searchNetwork(
     profile.looking_for,
     profile.career_interest,
     profile.industry,
-    ...(input.intent_snippets || []),
   ]
     .filter(Boolean)
     .join(' ');
-  const tokens = expandGeoTokens([...new Set(tokenize(queryParts))]);
+  const tokens = expandGeoTokens([
+    ...new Set([...tokenize(queryParts), ...intentSnippetTokens(input.intent_snippets)]),
+  ]);
   const boostAlumni = wantsAlumniBoost(tokens);
   const geoIntent = hasGeoIntent(tokens) || Boolean(input.location);
   const exclude = new Set(input.exclude_ids || []);

@@ -246,23 +246,13 @@ export async function PATCH(request: NextRequest) {
 
     const sanitized: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const key of allowedFields) {
-      if (key in updates) {
+      if (key in updates && key !== 'profile_complete') {
         sanitized[key] = updates[key];
       }
     }
 
-    const { data: existing } = await supabase
-      .from('scout_profiles')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (existing) {
-      sanitized.profile_complete = computeProfileComplete(
-        toDiscoveryProfile({ ...existing, ...sanitized })
-      );
-    }
-
+    // Write requested fields first, then score from the stored row so a concurrent
+    // patch cannot revert columns or bake a stale completeness value into this write.
     const { data, error } = await supabase
       .from('scout_profiles')
       .update(sanitized)
@@ -276,6 +266,21 @@ export async function PATCH(request: NextRequest) {
         { data: null, error: { message: error.message, code: error.code || 'DB_ERROR' } },
         { status: 500 }
       );
+    }
+
+    const complete = computeProfileComplete(toDiscoveryProfile(data));
+    if (complete !== (data.profile_complete ?? 0)) {
+      const { data: rescored, error: scoreErr } = await supabase
+        .from('scout_profiles')
+        .update({ profile_complete: complete, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (scoreErr) {
+        console.error('[PATCH /api/scout/profiles] completeness rescore failed:', scoreErr.message);
+      } else if (rescored) {
+        return NextResponse.json({ data: rescored, error: null });
+      }
     }
 
     return NextResponse.json({ data, error: null });

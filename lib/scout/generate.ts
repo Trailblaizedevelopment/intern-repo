@@ -161,6 +161,24 @@ async function loadOpenIntros(
   });
 }
 
+function resolveFirstIntroducible(ctx: ScoutTurnContext): string {
+  if (ctx.lastSearchHitIds) {
+    for (const id of ctx.lastSearchHitIds) {
+      if (ctx.introducibleHits.has(id)) return id;
+    }
+    return '';
+  }
+  let bestId = '';
+  let bestScore = -Infinity;
+  for (const [id, hit] of ctx.introducibleHits) {
+    if (hit.score > bestScore) {
+      bestScore = hit.score;
+      bestId = id;
+    }
+  }
+  return bestId;
+}
+
 async function hydrateConversationSearch(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   profileId: string,
@@ -393,6 +411,7 @@ export async function generateScoutMessage(
     rejections: [...dbRejections],
     searchAllowlist: new Set(),
     introducibleHits: new Map(),
+    lastSearchHitIds: null,
     introducibleNames: [],
     sendReplyMessage: null,
     lastProposeIntroId: null,
@@ -417,8 +436,7 @@ export async function generateScoutMessage(
       (name === 'propose_intro' || name === 'get_person') &&
       resolved.id === '$first_introducible'
     ) {
-      const first = [...ctx.introducibleHits.keys()][0] || '';
-      resolved = { ...resolved, id: first };
+      resolved = { ...resolved, id: resolveFirstIntroducible(ctx) };
     }
     recordedCalls.push({ name, input: resolved });
     const result = await handleScoutTool(name, resolved, ctx);

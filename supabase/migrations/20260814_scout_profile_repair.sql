@@ -9,16 +9,27 @@ WHERE university IS NOT NULL
   AND chapter IS NOT NULL
   AND university = chapter;
 
--- Search geo (e.g. Texas) was written into identity location. Home city lives on hometown.
+-- Search geo (e.g. Texas) was written into identity location. Only clear a bare
+-- state when hometown already holds identity geo, so a real Texas home is kept.
 UPDATE scout_profiles
 SET location = NULL, updated_at = NOW()
-WHERE lower(trim(location)) = 'texas';
+WHERE lower(trim(location)) = 'texas'
+  AND hometown IS NOT NULL
+  AND btrim(hometown) <> '';
 
--- Stale search goals that survived looking_for pivots.
+-- Drop stale Texas goal entries after an Atlanta-only pivot. Keep other goals
+-- and skip people whose looking_for still mentions Texas (multi-region intent).
 UPDATE scout_profiles
-SET goals = '[]'::jsonb, updated_at = NOW()
+SET goals = COALESCE((
+      SELECT jsonb_agg(elem)
+      FROM jsonb_array_elements(goals) AS elem
+      WHERE lower(elem::text) NOT LIKE '%texas%'
+    ), '[]'::jsonb),
+    updated_at = NOW()
 WHERE looking_for ILIKE '%atlanta%'
-  AND goals IS NOT NULL
+  AND looking_for NOT ILIKE '%texas%'
+  AND looking_for !~* '\mtx\m'
+  AND jsonb_typeof(goals) = 'array'
   AND goals <> '[]'::jsonb
   AND goals::text ILIKE '%texas%';
 
