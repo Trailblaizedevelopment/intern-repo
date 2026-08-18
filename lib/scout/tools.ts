@@ -150,7 +150,7 @@ export const SCOUT_TOOLS = [
   {
     name: 'send_reply',
     description:
-      'The only outbound SMS candidate. Keep it short (~1–3 sentences, under 500 characters). If you do not call this, nothing is sent.',
+      'Required on every open/reply turn: the only outbound SMS candidate. Keep it short (~1–3 sentences, under 500 characters). If you do not call this, nothing is sent.',
     input_schema: {
       type: 'object',
       properties: {

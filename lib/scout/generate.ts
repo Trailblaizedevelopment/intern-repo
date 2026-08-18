@@ -94,6 +94,23 @@ export async function loadNewestHistory(
   return [...newestFirst].reverse();
 }
 
+function textFromAnthropicContent(content: AnthropicContent[]): string | null {
+  const parts = content
+    .filter((b): b is Extract<AnthropicContent, { type: 'text' }> => b.type === 'text')
+    .map(b => b.text.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+  const joined = parts.join(' ').replace(/\s+/g, ' ').trim();
+  if (!joined) return null;
+  return joined.length > 500 ? joined.slice(0, 500).trim() : joined;
+}
+
+function sendReplyToolDef() {
+  const tool = SCOUT_TOOLS.find(t => t.name === 'send_reply');
+  if (!tool) throw new Error('send_reply tool missing');
+  return tool;
+}
+
 function unansweredOutboundCount(history: ScoutConversationMessage[]): number {
   let count = 0;
   const startIdx =
@@ -264,6 +281,7 @@ async function skipGenerate(opts: {
 
 /**
  * Claude plans with tools. Code validates send_reply before anything can go to Linq.
+ * Reply/open turns recover if the model forgets send_reply (text leftover, then forced tool_choice).
  */
 export async function generateScoutMessage(
   profileId: string,
@@ -466,10 +484,10 @@ export async function generateScoutMessage(
         role: 'user',
         content:
           type === 'open'
-            ? 'Start the conversation. This is the first outbound.'
+            ? 'Start the conversation. This is the first outbound. Always finish by calling send_reply.'
             : type === 'followup'
               ? 'Send a short follow-up if it still makes sense. If not, do not call send_reply.'
-              : 'Reply to the member.',
+              : 'Reply to the member. Always finish by calling send_reply with the SMS text.',
       });
     } else if (type === 'followup' && anthropicMessages[anthropicMessages.length - 1].role === 'assistant') {
       anthropicMessages.push({
@@ -479,6 +497,7 @@ export async function generateScoutMessage(
     }
 
     const system = `${SCOUT_SYSTEM_PROMPT}\n\n${memberBlock}`;
+    const mustSendReply = type === 'reply' || type === 'open';
 
     try {
       for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
@@ -547,6 +566,65 @@ export async function generateScoutMessage(
         }
         anthropicMessages.push({ role: 'user', content: results });
         if (sentThisRound) break;
+      }
+
+      // Reply/open must produce SMS. Recover if the model forgot send_reply.
+      if (mustSendReply && !ctx.sendReplyMessage) {
+        const leftoverText =
+          Array.isArray(rawModelOutput) ? textFromAnthropicContent(rawModelOutput as AnthropicContent[]) : null;
+        if (leftoverText) {
+          await runTool('send_reply', { message: leftoverText });
+        }
+      }
+
+      if (mustSendReply && !ctx.sendReplyMessage) {
+        const lastMsg = anthropicMessages[anthropicMessages.length - 1];
+        if (!lastMsg || lastMsg.role === 'assistant') {
+          anthropicMessages.push({
+            role: 'user',
+            content:
+              'You did not call send_reply. Call send_reply now with a short SMS for the member (1–3 sentences, under 500 characters). No other tools.',
+          });
+        }
+        const forceRes = await fetch(ANTHROPIC_API_URL, {
+          method: 'POST',
+          headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: MAX_TOKENS,
+            system,
+            tools: [sendReplyToolDef()],
+            tool_choice: { type: 'tool', name: 'send_reply' },
+            messages: anthropicMessages,
+          }),
+        });
+
+        if (!forceRes.ok) {
+          const errText = await forceRes.text();
+          console.error('[scout/generate] forced send_reply error:', forceRes.status, errText);
+        } else {
+          const forceData = (await forceRes.json()) as {
+            content: AnthropicContent[];
+            stop_reason: string;
+          };
+          rawModelOutput = forceData.content;
+          anthropicMessages.push({ role: 'assistant', content: forceData.content });
+          const forceUses = forceData.content.filter(
+            (b): b is Extract<AnthropicContent, { type: 'tool_use' }> => b.type === 'tool_use'
+          );
+          for (const use of forceUses) {
+            if (use.name !== 'send_reply') continue;
+            await runTool(use.name, use.input || {});
+          }
+          if (!ctx.sendReplyMessage) {
+            const forcedText = textFromAnthropicContent(forceData.content);
+            if (forcedText) await runTool('send_reply', { message: forcedText });
+          }
+        }
       }
     } catch (err) {
       console.error('[scout/generate] loop error:', err);
