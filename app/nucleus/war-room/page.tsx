@@ -2439,9 +2439,279 @@ const TEMP_OPTIONS_MAP = [
   { value: 'hot', label: '🔥 Hot' }, { value: 'warm', label: '🟡 Warm' }, { value: 'cold', label: '🧊 Cold' },
 ];
 
-// ── Main Page ──────────────────────────────────────────────────────────────
-type Tab = 'crm' | 'dashboard' | 'campaigns';
+// ─── Lead Finder Tab ─────────────────────────────────────────────────────────
+
+const US_STATES_LIST = [
+  ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],
+  ['CA','California'],['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],
+  ['DC','District of Columbia'],['FL','Florida'],['GA','Georgia'],['HI','Hawaii'],
+  ['ID','Idaho'],['IL','Illinois'],['IN','Indiana'],['IA','Iowa'],
+  ['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],['ME','Maine'],
+  ['MD','Maryland'],['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],
+  ['MS','Mississippi'],['MO','Missouri'],['MT','Montana'],['NE','Nebraska'],
+  ['NV','Nevada'],['NH','New Hampshire'],['NJ','New Jersey'],['NM','New Mexico'],
+  ['NY','New York'],['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],
+  ['OK','Oklahoma'],['OR','Oregon'],['PA','Pennsylvania'],['RI','Rhode Island'],
+  ['SC','South Carolina'],['SD','South Dakota'],['TN','Tennessee'],['TX','Texas'],
+  ['UT','Utah'],['VT','Vermont'],['VA','Virginia'],['WA','Washington'],
+  ['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
+] as const;
+
+const LEAD_ORG_TYPES = [
+  { id: 'alumni',       label: 'Alumni' },
+  { id: 'fraternal',   label: 'Fraternal' },
+  { id: 'veterans',    label: 'Veterans' },
+  { id: 'professional',label: 'Professional' },
+  { id: 'club',        label: 'Club' },
+] as const;
+
+const LEAD_CATEGORY_BADGE: Record<string, { color: string; bg: string }> = {
+  'Alumni Association':               { color: '#1d4ed8', bg: '#eff6ff' },
+  'Fraternal / Social Club':          { color: '#7c3aed', bg: '#f5f3ff' },
+  'Veterans / Service Post':          { color: '#065f46', bg: '#ecfdf5' },
+  'Professional / Trade Association': { color: '#b45309', bg: '#fffbeb' },
+  'Private / Country Club':           { color: '#be185d', bg: '#fdf2f8' },
+};
+
+interface LeadResult {
+  ein: string;
+  name: string;
+  contact: string;
+  city: string;
+  state: string;
+  zip: string;
+  revenue: number;
+  ntee: string;
+  subsection: number;
+  category: string;
+  sort_name: string;
+}
+
+type LeadSortKey = 'name' | 'category' | 'city' | 'revenue' | 'contact';
+
+function fmtRevenue(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+  if (n === 0) return '—';
+  return `$${n.toLocaleString()}`;
+}
+
+function LeadFinderTab() {
+  const [stateVal, setStateVal] = useState('');
+  const [orgTypes, setOrgTypes] = useState<Set<string>>(
+    new Set(['alumni', 'fraternal', 'veterans', 'professional', 'club']),
+  );
+  const [minRevenue, setMinRevenue] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<LeadResult[] | null>(null);
+  const [filter, setFilter] = useState('');
+  const [sortKey, setSortKey] = useState<LeadSortKey>('revenue');
+  const [sortAsc, setSortAsc] = useState(false);
+
+  function toggleType(id: string) {
+    setOrgTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleSearch() {
+    if (!stateVal) return;
+    setLoading(true);
+    setError(null);
+    setResults(null);
+    try {
+      const params = new URLSearchParams({
+        state: stateVal,
+        minRevenue: minRevenue || '0',
+        orgTypes: Array.from(orgTypes).join(','),
+      });
+      const res = await fetch(`/api/lead-finder?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Search failed');
+      setResults(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = useMemo(() => {
+    if (!results) return [];
+    let list = results;
+    if (filter.trim()) {
+      const q = filter.toLowerCase();
+      list = list.filter(r =>
+        r.name.toLowerCase().includes(q) ||
+        r.city.toLowerCase().includes(q) ||
+        r.contact.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q),
+      );
+    }
+    list = [...list].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'name':     cmp = a.name.localeCompare(b.name); break;
+        case 'category': cmp = a.category.localeCompare(b.category); break;
+        case 'city':     cmp = a.city.localeCompare(b.city); break;
+        case 'revenue':  cmp = a.revenue - b.revenue; break;
+        case 'contact':  cmp = a.contact.localeCompare(b.contact); break;
+      }
+      return sortAsc ? cmp : -cmp;
+    });
+    return list;
+  }, [results, filter, sortKey, sortAsc]);
+
+  function handleSort(key: LeadSortKey) {
+    if (sortKey === key) setSortAsc(v => !v);
+    else { setSortKey(key); setSortAsc(key !== 'revenue'); }
+  }
+
+  function downloadCsv() {
+    if (!filtered.length) return;
+    const headers = ['Name','Sort Name','Category','City','State','ZIP','Revenue','Contact','EIN','NTEE'];
+    const rows = filtered.map(r => [
+      `"${r.name.replace(/"/g, '""')}"`,
+      `"${r.sort_name.replace(/"/g, '""')}"`,
+      `"${r.category}"`,
+      `"${r.city}"`,
+      r.state,
+      r.zip,
+      r.revenue,
+      `"${r.contact}"`,
+      r.ein,
+      r.ntee,
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `leads-${stateVal.toLowerCase()}-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function SortIcon({ col }: { col: LeadSortKey }) {
+    if (sortKey !== col) return <span style={{ opacity: 0.3, fontSize: '0.65rem' }}>↕</span>;
+    return <span style={{ fontSize: '0.65rem' }}>{sortAsc ? '↑' : '↓'}</span>;
+  }
+
+  const TABLE_COLS = '1fr 160px 140px 100px 140px';
+
+  const TH: React.CSSProperties = {
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.08em',
+    color: WAR_ROOM_UI.textSubtle,
+    background: WAR_ROOM_UI.surfaceMuted,
+    padding: '8px 12px',
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    textAlign: 'left' as const,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    userSelect: 'none' as const,
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Controls */}
+      <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 12, padding: '18px 20px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: WAR_ROOM_UI.textMuted }}>State</label>
+          <select value={stateVal} onChange={e => setStateVal(e.target.value)} style={{ border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 12px', fontSize: '0.875rem', background: '#fff', outline: 'none', fontFamily: 'inherit', color: WAR_ROOM_UI.textSecondary, minWidth: 160 }}>
+            <option value=''>Select state…</option>
+            {US_STATES_LIST.map(([abbr, name]) => (<option key={abbr} value={abbr}>{abbr} — {name}</option>))}
+          </select>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: WAR_ROOM_UI.textMuted }}>Org Types</label>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {LEAD_ORG_TYPES.map(({ id, label }) => {
+              const active = orgTypes.has(id);
+              return (<button key={id} type='button' onClick={() => toggleType(id)} style={{ padding: '6px 12px', borderRadius: '9999px', border: `1px solid ${active ? WAR_ROOM_UI.ink : WAR_ROOM_UI.border}`, background: active ? WAR_ROOM_UI.ink : '#fff', color: active ? '#fff' : WAR_ROOM_UI.textSecondary, fontSize: '0.8125rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>);
+            })}
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: WAR_ROOM_UI.textMuted }}>Min Revenue</label>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span style={{ position: 'absolute', left: 10, fontSize: '0.875rem', color: WAR_ROOM_UI.textMuted, pointerEvents: 'none' }}>$</span>
+            <input type='number' value={minRevenue} onChange={e => setMinRevenue(e.target.value)} placeholder='0' min={0} style={{ border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 12px 8px 22px', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', width: 130 }} />
+          </div>
+        </div>
+        <button type='button' onClick={handleSearch} disabled={!stateVal || orgTypes.size === 0 || loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 20px', borderRadius: 8, border: 'none', background: WAR_ROOM_UI.ink, color: '#fff', fontSize: '0.875rem', fontWeight: 600, cursor: !stateVal || orgTypes.size === 0 || loading ? 'not-allowed' : 'pointer', opacity: !stateVal || orgTypes.size === 0 ? 0.5 : 1, fontFamily: 'inherit' }}>
+          {loading ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Searching…</> : <><Search size={14} /> Search</>}
+        </button>
+      </div>
+
+      {error && (<div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 10, color: '#dc2626', fontSize: '0.875rem' }}><AlertCircle size={16} style={{ flexShrink: 0 }} />{error}</div>)}
+
+      {loading && (<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: WAR_ROOM_UI.textSubtle, gap: '10px' }}><RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} /><span>Downloading IRS data for {stateVal}… this may take a moment on first load.</span></div>)}
+
+      {!loading && results === null && !error && (<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 20px', color: WAR_ROOM_UI.textSubtle, gap: '12px' }}><Target size={32} color={WAR_ROOM_UI.border} /><p style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 500, color: WAR_ROOM_UI.textMuted }}>Select a state and click Search</p><p style={{ margin: 0, fontSize: '0.8125rem' }}>Searches the IRS Exempt Organizations Master File — no API key needed.</p></div>)}
+
+      {!loading && results !== null && (
+        <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', background: WAR_ROOM_UI.surfaceMuted, borderBottom: `1px solid ${WAR_ROOM_UI.border}`, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: WAR_ROOM_UI.textMuted }}>Results</p>
+              <span style={{ fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary }}>Showing {filtered.length} of {results.length}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '5px 10px', background: '#fff' }}>
+                <Search size={13} color={WAR_ROOM_UI.textMuted} />
+                <input type='text' placeholder='Filter results…' value={filter} onChange={e => setFilter(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '0.8125rem', width: 160, fontFamily: 'inherit', color: WAR_ROOM_UI.textSecondary }} />
+                {filter && (<button onClick={() => setFilter('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: WAR_ROOM_UI.textSubtle, padding: 0, display: 'flex' }}><X size={12} /></button>)}
+              </div>
+              {filtered.length > 0 && (<button type='button' onClick={downloadCsv} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 14px', borderRadius: '9999px', border: `1px solid ${WAR_ROOM_UI.border}`, background: '#fff', color: WAR_ROOM_UI.textSecondary, fontSize: '0.8125rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}><FileUp size={13} /> Download CSV</button>)}
+            </div>
+          </div>
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: WAR_ROOM_UI.textSubtle, fontSize: '0.875rem' }}>No results match your filter.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: TABLE_COLS, borderBottom: `1px solid ${WAR_ROOM_UI.border}`, minWidth: 700 }}>
+                {([{ key: 'name', label: 'Organization' }, { key: 'category', label: 'Category' }, { key: 'city', label: 'City' }, { key: 'revenue', label: 'Revenue' }, { key: 'contact', label: 'Contact' }] as { key: LeadSortKey; label: string }[]).map(col => (
+                  <button key={col.key} type='button' onClick={() => handleSort(col.key)} style={TH}>{col.label} <SortIcon col={col.key} /></button>
+                ))}
+              </div>
+              <div style={{ maxHeight: 'min(60vh, 560px)', overflowY: 'auto', minWidth: 700 }}>
+                {filtered.map((row, idx) => {
+                  const badge = LEAD_CATEGORY_BADGE[row.category] ?? { color: '#6b7280', bg: '#f3f4f6' };
+                  return (
+                    <div key={row.ein || idx} style={{ display: 'grid', gridTemplateColumns: TABLE_COLS, borderBottom: idx < filtered.length - 1 ? `1px solid ${WAR_ROOM_UI.border}` : 'none', alignItems: 'center' }}>
+                      <div style={{ padding: '10px 12px', minWidth: 0 }}>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: WAR_ROOM_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</p>
+                        {row.sort_name && row.sort_name !== row.name && (<p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: WAR_ROOM_UI.textSubtle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.sort_name}</p>)}
+                      </div>
+                      <div style={{ padding: '10px 12px' }}><span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 600, color: badge.color, background: badge.bg, whiteSpace: 'nowrap' }}>{row.category.split(' / ')[0]}</span></div>
+                      <div style={{ padding: '10px 12px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.city}</div>
+                      <div style={{ padding: '10px 12px', fontSize: '0.875rem', fontWeight: 600, color: WAR_ROOM_UI.text, fontVariantNumeric: 'tabular-nums' }}>{fmtRevenue(row.revenue)}</div>
+                      <div style={{ padding: '10px 12px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.contact || <span style={{ color: WAR_ROOM_UI.textSubtle }}>—</span>}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Page ──────────────────────────────────────────────────────────────────
+type Tab = 'crm' | 'dashboard' | 'campaigns' | 'lead_finder';
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'lead_finder', label: 'Lead Finder' },
   { id: 'crm',       label: 'CRM' },
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'campaigns', label: 'Campaigns' },
@@ -2667,6 +2937,7 @@ export default function WarRoomPage() {
           />
         )}
         {tab === 'campaigns'  && <CampaignCRM stats={stats} openDeal={openDeal} />}
+        {tab === 'lead_finder' && <LeadFinderTab />}
       </div>
 
       {/* Deal Edit Panel — slide-in from right */}
