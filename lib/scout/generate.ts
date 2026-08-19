@@ -13,8 +13,8 @@ import {
   type ScoutTurnContext,
   type StandingIntentRow,
 } from '@/lib/scout/tool-handlers';
-import { loadPrivacySettings, type ScoutRejection } from '@/lib/scout/search';
-import { introStatusLine } from '@/lib/scout/intro-status';
+import { loadPrivacySettings, hydrateIntroducibleHit, type ScoutRejection } from '@/lib/scout/search';
+import { introStatusLine, pathwayStatusLine } from '@/lib/scout/intro-status';
 import { validateOutbound, type ValidationResult } from '@/lib/scout/validate';
 import { persistTurnLog, persistSkipLog, flagInbound } from '@/lib/scout/turn-log';
 import type { SearchHitIntroducible } from '@/lib/scout/search';
@@ -24,6 +24,13 @@ import {
   hoursSinceLastInbound,
 } from '@/lib/scout/followup';
 import { enrichProfileFromPlatform, toDiscoveryProfile } from '@/lib/scout/discovery';
+import {
+  capabilitiesPromptBlock,
+  DEFAULT_CAPABILITIES,
+  loadCapabilities,
+} from '@/lib/scout/product';
+import { memberHasContactMatches } from '@/lib/scout/contacts';
+import { emitActivationEvent, personaFromStatus } from '@/lib/scout/events';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6';
@@ -178,6 +185,31 @@ async function loadOpenIntros(
   });
 }
 
+async function loadOpenPathways(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  profileId: string
+): Promise<string[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('scout_pathways')
+    .select('id, status, person:person_id(display_name)')
+    .eq('member_id', profileId)
+    .in('status', ['drafted', 'member_approved', 'member_edited'])
+    .order('updated_at', { ascending: false })
+    .limit(10);
+  if (error) {
+    console.error('[scout/generate] loadOpenPathways failed:', error.message);
+    return [];
+  }
+  return (data || []).map(row => {
+    const person = row.person as { display_name?: string } | null;
+    return pathwayStatusLine({
+      status: row.status as string,
+      name: person?.display_name || 'someone',
+    });
+  });
+}
+
 function resolveFirstIntroducible(ctx: ScoutTurnContext): string {
   if (ctx.lastSearchHitIds) {
     for (const id of ctx.lastSearchHitIds) {
@@ -223,10 +255,8 @@ async function hydrateConversationSearch(
         if (!hit.id) continue;
         allow.add(hit.id);
         if (hit.introducible && hit.name && !hits.has(hit.id)) {
-          hits.set(hit.id, {
+          hits.set(hit.id, hydrateIntroducibleHit({
             id: hit.id,
-            tier: 1,
-            introducible: true,
             name: hit.name,
             role: hit.role ?? null,
             location: hit.location ?? null,
@@ -239,7 +269,12 @@ async function hydrateConversationSearch(
             linkedin_url: hit.linkedin_url ?? null,
             reason: hit.reason || 'prior search hit',
             score: hit.score ?? 0,
-          });
+            sources: hit.sources,
+            evidence: hit.evidence,
+            suggested_channel: hit.suggested_channel,
+            space_name: hit.space_name,
+            has_contact_match: hit.has_contact_match,
+          }));
         }
       }
     }
@@ -353,6 +388,8 @@ export async function generateScoutMessage(
 
   const profile = await enrichProfileFromPlatform(toDiscoveryProfile(profileRow));
   const privacy = await loadPrivacySettings();
+  const capabilities = dryRun ? { ...DEFAULT_CAPABILITIES } : await loadCapabilities();
+  const hasContactMatches = dryRun ? false : await memberHasContactMatches(profileId);
   const dbRejections = opts.seedRejections || (await loadActiveRejections(supabase, profileId));
   const standingIntents = await loadStandingIntents(supabase, profileId, opts.seedIntents);
   const openIntros: OpenIntro[] = dryRun
@@ -363,7 +400,8 @@ export async function generateScoutMessage(
         statusLine: `${o.name} — already offered (queued).`,
       }))
     : await loadOpenIntros(supabase, profileId);
-  const introStatuses = openIntros.map(i => i.statusLine);
+  const pathwayStatuses = dryRun ? [] : await loadOpenPathways(supabase, profileId);
+  const introStatuses = [...openIntros.map(i => i.statusLine), ...pathwayStatuses];
   const alreadyOfferedNames = [...new Set(openIntros.map(i => i.name))];
   const alreadyOfferedIds = new Set(openIntros.map(i => i.id));
   const inbound = latestInboundText(history);
@@ -403,6 +441,8 @@ export async function generateScoutMessage(
     })),
     sessionOfferSuppressed: Boolean(profileRow.session_offer_suppressed),
     consecutiveDeclines: Number(profileRow.session_consecutive_declines || 0),
+    capabilitiesBlock: capabilitiesPromptBlock(capabilities),
+    hasContactMatches,
   });
 
   const ctx: ScoutTurnContext = {
@@ -438,6 +478,10 @@ export async function generateScoutMessage(
     standingIntents,
     alreadyOfferedIds,
     alreadyOfferedNames: [...alreadyOfferedNames],
+    capabilities,
+    lastDraftedPathwayId: null,
+    lastPathwayStatusLine: null,
+    draftedPathways: new Map(),
   };
 
   if (!dryRun) {
@@ -451,10 +495,13 @@ export async function generateScoutMessage(
   const runTool = async (name: string, input: Record<string, unknown>) => {
     let resolved = input;
     if (
-      (name === 'propose_intro' || name === 'get_person') &&
+      (name === 'propose_intro' || name === 'get_person' || name === 'draft_pathway') &&
       resolved.id === '$first_introducible'
     ) {
       resolved = { ...resolved, id: resolveFirstIntroducible(ctx) };
+    }
+    if (name === 'confirm_pathway' && resolved.pathway_id === '$last_pathway') {
+      resolved = { ...resolved, pathway_id: ctx.lastDraftedPathwayId || '' };
     }
     recordedCalls.push({ name, input: resolved });
     const result = await handleScoutTool(name, resolved, ctx);
@@ -642,8 +689,9 @@ export async function generateScoutMessage(
   }
 
   let candidate = ctx.sendReplyMessage;
-  if (candidate && ctx.lastProposeStatusLine && !/queued|waiting on team|have not been auto-texted/i.test(candidate)) {
-    const combined = `${candidate} ${ctx.lastProposeStatusLine}`.trim();
+  const extraStatus = ctx.lastPathwayStatusLine || ctx.lastProposeStatusLine;
+  if (candidate && extraStatus && !/queued|waiting on team|have not been auto-texted|nothing has been sent/i.test(candidate)) {
+    const combined = `${candidate} ${extraStatus}`.trim();
     if (combined.length <= 500) candidate = combined;
   }
 
@@ -671,6 +719,20 @@ export async function generateScoutMessage(
     } else {
       sent = candidate;
     }
+  }
+
+  if (sent && !dryRun) {
+    const eventType = type === 'open' || history.filter(h => h.direction === 'inbound').length <= 1
+      ? 'scout_opened'
+      : 'repeat_turn';
+    await emitActivationEvent({
+      memberId: profileId,
+      type: eventType,
+      communityId: profile.platform_chapter_id,
+      industry: profile.industry,
+      geo: profile.location,
+      persona: personaFromStatus(profile.member_status),
+    });
   }
 
   const validationPayload = validation

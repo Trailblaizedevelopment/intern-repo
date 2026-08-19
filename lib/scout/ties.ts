@@ -8,8 +8,10 @@ export interface TieFeatures {
 
 const SOURCE_COST: Record<string, number> = {
   accepted_intro: 8,
-  chapter_overlap: 5,
+  phone_match: 7,
   explicit_connection: 6,
+  chapter_overlap: 5,
+  shared_space: 5,
   event_coattendance: 5,
   conversation: 1,
 };

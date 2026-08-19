@@ -60,7 +60,7 @@ export async function notifyMemberOfApprovedIntro(
   const requesterName =
     (intro.requester as { name?: string } | null)?.name?.split(' ')[0] || 'hey';
 
-  const message = `${requesterName} — found someone who might be a fit: ${targetName}. Want me to make the intro?`;
+  const message = `${requesterName} — someone who might be a fit: ${targetName}. A teammate will reach out if you still want that intro. They have not been auto-texted.`;
 
   const ctx = await resolveScoutSendContext(requesterId);
   if (!ctx) {

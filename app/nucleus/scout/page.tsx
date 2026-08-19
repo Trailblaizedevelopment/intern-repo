@@ -22,6 +22,7 @@ interface ScoutStats {
   total_profiles: number;
   flagged_count: number;
   pending_intros: number;
+  pending_invites?: number;
   unread_count: number;
   stage_breakdown?: Record<string, number>;
 }
@@ -79,8 +80,8 @@ export default function ScoutDashboard() {
               <MessageCircle size={24} />
             </div>
             <div>
-              <h1>Scout</h1>
-              <p>AI networking assistant — manage conversations, profiles, and introductions at scale.</p>
+              <h1>Scout Ops</h1>
+              <p>Internal conversation ops — transcripts, flags, and intro queue. Not the institution activation view.</p>
             </div>
           </div>
         </div>
@@ -115,6 +116,12 @@ export default function ScoutDashboard() {
             <div className="module-stat" style={{ cursor: 'pointer' }}>
               <span className="module-stat-value" style={{ color: '#8b5cf6' }}>{stats?.pending_intros ?? 0}</span>
               <span className="module-stat-label">Pending Intros</span>
+            </div>
+          </Link>
+          <Link href="/nucleus/scout/activation" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div className="module-stat" style={{ cursor: 'pointer' }}>
+              <span className="module-stat-value" style={{ color: '#0f766e' }}>{stats?.pending_invites ?? 0}</span>
+              <span className="module-stat-label">Invite Queue</span>
             </div>
           </Link>
         </div>
@@ -165,6 +172,7 @@ export default function ScoutDashboard() {
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
             {[
+              { href: '/nucleus/scout/activation', icon: LayoutDashboard, title: 'Activation', description: 'Aggregate network activation — no transcripts or private contacts.', color: '#0f766e' },
               { href: '/nucleus/scout/conversations', icon: MessageCircle, title: 'Conversations', description: 'View and manage all Scout conversations across lines.', color: '#3b82f6' },
               { href: '/nucleus/scout/profiles', icon: Users, title: 'Member Profiles', description: 'Browse and edit member profiles, track completeness.', color: '#10b981' },
               { href: '/nucleus/scout/introductions', icon: GitPullRequest, title: 'Intro Queue', description: 'Review and approve pending introductions.', color: '#8b5cf6' },

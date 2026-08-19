@@ -2,7 +2,7 @@ export const SCOUT_TOOLS = [
   {
     name: 'search_network',
     description:
-      'Search the member chapter network. Server excludes rejected people and rejected criteria. Non-introducible hits have no name/PII. Only tier 1 (same chapter) is available; other tier_scope values are ignored.',
+      'Search the member Trailblaize community (same space/chapter). Returns pathways with source, verified evidence, and suggested action channel — not a people-search dump. Server excludes rejected people and rejected criteria. Non-introducible hits have no name/PII. Only tier 1 (same community) is available. Phone-contact matches are included only when already authorized; never ask for the address book over SMS.',
     input_schema: {
       type: 'object',
       properties: {
@@ -16,14 +16,14 @@ export const SCOUT_TOOLS = [
           items: { type: 'integer' },
           description: 'Requested tiers 1-4. Only 1 is implemented.',
         },
-        limit: { type: 'integer' },
+        limit: { type: 'integer', description: 'Max pathways. Prefer a few credible paths (default 8, max 12).' },
       },
     },
   },
   {
     name: 'get_person',
     description:
-      'Fetch details for an introducible person whose id appeared in search_network this conversation.',
+      'Fetch pathway details for an introducible person whose id appeared in search_network this conversation.',
     input_schema: {
       type: 'object',
       properties: {
@@ -33,14 +33,46 @@ export const SCOUT_TOOLS = [
     },
   },
   {
+    name: 'draft_pathway',
+    description:
+      'Store a recommended pathway (person, evidence, channel, draft). Does not contact anyone. Member must still confirm. Use after they are interested in a search hit.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Platform profile id from search_network' },
+        draft_text: { type: 'string', description: 'Short outreach draft for the member to review' },
+        channel: {
+          type: 'string',
+          description: 'Override suggested channel. Unwired channels are rejected.',
+        },
+      },
+      required: ['id', 'draft_text'],
+    },
+  },
+  {
+    name: 'confirm_pathway',
+    description:
+      'Record that the member reviewed the draft (approved, edited, or declined). For trailblaize_ops_intro, queues a teammate intro. Does not text the other person.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        pathway_id: { type: 'string' },
+        decision: { type: 'string', enum: ['approved', 'edited', 'declined'] },
+        draft_text: { type: 'string', description: 'Required when decision=edited' },
+      },
+      required: ['pathway_id', 'decision'],
+    },
+  },
+  {
     name: 'propose_intro',
     description:
-      'Queue a human-gated intro (status suggested). Does not text anyone. Rejected if the person/criterion is rejected or not introducible.',
+      'Queue a human-gated teammate intro (status suggested) AFTER confirm_pathway when the channel is trailblaize_ops_intro. Does not text anyone.',
     input_schema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Platform profile id' },
         reason: { type: 'string', description: 'Why this intro fits' },
+        pathway_id: { type: 'string', description: 'Optional pathway this intro belongs to' },
       },
       required: ['id'],
     },
@@ -138,8 +170,22 @@ export const SCOUT_TOOLS = [
   },
   {
     name: 'get_relationships',
-    description: 'List this member’s captured relationships. Does not search the platform network.',
+    description:
+      'List this member’s captured relationships from conversation. Does not search the network or dump a phone book.',
     input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'report_outcome',
+    description:
+      'Record a self-reported outcome after outreach (meeting, mentorship, referral, internship). Stores an aggregate event only — not message contents.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        pathway_id: { type: 'string' },
+        outcome: { type: 'string', enum: ['meeting', 'mentorship', 'referral', 'internship'] },
+      },
+      required: ['outcome'],
+    },
   },
   {
     name: 'reset_working_session',
@@ -150,7 +196,7 @@ export const SCOUT_TOOLS = [
   {
     name: 'send_reply',
     description:
-      'Required on every open/reply turn: the only outbound SMS candidate. Keep it short (~1–3 sentences, under 500 characters). If you do not call this, nothing is sent.',
+      'Required on every open/reply turn: conversation SMS to the member only — not outreach to a third party. Keep it short (~1–3 sentences, under 500 characters). If you do not call this, nothing is sent.',
     input_schema: {
       type: 'object',
       properties: {

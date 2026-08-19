@@ -5,9 +5,17 @@ import {
   isIntroducible,
   type ScoutPrivacySettings,
 } from '@/lib/scout/privacy';
+import {
+  evidenceSummary,
+  suggestActionChannel,
+  type ActionChannel,
+  type PathwayEvidence,
+  type PersonSource,
+} from '@/lib/scout/product';
+import { loadContactMatches, type ContactMatchRow } from '@/lib/scout/contacts';
 
 const PEER_FETCH_LIMIT = 200;
-const TOP_N = 40;
+const TOP_N = 12;
 
 const STOP_WORDS = new Set([
   'a', 'an', 'the', 'and', 'or', 'for', 'to', 'of', 'in', 'on', 'at', 'with',
@@ -73,6 +81,11 @@ export interface SearchHitIntroducible {
   linkedin_url: string | null;
   reason: string;
   score: number;
+  sources: PersonSource[];
+  evidence: PathwayEvidence[];
+  suggested_channel: ActionChannel;
+  space_name: string | null;
+  has_contact_match: boolean;
 }
 
 export interface SearchHitOpaque {
@@ -91,6 +104,7 @@ export interface SearchNetworkResult {
   skipped_tiers: number[];
   note: string;
   query_tokens: string[];
+  has_contact_matches: boolean;
 }
 
 interface PlatformPeer {
@@ -371,6 +385,130 @@ export async function resolvePlatformChapterId(
   return chapterId;
 }
 
+async function loadSpaceName(chapterId: string): Promise<string | null> {
+  const platform = getPlatformAdmin();
+  if (!platform) return null;
+  const { data, error } = await platform.from('spaces').select('name').eq('id', chapterId).maybeSingle();
+  if (error || !data) return null;
+  return typeof data.name === 'string' ? data.name : null;
+}
+
+async function loadTieBoosts(memberId: string): Promise<Map<string, number>> {
+  const supabase = getSupabaseAdmin();
+  const out = new Map<string, number>();
+  if (!supabase) return out;
+  const { data, error } = await supabase
+    .from('scout_relationships')
+    .select('tie_strength, person:person_id(platform_profile_id, matched_platform_profile_id)')
+    .eq('member_id', memberId)
+    .limit(100);
+  if (error || !data) {
+    if (error) console.error('[scout/search] tie boost load failed:', error.message);
+    return out;
+  }
+  for (const row of data) {
+    const person = row.person as {
+      platform_profile_id?: string | null;
+      matched_platform_profile_id?: string | null;
+    } | null;
+    const pid = person?.matched_platform_profile_id || person?.platform_profile_id;
+    const strength = typeof row.tie_strength === 'number' ? row.tie_strength : Number(row.tie_strength || 0);
+    if (pid && strength > 0) {
+      const prev = out.get(pid) || 0;
+      if (strength > prev) out.set(pid, strength);
+    }
+  }
+  return out;
+}
+
+function contactByPlatform(matches: ContactMatchRow[]): Map<string, ContactMatchRow> {
+  const out = new Map<string, ContactMatchRow>();
+  for (const m of matches) {
+    if (m.matched_platform_profile_id) out.set(m.matched_platform_profile_id, m);
+  }
+  return out;
+}
+
+function buildPathwayFields(opts: {
+  spaceName: string | null;
+  contact: ContactMatchRow | undefined;
+  linkedinUrl: string | null;
+  reasonBits: string;
+}): {
+  sources: PersonSource[];
+  evidence: PathwayEvidence[];
+  suggested_channel: ActionChannel;
+  reason: string;
+} {
+  const sources: PersonSource[] = ['trailblaize_community'];
+  const evidence: PathwayEvidence[] = [
+    {
+      kind: opts.spaceName ? 'shared_space' : 'shared_chapter',
+      label: opts.spaceName ? `same community (${opts.spaceName})` : 'same chapter',
+    },
+  ];
+  if (opts.reasonBits && opts.reasonBits !== 'chapter peer') {
+    evidence.push({ kind: 'member_stated', label: opts.reasonBits });
+  }
+  if (opts.contact) {
+    sources.push('phone_contact');
+    evidence.push({ kind: 'phone_match', label: 'in your contacts' });
+  }
+  if (opts.linkedinUrl) {
+    evidence.push({ kind: 'linkedin_url', label: 'LinkedIn on file' });
+  }
+  const suggested_channel = suggestActionChannel({
+    hasContactMatch: Boolean(opts.contact),
+    reachableSms: Boolean(opts.contact?.reachable_sms),
+    hasCommunityPath: true,
+    linkedinUrl: opts.linkedinUrl,
+  });
+  return {
+    sources,
+    evidence,
+    suggested_channel,
+    reason: evidenceSummary(evidence),
+  };
+}
+
+export function hydrateIntroducibleHit(
+  hit: Partial<SearchHitIntroducible> & { id: string; name: string }
+): SearchHitIntroducible {
+  const evidence = hit.evidence || [
+    { kind: 'shared_chapter', label: hit.reason || 'prior search hit' },
+  ];
+  const suggested =
+    hit.suggested_channel ||
+    suggestActionChannel({
+      hasContactMatch: Boolean(hit.has_contact_match),
+      reachableSms: false,
+      hasCommunityPath: true,
+      linkedinUrl: hit.linkedin_url ?? null,
+    });
+  return {
+    id: hit.id,
+    tier: 1,
+    introducible: true,
+    name: hit.name,
+    role: hit.role ?? null,
+    location: hit.location ?? null,
+    hometown: hit.hometown ?? null,
+    member_status: hit.member_status ?? null,
+    company: hit.company ?? null,
+    industry: hit.industry ?? null,
+    bio: hit.bio ?? null,
+    grad_year: hit.grad_year ?? null,
+    linkedin_url: hit.linkedin_url ?? null,
+    reason: hit.reason || evidenceSummary(evidence),
+    score: hit.score ?? 0,
+    sources: hit.sources || ['trailblaize_community'],
+    evidence,
+    suggested_channel: suggested,
+    space_name: hit.space_name ?? null,
+    has_contact_match: Boolean(hit.has_contact_match),
+  };
+}
+
 export async function searchNetwork(
   profile: ScoutProfileForSearch,
   input: SearchNetworkInput,
@@ -395,7 +533,8 @@ export async function searchNetwork(
     note:
       skippedTiers.length > 0
         ? 'Only chapter (tier 1) search is available. Broader network tiers are not wired.'
-        : 'No chapter matches for this query.',
+        : 'No community matches for this query.',
+    has_contact_matches: false,
   };
 
   if (profile.opt_in_status === 'opted_out') return empty;
@@ -408,6 +547,14 @@ export async function searchNetwork(
 
   const platform = getPlatformAdmin();
   if (!platform) return empty;
+
+  const [spaceName, tieBoosts, contactMatches] = await Promise.all([
+    loadSpaceName(chapterId),
+    loadTieBoosts(profile.id),
+    loadContactMatches(profile.id),
+  ]);
+  const contactsByPlatform = contactByPlatform(contactMatches);
+  const hasContactMatches = contactsByPlatform.size > 0;
 
   const { data: peers, error } = await platform
     .from('profiles')
@@ -468,7 +615,8 @@ export async function searchNetwork(
     }
 
     const { score, reason, geoHit } = scorePeer(peer, tokens, boostAlumni, geoIntent);
-    scored.push({ peer, score, reason, geoHit });
+    const tie = tieBoosts.get(peer.id) || 0;
+    scored.push({ peer, score: score + tie * 1.5, reason, geoHit });
   }
 
   scored.sort((a, b) => {
@@ -481,12 +629,19 @@ export async function searchNetwork(
   });
 
   const geoPool = geoIntent ? scored.filter(c => c.geoHit) : [];
-  const limit = Math.min(input.limit ?? TOP_N, TOP_N);
+  const limit = Math.min(input.limit ?? 8, TOP_N);
   const top = (geoIntent && geoPool.length > 0 ? geoPool : scored).slice(0, limit);
 
   const hits: SearchHit[] = [];
   for (const row of top) {
     if (isIntroducible(1, settings)) {
+      const contact = contactsByPlatform.get(row.peer.id);
+      const pathway = buildPathwayFields({
+        spaceName,
+        contact,
+        linkedinUrl: row.peer.linkedin_url,
+        reasonBits: row.reason,
+      });
       hits.push({
         id: row.peer.id,
         tier: 1,
@@ -504,8 +659,13 @@ export async function searchNetwork(
         bio: row.peer.bio ? row.peer.bio.slice(0, 200) : null,
         grad_year: row.peer.grad_year,
         linkedin_url: row.peer.linkedin_url,
-        reason: row.reason,
+        reason: pathway.reason,
         score: row.score,
+        sources: pathway.sources,
+        evidence: pathway.evidence,
+        suggested_channel: pathway.suggested_channel,
+        space_name: spaceName,
+        has_contact_match: Boolean(contact),
       });
     } else {
       hits.push({
@@ -526,12 +686,13 @@ export async function searchNetwork(
     opaque_count: opaqueHits.length,
     skipped_tiers: skippedTiers,
     query_tokens: tokens,
+    has_contact_matches: hasContactMatches,
     note:
       hits.length === 0
         ? empty.note
         : opaqueHits.length > 0 && introducibleHits.length === 0
           ? `${opaqueHits.length} people match but are not introducible. Speak in aggregates only; offer request_visibility.`
-          : `${introducibleHits.length} introducible chapter match(es).`,
+          : `${introducibleHits.length} introducible community pathway(s).${hasContactMatches ? ' Permissioned contact matches applied.' : ''}`,
   };
 }
 
@@ -541,6 +702,7 @@ export function sanitizeToolSearchResult(result: SearchNetworkResult): unknown {
       if (!h.introducible) {
         return { id: h.id, tier: h.tier, introducible: false, aggregate_eligible: true };
       }
+      const includeLinkedIn = h.suggested_channel === 'linkedin_linkout';
       return {
         id: h.id,
         tier: h.tier,
@@ -555,11 +717,18 @@ export function sanitizeToolSearchResult(result: SearchNetworkResult): unknown {
         bio: h.bio,
         grad_year: h.grad_year,
         reason: h.reason,
+        sources: h.sources,
+        evidence: h.evidence,
+        suggested_channel: h.suggested_channel,
+        space_name: h.space_name,
+        has_contact_match: h.has_contact_match,
+        ...(includeLinkedIn ? { linkedin_url: h.linkedin_url } : {}),
       };
     }),
     tier1_count: result.tier1_count,
     opaque_count: result.opaque_count,
     skipped_tiers: result.skipped_tiers,
     note: result.note,
+    has_contact_matches: result.has_contact_matches,
   };
 }

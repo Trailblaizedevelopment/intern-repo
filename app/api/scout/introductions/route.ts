@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { notifyMemberOfApprovedIntro } from '@/lib/scout/intro-notify';
+import { emitActivationEvent, personaFromStatus } from '@/lib/scout/events';
 
 const INTRO_SELECT = `
   *,
@@ -179,6 +180,29 @@ export async function PATCH(request: NextRequest) {
         { data: null, error: { message: error.message, code: error.code || 'DB_ERROR' } },
         { status: 500 }
       );
+    }
+
+    if (status === 'accepted' && data) {
+      const snap = data.platform_target_snapshot as {
+        industry?: string;
+        location?: string;
+        member_status?: string;
+      } | null;
+      const requesterId =
+        typeof data.requester_id === 'string'
+          ? data.requester_id
+          : (data.requester as { id?: string } | null)?.id;
+      if (requesterId) {
+        await emitActivationEvent({
+          memberId: requesterId,
+          type: 'intro_accepted',
+          introId: id,
+          pathwayId: (data.pathway_id as string) || null,
+          industry: snap?.industry || null,
+          geo: snap?.location || null,
+          persona: personaFromStatus(snap?.member_status),
+        });
+      }
     }
 
     let notify: { sent: boolean; reason?: string } | null = null;

@@ -1,4 +1,4 @@
-import { INTRO_CLAIM } from '@/lib/scout/intro-status';
+import { INTRO_CLAIM, LINKEDIN_SEND_CLAIM, TRAILBLAIZE_DM_CLAIM } from '@/lib/scout/intro-status';
 
 export const MAX_MESSAGE_CHARS = 500;
 
@@ -79,6 +79,8 @@ export function validateOutbound(
     if (re.test(message)) reasons.push(`reasoning:${re.source}`);
   }
   if (INTRO_CLAIM.test(message)) reasons.push('intro_claim');
+  if (LINKEDIN_SEND_CLAIM.test(message)) reasons.push('linkedin_send_claim');
+  if (TRAILBLAIZE_DM_CLAIM.test(message)) reasons.push('trailblaize_dm_claim');
 
   const inboundAllowed = nameTokens(allow.inboundNames);
   const allowed = nameTokens([...allow.introducibleNames, ...allow.inboundNames]);

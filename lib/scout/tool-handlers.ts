@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { introStatusLine } from '@/lib/scout/intro-status';
+import { introStatusLine, pathwayStatusLine } from '@/lib/scout/intro-status';
 import { computeTieStrength, type TieFeatures } from '@/lib/scout/ties';
 import {
   searchNetwork,
@@ -11,6 +11,15 @@ import {
 } from '@/lib/scout/search';
 import type { ScoutPrivacySettings } from '@/lib/scout/privacy';
 import { computeProfileComplete, toDiscoveryProfile } from '@/lib/scout/discovery';
+import {
+  ACTION_CHANNELS,
+  isChannelAvailable,
+  sourceToPeopleRow,
+  type ActionChannel,
+  type OutcomeKind,
+  type ScoutCapabilities,
+} from '@/lib/scout/product';
+import { emitActivationEvent, personaFromStatus } from '@/lib/scout/events';
 
 export interface StandingIntentRow {
   id: string;
@@ -49,6 +58,13 @@ export interface ScoutTurnContext {
   standingIntents: StandingIntentRow[];
   alreadyOfferedIds: Set<string>;
   alreadyOfferedNames: string[];
+  capabilities: ScoutCapabilities;
+  lastDraftedPathwayId: string | null;
+  lastPathwayStatusLine: string | null;
+  draftedPathways: Map<
+    string,
+    { id: string; platformProfileId: string; channel: ActionChannel; name: string }
+  >;
 }
 
 function asString(v: unknown): string | undefined {
@@ -59,6 +75,146 @@ function asStringArray(v: unknown): string[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const out = v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
   return out.length > 0 ? out : undefined;
+}
+
+function sanitizePersonHit(hit: SearchHitIntroducible): Record<string, unknown> {
+  const includeLinkedIn = hit.suggested_channel === 'linkedin_linkout';
+  return {
+    id: hit.id,
+    name: hit.name,
+    role: hit.role,
+    location: hit.location,
+    hometown: hit.hometown,
+    member_status: hit.member_status,
+    company: hit.company,
+    industry: hit.industry,
+    bio: hit.bio,
+    grad_year: hit.grad_year,
+    reason: hit.reason,
+    sources: hit.sources,
+    evidence: hit.evidence,
+    suggested_channel: hit.suggested_channel,
+    space_name: hit.space_name,
+    has_contact_match: hit.has_contact_match,
+    ...(includeLinkedIn ? { linkedin_url: hit.linkedin_url } : {}),
+  };
+}
+
+async function upsertPathwayPerson(
+  ctx: ScoutTurnContext,
+  hit: SearchHitIntroducible
+): Promise<string> {
+  if (ctx.dryRun) return `dry-run-person-${hit.id}`;
+  const source = sourceToPeopleRow(hit.sources[0] || 'trailblaize_community');
+  const { data: existing } = await ctx.supabase
+    .from('scout_people')
+    .select('id')
+    .eq('member_id', ctx.profileId)
+    .eq('platform_profile_id', hit.id)
+    .maybeSingle();
+  if (existing?.id) {
+    await ctx.supabase
+      .from('scout_people')
+      .update({
+        display_name: hit.name,
+        unresolved: false,
+        source,
+        matched_platform_profile_id: hit.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id);
+    return existing.id as string;
+  }
+  const { data, error } = await ctx.supabase
+    .from('scout_people')
+    .insert({
+      member_id: ctx.profileId,
+      platform_profile_id: hit.id,
+      display_name: hit.name,
+      unresolved: false,
+      source,
+      matched_platform_profile_id: hit.id,
+    })
+    .select('id')
+    .single();
+  if (error || !data) throw new Error(error?.message || 'person_insert_failed');
+  return data.id as string;
+}
+
+async function queueOpsIntro(
+  ctx: ScoutTurnContext,
+  hit: SearchHitIntroducible,
+  reason: string,
+  pathwayId: string | null
+): Promise<{ introId: string; status: string }> {
+  const snapshot = {
+    name: hit.name,
+    role: hit.role,
+    location: hit.location,
+    hometown: hit.hometown,
+    member_status: hit.member_status,
+    grad_year: hit.grad_year,
+    linkedin_url: hit.suggested_channel === 'linkedin_linkout' ? hit.linkedin_url : null,
+    bio: hit.bio,
+    reason,
+  };
+  let introId = 'dry-run-intro';
+  let status = 'suggested';
+  if (!ctx.dryRun) {
+    const { data: existing } = await ctx.supabase
+      .from('scout_introductions')
+      .select('id, status')
+      .eq('requester_id', ctx.profileId)
+      .eq('platform_target_id', hit.id)
+      .maybeSingle();
+    const extra: Record<string, unknown> = {
+      reason: snapshot.reason,
+      platform_target_snapshot: snapshot,
+      action_channel: 'trailblaize_ops_intro',
+      updated_at: new Date().toISOString(),
+    };
+    if (pathwayId) extra.pathway_id = pathwayId;
+    if (existing) {
+      introId = existing.id as string;
+      status = (existing.status as string) || 'suggested';
+      const locked = status === 'sent' || status === 'accepted';
+      if (!locked) {
+        await ctx.supabase
+          .from('scout_introductions')
+          .update({ ...extra, status: 'suggested' })
+          .eq('id', introId);
+        status = 'suggested';
+      }
+    } else {
+      const { data, error } = await ctx.supabase
+        .from('scout_introductions')
+        .insert({
+          requester_id: ctx.profileId,
+          target_id: null,
+          platform_target_id: hit.id,
+          platform_target_snapshot: snapshot,
+          reason: snapshot.reason,
+          status: 'suggested',
+          pathway_id: pathwayId,
+          action_channel: 'trailblaize_ops_intro',
+        })
+        .select('id, status')
+        .single();
+      if (error || !data) throw new Error(error?.message || 'intro_insert_failed');
+      introId = data.id as string;
+      status = data.status as string;
+    }
+  }
+  ctx.lastProposeIntroId = introId;
+  ctx.lastProposeStatusLine = introStatusLine({
+    status,
+    platform_target_snapshot: { name: hit.name },
+  });
+  ctx.alreadyOfferedIds.add(hit.id);
+  if (!ctx.alreadyOfferedNames.includes(hit.name)) {
+    ctx.alreadyOfferedNames.push(hit.name);
+  }
+  return { introId, status };
 }
 
 export function effectiveIntentStatus(row: {
@@ -193,7 +349,196 @@ export async function handleScoutTool(
       if (!hit || !ctx.searchAllowlist.has(id)) {
         return { error: 'not_allowlisted_or_not_introducible', status: 403 };
       }
-      return hit;
+      return sanitizePersonHit(hit);
+    }
+
+    case 'draft_pathway': {
+      const id = asString(input.id);
+      const draftText = asString(input.draft_text);
+      if (!id) return { error: 'id_required', status: 400 };
+      if (!draftText) return { error: 'draft_text_required', status: 400 };
+      const hit = ctx.introducibleHits.get(id);
+      if (!hit) return { error: 'not_introducible_or_unknown', status: 403 };
+      if (
+        ctx.rejections.some(
+          r =>
+            r.type === 'person' &&
+            (r.platform_profile_id === id || r.value.toLowerCase() === hit.name.toLowerCase())
+        )
+      ) {
+        return { error: 'person_rejected', status: 403 };
+      }
+      let channel = hit.suggested_channel;
+      const channelOverride = asString(input.channel) as ActionChannel | undefined;
+      if (channelOverride) {
+        if (!ACTION_CHANNELS.includes(channelOverride)) {
+          return { error: 'invalid_channel', status: 400 };
+        }
+        if (!isChannelAvailable(channelOverride, ctx.capabilities)) {
+          return {
+            error: 'channel_unavailable',
+            status: 403,
+            note: `${channelOverride} is not available. Do not claim it was sent.`,
+          };
+        }
+        channel = channelOverride;
+      }
+      let pathwayId = `dry-run-pathway-${id}`;
+      let personId: string | null = null;
+      if (!ctx.dryRun) {
+        try {
+          personId = await upsertPathwayPerson(ctx, hit);
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : 'person_insert_failed', status: 500 };
+        }
+        const { data, error } = await ctx.supabase
+          .from('scout_pathways')
+          .insert({
+            member_id: ctx.profileId,
+            person_id: personId,
+            platform_profile_id: hit.id,
+            sources: hit.sources,
+            evidence: hit.evidence,
+            suggested_channel: channel,
+            draft_text: draftText,
+            status: 'drafted',
+          })
+          .select('id')
+          .single();
+        if (error || !data) return { error: error?.message || 'pathway_insert_failed', status: 500 };
+        pathwayId = data.id as string;
+        await emitActivationEvent({
+          memberId: ctx.profileId,
+          type: 'pathway_drafted',
+          communityId: ctx.profile.platform_chapter_id,
+          industry: hit.industry || ctx.profile.industry,
+          geo: hit.location,
+          persona: personaFromStatus(hit.member_status),
+          pathwayId,
+        });
+      }
+      ctx.lastDraftedPathwayId = pathwayId;
+      ctx.lastPathwayStatusLine = pathwayStatusLine({ status: 'drafted', name: hit.name });
+      ctx.draftedPathways.set(pathwayId, {
+        id: pathwayId,
+        platformProfileId: hit.id,
+        channel,
+        name: hit.name,
+      });
+      return {
+        pathway_id: pathwayId,
+        status: 'drafted',
+        name: hit.name,
+        sources: hit.sources,
+        evidence: hit.evidence,
+        suggested_channel: channel,
+        status_line: ctx.lastPathwayStatusLine,
+        reminder: 'Member must review this draft. Nobody has been contacted.',
+      };
+    }
+
+    case 'confirm_pathway': {
+      const pathwayId = asString(input.pathway_id);
+      const decision = asString(input.decision);
+      if (!pathwayId || !decision) return { error: 'pathway_id_and_decision_required', status: 400 };
+      if (!['approved', 'edited', 'declined'].includes(decision)) {
+        return { error: 'invalid_decision', status: 400 };
+      }
+      const drafted = ctx.draftedPathways.get(pathwayId);
+      let platformId = drafted?.platformProfileId;
+      let channel: ActionChannel = drafted?.channel || 'trailblaize_ops_intro';
+      let name = drafted?.name || 'that person';
+      if (!ctx.dryRun) {
+        const { data: row } = await ctx.supabase
+          .from('scout_pathways')
+          .select('id, platform_profile_id, suggested_channel, chosen_channel, status')
+          .eq('id', pathwayId)
+          .eq('member_id', ctx.profileId)
+          .maybeSingle();
+        if (!row) return { error: 'pathway_not_found', status: 404 };
+        platformId = (row.platform_profile_id as string) || platformId;
+        channel = ((row.chosen_channel || row.suggested_channel) as ActionChannel) || channel;
+      }
+      if (decision === 'declined') {
+        if (!ctx.dryRun) {
+          await ctx.supabase
+            .from('scout_pathways')
+            .update({
+              status: 'declined',
+              member_reviewed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', pathwayId);
+        }
+        ctx.lastPathwayStatusLine = pathwayStatusLine({ status: 'declined', name });
+        return { ok: true, pathway_id: pathwayId, status: 'declined', status_line: ctx.lastPathwayStatusLine };
+      }
+      const editedDraft = asString(input.draft_text);
+      if (decision === 'edited' && !editedDraft) {
+        return { error: 'draft_text_required_when_edited', status: 400 };
+      }
+      const status = decision === 'edited' ? 'member_edited' : 'member_approved';
+      const patch: Record<string, unknown> = {
+        status,
+        member_reviewed_at: new Date().toISOString(),
+        chosen_channel: channel,
+        updated_at: new Date().toISOString(),
+      };
+      if (editedDraft) patch.draft_text = editedDraft;
+      if (!ctx.dryRun) {
+        await ctx.supabase.from('scout_pathways').update(patch).eq('id', pathwayId);
+      }
+      ctx.lastPathwayStatusLine = pathwayStatusLine({ status, name });
+
+      let intro: { introId: string; status: string } | null = null;
+      const hit = platformId ? ctx.introducibleHits.get(platformId) : undefined;
+      if (channel === 'trailblaize_ops_intro' && hit) {
+        try {
+          intro = await queueOpsIntro(ctx, hit, hit.reason, pathwayId);
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : 'intro_queue_failed', status: 500 };
+        }
+        if (!ctx.dryRun) {
+          await ctx.supabase
+            .from('scout_introductions')
+            .update({ member_reviewed_at: new Date().toISOString() })
+            .eq('id', intro.introId);
+          await emitActivationEvent({
+            memberId: ctx.profileId,
+            type: 'intro_requested',
+            communityId: ctx.profile.platform_chapter_id,
+            industry: hit.industry || ctx.profile.industry,
+            geo: hit.location,
+            persona: personaFromStatus(hit.member_status),
+            pathwayId,
+            introId: intro.introId,
+          });
+        }
+      } else if (!ctx.dryRun) {
+        await emitActivationEvent({
+          memberId: ctx.profileId,
+          type: 'intro_requested',
+          communityId: ctx.profile.platform_chapter_id,
+          industry: ctx.profile.industry,
+          geo: ctx.profile.location,
+          pathwayId,
+          metadata: { channel, self_send: true },
+        });
+      }
+
+      return {
+        ok: true,
+        pathway_id: pathwayId,
+        status,
+        channel,
+        intro_id: intro?.introId || null,
+        intro_status: intro?.status || null,
+        status_line: ctx.lastPathwayStatusLine,
+        reminder:
+          channel === 'trailblaize_ops_intro'
+            ? 'Teammate intro queued. The other person has not been texted.'
+            : 'Member-owned channel recorded. Scout did not send to the other person.',
+      };
     }
 
     case 'propose_intro': {
@@ -206,77 +551,23 @@ export async function handleScoutTool(
       if (ctx.rejections.some(r => r.type === 'person' && (r.platform_profile_id === id || r.value.toLowerCase() === hit.name.toLowerCase()))) {
         return { error: 'person_rejected', status: 403 };
       }
-      const snapshot = {
-        name: hit.name,
-        role: hit.role,
-        location: hit.location,
-        hometown: hit.hometown,
-        member_status: hit.member_status,
-        grad_year: hit.grad_year,
-        linkedin_url: hit.linkedin_url,
-        bio: hit.bio,
-        reason: asString(input.reason) || hit.reason,
-      };
-      let introId = 'dry-run-intro';
-      let status = 'suggested';
-      if (!ctx.dryRun) {
-        const { data: existing } = await ctx.supabase
-          .from('scout_introductions')
-          .select('id, status')
-          .eq('requester_id', ctx.profileId)
-          .eq('platform_target_id', id)
-          .maybeSingle();
-        if (existing) {
-          introId = existing.id as string;
-          status = (existing.status as string) || 'suggested';
-          const locked = status === 'sent' || status === 'accepted';
-          if (!locked) {
-            await ctx.supabase
-              .from('scout_introductions')
-              .update({
-                reason: snapshot.reason,
-                platform_target_snapshot: snapshot,
-                status: 'suggested',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', introId);
-            status = 'suggested';
-          }
-        } else {
-          const { data, error } = await ctx.supabase
-            .from('scout_introductions')
-            .insert({
-              requester_id: ctx.profileId,
-              target_id: null,
-              platform_target_id: id,
-              platform_target_snapshot: snapshot,
-              reason: snapshot.reason,
-              status: 'suggested',
-            })
-            .select('id, status')
-            .single();
-          if (error || !data) {
-            return { error: error?.message || 'intro_insert_failed', status: 500 };
-          }
-          introId = data.id as string;
-          status = data.status as string;
-        }
+      const pathwayId = asString(input.pathway_id) || ctx.lastDraftedPathwayId;
+      try {
+        const queued = await queueOpsIntro(
+          ctx,
+          hit,
+          asString(input.reason) || hit.reason,
+          pathwayId
+        );
+        return {
+          intro_id: queued.introId,
+          status: queued.status,
+          status_line: ctx.lastProposeStatusLine,
+          name: hit.name,
+        };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : 'intro_insert_failed', status: 500 };
       }
-      ctx.lastProposeIntroId = introId;
-      ctx.lastProposeStatusLine = introStatusLine({
-        status,
-        platform_target_snapshot: { name: hit.name },
-      });
-      ctx.alreadyOfferedIds.add(id);
-      if (!ctx.alreadyOfferedNames.includes(hit.name)) {
-        ctx.alreadyOfferedNames.push(hit.name);
-      }
-      return {
-        intro_id: introId,
-        status,
-        status_line: ctx.lastProposeStatusLine,
-        name: hit.name,
-      };
     }
 
     case 'request_visibility': {
@@ -451,14 +742,15 @@ export async function handleScoutTool(
       if (!displayName) return { error: 'display_name_required', status: 400 };
       const platformId = asString(input.platform_profile_id) || null;
       const unresolved = !platformId;
+      const source = platformId ? 'community' : 'member_mentioned';
       const features: TieFeatures = {
-        same_chapter: false,
+        same_chapter: Boolean(platformId),
         year_overlap: false,
         accepted_intro: false,
         recency_days: 0,
         independent_source_count: 1,
       };
-      const tieSources = ['conversation'];
+      const tieSources = platformId ? ['shared_space', 'conversation'] : ['conversation'];
       const strength = computeTieStrength(features, tieSources);
 
       let personId = `dry-run-person-${Date.now()}`;
@@ -480,6 +772,8 @@ export async function handleScoutTool(
             .update({
               display_name: displayName,
               unresolved,
+              source,
+              matched_platform_profile_id: platformId,
               notes: asString(input.notes) || null,
               updated_at: new Date().toISOString(),
             })
@@ -492,6 +786,8 @@ export async function handleScoutTool(
               platform_profile_id: platformId,
               display_name: displayName,
               unresolved,
+              source,
+              matched_platform_profile_id: platformId,
               notes: asString(input.notes) || null,
             })
             .select('id')
@@ -521,6 +817,8 @@ export async function handleScoutTool(
         person_id: personId,
         unresolved,
         display_name: displayName,
+        source,
+        evidence: platformId ? ['shared_space', 'member_stated'] : ['member_stated'],
         do_not_introduce: unresolved,
       };
     }
@@ -530,11 +828,37 @@ export async function handleScoutTool(
       const { data } = await ctx.supabase
         .from('scout_relationships')
         .select(
-          'id, how_they_know_each_other, last_context, open_thread, tie_features, tie_strength, person:person_id(id, display_name, unresolved, platform_profile_id)'
+          'id, how_they_know_each_other, last_context, open_thread, tie_features, tie_strength, person:person_id(id, display_name, unresolved, platform_profile_id, source)'
         )
         .eq('member_id', ctx.profileId)
         .limit(50);
-      return { relationships: data || [] };
+      const relationships = (data || []).filter(row => {
+        const person = row.person as { source?: string; unresolved?: boolean } | null;
+        if (!person) return false;
+        if (person.source === 'phone_contact' && person.unresolved) return false;
+        return true;
+      });
+      return { relationships, note: 'Conversation relationships only. Address book is never listed.' };
+    }
+
+    case 'report_outcome': {
+      const outcome = asString(input.outcome) as OutcomeKind | undefined;
+      if (!outcome || !['meeting', 'mentorship', 'referral', 'internship'].includes(outcome)) {
+        return { error: 'invalid_outcome', status: 400 };
+      }
+      const pathwayId = asString(input.pathway_id) || ctx.lastDraftedPathwayId;
+      if (!ctx.dryRun) {
+        await emitActivationEvent({
+          memberId: ctx.profileId,
+          type: 'outcome_reported',
+          communityId: ctx.profile.platform_chapter_id,
+          industry: ctx.profile.industry,
+          geo: ctx.profile.location,
+          pathwayId,
+          outcome,
+        });
+      }
+      return { ok: true, outcome, pathway_id: pathwayId || null };
     }
 
     case 'reset_working_session': {

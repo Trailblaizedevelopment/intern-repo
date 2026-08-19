@@ -82,6 +82,11 @@ export async function GET() {
       .select('*', { count: 'exact', head: true })
       .in('status', ['suggested', 'pending_approval']);
 
+    const { count: pendingInvites } = await supabase
+      .from('scout_invite_suggestions')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
     // Unread count
     const { count: unreadCount } = await supabase
       .from('scout_conversations')
@@ -98,6 +103,7 @@ export async function GET() {
       total_profiles: totalProfiles ?? 0,
       flagged_count: flaggedCount ?? 0,
       pending_intros: pendingIntros ?? 0,
+      pending_invites: pendingInvites ?? 0,
       unread_count: unreadCount ?? 0,
     };
 
