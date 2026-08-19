@@ -13,6 +13,9 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 
+// Extend Vercel function timeout to 60s (Pro) — IRS CSV downloads can be large
+export const maxDuration = 60;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BmfRow {
@@ -249,7 +252,7 @@ async function getBmfData(state: string): Promise<BmfRow[]> {
   const response = await fetch(url, {
     headers: { 'User-Agent': 'Trailblaize/1.0' },
     // 60 second timeout via AbortController
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(55_000),
   });
 
   if (!response.ok) {
@@ -305,12 +308,7 @@ export async function GET(req: NextRequest) {
     const results: LeadResult[] = [];
 
     for (const row of rows) {
-      // Skip inactive orgs (STATUS != '1' means revoked/not active)
-      // BMF STATUS field: '1' = unconditional exemption, '2' = conditional, etc.
-      // We include both 1 and 2 as valid active orgs
-      const status = (row.STATUS ?? '').trim();
-      if (status && status !== '1' && status !== '2') continue;
-
+      // The IRS BMF already only contains currently exempt orgs — no status filter needed.
       const name = (row.NAME ?? '').trim();
       if (!name) continue;
 
