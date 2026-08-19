@@ -2490,16 +2490,14 @@ interface LeadResult {
 interface EnrichedData {
   website?: string;
   phone?: string;
+  email?: string;
   linkedin?: string;
   description?: string;
-  employees?: string;
-  founded?: string;
   propublica_url?: string;
   address?: string;
   total_assets?: number;
   total_revenue?: number;
-  tax_period?: string;
-  filing_year?: string;
+  filing_year?: number;
 }
 
 type LeadSortKey = 'name' | 'category' | 'city' | 'revenue' | 'contact';
@@ -2764,18 +2762,18 @@ function LeadFinderTab() {
                               {/* Left: contact info */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 220 }}>
                                 {data.website && (
-                                  <a href={data.website} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#1d4ed8', textDecoration: 'none', fontWeight: 500 }}>
+                                  <a href={data.website.startsWith('http') ? data.website : `https://${data.website}`} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#1d4ed8', textDecoration: 'none', fontWeight: 500 }}>
                                     <Link2 size={13} /> {data.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
                                   </a>
                                 )}
-                                {data.linkedin && (
-                                  <a href={data.linkedin} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#0a66c2', textDecoration: 'none', fontWeight: 500 }}>
-                                    <ExternalLink size={13} /> LinkedIn
+                                {data.email && (
+                                  <a href={`mailto:${data.email}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#059669', textDecoration: 'none', fontWeight: 500 }}>
+                                    <Mail size={13} /> {data.email}
                                   </a>
                                 )}
-                                {data.propublica_url && (
-                                  <a href={data.propublica_url} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#7c3aed', textDecoration: 'none', fontWeight: 500 }}>
-                                    <ExternalLink size={13} /> ProPublica 990
+                                {data.linkedin && (
+                                  <a href={data.linkedin.startsWith('http') ? data.linkedin : `https://${data.linkedin}`} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#0a66c2', textDecoration: 'none', fontWeight: 500 }}>
+                                    <ExternalLink size={13} /> LinkedIn
                                   </a>
                                 )}
                                 {data.phone && (
@@ -2787,6 +2785,11 @@ function LeadFinderTab() {
                                   <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSubtle }}>
                                     <MapPin size={13} style={{ marginTop: 2, flexShrink: 0 }} /> {data.address}
                                   </span>
+                                )}
+                                {data.propublica_url && (
+                                  <a href={data.propublica_url} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#7c3aed', textDecoration: 'none', fontWeight: 500 }}>
+                                    <ExternalLink size={13} /> ProPublica 990
+                                  </a>
                                 )}
                               </div>
 
@@ -2802,18 +2805,6 @@ function LeadFinderTab() {
                                   <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
                                     <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: WAR_ROOM_UI.textMuted }}>Assets</p>
                                     <p style={{ margin: '4px 0 0', fontSize: '0.9375rem', fontWeight: 700, color: WAR_ROOM_UI.text }}>{fmtRevenue(data.total_assets)}</p>
-                                  </div>
-                                )}
-                                {data.employees && (
-                                  <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
-                                    <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: WAR_ROOM_UI.textMuted }}>Employees</p>
-                                    <p style={{ margin: '4px 0 0', fontSize: '0.9375rem', fontWeight: 700, color: WAR_ROOM_UI.text }}>{data.employees}</p>
-                                  </div>
-                                )}
-                                {data.founded && (
-                                  <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
-                                    <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: WAR_ROOM_UI.textMuted }}>Founded</p>
-                                    <p style={{ margin: '4px 0 0', fontSize: '0.9375rem', fontWeight: 700, color: WAR_ROOM_UI.text }}>{data.founded}</p>
                                   </div>
                                 )}
                                 {data.filing_year && (
