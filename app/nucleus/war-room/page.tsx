@@ -2487,6 +2487,21 @@ interface LeadResult {
   sort_name: string;
 }
 
+interface EnrichedData {
+  website?: string;
+  phone?: string;
+  linkedin?: string;
+  description?: string;
+  employees?: string;
+  founded?: string;
+  propublica_url?: string;
+  address?: string;
+  total_assets?: number;
+  total_revenue?: number;
+  tax_period?: string;
+  filing_year?: string;
+}
+
 type LeadSortKey = 'name' | 'category' | 'city' | 'revenue' | 'contact';
 
 function fmtRevenue(n: number): string {
@@ -2508,6 +2523,29 @@ function LeadFinderTab() {
   const [filter, setFilter] = useState('');
   const [sortKey, setSortKey] = useState<LeadSortKey>('revenue');
   const [sortAsc, setSortAsc] = useState(false);
+  const [enriched, setEnriched] = useState<Record<string, EnrichedData | 'loading' | 'error'>>({});
+  const [expandedEin, setExpandedEin] = useState<string | null>(null);
+
+  async function handleEnrich(row: LeadResult) {
+    const key = row.ein || row.name;
+    if (enriched[key] && enriched[key] !== 'error') {
+      setExpandedEin(expandedEin === key ? null : key);
+      return;
+    }
+    setEnriched(prev => ({ ...prev, [key]: 'loading' }));
+    setExpandedEin(key);
+    try {
+      const params = new URLSearchParams({
+        ein: row.ein, name: row.name, city: row.city, state: row.state,
+      });
+      const res = await fetch(`/api/lead-finder/enrich?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Enrichment failed');
+      setEnriched(prev => ({ ...prev, [key]: data as EnrichedData }));
+    } catch {
+      setEnriched(prev => ({ ...prev, [key]: 'error' }));
+    }
+  }
 
   function toggleType(id: string) {
     setOrgTypes(prev => {
@@ -2600,7 +2638,7 @@ function LeadFinderTab() {
     return <span style={{ fontSize: '0.65rem' }}>{sortAsc ? '↑' : '↓'}</span>;
   }
 
-  const TABLE_COLS = '1fr 160px 140px 100px 140px';
+  const TABLE_COLS = '1fr 160px 130px 90px 130px 90px';
 
   const TH: React.CSSProperties = {
     fontSize: '0.6875rem',
@@ -2682,21 +2720,121 @@ function LeadFinderTab() {
                 {([{ key: 'name', label: 'Organization' }, { key: 'category', label: 'Category' }, { key: 'city', label: 'City' }, { key: 'revenue', label: 'Revenue' }, { key: 'contact', label: 'Contact' }] as { key: LeadSortKey; label: string }[]).map(col => (
                   <button key={col.key} type='button' onClick={() => handleSort(col.key)} style={TH}>{col.label} <SortIcon col={col.key} /></button>
                 ))}
+                <div style={TH}>Enrich</div>
               </div>
               <div style={{ maxHeight: 'min(60vh, 560px)', overflowY: 'auto', minWidth: 700 }}>
                 {filtered.map((row, idx) => {
                   const badge = LEAD_CATEGORY_BADGE[row.category] ?? { color: '#6b7280', bg: '#f3f4f6' };
+                  const key = row.ein || row.name;
+                  const enrichState = enriched[key];
+                  const isExpanded = expandedEin === key;
+                  const isLoading = enrichState === 'loading';
+                  const hasData = enrichState && enrichState !== 'loading' && enrichState !== 'error';
+                  const data = hasData ? enrichState as EnrichedData : null;
                   return (
-                    <div key={row.ein || idx} style={{ display: 'grid', gridTemplateColumns: TABLE_COLS, borderBottom: idx < filtered.length - 1 ? `1px solid ${WAR_ROOM_UI.border}` : 'none', alignItems: 'center' }}>
-                      <div style={{ padding: '10px 12px', minWidth: 0 }}>
-                        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: WAR_ROOM_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</p>
-                        {row.sort_name && row.sort_name !== row.name && (<p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: WAR_ROOM_UI.textSubtle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.sort_name}</p>)}
+                    <React.Fragment key={row.ein || idx}>
+                      <div style={{ display: 'grid', gridTemplateColumns: TABLE_COLS, borderBottom: (!isExpanded && idx < filtered.length - 1) ? `1px solid ${WAR_ROOM_UI.border}` : 'none', alignItems: 'center', background: isExpanded ? '#fafafa' : '#fff' }}>
+                        <div style={{ padding: '10px 12px', minWidth: 0 }}>
+                          <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: WAR_ROOM_UI.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</p>
+                          {row.sort_name && row.sort_name !== row.name && (<p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: WAR_ROOM_UI.textSubtle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.sort_name}</p>)}
+                        </div>
+                        <div style={{ padding: '10px 12px' }}><span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 600, color: badge.color, background: badge.bg, whiteSpace: 'nowrap' }}>{row.category.split(' / ')[0]}</span></div>
+                        <div style={{ padding: '10px 12px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.city}</div>
+                        <div style={{ padding: '10px 12px', fontSize: '0.875rem', fontWeight: 600, color: WAR_ROOM_UI.text, fontVariantNumeric: 'tabular-nums' }}>{fmtRevenue(row.revenue)}</div>
+                        <div style={{ padding: '10px 12px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.contact || <span style={{ color: WAR_ROOM_UI.textSubtle }}>—</span>}</div>
+                        <div style={{ padding: '8px 12px' }}>
+                          <button
+                            type='button'
+                            onClick={() => handleEnrich(row)}
+                            disabled={isLoading}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', border: `1px solid ${isExpanded && hasData ? WAR_ROOM_UI.ink : WAR_ROOM_UI.border}`, background: isExpanded && hasData ? WAR_ROOM_UI.ink : '#fff', color: isExpanded && hasData ? '#fff' : WAR_ROOM_UI.textSecondary, fontSize: '0.75rem', fontWeight: 600, cursor: isLoading ? 'wait' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                          >
+                            {isLoading ? <><RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> Loading…</> : isExpanded && hasData ? <><ChevronUp size={11} /> Hide</> : <><Zap size={11} /> Enrich</>}
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ padding: '10px 12px' }}><span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 600, color: badge.color, background: badge.bg, whiteSpace: 'nowrap' }}>{row.category.split(' / ')[0]}</span></div>
-                      <div style={{ padding: '10px 12px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.city}</div>
-                      <div style={{ padding: '10px 12px', fontSize: '0.875rem', fontWeight: 600, color: WAR_ROOM_UI.text, fontVariantNumeric: 'tabular-nums' }}>{fmtRevenue(row.revenue)}</div>
-                      <div style={{ padding: '10px 12px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.contact || <span style={{ color: WAR_ROOM_UI.textSubtle }}>—</span>}</div>
-                    </div>
+
+                      {/* Enriched data panel */}
+                      {isExpanded && enrichState !== 'loading' && (
+                        <div style={{ borderBottom: idx < filtered.length - 1 ? `1px solid ${WAR_ROOM_UI.border}` : 'none', background: '#f8fafc', padding: '14px 16px' }}>
+                          {enrichState === 'error' ? (
+                            <p style={{ margin: 0, fontSize: '0.8125rem', color: '#dc2626' }}>Enrichment failed. Try again.</p>
+                          ) : data ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start' }}>
+                              {/* Left: contact info */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 220 }}>
+                                {data.website && (
+                                  <a href={data.website} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#1d4ed8', textDecoration: 'none', fontWeight: 500 }}>
+                                    <Link2 size={13} /> {data.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                                  </a>
+                                )}
+                                {data.linkedin && (
+                                  <a href={data.linkedin} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#0a66c2', textDecoration: 'none', fontWeight: 500 }}>
+                                    <ExternalLink size={13} /> LinkedIn
+                                  </a>
+                                )}
+                                {data.propublica_url && (
+                                  <a href={data.propublica_url} target='_blank' rel='noopener noreferrer' style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#7c3aed', textDecoration: 'none', fontWeight: 500 }}>
+                                    <ExternalLink size={13} /> ProPublica 990
+                                  </a>
+                                )}
+                                {data.phone && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary }}>
+                                    <Phone size={13} /> {data.phone}
+                                  </span>
+                                )}
+                                {data.address && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSubtle }}>
+                                    <MapPin size={13} style={{ marginTop: 2, flexShrink: 0 }} /> {data.address}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Right: org stats */}
+                              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                {data.total_revenue !== undefined && (
+                                  <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
+                                    <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: WAR_ROOM_UI.textMuted }}>Revenue</p>
+                                    <p style={{ margin: '4px 0 0', fontSize: '0.9375rem', fontWeight: 700, color: WAR_ROOM_UI.text }}>{fmtRevenue(data.total_revenue)}</p>
+                                  </div>
+                                )}
+                                {data.total_assets !== undefined && (
+                                  <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
+                                    <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: WAR_ROOM_UI.textMuted }}>Assets</p>
+                                    <p style={{ margin: '4px 0 0', fontSize: '0.9375rem', fontWeight: 700, color: WAR_ROOM_UI.text }}>{fmtRevenue(data.total_assets)}</p>
+                                  </div>
+                                )}
+                                {data.employees && (
+                                  <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
+                                    <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: WAR_ROOM_UI.textMuted }}>Employees</p>
+                                    <p style={{ margin: '4px 0 0', fontSize: '0.9375rem', fontWeight: 700, color: WAR_ROOM_UI.text }}>{data.employees}</p>
+                                  </div>
+                                )}
+                                {data.founded && (
+                                  <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
+                                    <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: WAR_ROOM_UI.textMuted }}>Founded</p>
+                                    <p style={{ margin: '4px 0 0', fontSize: '0.9375rem', fontWeight: 700, color: WAR_ROOM_UI.text }}>{data.founded}</p>
+                                  </div>
+                                )}
+                                {data.filing_year && (
+                                  <div style={{ background: '#fff', border: `1px solid ${WAR_ROOM_UI.border}`, borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
+                                    <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: WAR_ROOM_UI.textMuted }}>Filed</p>
+                                    <p style={{ margin: '4px 0 0', fontSize: '0.9375rem', fontWeight: 700, color: WAR_ROOM_UI.text }}>{data.filing_year}</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Description */}
+                              {data.description && (
+                                <p style={{ margin: 0, flex: '1 1 100%', fontSize: '0.8125rem', color: WAR_ROOM_UI.textSecondary, lineHeight: 1.55, maxWidth: 600 }}>
+                                  {data.description}
+                                </p>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </div>
