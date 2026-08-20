@@ -958,6 +958,13 @@ export interface AlumniContact {
   linkedin_url: string | null;
   location_city: string | null;
   signed_up_at: string | null;
+  // AI enrichment fields (Perplexity Sonar — /api/alumni/enrich)
+  pplx_title: string | null;
+  pplx_company: string | null;
+  pplx_location: string | null;
+  pplx_confidence: string | null;
+  pplx_notes: string | null;
+  pplx_enriched_at: string | null;
   created_at: string;
   updated_at: string;
 }

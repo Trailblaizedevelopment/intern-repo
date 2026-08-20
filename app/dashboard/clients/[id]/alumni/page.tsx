@@ -7,7 +7,7 @@ import {
   ArrowLeft, Upload, Download, Search, X, Trash2, ChevronLeft, ChevronRight,
   Users, Phone, Mail, UserCheck, FileSpreadsheet, AlertCircle, CheckCircle2,
   ChevronDown, Filter, Send, Zap, MessageSquare, RefreshCw, MessageCircle,
-  Activity,
+  Activity, Sparkles,
 } from 'lucide-react';
 import {
   AlumniContact,
@@ -468,6 +468,14 @@ export default function AlumniPage() {
   const [activityItems, setActivityItems] = useState<AlumniContact[]>([]);
   const [exportingCSV, setExportingCSV] = useState(false);
 
+  // AI Enrichment
+  const [showEnrichModal, setShowEnrichModal] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<{
+    enriched: number; not_found: number; errors: number;
+    total_processed: number; remaining: number; all_done: boolean;
+  } | null>(null);
+
   const limit = 25;
   const totalPages = Math.ceil(total / limit);
 
@@ -550,6 +558,32 @@ export default function AlumniPage() {
   }, [activityOpen, fetchActivity]);
 
   // ── Actions ──
+
+  async function handleEnrich() {
+    setEnriching(true);
+    setEnrichResult(null);
+    try {
+      const res = await fetch('/api/alumni/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapter_id: chapterId, limit: 25 }),
+      });
+      const json = await res.json();
+      if (json.data) {
+        setEnrichResult(json.data);
+        fetchContacts();
+        fetchStats();
+      } else {
+        showToast(json.error || 'Enrichment failed', 'error');
+        setShowEnrichModal(false);
+      }
+    } catch {
+      showToast('Network error during enrichment', 'error');
+      setShowEnrichModal(false);
+    } finally {
+      setEnriching(false);
+    }
+  }
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {
     setToast({ message, type });
@@ -920,6 +954,15 @@ export default function AlumniPage() {
                   </>
                 )}
                 {selected.size === 0 && <button className="module-filter-btn" onClick={exportCSV} disabled={contacts.length === 0 || exportingCSV}><Download size={16} /> {exportingCSV ? 'Exporting...' : 'Export CSV'}</button>}
+                <button
+                  className="module-filter-btn"
+                  onClick={() => { setEnrichResult(null); setShowEnrichModal(true); }}
+                  disabled={total === 0}
+                  title="Enrich alumni careers with Perplexity AI — finds current job, company & location"
+                  style={{ color: '#7c3aed', borderColor: '#c4b5fd' }}
+                >
+                  <Sparkles size={15} /> Enrich AI
+                </button>
                 <button className="module-primary-btn" onClick={() => setShowImportModal(true)}><Upload size={18} /> Import CSV</button>
               </div>
             </div>
@@ -949,16 +992,27 @@ export default function AlumniPage() {
                       {contacts.map(contact => (
                         <tr key={contact.id} style={{ background: selected.has(contact.id) ? '#f0f4ff' : undefined }}>
                           <td><input type="checkbox" checked={selected.has(contact.id)} onChange={() => toggleSelect(contact.id)} /></td>
-                          <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
-                            {contact.first_name} {contact.last_name}
-                            {contact.platform_user_id && (
-                              <span style={{
-                                marginLeft: '6px', display: 'inline-flex', alignItems: 'center',
-                                padding: '1px 5px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700,
-                                color: '#15803d', background: '#dcfce7', verticalAlign: 'middle',
-                              }}>
-                                ✓ On Platform
-                              </span>
+                          <td style={{ fontWeight: 500 }}>
+                            <div style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {contact.first_name} {contact.last_name}
+                              {contact.pplx_confidence && contact.pplx_confidence !== 'not_found' && contact.pplx_confidence !== 'error' && (
+                                <span title={`AI enriched (${contact.pplx_confidence} confidence)`} style={{ display: 'inline-flex' }}><Sparkles size={10} style={{ color: '#8b5cf6', flexShrink: 0 }} /></span>
+                              )}
+                              {contact.platform_user_id && (
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center',
+                                  padding: '1px 5px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700,
+                                  color: '#15803d', background: '#dcfce7',
+                                }}>
+                                  ✓ On Platform
+                                </span>
+                              )}
+                            </div>
+                            {contact.pplx_company && (
+                              <div style={{ fontSize: '0.68rem', color: '#6b7280', fontWeight: 400, marginTop: '2px', lineHeight: 1.3, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {contact.pplx_title ? `${contact.pplx_title} @ ${contact.pplx_company}` : contact.pplx_company}
+                                {contact.pplx_location && ` · ${contact.pplx_location}`}
+                              </div>
                             )}
                           </td>
                           <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>{formatPhone(contact.phone_primary)}</td>
@@ -1292,6 +1346,95 @@ export default function AlumniPage() {
               {!sendResult && (
                 <button className="module-primary-btn" onClick={handleSendBatch} disabled={sending || (sendTouch <= 2 && (!sendSchool || !sendFraternity)) || (sendTouch === 2 && !sendSignupLink)}>
                   {sending ? 'Sending...' : `Send Touch ${sendTouch}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* AI Enrichment Modal */}
+      {showEnrichModal && (
+        <ModalOverlay className="module-modal-overlay" onClose={() => { if (!enriching) setShowEnrichModal(false); }}>
+          <div className="module-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="module-modal-header">
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={20} style={{ color: '#8b5cf6' }} /> AI Career Enrichment
+              </h2>
+              <button className="module-modal-close" onClick={() => { if (!enriching) setShowEnrichModal(false); }} disabled={enriching}><X size={20} /></button>
+            </div>
+            <div className="module-modal-body">
+              {!enrichResult && !enriching && (
+                <div>
+                  <p style={{ color: '#374151', marginBottom: '12px', lineHeight: 1.6 }}>
+                    Searches the web with Perplexity AI to find each alumnus&apos;s current job title, company, and location — automatically, no manual lookup needed.
+                  </p>
+                  <div style={{ padding: '12px 16px', background: '#f5f3ff', borderRadius: '8px', border: '1px solid #ede9fe', fontSize: '0.8125rem', color: '#5b21b6', marginBottom: '16px', lineHeight: 1.5 }}>
+                    <strong>Context used:</strong> name + grad year + {chapter?.fraternity || 'chapter'} + {chapter?.school || 'school'}<br />
+                    <strong>Output:</strong> job title, company, city/state<br />
+                    <strong>Rate:</strong> ~25 contacts per run · ~$0.03 each
+                  </div>
+                  <p style={{ fontSize: '0.8125rem', color: '#6b7280' }}>
+                    Processes up to 25 unenriched contacts. Run again to continue with the rest.
+                    Results appear inline under each name in the table.
+                  </p>
+                </div>
+              )}
+              {enriching && (
+                <div style={{ textAlign: 'center', padding: '40px 24px' }}>
+                  <Sparkles size={36} style={{ color: '#8b5cf6', marginBottom: '16px' }} />
+                  <p style={{ fontWeight: 600, color: '#374151', marginBottom: '8px', fontSize: '1rem' }}>Enriching alumni data...</p>
+                  <p style={{ fontSize: '0.8125rem', color: '#6b7280' }}>
+                    Searching the web for each alumnus. Takes about 30 seconds for 25 contacts.
+                  </p>
+                </div>
+              )}
+              {enrichResult && (
+                <div>
+                  <div style={{ textAlign: 'center', padding: '8px 0 20px' }}>
+                    <div style={{ fontSize: '1.75rem', marginBottom: '8px' }}>✅</div>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#374151' }}>Batch Complete</h3>
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '4px' }}>Processed {enrichResult.total_processed} contacts</p>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ textAlign: 'center', padding: '14px 8px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+                      <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#16a34a' }}>{enrichResult.enriched}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '2px' }}>Found ✅</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '14px 8px', background: '#fef3c7', borderRadius: '10px', border: '1px solid #fde68a' }}>
+                      <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#d97706' }}>{enrichResult.not_found}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '2px' }}>Not Found</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '14px 8px', background: '#fee2e2', borderRadius: '10px', border: '1px solid #fecaca' }}>
+                      <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#dc2626' }}>{enrichResult.errors}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '2px' }}>Errors ⚠️</div>
+                    </div>
+                  </div>
+                  {enrichResult.remaining > 0 && (
+                    <div style={{ padding: '12px 16px', background: '#f5f3ff', borderRadius: '8px', border: '1px solid #ede9fe', fontSize: '0.875rem', color: '#5b21b6', textAlign: 'center', marginBottom: '8px' }}>
+                      <strong>{enrichResult.remaining}</strong> contacts still unenriched — click &ldquo;Run Again&rdquo; to continue.
+                    </div>
+                  )}
+                  {enrichResult.all_done && (
+                    <div style={{ padding: '12px 16px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', fontSize: '0.875rem', color: '#166534', textAlign: 'center' }}>
+                      🎉 All contacts have been enriched!
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="module-modal-footer">
+              <button className="module-cancel-btn" onClick={() => setShowEnrichModal(false)} disabled={enriching}>
+                {enrichResult ? 'Close' : 'Cancel'}
+              </button>
+              {!enriching && !enrichResult && (
+                <button className="module-primary-btn" onClick={handleEnrich}>
+                  <Sparkles size={16} /> Run Enrichment
+                </button>
+              )}
+              {!enriching && enrichResult && enrichResult.remaining > 0 && (
+                <button className="module-primary-btn" onClick={handleEnrich}>
+                  <Sparkles size={16} /> Run Again ({enrichResult.remaining} left)
                 </button>
               )}
             </div>
